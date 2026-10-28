@@ -5,7 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { api, useApi, type MediaItem, type PlaylistDetail } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
-type Slide = { key: string; mediaId: string; fileName: string; url: string | null; seconds: string };
+type Slide = {
+  key: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl: string | null;
+  kind: "image" | "video"; mediaDurationMs: number | null; seconds: string;
+};
 
 export default function PlaylistEditor() {
   const params = useParams<{ id: string }>();
@@ -33,6 +36,9 @@ export default function PlaylistEditor() {
       mediaId: item.mediaId,
       fileName: item.fileName,
       url: item.url,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      kind: item.kind === "video" ? "video" : "image",
+      mediaDurationMs: item.mediaDurationMs ?? null,
       seconds: item.durationMs == null ? "" : String(Math.round(item.durationMs / 1000)),
     })));
     const next: Record<string, boolean> = {};
@@ -46,9 +52,13 @@ export default function PlaylistEditor() {
     () => slides.filter((slide) => slide.url).map((slide) => ({
       url: slide.url as string,
       fileName: slide.fileName,
-      durationMs: slide.seconds.trim() === "" || !Number.isFinite(Number(slide.seconds))
-        ? (Number.isFinite(defaultMs) && defaultMs >= 1000 ? defaultMs : 10000)
-        : Math.round(Number(slide.seconds) * 1000),
+      kind: slide.kind,
+      thumbnailUrl: slide.thumbnailUrl,
+      durationMs: slide.kind === "video"
+        ? (slide.mediaDurationMs && slide.mediaDurationMs >= 500 ? slide.mediaDurationMs : 5000)
+        : slide.seconds.trim() === "" || !Number.isFinite(Number(slide.seconds))
+          ? (Number.isFinite(defaultMs) && defaultMs >= 1000 ? defaultMs : 10000)
+          : Math.round(Number(slide.seconds) * 1000),
     })),
     [slides, defaultMs],
   );
@@ -56,7 +66,7 @@ export default function PlaylistEditor() {
   function payload() {
     const items = slides.map((slide) => ({
       mediaId: slide.mediaId,
-      durationMs: slide.seconds.trim() === "" ? null : Math.round(Number(slide.seconds) * 1000),
+      durationMs: slide.kind === "video" || slide.seconds.trim() === "" ? null : Math.round(Number(slide.seconds) * 1000),
     }));
     return {
       name: name.trim(),
@@ -102,7 +112,7 @@ export default function PlaylistEditor() {
 
   async function publish() {
     const displayIds = Object.entries(chosen).filter(([, on]) => on).map(([displayId]) => displayId);
-    if (!slides.length) return toast.show("Add at least one image.", true);
+    if (!slides.length) return toast.show("Add at least one image or video.", true);
     if (!displayIds.length) return toast.show("Choose at least one TV.", true);
     const saved = await save();
     if (!saved) return;
@@ -179,16 +189,23 @@ export default function PlaylistEditor() {
               <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>Add images</button>
             </div>
             {slides.length === 0 ? (
-              <p className="text-sm text-muted">No images yet. Add some from your library.</p>
+              <p className="text-sm text-muted">Nothing in this playlist yet. Add images or videos from your library.</p>
             ) : (
               <ol className="grid gap-3">
                 {slides.map((slide, index) => (
                   <li key={slide.key} className="rounded-lg bg-white border border-line p-3 grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
                     <span className="block aspect-video bg-black rounded-md overflow-hidden">
-                      {slide.url && <img src={slide.url} alt="" className="size-full object-contain" />}
+                      {slide.kind === "video" ? (
+                        <video poster={slide.thumbnailUrl || undefined} src={slide.url || undefined} muted playsInline preload="none" className="size-full object-contain" />
+                      ) : (
+                        slide.url && <img src={slide.url} alt="" className="size-full object-contain" />
+                      )}
                     </span>
                     <div className="min-w-0">
                       <p className="font-medium truncate">{index + 1}. {slide.fileName}</p>
+                      {slide.kind === "video" ? (
+                        <p className="mt-2 text-sm text-muted">Plays until the end{slide.mediaDurationMs ? ` (${Math.round(slide.mediaDurationMs / 1000)}s)` : ""}.</p>
+                      ) : (
                       <label className="mt-2 grid gap-1">
                         <span className="text-xs text-muted">Seconds (blank uses the default)</span>
                         <input className="field" type="number" min={1} max={600} inputMode="numeric"
@@ -196,6 +213,7 @@ export default function PlaylistEditor() {
                           value={slide.seconds}
                           onChange={(e) => setSlides(slides.map((row, i) => i === index ? { ...row, seconds: e.target.value } : row))} />
                       </label>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</button>
                         <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} down`} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>Down</button>
@@ -254,11 +272,12 @@ export default function PlaylistEditor() {
   );
 }
 
-function Preview({ slides, transition }: { slides: { url: string; fileName: string; durationMs: number }[]; transition: "none" | "fade" }) {
+function Preview({ slides, transition }: { slides: { url: string; fileName: string; durationMs: number; kind: "image" | "video"; thumbnailUrl: string | null }[]; transition: "none" | "fade" }) {
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [slides]);
   useEffect(() => {
     if (slides.length < 2) return;
+    if (slides[index]?.kind === "video") return;
     const ms = Math.max(1000, slides[index]?.durationMs || 10000);
     const timer = window.setTimeout(() => setIndex((current) => (current + 1) % slides.length), ms);
     return () => window.clearTimeout(timer);
@@ -269,8 +288,20 @@ function Preview({ slides, transition }: { slides: { url: string; fileName: stri
       <h2 className="font-semibold mb-2">Preview</h2>
       <div className="relative aspect-video bg-black rounded-md overflow-hidden border border-ink">
         {slides.length === 0 ? (
-          <p className="absolute inset-0 grid place-items-center text-sm text-white/70 px-4 text-center">Add images to preview the loop.</p>
-        ) : slides.map((slide, i) => (
+          <p className="absolute inset-0 grid place-items-center text-sm text-white/70 px-4 text-center">Add images or videos to preview the loop.</p>
+        ) : slides.map((slide, i) => slide.kind === "video" ? (
+          <video key={`${slide.url}-${i}`} src={i === index ? slide.url : undefined} poster={slide.thumbnailUrl || undefined}
+            muted playsInline autoPlay={i === index} preload={i === index ? "auto" : "none"}
+            onEnded={(event) => {
+              if (slides.length < 2) {
+                event.currentTarget.currentTime = 0;
+                void event.currentTarget.play();
+                return;
+              }
+              setIndex((current) => (current + 1) % slides.length);
+            }}
+            className={`absolute inset-0 size-full object-contain ${i === index ? "opacity-100" : "opacity-0"}`} />
+        ) : (
           <img key={`${slide.url}-${i}`} src={slide.url} alt={i === index ? `Preview slide ${i + 1} of ${slides.length}, ${slide.fileName}` : ""}
             className={`absolute inset-0 size-full object-contain motion-reduce:transition-none ${transition === "fade" ? "transition-opacity duration-700" : ""} ${i === index ? "opacity-100" : "opacity-0"}`} />
         ))}
@@ -303,7 +334,11 @@ function AddImages({ existing, onClose, onAdd }: {
               <li key={item.id}>
                 <label className="block">
                   <span className="block aspect-video bg-black rounded-md overflow-hidden">
-                    {item.url && <img src={item.url} alt="" className="size-full object-contain" />}
+                    {item.kind === "video" ? (
+                      item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">Video</span>
+                    ) : (
+                      item.url && <img src={item.url} alt="" className="size-full object-contain" />
+                    )}
                   </span>
                   <span className="mt-1 flex items-center gap-2 text-sm">
                     <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]}
@@ -322,6 +357,9 @@ function AddImages({ existing, onClose, onAdd }: {
             mediaId: item.id,
             fileName: item.fileName,
             url: item.url,
+            thumbnailUrl: item.thumbnailUrl ?? null,
+            kind: item.kind === "video" ? "video" : "image",
+            mediaDurationMs: item.durationMs ?? null,
             seconds: "",
           })));
         }}>Add selected</button>

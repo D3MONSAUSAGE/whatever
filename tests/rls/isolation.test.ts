@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync as readFixture } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, describe, expect, it } from "vitest";
+import { removeCreatedTestUsers } from "../helpers/account-cleanup";
 import { jpeg } from "../helpers/bytes";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -16,21 +18,23 @@ const localUrl = (() => {
 })();
 const configured = (url.startsWith("https://") || localUrl) && anon.length > 20 && service.length > 20 && !anon.includes("your-");
 
+const videoMigrationAbsent = process.env.PANTALLA_VIDEO_MIGRATION === "absent";
+
 if (!configured) {
   console.log(
     "RLS tests skipped. Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY (migration 0001_init.sql must already be applied).",
   );
+} else if (videoMigrationAbsent) {
+  console.log("RLS video/thumbnail test skipped: PANTALLA_VIDEO_MIGRATION=absent (0003_video.sql is not applied).");
 }
 
 describe.skipIf(!configured)("RLS account isolation", () => {
   let admin: SupabaseClient | null = null;
   const createdUsers: string[] = [];
-  let storagePath = "";
 
   afterAll(async () => {
     if (!admin) return;
-    if (storagePath) await admin.storage.from("media").remove([storagePath]);
-    for (const id of createdUsers) await admin.auth.admin.deleteUser(id);
+    await removeCreatedTestUsers(admin, createdUsers);
   });
 
   it("keeps accounts, tokens, storage, and server functions apart", async () => {
@@ -46,7 +50,7 @@ describe.skipIf(!configured)("RLS account isolation", () => {
     expect(accountA).not.toBe(accountB);
 
     const mediaId = randomUUID();
-    storagePath = `${accountA}/${mediaId}.jpg`;
+    const storagePath = `${accountA}/${mediaId}.jpg`;
     const bytes = jpeg(8, 8);
     const { error: uploadError } = await admin.storage.from("media").upload(storagePath, bytes, { contentType: "image/jpeg" });
     expect(uploadError).toBeNull();
@@ -196,6 +200,62 @@ describe.skipIf(!configured)("RLS account isolation", () => {
     const userHit = await userA.client.rpc("rate_limit_hit", { p_key: key, p_window_seconds: 60, p_max: 5 });
     expect(userHit.error).toBeTruthy();
   }, 90_000);
+
+  // Set PANTALLA_VIDEO_MIGRATION=absent only when 0003_video.sql is intentionally not applied.
+  // Otherwise a missing kind column or a bucket that rejects video/mp4 fails this test.
+  it.skipIf(videoMigrationAbsent)(
+    "isolates video files and thumbnails from the other account",
+    async () => {
+      admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+      const password = `${randomUUID()}Aa1!`;
+      const emailA = `pantalla-rls-${randomUUID()}@mailinator.com`;
+      const emailB = `pantalla-rls-${randomUUID()}@mailinator.com`;
+      const userA = await makeUser(admin, emailA, password, createdUsers);
+      const userB = await makeUser(admin, emailB, password, createdUsers);
+      const accountA = await ensure(admin, userA.id, "Cafe A video");
+      const accountB = await ensure(admin, userB.id, "Cafe B video");
+      expect(accountA).not.toBe(accountB);
+
+      const videoId = randomUUID();
+      const videoPath = `${accountA}/${videoId}.mp4`;
+      const thumbPath = `${accountA}/${videoId}-thumb.jpg`;
+      const mp4 = new Uint8Array(readFixture(new URL("../fixtures/h264-aac.mp4", import.meta.url)));
+      const videoUp = await admin.storage.from("media").upload(videoPath, mp4, { contentType: "video/mp4", upsert: false });
+      expect(videoUp.error, videoUp.error?.message || "bucket rejected video/mp4; apply 0003_video.sql or set PANTALLA_VIDEO_MIGRATION=absent").toBeNull();
+      const thumbUp = await admin.storage.from("media").upload(thumbPath, jpeg(8, 8), { contentType: "image/jpeg", upsert: false });
+      expect(thumbUp.error, thumbUp.error?.message || "thumbnail upload failed").toBeNull();
+      const inserted = await admin.from("media").insert({
+        id: videoId,
+        account_id: accountA,
+        file_name: "secret-loop.mp4",
+        storage_path: videoPath,
+        mime_type: "video/mp4",
+        size_bytes: mp4.length,
+        kind: "video",
+        duration_ms: 1000,
+        width: 160,
+        height: 120,
+        thumbnail_path: thumbPath,
+      });
+      expect(inserted.error, inserted.error?.message || "media.kind insert failed; apply 0003_video.sql or set PANTALLA_VIDEO_MIGRATION=absent").toBeNull();
+
+      const ownVideo = await userA.client.from("media").select("id, file_name, thumbnail_path").eq("id", videoId);
+      expect(ownVideo.data?.map((row) => row.id)).toContain(videoId);
+      const otherVideo = await userB.client.from("media").select("id, file_name, thumbnail_path");
+      const otherJson = JSON.stringify(otherVideo.data ?? []);
+      expect(otherJson).not.toContain(videoId);
+      expect(otherJson).not.toContain("secret-loop.mp4");
+      expect(otherJson).not.toContain(thumbPath);
+      expect(otherJson).not.toContain(videoPath);
+      expect((await userB.client.storage.from("media").download(videoPath)).data).toBeNull();
+      expect((await userB.client.storage.from("media").download(thumbPath)).data).toBeNull();
+      expect((await userA.client.storage.from("media").download(videoPath)).data).toBeNull();
+      expect((await userA.client.storage.from("media").download(thumbPath)).data).toBeNull();
+      const signedThumb = await admin.storage.from("media").createSignedUrl(thumbPath, 60);
+      expect(signedThumb.data?.signedUrl).toMatch(/^https?:\/\//);
+    },
+    90_000,
+  );
 });
 
 async function makeUser(admin: SupabaseClient, email: string, password: string, created: string[]) {

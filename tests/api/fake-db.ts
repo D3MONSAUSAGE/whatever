@@ -107,6 +107,9 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     this.op.order = { col, ascending: opts?.ascending !== false };
     return this;
   }
+  limit(_count: number) {
+    return this;
+  }
   single() {
     this.op.mode = "single";
     return this;
@@ -240,8 +243,9 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     }];
   }
   if (name === "assign_media") {
-    if (args.p_media_id != null && !store.media.some((item) => item.id === args.p_media_id && item.account_id === args.p_account_id)) {
-      return false;
+    if (args.p_media_id != null) {
+      const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+      if (!media || media.kind === "video") return false;
     }
     const display = store.displays.find((item) =>
       item.id === args.p_display_id && item.account_id === args.p_account_id && item.status === "active");
@@ -271,6 +275,14 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
   if (name === "publish_playlist") return publishPlaylist(store, args);
   if (name === "delete_playlist") return deletePlaylist(store, args);
   if (name === "player_playlist") return playerPlaylist(store, args);
+  if (name === "report_player_error") {
+    const display = store.displays.find((item) => item.token_hash === args.p_token_hash && item.status === "active");
+    if (!display) return false;
+    const message = String(args.p_error ?? "").trim();
+    display.player_error = message ? message.slice(0, 180) : null;
+    display.player_error_at = message ? new Date().toISOString() : null;
+    return true;
+  }
   throw new Error(`Unknown rpc ${name}`);
 }
 
@@ -378,6 +390,10 @@ function playerPlaylist(store: Store, args: Record<string, unknown>) {
         media_id: item.media_id,
         storage_path: media?.storage_path ?? null,
         duration_ms: item.duration_ms,
+        kind: media?.kind === "video" ? "video" : "image",
+        width: media?.width ?? null,
+        height: media?.height ?? null,
+        media_duration_ms: media?.duration_ms ?? null,
       };
     });
 }
@@ -418,10 +434,27 @@ export function createFakeDb() {
     storage: {
       from() {
         return {
-          async upload(path: string, body: Uint8Array) {
+          async upload(path: string, body: Uint8Array | Blob) {
             if (store.objects.has(path)) return { data: null, error: { message: "already exists" } };
-            store.objects.set(path, new Uint8Array(body));
+            const bytes = body instanceof Uint8Array ? body : new Uint8Array(await body.arrayBuffer());
+            store.objects.set(path, Uint8Array.from(bytes));
             return { data: { path }, error: null };
+          },
+          async download(path: string) {
+            const bytes = store.objects.get(path);
+            if (!bytes) return { data: null, error: { message: "not found" } };
+            return { data: new Blob([Uint8Array.from(bytes)]), error: null };
+          },
+          async createSignedUploadUrl(path: string) {
+            const token = "upload-token";
+            return {
+              data: {
+                signedUrl: `https://signed.test/upload/${encodeURIComponent(path)}?token=${token}`,
+                path,
+                token,
+              },
+              error: null,
+            };
           },
           async remove(paths: string[]) {
             for (const path of paths) store.objects.delete(path);

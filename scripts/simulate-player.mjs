@@ -10,16 +10,90 @@ const clearTimeout_ = (id) => { timers = timers.filter((t) => t.id !== id); };
 const els = {};
 for (const id of ["a", "b", "pair", "empty", "connecting", "code", "status"])
   els[id] = { id, className: id === "status" ? "status" : id.length === 1 ? "layer" : "screen", style: {}, innerHTML: "" };
+function makeVideo(id) {
+  const el = {
+    id,
+    className: "stage",
+    style: {},
+    innerHTML: "",
+    muted: true,
+    paused: true,
+    currentTime: 0,
+    duration: 0,
+    videoWidth: 320,
+    videoHeight: 180,
+    preload: "auto",
+    _src: "",
+    _attrs: {},
+    onplaying: null,
+    onended: null,
+    onerror: null,
+    ontimeupdate: null,
+    setAttribute(name, value) { this._attrs[name] = String(value); },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(this._attrs, name) ? this._attrs[name] : null; },
+    removeAttribute(name) {
+      delete this._attrs[name];
+      if (name === "src") this._src = "";
+    },
+    load() {},
+    pause() { this.paused = true; },
+    play() {
+      const src = this._src;
+      this.paused = false;
+      return {
+        then: (ok, bad) => {
+          setTimeout_(() => {
+            if (!src || src.indexOf("bad") !== -1 || src.indexOf("unsupported") !== -1) {
+              if (this.onerror) this.onerror();
+              if (bad) bad();
+              return;
+            }
+            if (src.indexOf("blocked") !== -1) {
+              if (bad) bad();
+              return;
+            }
+            if (src.indexOf("stall") !== -1) return;
+            this.currentTime = 0.2;
+            if (this.onplaying) this.onplaying();
+            if (ok) ok();
+            if (src.indexOf("freeze") !== -1) {
+              this.currentTime = 0.1;
+              if (this.ontimeupdate) this.ontimeupdate();
+              return;
+            }
+            setTimeout_(() => { if (this.onended) this.onended(); }, this.duration || 3000);
+          }, 300);
+        },
+      };
+    },
+  };
+  Object.defineProperty(el, "src", {
+    get() { return el._src; },
+    set(value) {
+      el._src = value || "";
+      if (!value) return;
+      const match = /dur=(\d+)/.exec(value);
+      el.duration = match ? Number(match[1]) : 3000;
+      el.videoWidth = 320;
+      el.videoHeight = 180;
+    },
+  });
+  return el;
+}
+els.va = makeVideo("va");
+els.vb = makeVideo("vb");
 const storage = {};
 const listeners = {};
 const window_ = {
+  innerWidth: 1280,
+  innerHeight: 720,
   localStorage: { getItem: (k) => storage[k] ?? null, setItem: (k, v) => (storage[k] = v), removeItem: (k) => delete storage[k] },
   addEventListener: (e, f) => (listeners[e] = f),
 };
 const document_ = { getElementById: (id) => els[id], documentElement: {}, addEventListener() {}, removeEventListener() {} };
 
 // fake server
-const S = { online: true, sessions: {}, token: null, version: 0, url: null, playlist: null, revoked: false, stateCalls: 0 };
+const S = { online: true, sessions: {}, token: null, version: 0, url: null, playlist: null, revoked: false, stateCalls: 0, playerError: "", playerErrorPosts: 0 };
 function server(method, url, body, headers) {
   if (!S.online) return [0, ""];
   if (url === "/api/player/pair") { S.sessions.s1 = { status: "pending" }; return [200, { sessionId: "s1", code: "123456", secret: "x".repeat(40) }]; }
@@ -27,6 +101,11 @@ function server(method, url, body, headers) {
     const s = S.sessions[body.sessionId];
     if (s?.status === "claimed") { s.status = "done"; S.token = "tok".repeat(10); return [200, { status: "paired", token: S.token }]; }
     return [200, { status: s ? "pending" : "expired" }];
+  }
+  if (url.startsWith("/api/player/state") && method === "POST") {
+    S.playerErrorPosts++;
+    S.playerError = body && body.error ? String(body.error) : "";
+    return [200, { ok: true }];
   }
   if (url.startsWith("/api/player/state")) {
     S.stateCalls++;
@@ -63,10 +142,15 @@ class Img { set src(u) { setTimeout_(() => (u.includes("bad") ? this.onerror() :
 new Function("window", "document", "XMLHttpRequest", "Image", "setTimeout", "clearTimeout", "localStorage", js)(
   window_, document_, XHR, Img, setTimeout_, clearTimeout_, window_.localStorage);
 
-const visible = () => ["a", "b"].filter((k) => els[k].className.includes("on"));
+const visible = () => ["a", "b", "va", "vb"].filter((k) => els[k] && els[k].className.includes("on"));
 const screen = () => ["pair", "empty", "connecting"].find((k) => els[k].className.includes("on")) || "image";
-const shownUrl = () => { const l = visible().sort((x, y) => (els[y].style.zIndex || 0) - (els[x].style.zIndex || 0))[0]; return l ? els[l].style.backgroundImage : null; };
-let mustShowImage = false, blankFrames = 0, slideLog = null;
+const shownUrl = () => { const l = ["a", "b"].filter((k) => els[k].className.includes("on")).sort((x, y) => (els[y].style.zIndex || 0) - (els[x].style.zIndex || 0))[0]; return l ? els[l].style.backgroundImage : null; };
+const shownVideo = () => {
+  const ids = ["va", "vb"].filter((k) => els[k].className.includes("on"));
+  ids.sort((x, y) => (Number(els[y].style.zIndex) || 0) - (Number(els[x].style.zIndex) || 0));
+  return ids.length ? els[ids[0]].src : "";
+};
+let mustShowImage = false, blankFrames = 0, slideLog = null, mediaLog = null, timedLog = null;
 function run(ms) {
   const end = now + ms;
   while (true) {
@@ -79,9 +163,21 @@ function run(ms) {
       const url = shownUrl() || "";
       if (url && url !== slideLog[slideLog.length - 1]) slideLog.push(url);
     }
+    if (mediaLog) {
+      const current = shownVideo() || shownUrl() || "";
+      if (current && current !== mediaLog[mediaLog.length - 1]) mediaLog.push(current);
+    }
+    if (timedLog) {
+      const name = clipName(shownVideo() || shownUrl() || "");
+      if (name && (!timedLog.length || timedLog[timedLog.length - 1].name !== name)) timedLog.push({ name, at: now });
+    }
   }
   now = end;
 }
+const clipName = (url) => {
+  const match = /\/([A-Za-z0-9_-]+)\.(?:jpg|mp4)/.exec(url || "");
+  return match ? match[1] : "";
+};
 let pass = 0, failN = 0;
 function check(name, ok) {
   console.log((ok ? "✓ " : "✗ ") + name);
@@ -144,6 +240,7 @@ S.playlist = {
 slideLog = [];
 run(60000);
 check("playlist plays in order and loops", slideLog.map((url) => url.replace(/.*\/(\w+)\.jpg.*/, "$1")).slice(0, 4).join(",") === "a,b,c,a");
+check("image-only playlist does not open a video", els.va.className.indexOf("on") === -1 && els.vb.className.indexOf("on") === -1);
 mustShowImage = true;
 blankFrames = 0;
 run(20000);
@@ -180,6 +277,147 @@ run(12000);
 check("single image replaces the playlist and holds", single.indexOf("img9") !== -1 && shownUrl() === single);
 mustShowImage = false;
 slideLog = null;
+
+S.version = 10;
+S.url = null;
+S.playlist = {
+  id: "videos",
+  transition: "none",
+  items: [
+    { mediaId: "v1", url: "https://cdn/v1.mp4?dur=3000", durationMs: 10000, kind: "video" },
+    { mediaId: "v2", url: "https://cdn/v2.mp4?dur=3000", durationMs: 10000, kind: "video" },
+  ],
+};
+mediaLog = [];
+run(20000);
+check("video-only playlist plays each clip then loops", mediaLog.map(clipName).join(",").indexOf("v1,v2,v1,v2") !== -1);
+mustShowImage = true;
+blankFrames = 0;
+run(8000);
+check("video loop does not go blank between clips", blankFrames === 0 && shownVideo().indexOf(".mp4") !== -1);
+mustShowImage = false;
+
+S.version = 11;
+S.playlist = {
+  id: "mixed",
+  transition: "none",
+  items: [
+    { mediaId: "a", url: "https://cdn/a.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "v1", url: "https://cdn/v1.mp4?dur=2000", durationMs: 9000, kind: "video" },
+    { mediaId: "c", url: "https://cdn/c.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+mediaLog = [];
+run(15000);
+check("mixed playlist plays image, video, image, then loops", mediaLog.map(clipName).join(",").indexOf("a,v1,c,a") !== -1);
+
+S.version = 11.5;
+S.playlist = {
+  id: "mixed-bad",
+  transition: "none",
+  items: [
+    { mediaId: "a", url: "https://cdn/a.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "bad", url: "https://cdn/bad.mp4", durationMs: 2000, kind: "video" },
+    { mediaId: "c", url: "https://cdn/c.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+run(8000);
+timedLog = [];
+mustShowImage = true;
+blankFrames = 0;
+run(12000);
+{
+  const names = timedLog.map((entry) => entry.name).join(",");
+  const gaps = timedLog.slice(1).map((entry, i) => entry.at - timedLog[i].at);
+  const held = gaps.slice(1);
+  check("broken video is skipped and the images keep alternating", names.indexOf("a,c,a,c") !== -1 && names.indexOf("bad") === -1);
+  check("broken video does not hold the previous image past its duration", held.length >= 2 && held.every((gap) => gap >= 1500 && gap <= 3500));
+  check("broken video never leaves the screen blank", blankFrames === 0 && shownUrl() && shownUrl().indexOf(".jpg") !== -1);
+  check("known-bad video is not loaded into a video element", !els.va.src && !els.vb.src && els.va.className.indexOf("on") === -1 && els.vb.className.indexOf("on") === -1);
+}
+mustShowImage = false;
+timedLog = null;
+
+S.version = 12;
+S.playerError = "";
+S.playlist = {
+  id: "bad-video",
+  transition: "none",
+  items: [
+    { mediaId: "vbad", url: "https://cdn/bad.mp4?dur=4000", durationMs: 5000, kind: "video" },
+    { mediaId: "a", url: "https://cdn/a.jpg", durationMs: 4000, kind: "image" },
+  ],
+};
+run(15000);
+check("unsupported video is reported and the next image stays up", S.playerError.indexOf("can't play") !== -1 && (shownUrl() || "").indexOf("a.jpg") !== -1 && S.playerErrorPosts > 0);
+
+S.version = 13;
+S.playerError = "";
+S.playlist = {
+  id: "blocked",
+  transition: "none",
+  items: [
+    { mediaId: "bk", url: "https://cdn/blocked.mp4", durationMs: 5000, kind: "video" },
+    { mediaId: "c", url: "https://cdn/c.jpg", durationMs: 3000, kind: "image" },
+  ],
+};
+run(15000);
+check("blocked autoplay skips to the next item", S.playerError.indexOf("autoplay") !== -1 && (shownUrl() || "").indexOf("c.jpg") !== -1);
+
+S.version = 14;
+S.playerError = "";
+S.playlist = {
+  id: "stall",
+  transition: "none",
+  items: [
+    { mediaId: "st", url: "https://cdn/stall.mp4", durationMs: 5000, kind: "video" },
+    { mediaId: "c", url: "https://cdn/c.jpg", durationMs: 3000, kind: "image" },
+  ],
+};
+run(40000);
+check("a video that never starts skips after the timeout", S.playerError.indexOf("did not start") !== -1 && (shownUrl() || "").indexOf("c.jpg") !== -1);
+
+S.version = 15;
+S.playerError = "";
+S.playlist = {
+  id: "freeze",
+  transition: "none",
+  items: [
+    { mediaId: "fr", url: "https://cdn/freeze.mp4?dur=30000", durationMs: 5000, kind: "video" },
+    { mediaId: "a", url: "https://cdn/a.jpg", durationMs: 4000, kind: "image" },
+  ],
+};
+mediaLog = [];
+run(35000);
+check("a stalled video skips to the next item", S.playerError.indexOf("stalled") !== -1 && mediaLog.map(clipName).join(",").indexOf("freeze,a") !== -1);
+
+S.version = 16;
+S.playlist = {
+  id: "drop",
+  transition: "none",
+  items: [
+    { mediaId: "v1", url: "https://cdn/v1.mp4?dur=8000", durationMs: 10000, kind: "video" },
+    { mediaId: "v2", url: "https://cdn/v2.mp4?dur=8000", durationMs: 10000, kind: "video" },
+  ],
+};
+run(15000);
+S.online = false;
+mustShowImage = true;
+blankFrames = 0;
+run(15000);
+check("connection loss keeps the video on screen", blankFrames === 0 && shownVideo().indexOf(".mp4") !== -1 && screen() === "image" && els.status.className.indexOf("on") !== -1);
+S.online = true;
+run(8000);
+check("playback continues after the connection returns", shownVideo().indexOf(".mp4") !== -1 && els.status.className.indexOf("on") === -1);
+mustShowImage = false;
+
+S.version = 17;
+S.playlist = null;
+S.url = "https://cdn/still.jpg";
+run(15000);
+const still = shownUrl() || "";
+run(6000);
+check("a single image replaces the video playlist and holds", still.indexOf("still.jpg") !== -1 && shownUrl() === still && shownVideo() === "");
 
 S.revoked = true;
 run(12000);

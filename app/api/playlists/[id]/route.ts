@@ -9,6 +9,14 @@ import { fail, json, readJson } from "@/lib/server/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
+type MediaRef = {
+  id: string;
+  file_name: string;
+  storage_path: string;
+  kind?: string | null;
+  duration_ms?: number | null;
+  thumbnail_path?: string | null;
+};
 
 export async function GET(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
@@ -38,18 +46,29 @@ export async function GET(req: Request, { params }: Ctx) {
   if (itemError) return fail("Couldn't load the playlist.", 500);
 
   const mediaIds = [...new Set((itemRows ?? []).map((item) => item.media_id))];
-  const mediaById = new Map<string, { file_name: string; storage_path: string }>();
+  const mediaById = new Map<string, MediaRef>();
   if (mediaIds.length) {
-    const { data: mediaRows, error: mediaError } = await db()
+    const rich = await db()
       .from("media")
-      .select("id, file_name, storage_path")
+      .select("id, file_name, storage_path, kind, duration_ms, thumbnail_path")
       .eq("account_id", admin.accountId)
       .in("id", mediaIds);
+    let mediaRows = rich.data as MediaRef[] | null;
+    let mediaError = rich.error;
+    if (mediaError && isMissingSchema(mediaError)) {
+      const plain = await db()
+        .from("media")
+        .select("id, file_name, storage_path")
+        .eq("account_id", admin.accountId)
+        .in("id", mediaIds);
+      mediaRows = plain.data as MediaRef[] | null;
+      mediaError = plain.error;
+    }
     if (mediaError) return fail("Couldn't load the playlist.", 500);
     for (const media of mediaRows ?? []) mediaById.set(media.id, media);
   }
   const urls = new Map<string, string>();
-  const paths = [...new Set([...mediaById.values()].map((media) => media.storage_path))];
+  const paths = [...new Set([...mediaById.values()].flatMap((media) => [media.storage_path, media.thumbnail_path].filter(Boolean)))] as string[];
   if (paths.length) {
     const { data: signed } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
     signed?.forEach((item) => item.path && item.signedUrl && urls.set(item.path, item.signedUrl));
@@ -82,6 +101,9 @@ export async function GET(req: Request, { params }: Ctx) {
         mediaId: item.media_id,
         fileName: media?.file_name ?? "Image",
         url: media ? urls.get(media.storage_path) ?? null : null,
+        thumbnailUrl: media?.thumbnail_path ? urls.get(media.thumbnail_path) ?? null : null,
+        kind: media?.kind === "video" ? "video" : "image",
+        mediaDurationMs: media?.duration_ms ?? null,
         durationMs: item.duration_ms,
         position: item.position,
       };
