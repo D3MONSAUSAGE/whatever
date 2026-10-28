@@ -41,6 +41,7 @@ export default function Displays() {
               <p className="text-sm text-muted truncate">
                 {d.media ? `Showing ${d.media.fileName}` : d.playlist ? `Showing playlist ${d.playlist.name}` : "Nothing published yet"}
               </p>
+              {d.playerError && <p className="text-sm text-danger mt-1" role="status">{d.playerError}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button className="btn btn-primary flex-1" onClick={() => setPicking(d)}>Change image</button>
                 <button className="btn btn-quiet" onClick={() => rename(d)}>Rename</button>
@@ -115,11 +116,11 @@ function Picker({ display, onClose, onPublished, onError }: {
           Tap an image. The TV updates within about 10 seconds.
           {display.playlist ? " This replaces the playlist on this TV." : ""}
         </p>
-        {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : media.data.length === 0 ? (
-          <p className="text-muted">Upload an image in Media first.</p>
+        {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : media.data.filter((item) => item.kind !== "video").length === 0 ? (
+          <p className="text-muted">Upload an image in Media first. Videos play from a playlist.</p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {media.data.map((m) => {
+            {media.data.filter((item) => item.kind !== "video").map((m) => {
               const current = display.media?.id === m.id;
               return (
                 <li key={m.id}>

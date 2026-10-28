@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Page } from "@playwright/test";
+import { removeCreatedTestEmails } from "../helpers/account-cleanup";
+
+const pendingEmails: string[] = [];
+
+test.afterEach(async () => {
+  await deleteTestUsers(pendingEmails.splice(0, pendingEmails.length));
+});
 
 const baseURL = process.env.BASE_URL || "";
 const png = Buffer.from(
@@ -148,10 +155,12 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
 });
 
 function account() {
-  return {
+  const user = {
     email: `pantalla-e2e-${randomUUID()}@mailinator.com`,
     password: `Pantalla-${randomUUID()}`,
   };
+  pendingEmails.push(user.email);
+  return user;
 }
 
 async function signUp(page: Page, user: { email: string; password: string }) {
@@ -178,7 +187,7 @@ async function signIn(page: Page, user: { email: string; password: string }) {
 }
 
 async function upload(page: Page, name: string) {
-  await page.locator('input[type="file"]').setInputFiles({ name, mimeType: "image/png", buffer: png });
+  await page.locator('input[type="file"][accept*="image"]').setInputFiles({ name, mimeType: "image/png", buffer: png });
 }
 
 async function readCode(tv: Page) {
@@ -363,13 +372,105 @@ async function slideChanges(tv: Page, ids: Record<string, string>, count: number
   return events;
 }
 
+test("an unsupported video is rejected in the library", async ({ browser }) => {
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const phone = await phoneContext.newPage();
+  const owner = account();
+  try {
+    await signUp(phone, owner);
+    await phone.goto("/dashboard/media");
+    const videoInput = phone.locator('input[type="file"][accept*="video"]');
+    if ((await videoInput.count()) === 0) test.skip(true, "This deployment has no video upload yet.");
+    await videoInput.setInputFiles("tests/fixtures/hevc.mp4");
+    await expect(phone.getByRole("status")).toContainText("H.264", { timeout: 15_000 });
+    await expect(phone.getByText("No images yet")).toBeVisible();
+  } finally {
+    await phoneContext.close();
+    await deleteTestUsers([owner.email]);
+  }
+});
+
+test("a video playlist plays on the TV and survives a dropped connection", async ({ browser }) => {
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const tvContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const phone = await phoneContext.newPage();
+  const tv = await tvContext.newPage();
+  const owner = account();
+
+  try {
+    await signUp(phone, owner);
+    await phone.goto("/dashboard/media");
+    const videoInput = phone.locator('input[type="file"][accept*="video"]');
+    if ((await videoInput.count()) === 0) test.skip(true, "This deployment has no video upload yet.");
+    const probe = await authed(phone, "/api/media/upload", {
+      method: "POST",
+      json: { fileName: "probe.mp4", sizeBytes: 1024 },
+    });
+    if (probe.status === 503) test.skip(true, "Apply migration 0003_video.sql before the video playback check.");
+    expect(probe.status).toBe(201);
+
+    await videoInput.setInputFiles("tests/fixtures/h264-aac.mp4");
+    await expect(phone.getByText("h264-aac.mp4")).toBeVisible({ timeout: 20_000 });
+    await expect(phone.getByText(/s ·/)).toBeVisible();
+
+    await tv.goto("/player");
+    const code = await readCode(tv);
+    await phone.goto("/dashboard/displays");
+    await phone.getByLabel("Code on the TV").fill(code);
+    await phone.getByLabel("TV name").fill("Video screen");
+    await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
+    await expect(phone.getByRole("heading", { name: "Video screen" })).toBeVisible();
+
+    await phone.getByRole("link", { name: "Playlists" }).click();
+    await phone.getByLabel("Playlist name").fill("Video loop");
+    await phone.getByRole("button", { name: "Create playlist" }).click();
+    await expect(phone.getByRole("heading", { name: "Edit playlist" })).toBeVisible();
+    await phone.getByRole("button", { name: "Add images" }).click();
+    await phone.getByRole("checkbox", { name: "h264-aac.mp4" }).check();
+    await phone.getByRole("button", { name: "Add selected" }).click();
+    await expect(phone.getByText("Plays until the end")).toBeVisible();
+    await phone.getByRole("checkbox", { name: "Video screen" }).check();
+    await phone.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+
+    await expect.poll(async () => playingVideo(tv), { timeout: 25_000 }).toBe(true);
+    const started = await videoTime(tv);
+    await tv.waitForTimeout(700);
+    const later = await videoTime(tv);
+    expect(later !== started || await playingVideo(tv)).toBeTruthy();
+
+    await tvContext.setOffline(true);
+    await expect(tv.locator("#status")).toContainText("Reconnecting", { timeout: 30_000 });
+    expect(await playingVideo(tv)).toBe(true);
+    await tvContext.setOffline(false);
+    await expect(tv.locator("#status")).not.toHaveClass(/on/, { timeout: 30_000 });
+    expect(await playingVideo(tv)).toBe(true);
+  } finally {
+    await phoneContext.close();
+    await tvContext.close();
+    await deleteTestUsers([owner.email]);
+  }
+});
+
+async function playingVideo(tv: Page) {
+  return tv.evaluate(() => {
+    const nodes = [document.getElementById("va"), document.getElementById("vb")];
+    return nodes.some((node) => !!node && node.className.indexOf("on") !== -1 && !!node.getAttribute("src"));
+  });
+}
+
+async function videoTime(tv: Page) {
+  return tv.evaluate(() => {
+    const nodes = [document.getElementById("va"), document.getElementById("vb")] as HTMLVideoElement[];
+    const node = nodes.find((item) => item && item.className.indexOf("on") !== -1);
+    return node ? node.currentTime : -1;
+  });
+}
+
 async function deleteTestUsers(emails: string[]) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !service || emails.length === 0) return;
   const admin = createClient(supabaseUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  for (const user of data?.users ?? []) {
-    if (user.email && emails.includes(user.email)) await admin.auth.admin.deleteUser(user.id);
-  }
+  await removeCreatedTestEmails(admin, emails);
 }

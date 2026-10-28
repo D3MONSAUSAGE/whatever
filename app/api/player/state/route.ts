@@ -1,13 +1,20 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { sha256 } from "@/lib/server/crypto";
-import { fail, json } from "@/lib/server/http";
+import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const URL_TTL_SECONDS = 3600;
 
-type PlaylistItem = { mediaId: string; url: string; durationMs: number };
+type PlaylistItem = {
+  mediaId: string;
+  url: string;
+  durationMs: number;
+  kind: "image" | "video";
+  width: number | null;
+  height: number | null;
+};
 type PlaylistPayload = { id: string; transition: "none" | "fade"; items: PlaylistItem[] };
 type PlaylistRow = {
   playlist_id: string;
@@ -16,6 +23,9 @@ type PlaylistRow = {
   media_id: string;
   storage_path: string;
   duration_ms: number;
+  kind?: string | null;
+  width?: number | null;
+  height?: number | null;
 };
 
 // TV poll (every 10s) and heartbeat. `?v=` is the version the TV is showing;
@@ -64,6 +74,24 @@ export async function GET(req: Request) {
   });
 }
 
+// The player reports a clip it could not decode. Before 0003 this is a no-op.
+export async function POST(req: Request) {
+  const token = req.headers.get("x-display-token") || "";
+  if (token.length < 20 || token.length > 200) return fail("unauthorized", 401);
+  const body = await readJson(req);
+  const message = body.error == null ? "" : String(body.error).slice(0, 180);
+  const { data, error } = await db().rpc("report_player_error", {
+    p_token_hash: sha256(token),
+    p_error: message,
+  });
+  if (error) {
+    if (isMissingSchema(error)) return json({ ok: true });
+    return fail("unavailable", 503);
+  }
+  if (!data) return fail("unauthorized", 401);
+  return json({ ok: true });
+}
+
 async function publishedPlaylist(tokenHash: string): Promise<PlaylistPayload | null | "missing" | "error"> {
   const { data, error } = await db().rpc("player_playlist", { p_token_hash: tokenHash });
   if (error) return isMissingSchema(error) ? "missing" : "error";
@@ -80,7 +108,14 @@ async function publishedPlaylist(tokenHash: string): Promise<PlaylistPayload | n
   for (const item of rows) {
     const url = urls.get(item.storage_path);
     if (!url || typeof item.duration_ms !== "number") return "error";
-    items.push({ mediaId: item.media_id, url, durationMs: item.duration_ms });
+    items.push({
+      mediaId: item.media_id,
+      url,
+      durationMs: item.duration_ms,
+      kind: item.kind === "video" ? "video" : "image",
+      width: typeof item.width === "number" ? item.width : null,
+      height: typeof item.height === "number" ? item.height : null,
+    });
   }
   return {
     id: rows[0].playlist_id,

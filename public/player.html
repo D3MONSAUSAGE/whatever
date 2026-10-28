@@ -15,6 +15,8 @@
   .layer.on { visibility: visible; }
   .layer.fade { opacity: 0; -webkit-transition: opacity 0.6s linear; transition: opacity 0.6s linear; }
   .layer.fade.on { opacity: 1; }
+  .stage { position: absolute; visibility: hidden; background: transparent; }
+  .stage.on { visibility: visible; }
   .screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000;
     display: none; z-index: 2000000; }
   .screen.on { display: block; }
@@ -33,6 +35,8 @@
 <body>
 <div id="a" class="layer"></div>
 <div id="b" class="layer"></div>
+<video id="va" class="stage" muted playsinline webkit-playsinline preload="auto"></video>
+<video id="vb" class="stage" muted playsinline webkit-playsinline preload="auto"></video>
 
 <div id="pair" class="screen"><div class="center">
   <div class="label">Enter this code in Pantalla to connect this TV.</div>
@@ -65,6 +69,8 @@
   var memToken = null;
   var playlist = null, slideIndex = 0, slideToken = 0, slideTimer = null;
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
+  var videos = [el('va'), el('vb')];
+  var shownVideo = null, stableSrc = {}, videoFails = 0, watchTimer = null, attempt = 0, reportedError = false;
 
   // ---- token storage (memory fallback if localStorage is unavailable)
   function getToken() {
@@ -167,32 +173,250 @@
   function stopPlaylist() {
     playlist = null;
     clearSlideTimer();
+    clearWatch();
     slideToken++;
     needRefresh = false;
     urlRefreshAt = 0;
     loadedUrls = {};
+    releaseAllVideos();
   }
-  function cached(url) { return loadedUrls[url] === 1; }
-  function remember(url) { loadedUrls[url] = 1; }
+  function clearWatch() {
+    if (watchTimer) { clearTimeout(watchTimer); watchTimer = null; }
+  }
+  function otherVideo(v) { return v === videos[0] ? videos[1] : videos[0]; }
+  function resolveUrl(item) {
+    if (item.mediaId && stableSrc[item.mediaId]) return stableSrc[item.mediaId];
+    return item.url;
+  }
+  function pinUrl(item, url) {
+    if (item.mediaId) stableSrc[item.mediaId] = url;
+    loadedUrls[url] = 1;
+  }
+  function dropPin(item) {
+    if (item && item.mediaId) delete stableSrc[item.mediaId];
+  }
+  function releaseVideo(v) {
+    if (!v) return;
+    v.onplaying = null;
+    v.onended = null;
+    v.onerror = null;
+    v.ontimeupdate = null;
+    try { v.pause(); } catch (e) {}
+    v.className = 'stage';
+    try { v.removeAttribute('data-id'); } catch (e2) {}
+    try { v.removeAttribute('data-src'); } catch (e3) {}
+    try { v.removeAttribute('src'); v.load(); } catch (e4) {}
+  }
+  function releaseAllVideos() {
+    var i;
+    for (i = 0; i < videos.length; i++) releaseVideo(videos[i]);
+    shownVideo = null;
+  }
+  function hideImages() {
+    var i;
+    for (i = 0; i < layers.length; i++) layers[i].className = 'layer';
+  }
+  function buryVideos(keepId) {
+    var i, id;
+    for (i = 0; i < videos.length; i++) {
+      id = videos[i].getAttribute ? videos[i].getAttribute('data-id') : '';
+      videos[i].className = 'stage';
+      try { videos[i].pause(); } catch (e) {}
+      if (!keepId || id !== keepId) releaseVideo(videos[i]);
+    }
+    shownVideo = null;
+  }
+  function fitVideo(v) {
+    var vw = v.videoWidth || 16, vh = v.videoHeight || 9;
+    var sw = window.innerWidth || 1280, sh = window.innerHeight || 720;
+    var scale, w, h;
+    if (!sw) sw = 1280;
+    if (!sh) sh = 720;
+    scale = Math.min(sw / vw, sh / vh);
+    w = Math.round(vw * scale);
+    h = Math.round(vh * scale);
+    v.style.width = w + 'px';
+    v.style.height = h + 'px';
+    v.style.left = Math.round((sw - w) / 2) + 'px';
+    v.style.top = Math.round((sh - h) / 2) + 'px';
+  }
+  function armVideo(v, item) {
+    var url = resolveUrl(item);
+    v.muted = true;
+    try { v.playsInline = true; } catch (e) {}
+    try { v.setAttribute('muted', 'muted'); } catch (e2) {}
+    try { v.setAttribute('playsinline', 'playsinline'); } catch (e3) {}
+    try { v.setAttribute('webkit-playsinline', 'webkit-playsinline'); } catch (e4) {}
+    v.setAttribute('data-id', item.mediaId || '');
+    if (v.getAttribute('data-src') !== url) {
+      v.setAttribute('data-src', url);
+      try { v.preload = 'auto'; } catch (e5) {}
+      v.src = url;
+    }
+    return url;
+  }
+  function reportError(message) {
+    var token = getToken();
+    if (!token || !message) return;
+    reportedError = true;
+    request('POST', '/api/player/state', { error: String(message).substring(0, 180) }, token, function () {});
+  }
+  function clearReportedError() {
+    var token = getToken();
+    videoFails = 0;
+    if (!token || !reportedError) return;
+    reportedError = false;
+    request('POST', '/api/player/state', { error: '' }, token, function () {});
+  }
+  function preloadVideo(index) {
+    var item, idle;
+    if (!playlist || playlist.items.length < 2) return;
+    item = playlist.items[index];
+    idle = shownVideo ? otherVideo(shownVideo) : videos[0];
+    if (!idle || idle === shownVideo) return;
+    armVideo(idle, item);
+  }
   function preloadIndex(index) {
     if (!playlist) return;
-    var url = playlist.items[index].url;
-    if (cached(url)) return;
-    var img = new Image();
-    var token = slideToken;
-    img.onload = function () { if (token === slideToken) remember(url); };
+    var item = playlist.items[index];
+    var url, img, token;
+    if (!item) return;
+    if (item.kind === 'video') { preloadVideo(index); return; }
+    url = resolveUrl(item);
+    if ((item.mediaId && stableSrc[item.mediaId]) || loadedUrls[url] === 1) return;
+    img = new Image();
+    token = slideToken;
+    img.onload = function () { if (token === slideToken) pinUrl(item, url); };
     img.onerror = function () {};
     img.src = url;
+  }
+  function showVideo(v) {
+    var other;
+    fitVideo(v);
+    z += 1;
+    v.style.zIndex = String(z);
+    v.className = 'stage on';
+    shownVideo = v;
+    hasImage = true;
+    showScreen('');
+    hideImages();
+    other = otherVideo(v);
+    if (other && other.className.indexOf('on') !== -1) other.className = 'stage';
+  }
+  function failVideo(index, item, message) {
+    var token = slideToken, next;
+    dropPin(item);
+    videoFails += 1;
+    reportError(message);
+    if (!playlist) return;
+    clearWatch();
+    clearSlideTimer();
+    if (playlist.items.length < 2 || videoFails >= playlist.items.length) {
+      setStatus("This video can't play on this TV.");
+      slideTimer = setTimeout(function () {
+        if (token !== slideToken || !playlist) return;
+        videoFails = 0;
+        present(index % playlist.items.length, null);
+      }, 10000);
+      return;
+    }
+    setStatus('');
+    next = (index + 1) % playlist.items.length;
+    slideTimer = setTimeout(function () {
+      if (token !== slideToken || !playlist) return;
+      present(next, null);
+    }, 1200);
+  }
+  function presentVideo(index, versionOrNull) {
+    if (!playlist) return;
+    var item = playlist.items[index];
+    var token = slideToken;
+    var my = ++attempt;
+    var v = shownVideo ? otherVideo(shownVideo) : videos[0];
+    var i, started = false, failed = false, sawTime = false, lastTime = 0, stuckFor = 0, url, startTimer;
+    for (i = 0; i < videos.length; i++) {
+      if (videos[i].getAttribute('data-id') === (item.mediaId || '') && videos[i].getAttribute('data-src') === resolveUrl(item)) v = videos[i];
+    }
+    if (shownVideo && v === shownVideo && playlist.items.length > 1) v = otherVideo(shownVideo);
+    url = armVideo(v, item);
+    function gone() { return token !== slideToken || my !== attempt || !playlist; }
+    function failOnce(message) {
+      if (failed || gone()) return;
+      failed = true;
+      attempt += 1;
+      clearTimeout(startTimer);
+      failVideo(index, item, message);
+    }
+    function watchPlayback() {
+      function tick() {
+        var nowT;
+        if (gone() || shownVideo !== v) return;
+        if (!sawTime) { watchTimer = setTimeout(tick, 2000); return; }
+        nowT = v.currentTime || 0;
+        if (nowT <= lastTime + 0.05) stuckFor += 2000;
+        else stuckFor = 0;
+        lastTime = nowT;
+        if (stuckFor >= 12000) { failOnce('This video stalled.'); return; }
+        watchTimer = setTimeout(tick, 2000);
+      }
+      clearWatch();
+      watchTimer = setTimeout(tick, 2000);
+    }
+    function go() {
+      if (gone() || started) return;
+      started = true;
+      clearTimeout(startTimer);
+      pinUrl(item, url);
+      showVideo(v);
+      slideIndex = index;
+      if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
+      preloadIndex((index + 1) % playlist.items.length);
+      watchPlayback();
+    }
+    v.onplaying = function () { if (!gone()) go(); };
+    v.ontimeupdate = function () { sawTime = true; lastTime = v.currentTime || 0; stuckFor = 0; };
+    v.onended = function () {
+      var again;
+      if (gone()) return;
+      clearWatch();
+      if (playlist.items.length === 1) {
+        try {
+          v.currentTime = 0;
+          again = v.play();
+          if (again && typeof again.then === 'function') {
+            again.then(function () {}, function () { failOnce("This video can't play on this TV."); });
+          }
+        } catch (e) { failOnce("This video can't play on this TV."); }
+        return;
+      }
+      present((index + 1) % playlist.items.length, null);
+    };
+    v.onerror = function () { failOnce("This video can't play on this TV."); };
+    startTimer = setTimeout(function () { failOnce('This video did not start in time.'); }, 20000);
+    try {
+      var playResult = v.play();
+      if (playResult && typeof playResult.then === 'function') {
+        playResult.then(function () {}, function () { failOnce('This video was blocked from autoplaying.'); });
+      }
+    } catch (err) {
+      failOnce("This video can't play on this TV.");
+    }
   }
   function present(index, versionOrNull) {
     if (!playlist) return;
     var item = playlist.items[index];
     var token = slideToken;
+    var src, nextItem;
+    if (!item) return;
+    if (item.kind === 'video') { presentVideo(index, versionOrNull); return; }
+    src = resolveUrl(item);
     function commit() {
       if (token !== slideToken || !playlist) return;
-      swapTo(item.url, playlist.transition === 'fade');
+      nextItem = playlist.items[(index + 1) % playlist.items.length];
+      swapTo(src, playlist.transition === 'fade');
+      buryVideos(nextItem && nextItem.kind === 'video' ? (nextItem.mediaId || '') : '');
       slideIndex = index;
-      if (typeof versionOrNull === 'number') shownVersion = versionOrNull;
+      if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
       preloadIndex((index + 1) % playlist.items.length);
       clearSlideTimer();
       var waitToken = slideToken;
@@ -201,11 +425,12 @@
         present((index + 1) % playlist.items.length, null);
       }, item.durationMs);
     }
-    if (cached(item.url)) { commit(); return; }
+    if ((item.mediaId && stableSrc[item.mediaId]) || loadedUrls[src] === 1) { commit(); return; }
     var img = new Image();
-    img.onload = function () { remember(item.url); commit(); };
+    img.onload = function () { pinUrl(item, src); commit(); };
     img.onerror = function () {
       if (token !== slideToken) return;
+      dropPin(item);
       needRefresh = true;
       clearSlideTimer();
       slideTimer = setTimeout(function () {
@@ -213,16 +438,16 @@
         present(index, versionOrNull);
       }, 3000);
     };
-    img.src = item.url;
+    img.src = src;
   }
   function refreshPlaylistUrls(items) {
     var i;
     if (!playlist) return;
     for (i = 0; i < playlist.items.length && i < items.length; i++) {
-      if (playlist.items[i].mediaId === items[i].mediaId && playlist.items[i].url !== items[i].url) {
-        delete loadedUrls[playlist.items[i].url];
+      if (playlist.items[i].mediaId === items[i].mediaId) {
         playlist.items[i].url = items[i].url;
         playlist.items[i].durationMs = items[i].durationMs;
+        if (items[i].kind === 'video' || items[i].kind === 'image') playlist.items[i].kind = items[i].kind;
       }
     }
     needRefresh = false;
@@ -233,8 +458,13 @@
     for (i = 0; i < list.length; i++) {
       it = list[i];
       ms = it && it.durationMs;
-      if (!it || !it.url || typeof ms !== 'number' || ms < 1000) continue;
-      items.push({ url: it.url, durationMs: ms, mediaId: it.mediaId || '' });
+      if (!it || !it.url) continue;
+      if (it.kind === 'video') {
+        items.push({ url: it.url, durationMs: typeof ms === 'number' ? ms : 0, mediaId: it.mediaId || '', kind: 'video' });
+        continue;
+      }
+      if (typeof ms !== 'number' || ms < 1000) continue;
+      items.push({ url: it.url, durationMs: ms, mediaId: it.mediaId || '', kind: 'image' });
     }
     if (!items.length) return;
     if (playlist && shownVersion === version && playlist.id === (incoming.id || '')) {
@@ -250,6 +480,8 @@
       items: items
     };
     urlRefreshAt = new Date().getTime() + 1800000;
+    shownVersion = version;
+    videoFails = 0;
     present(0, version);
   }
 
@@ -257,6 +489,8 @@
   function startPairing() {
     var g = enter('pairing');
     stopPlaylist();
+    stableSrc = {};
+    videoFails = 0;
     clearImages();
     setStatus('');
     shownVersion = null; loadingVersion = null; preloadImg = null;
@@ -326,6 +560,7 @@
       clearImages();
       showScreen('empty');
       shownVersion = d.version;
+      clearReportedError();
       return;
     }
     if (loadingVersion === d.version) return; // already downloading this one
@@ -341,6 +576,7 @@
       preloadImg = null; loadingVersion = null;
       swapTo(src);
       shownVersion = v;
+      clearReportedError();
     };
     img.onerror = function () {
       // Keep the last image; next poll gets a fresh URL and retries.

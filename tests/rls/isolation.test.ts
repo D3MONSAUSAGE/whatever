@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync as readFixture } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, describe, expect, it } from "vitest";
+import { removeCreatedTestUsers } from "../helpers/account-cleanup";
 import { jpeg } from "../helpers/bytes";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -25,12 +27,10 @@ if (!configured) {
 describe.skipIf(!configured)("RLS account isolation", () => {
   let admin: SupabaseClient | null = null;
   const createdUsers: string[] = [];
-  let storagePath = "";
 
   afterAll(async () => {
     if (!admin) return;
-    if (storagePath) await admin.storage.from("media").remove([storagePath]);
-    for (const id of createdUsers) await admin.auth.admin.deleteUser(id);
+    await removeCreatedTestUsers(admin, createdUsers);
   });
 
   it("keeps accounts, tokens, storage, and server functions apart", async () => {
@@ -46,7 +46,7 @@ describe.skipIf(!configured)("RLS account isolation", () => {
     expect(accountA).not.toBe(accountB);
 
     const mediaId = randomUUID();
-    storagePath = `${accountA}/${mediaId}.jpg`;
+    const storagePath = `${accountA}/${mediaId}.jpg`;
     const bytes = jpeg(8, 8);
     const { error: uploadError } = await admin.storage.from("media").upload(storagePath, bytes, { contentType: "image/jpeg" });
     expect(uploadError).toBeNull();
@@ -195,6 +195,47 @@ describe.skipIf(!configured)("RLS account isolation", () => {
     await admin.from("rate_limits").delete().eq("key", key);
     const userHit = await userA.client.rpc("rate_limit_hit", { p_key: key, p_window_seconds: 60, p_max: 5 });
     expect(userHit.error).toBeTruthy();
+
+    const videoId = randomUUID();
+    const videoPath = `${accountA}/${videoId}.mp4`;
+    const thumbPath = `${accountA}/${videoId}-thumb.jpg`;
+    const mp4 = new Uint8Array(readFixture(new URL("../fixtures/h264-aac.mp4", import.meta.url)));
+    const videoUp = await admin.storage.from("media").upload(videoPath, mp4, { contentType: "video/mp4", upsert: false });
+    if (!videoUp.error) {
+      const thumbUp = await admin.storage.from("media").upload(thumbPath, jpeg(8, 8), { contentType: "image/jpeg", upsert: false });
+      expect(thumbUp.error).toBeNull();
+      const inserted = await admin.from("media").insert({
+        id: videoId,
+        account_id: accountA,
+        file_name: "secret-loop.mp4",
+        storage_path: videoPath,
+        mime_type: "video/mp4",
+        size_bytes: mp4.length,
+        kind: "video",
+        duration_ms: 1000,
+        width: 160,
+        height: 120,
+        thumbnail_path: thumbPath,
+      });
+      const missingColumn = /does not exist|schema cache|Could not find/i.test(inserted.error?.message || "");
+      if (inserted.error && !missingColumn) throw new Error(inserted.error.message);
+      if (!inserted.error) {
+        const ownVideo = await userA.client.from("media").select("id, file_name, thumbnail_path").eq("id", videoId);
+        expect(ownVideo.data?.map((row) => row.id)).toContain(videoId);
+        const otherVideo = await userB.client.from("media").select("id, file_name, thumbnail_path");
+        const otherJson = JSON.stringify(otherVideo.data ?? []);
+        expect(otherJson).not.toContain(videoId);
+        expect(otherJson).not.toContain("secret-loop.mp4");
+        expect(otherJson).not.toContain(thumbPath);
+        expect(otherJson).not.toContain(videoPath);
+        expect((await userB.client.storage.from("media").download(videoPath)).data).toBeNull();
+        expect((await userB.client.storage.from("media").download(thumbPath)).data).toBeNull();
+        expect((await userA.client.storage.from("media").download(videoPath)).data).toBeNull();
+        expect((await userA.client.storage.from("media").download(thumbPath)).data).toBeNull();
+        const signedThumb = await admin.storage.from("media").createSignedUrl(thumbPath, 60);
+        expect(signedThumb.data?.signedUrl).toMatch(/^https?:\/\//);
+      }
+    }
   }, 90_000);
 });
 

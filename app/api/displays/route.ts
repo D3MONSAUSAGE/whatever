@@ -11,33 +11,17 @@ export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
-  const columns = "id, name, token_hash, last_seen_at, created_at, media:assigned_media_id (id, file_name, storage_path)";
-  const withPlaylist = await db()
-    .from("displays")
-    .select(`${columns}, assigned_playlist_id`)
-    .eq("account_id", admin.accountId)
-    .eq("status", "active")
-    .order("created_at");
-  let rows: unknown = withPlaylist.data;
-  let error = withPlaylist.error;
-  let playlistColumn = !error;
-  if (error && isMissingSchema(error)) {
-    const plain = await db()
-      .from("displays")
-      .select(columns)
-      .eq("account_id", admin.accountId)
-      .eq("status", "active")
-      .order("created_at");
-    rows = plain.data;
-    error = plain.error;
-    playlistColumn = false;
-  }
-  if (error) return fail("Couldn't load displays.", 500);
+  const loaded = await loadDisplayRows(admin.accountId);
+  if (loaded.error) return fail("Couldn't load displays.", 500);
+  const rows = loaded.rows;
+  const playlistColumn = loaded.playlistColumn;
 
   type MediaJoin = { id: string; file_name: string; storage_path: string };
   type Row = {
     id: string; name: string; token_hash: string | null; last_seen_at: string | null;
     assigned_playlist_id?: string | null;
+    player_error?: string | null;
+    player_error_at?: string | null;
     media: MediaJoin | MediaJoin[] | null;
   };
   const list = (rows ?? []) as unknown as Row[];
@@ -63,6 +47,7 @@ export async function GET(req: Request) {
         connected: !!d.token_hash, // false until the TV collects its token
         online: !!d.last_seen_at && now - new Date(d.last_seen_at).getTime() < ONLINE_MS,
         lastSeenAt: d.last_seen_at,
+        playerError: d.player_error ?? null,
         media: media
           ? { id: media.id, fileName: media.file_name, url: urls.get(media.storage_path) ?? null }
           : null,
@@ -76,6 +61,29 @@ export async function GET(req: Request) {
       };
     }),
   );
+}
+
+async function loadDisplayRows(accountId: string) {
+  const media = "media:assigned_media_id (id, file_name, storage_path)";
+  const base = `id, name, token_hash, last_seen_at, created_at, ${media}`;
+  const attempts = [
+    { columns: `${base}, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
+    { columns: `${base}, assigned_playlist_id`, playlistColumn: true },
+    { columns: base, playlistColumn: false },
+  ];
+  let lastError: { code?: string; message?: string } | null = null;
+  for (const attempt of attempts) {
+    const result = await db()
+      .from("displays")
+      .select(attempt.columns)
+      .eq("account_id", accountId)
+      .eq("status", "active")
+      .order("created_at");
+    if (!result.error) return { rows: result.data, playlistColumn: attempt.playlistColumn, error: null };
+    lastError = result.error;
+    if (!isMissingSchema(result.error)) return { rows: null, playlistColumn: false, error: result.error };
+  }
+  return { rows: null, playlistColumn: false, error: lastError };
 }
 
 async function loadPlaylists(accountId: string, rows: { assigned_playlist_id?: string | null }[]) {
@@ -106,13 +114,23 @@ async function loadPlaylists(accountId: string, rows: { assigned_playlist_id?: s
   }
   const mediaIds = [...new Set(firstMedia.values())];
   if (!mediaIds.length) return info;
-  const { data: mediaRows, error: mediaError } = await db()
+  const richMedia = await db()
     .from("media")
-    .select("id, storage_path")
+    .select("id, storage_path, thumbnail_path, kind")
     .eq("account_id", accountId)
     .in("id", mediaIds);
+  let mediaRows = richMedia.data as { id: string; storage_path: string; thumbnail_path?: string | null; kind?: string | null }[] | null;
+  let mediaError = richMedia.error;
+  if (mediaError && isMissingSchema(mediaError)) {
+    const plain = await db().from("media").select("id, storage_path").eq("account_id", accountId).in("id", mediaIds);
+    mediaRows = plain.data;
+    mediaError = plain.error;
+  }
   if (mediaError) return null;
-  const pathByMedia = new Map((mediaRows ?? []).map((media) => [media.id, media.storage_path]));
+  const pathByMedia = new Map((mediaRows ?? []).map((media) => [
+    media.id,
+    media.kind === "video" && media.thumbnail_path ? media.thumbnail_path : media.storage_path,
+  ]));
   const paths = [...new Set([...pathByMedia.values()])];
   const urls = new Map<string, string>();
   if (paths.length) {

@@ -1,6 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
+import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
@@ -18,6 +19,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if ("mediaId" in body) {
     const mediaId = body.mediaId === null ? null : body.mediaId;
     if (mediaId !== null && !isUuid(mediaId)) return fail("Image not found.", 404);
+    if (mediaId !== null) {
+      const looked = await db().from("media").select("id, kind").eq("id", mediaId).eq("account_id", admin.accountId).maybeSingle();
+      if (looked.error && !isMissingSchema(looked.error)) return fail("Couldn't publish. Try again.", 500);
+      if (!looked.error && looked.data?.kind === "video") {
+        return fail("Publish a video from a playlist. A single screen assignment has to be an image.", 400);
+      }
+    }
     const { data: ok, error } = await db().rpc("assign_media", {
       p_account_id: admin.accountId,
       p_display_id: id,

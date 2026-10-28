@@ -1,6 +1,9 @@
 export const PLAYLISTS_UNAVAILABLE =
   "Playlists aren't available yet. Apply migration 0002_playlists.sql, then reload.";
 
+export const VIDEO_UNAVAILABLE =
+  "Video isn't available yet. Apply migration 0003_video.sql, then reload.";
+
 type DbError = { code?: string; message?: string } | null | undefined;
 
 /** True when this database has not had 0002_playlists.sql applied yet. */

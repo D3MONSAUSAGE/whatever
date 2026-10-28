@@ -2,11 +2,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSupabase } from "./supabase-browser";
 
-export type MediaItem = { id: string; fileName: string; sizeBytes: number; createdAt: string; url: string | null };
+export type MediaItem = {
+  id: string; fileName: string; sizeBytes: number; createdAt: string; url: string | null;
+  kind?: "image" | "video"; durationMs?: number | null; width?: number | null; height?: number | null;
+  thumbnailUrl?: string | null;
+};
 export type DisplayItem = {
   id: string; name: string; connected: boolean; online: boolean; lastSeenAt: string | null;
   media: { id: string; fileName: string; url: string | null } | null;
   playlist: { id: string; name: string; url: string | null } | null;
+  playerError?: string | null;
 };
 
 export type PlaylistSummary = {
@@ -17,7 +22,7 @@ export type PlaylistSummary = {
 export type PlaylistDetail = {
   id: string; name: string; defaultDurationMs: number; transition: "none" | "fade";
   publishedAt: string | null; publishedTransition: "none" | "fade" | null; revision: number; updatedAt: string;
-  items: { id: string; mediaId: string; fileName: string; url: string | null; durationMs: number | null; position: number }[];
+  items: { id: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl?: string | null; kind?: "image" | "video"; mediaDurationMs?: number | null; durationMs: number | null; position: number }[];
   displays: { id: string; name: string; assigned: boolean }[];
 };
 
@@ -76,3 +81,11 @@ export function timeAgo(iso: string | null) {
 
 export const formatSize = (b: number) =>
   b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
+
+export function formatDuration(ms: number) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  if (!minutes) return `${seconds}s`;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}

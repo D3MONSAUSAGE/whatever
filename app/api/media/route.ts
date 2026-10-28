@@ -2,8 +2,12 @@ import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { checkImage } from "@/lib/server/images";
 import { MAX_UPLOAD_BYTES } from "@/lib/server/limits";
+import { isMissingSchema } from "@/lib/server/schema";
 import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
 import { fail, json } from "@/lib/server/http";
+
+const MEDIA_COLUMNS = "id, file_name, storage_path, size_bytes, created_at";
+const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path`;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,16 +22,28 @@ export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
-  const { data: rows, error } = await db()
+  const rich = await db()
     .from("media")
-    .select("id, file_name, storage_path, size_bytes, created_at")
+    .select(MEDIA_COLUMNS_VIDEO)
     .eq("account_id", admin.accountId)
     .order("created_at", { ascending: false });
+  let rows = rich.data as MediaRow[] | null;
+  let error = rich.error;
+  if (error && isMissingSchema(error)) {
+    const plain = await db()
+      .from("media")
+      .select(MEDIA_COLUMNS)
+      .eq("account_id", admin.accountId)
+      .order("created_at", { ascending: false });
+    rows = plain.data as MediaRow[] | null;
+    error = plain.error;
+  }
   if (error) return fail("Couldn't load images.", 500);
 
   const urls = new Map<string, string>();
-  if (rows?.length) {
-    const { data } = await db().storage.from(BUCKET).createSignedUrls(rows.map((r) => r.storage_path), 3600);
+  const paths = [...new Set((rows ?? []).flatMap((row) => [row.storage_path, row.thumbnail_path].filter(Boolean)))] as string[];
+  if (paths.length) {
+    const { data } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
     data?.forEach((s) => s.path && s.signedUrl && urls.set(s.path, s.signedUrl));
   }
   return json(
@@ -37,9 +53,27 @@ export async function GET(req: Request) {
       sizeBytes: r.size_bytes,
       createdAt: r.created_at,
       url: urls.get(r.storage_path) ?? null,
+      kind: r.kind === "video" ? "video" : "image",
+      durationMs: r.duration_ms ?? null,
+      width: r.width ?? null,
+      height: r.height ?? null,
+      thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
     })),
   );
 }
+
+type MediaRow = {
+  id: string;
+  file_name: string;
+  storage_path: string;
+  size_bytes: number;
+  created_at: string;
+  kind?: string | null;
+  duration_ms?: number | null;
+  width?: number | null;
+  height?: number | null;
+  thumbnail_path?: string | null;
+};
 
 export async function POST(req: Request) {
   const admin = await requireAdmin(req);
