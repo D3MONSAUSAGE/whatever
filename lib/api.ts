@@ -6,6 +6,19 @@ export type MediaItem = { id: string; fileName: string; sizeBytes: number; creat
 export type DisplayItem = {
   id: string; name: string; connected: boolean; online: boolean; lastSeenAt: string | null;
   media: { id: string; fileName: string; url: string | null } | null;
+  playlist: { id: string; name: string; url: string | null } | null;
+};
+
+export type PlaylistSummary = {
+  id: string; name: string; defaultDurationMs: number; transition: "none" | "fade";
+  slideCount: number; displayCount: number; publishedAt: string | null; updatedAt: string; revision: number;
+};
+
+export type PlaylistDetail = {
+  id: string; name: string; defaultDurationMs: number; transition: "none" | "fade";
+  publishedAt: string | null; publishedTransition: "none" | "fade" | null; revision: number; updatedAt: string;
+  items: { id: string; mediaId: string; fileName: string; url: string | null; durationMs: number | null; position: number }[];
+  displays: { id: string; name: string; assigned: boolean }[];
 };
 
 export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {

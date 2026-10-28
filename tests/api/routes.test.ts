@@ -10,6 +10,9 @@ import { GET as listDisplays, } from "@/app/api/displays/route";
 import { PATCH as updateDisplay, DELETE as disconnectDisplay } from "@/app/api/displays/[id]/route";
 import { GET as listMedia, POST as uploadMedia } from "@/app/api/media/route";
 import { DELETE as deleteMedia } from "@/app/api/media/[id]/route";
+import { GET as listPlaylists, POST as createPlaylist } from "@/app/api/playlists/route";
+import { GET as getPlaylist, PATCH as savePlaylist, DELETE as deletePlaylistRoute } from "@/app/api/playlists/[id]/route";
+import { POST as publishPlaylist } from "@/app/api/playlists/[id]/publish/route";
 import { GET as me } from "@/app/api/me/route";
 import { createFakeDb, type Store } from "./fake-db";
 import { jpeg } from "../helpers/bytes";
@@ -176,6 +179,9 @@ describe("API", () => {
     expect(String(shown.body?.url)).toContain("signed.test");
     const unchanged = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
     expect(unchanged.body).toEqual({ version: 1, unchanged: true });
+    const refreshIgnored = await call(playerState, "http://localhost/api/player/state?v=1&refresh=1", { headers: { "X-Display-Token": token } });
+    expect(refreshIgnored.body).toEqual({ version: 1, unchanged: true });
+    expect(shown.body.playlist).toBeUndefined();
 
     const replaced = await call(updateDisplay, `http://localhost/api/displays/${displayId}`, auth("token-a", {
       method: "PATCH",
@@ -330,5 +336,134 @@ describe("API", () => {
     });
     expect(status.body).toMatchObject({ status: "expired" });
     expect(status.body?.token).toBeUndefined();
+  });
+
+  it("publishes a playlist, keeps a single image on the old path, and blocks deletes", async () => {
+    const created = await call(createPair, "http://localhost/api/player/pair", { method: "POST", body: "{}" });
+    const { sessionId, code, secret } = created.body as { sessionId: string; code: string; secret: string };
+    const claimed = await call(claimPair, "http://localhost/api/displays/pair", auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ code, name: "Counter" }),
+    }));
+    const displayId = claimed.body?.id as string;
+    const paired = await call(pairStatus, "http://localhost/api/player/pair/status", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, secret }),
+    });
+    const token = paired.body?.token as string;
+    const first = await upload("token-a", "a.png", jpeg(8, 8));
+    const second = await upload("token-a", "b.png", jpeg(8, 8));
+    const third = await upload("token-a", "c.png", jpeg(8, 8));
+    const other = await upload("token-b", "other.png", jpeg(8, 8));
+    const ids = [first.body?.id, second.body?.id, third.body?.id] as string[];
+
+    const made = await call(createPlaylist, "http://localhost/api/playlists", auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ name: "  Lunch loop  " }),
+    }));
+    expect(made.status).toBe(201);
+    const playlistId = made.body?.id as string;
+
+    const saved = await call(savePlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: "Lunch loop",
+        defaultDurationMs: 10000,
+        transition: "none",
+        items: [
+          { mediaId: ids[0], durationMs: 2000 },
+          { mediaId: ids[1], durationMs: 3000 },
+          { mediaId: ids[2], durationMs: null },
+        ],
+      }),
+    }), playlistId);
+    expect(saved.status).toBe(200);
+
+    const before = await call(playerState, "http://localhost/api/player/state", { headers: { "X-Display-Token": token } });
+    expect(before.body).toMatchObject({ version: 0, mediaId: null, url: null });
+    expect(before.body.playlist).toBeUndefined();
+
+    const published = await call(publishPlaylist, `http://localhost/api/playlists/${playlistId}/publish`, auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ displayIds: [displayId] }),
+    }), playlistId);
+    expect(published.status).toBe(200);
+
+    const playing = await call(playerState, "http://localhost/api/player/state?v=0", { headers: { "X-Display-Token": token } });
+    expect(playing.body.version).toBe(1);
+    expect(playing.body.playlist.items.map((item: { mediaId: string; durationMs: number }) => [item.mediaId, item.durationMs])).toEqual([
+      [ids[0], 2000],
+      [ids[1], 3000],
+      [ids[2], 10000],
+    ]);
+    expect(playing.body.playlist.transition).toBe("none");
+    expect(String(playing.body.url)).toContain("signed.test");
+    expect(playing.body.mediaId).toBe(ids[0]);
+    const same = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
+    expect(same.body).toEqual({ version: 1, unchanged: true });
+
+    const drafted = await call(savePlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: "Lunch loop",
+        defaultDurationMs: 8000,
+        transition: "fade",
+        items: [
+          { mediaId: ids[2], durationMs: 4000 },
+          { mediaId: ids[0], durationMs: 2000 },
+        ],
+      }),
+    }), playlistId);
+    expect(drafted.status).toBe(200);
+    const still = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
+    expect(still.body).toEqual({ version: 1, unchanged: true });
+
+    const republished = await call(publishPlaylist, `http://localhost/api/playlists/${playlistId}/publish`, auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ displayIds: [displayId] }),
+    }), playlistId);
+    expect(republished.status).toBe(200);
+    const next = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
+    expect(next.body.version).toBe(2);
+    expect(next.body.playlist.transition).toBe("fade");
+    expect(next.body.playlist.items.map((item: { mediaId: string }) => item.mediaId)).toEqual([ids[2], ids[0]]);
+
+    const displays = await call(listDisplays, "http://localhost/api/displays", auth("token-a"));
+    expect(displays.body[0].media).toBeNull();
+    expect(displays.body[0].playlist).toMatchObject({ id: playlistId, name: "Lunch loop" });
+
+    const blocked = await call(deleteMedia, `http://localhost/api/media/${ids[2]}`, auth("token-a", { method: "DELETE" }), ids[2]);
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error).toMatch(/playlist/i);
+    expect(store.media.some((item) => item.id === ids[2])).toBe(true);
+
+    const image = await call(updateDisplay, `http://localhost/api/displays/${displayId}`, auth("token-a", {
+      method: "PATCH",
+      body: JSON.stringify({ mediaId: ids[1] }),
+    }), displayId);
+    expect(image.status).toBe(200);
+    const single = await call(playerState, "http://localhost/api/player/state?v=2", { headers: { "X-Display-Token": token } });
+    expect(single.body.version).toBe(3);
+    expect(single.body.mediaId).toBe(ids[1]);
+    expect(single.body.playlist).toBeUndefined();
+    expect(store.displays[0].assigned_playlist_id).toBeNull();
+
+    const foreignList = await call(listPlaylists, "http://localhost/api/playlists", auth("token-b"));
+    expect(foreignList.body).toEqual([]);
+    const foreignGet = await call(getPlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-b"), playlistId);
+    expect(foreignGet.status).toBe(404);
+    const foreignSave = await call(savePlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-b", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: "Stolen",
+        defaultDurationMs: 1000,
+        transition: "none",
+        items: [{ mediaId: other.body?.id, durationMs: null }],
+      }),
+    }), playlistId);
+    expect(foreignSave.status).toBe(400);
+    expect(store.playlists[0].name).toBe("Lunch loop");
+    const foreignDelete = await call(deletePlaylistRoute, `http://localhost/api/playlists/${playlistId}`, auth("token-b", { method: "DELETE" }), playlistId);
+    expect(foreignDelete.status).toBe(404);
   });
 });

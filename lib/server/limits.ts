@@ -18,6 +18,11 @@ export const HEARTBEAT_SECONDS = 30;
 
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
+export const PLAYLIST_MAX_ITEMS = 40;
+export const PLAYLIST_MIN_DURATION_MS = 1000;
+export const PLAYLIST_MAX_DURATION_MS = 600_000;
+export const PLAYLIST_DEFAULT_DURATION_MS = 10_000;
+
 /** Long-edge cap. Blocks decompression bombs without a native image library. */
 export const MAX_EDGE = 7680;
 export const MAX_PIXELS = 7680 * 4320;
