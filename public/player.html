@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pantalla</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff;
+    overflow: hidden; cursor: none; font-family: Arial, Helvetica, sans-serif; }
+  /* Background images with background-size:contain work on older TV browsers that lack object-fit. */
+  .layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #000;
+    background-repeat: no-repeat; background-position: center center;
+    -webkit-background-size: contain; background-size: contain; visibility: hidden; }
+  .layer.on { visibility: visible; }
+  .screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000;
+    display: none; z-index: 2000000; }
+  .screen.on { display: block; }
+  .center { position: absolute; top: 50%; left: 5%; right: 5%; text-align: center;
+    -webkit-transform: translateY(-50%); transform: translateY(-50%); }
+  .label { font-size: 34px; font-size: 4.4vh; color: #e3e8e6; line-height: 1.3; }
+  .code { font-size: 170px; font-size: 22vh; font-weight: bold; letter-spacing: 0.06em;
+    line-height: 1.1; margin: 3vh 0; color: #fff; }
+  .muted { font-size: 24px; font-size: 3vh; color: #87918d; line-height: 1.4; }
+  .status { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2500000; display: none;
+    text-align: center; font-size: 22px; font-size: 2.6vh; padding: 1.6vh 0; color: #fff;
+    background: rgba(0, 0, 0, 0.55); }
+  .status.on { display: block; }
+</style>
+</head>
+<body>
+<div id="a" class="layer"></div>
+<div id="b" class="layer"></div>
+
+<div id="pair" class="screen"><div class="center">
+  <div class="label">Enter this code in Pantalla to connect this TV.</div>
+  <div id="code" class="code">&nbsp;</div>
+  <div class="muted">A new code appears every 10 minutes.</div>
+</div></div>
+
+<div id="empty" class="screen"><div class="center">
+  <div class="label">No content assigned</div>
+  <div class="muted">Choose an image for this screen in your dashboard.</div>
+</div></div>
+
+<div id="connecting" class="screen"><div class="center">
+  <div class="muted">Connecting&hellip;</div>
+</div></div>
+<div id="status" class="status"></div>
+
+<script>
+/* Plain ES5 only: Samsung Tizen and LG webOS browsers can be years behind. */
+(function () {
+  'use strict';
+  var TOKEN_KEY = 'pantalla_display_token';
+  var STATE_MS = 10000, PAIR_MS = 3000, RETRY_MS = 5000, LOAD_TIMEOUT_MS = 60000;
+
+  function el(id) { return document.getElementById(id); }
+  var layers = [el('a'), el('b')];
+  var active = 0, z = 1;
+  var mode = '', gen = 0, timer = null;
+  var shownVersion = null, loadingVersion = null, preloadImg = null, hasImage = false;
+  var memToken = null;
+
+  // ---- token storage (memory fallback if localStorage is unavailable)
+  function getToken() {
+    try { var t = window.localStorage.getItem(TOKEN_KEY); if (t) return t; } catch (e) {}
+    return memToken;
+  }
+  function setToken(t) {
+    memToken = t;
+    try { window.localStorage.setItem(TOKEN_KEY, t); } catch (e) {}
+  }
+  function clearToken() {
+    memToken = null;
+    try { window.localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+  }
+
+  // ---- XHR with timeout; status 0 means network failure
+  function request(method, url, body, token, cb) {
+    var done = false, x = null, watchdog;
+    function finish(status, text) {
+      if (done) return;
+      done = true;
+      clearTimeout(watchdog);
+      var data = null;
+      if (text) { try { data = JSON.parse(text); } catch (e) {} }
+      cb(status, data);
+    }
+    watchdog = setTimeout(function () {
+      try { if (x) x.abort(); } catch (e) {}
+      finish(0, null);
+    }, 20000);
+    try {
+      x = new XMLHttpRequest();
+      x.open(method, url, true);
+      try { x.timeout = 15000; } catch (e) {}
+      if (body) x.setRequestHeader('Content-Type', 'application/json');
+      if (token) x.setRequestHeader('X-Display-Token', token);
+      x.onreadystatechange = function () {
+        if (x.readyState === 4) finish(x.status, x.responseText);
+      };
+      x.onerror = function () { finish(0, null); };
+      x.ontimeout = function () { finish(0, null); };
+      x.send(body ? JSON.stringify(body) : null);
+    } catch (e) {
+      setTimeout(function () { finish(0, null); }, 0);
+    }
+  }
+
+  // ---- scheduling: one timer; stale callbacks from a previous mode are ignored
+  function enter(newMode) { mode = newMode; gen++; clearTimeout(timer); return gen; }
+  function later(g, fn, ms) {
+    clearTimeout(timer);
+    timer = setTimeout(function () { if (g === gen) fn(); }, ms);
+  }
+
+  // ---- screens and image layers
+  function showScreen(id) {
+    var ids = ['pair', 'empty', 'connecting'];
+    for (var i = 0; i < ids.length; i++) el(ids[i]).className = ids[i] === id ? 'screen on' : 'screen';
+  }
+  function setStatus(text) {
+    var s = el('status');
+    if (!s) return;
+    if (text) { s.innerHTML = text; s.className = 'status on'; }
+    else { s.innerHTML = ''; s.className = 'status'; }
+  }
+  function clearImages() {
+    for (var i = 0; i < layers.length; i++) {
+      layers[i].className = 'layer';
+      layers[i].style.backgroundImage = 'none';
+    }
+    hasImage = false;
+  }
+  // The new image is already fully loaded; put it on top of the old one, then hide the old one.
+  function swapTo(url) {
+    var next = layers[1 - active], prev = layers[active];
+    next.style.backgroundImage = 'url("' + url + '")';
+    z++;
+    next.style.zIndex = z;
+    next.className = 'layer on';
+    active = 1 - active;
+    hasImage = true;
+    showScreen('');
+    setTimeout(function () {
+      if (layers[active] !== prev) { prev.className = 'layer'; prev.style.backgroundImage = 'none'; }
+    }, 1500);
+  }
+
+  // ---- pairing
+  function startPairing() {
+    var g = enter('pairing');
+    clearImages();
+    setStatus('');
+    shownVersion = null; loadingVersion = null; preloadImg = null;
+    el('code').innerHTML = '&nbsp;';
+    showScreen('pair');
+    request('POST', '/api/player/pair', {}, null, function (status, data) {
+      if (g !== gen) return;
+      if (status === 200 && data && data.code && /^\d{6}$/.test(data.code)) {
+        el('code').innerHTML = data.code.substr(0, 3) + ' ' + data.code.substr(3);
+        pollPairing(g, data.sessionId, data.secret);
+      } else {
+        later(g, startPairing, status === 429 ? 60000 : RETRY_MS);
+      }
+    });
+  }
+  function pollPairing(g, sessionId, secret) {
+    later(g, function () {
+      request('POST', '/api/player/pair/status', { sessionId: sessionId, secret: secret }, null,
+        function (status, data) {
+          if (g !== gen) return;
+          if (status === 200 && data) {
+            if (data.status === 'paired' && data.token) { setToken(data.token); startPlayback(); return; }
+            if (data.status === 'expired') { startPairing(); return; }
+          }
+          pollPairing(g, sessionId, secret);
+        });
+    }, PAIR_MS);
+  }
+
+  // ---- playback
+  function startPlayback() {
+    var g = enter('playing');
+    pollState(g);
+  }
+  function pollState(g) {
+    var token = getToken();
+    if (!token) { startPairing(); return; }
+    var v = shownVersion === null ? '' : String(shownVersion);
+    var url = '/api/player/state?v=' + encodeURIComponent(v) + '&_=' + new Date().getTime();
+    request('GET', url, null, token, function (status, data) {
+      if (g !== gen) return;
+      if (status === 401) { clearToken(); startPairing(); return; } // disconnected from dashboard
+      if (status === 200 && data) {
+        setStatus('');
+        if (!data.unchanged) apply(data);
+      } else if (!hasImage && shownVersion === null) {
+        setStatus('');
+        showScreen('connecting'); // nothing on screen yet
+      } else {
+        // Keep the last image (or the empty state) and say we're retrying.
+        setStatus('Reconnecting...');
+      }
+      later(g, function () { pollState(g); }, STATE_MS);
+    });
+  }
+  function apply(d) {
+    if (typeof d.version !== 'number') return;
+    if (!d.url) {
+      preloadImg = null; loadingVersion = null;
+      clearImages();
+      showScreen('empty');
+      shownVersion = d.version;
+      return;
+    }
+    if (loadingVersion === d.version) return; // already downloading this one
+    var img = new Image(), v = d.version, src = d.url;
+    loadingVersion = v;
+    preloadImg = img;
+    var giveUp = setTimeout(function () {
+      if (preloadImg === img) { preloadImg = null; loadingVersion = null; }
+    }, LOAD_TIMEOUT_MS);
+    img.onload = function () {
+      clearTimeout(giveUp);
+      if (preloadImg !== img) return;
+      preloadImg = null; loadingVersion = null;
+      swapTo(src);
+      shownVersion = v;
+    };
+    img.onerror = function () {
+      // Keep the last image; next poll gets a fresh URL and retries.
+      clearTimeout(giveUp);
+      if (preloadImg === img) { preloadImg = null; loadingVersion = null; }
+    };
+    img.src = src;
+  }
+
+  // ---- fullscreen on first interaction, if supported (never required)
+  function tryFullscreen() {
+    var d = document.documentElement;
+    var fn = d.requestFullscreen || d.webkitRequestFullscreen || d.webkitRequestFullScreen || d.msRequestFullscreen;
+    if (fn) { try { fn.call(d); } catch (e) {} }
+    document.removeEventListener('click', tryFullscreen);
+    document.removeEventListener('keydown', tryFullscreen);
+  }
+  document.addEventListener('click', tryFullscreen);
+  document.addEventListener('keydown', tryFullscreen);
+
+  // Check right away when the network comes back.
+  window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });
+
+  if (getToken()) startPlayback(); else startPairing();
+})();
+</script>
+</body>
+</html>

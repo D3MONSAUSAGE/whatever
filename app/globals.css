@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #17201c;
+  --color-paper: #f3f5f4;
+  --color-line: #dce2df;
+  --color-muted: #5c6863;
+  --color-live: #14a35b;
+  --color-danger: #b8342a;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body { background: var(--color-paper); color: var(--color-ink); -webkit-tap-highlight-color: transparent; }
+
+/* The screen as it looks on the wall: black panel, dark bezel. */
+.tv { aspect-ratio: 16 / 9; background: #000; border: 7px solid var(--color-ink); border-radius: 10px; overflow: hidden; }
+.tv img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px;
+  border-radius: 8px; font-weight: 600; font-size: 15px; }
+.btn:focus-visible, input:focus-visible { outline: 3px solid #7fb69a; outline-offset: 2px; }
+.btn:disabled { opacity: .5; }
+.btn-primary { background: var(--color-ink); color: #fff; }
+.btn-quiet { background: #fff; border: 1px solid var(--color-line); }
+.field { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid var(--color-line); border-radius: 8px; background: #fff; font-size: 16px; }
