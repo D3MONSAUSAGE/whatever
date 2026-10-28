@@ -28,8 +28,8 @@ describe.skipIf(!configured)("RLS account isolation", () => {
   it("keeps accounts, tokens, storage, and server functions apart", async () => {
     admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
     const password = `${randomUUID()}Aa1!`;
-    const emailA = `pantalla-rls-${randomUUID()}@example.com`;
-    const emailB = `pantalla-rls-${randomUUID()}@example.com`;
+    const emailA = `pantalla-rls-${randomUUID()}@mailinator.com`;
+    const emailB = `pantalla-rls-${randomUUID()}@mailinator.com`;
     const userA = await makeUser(admin, emailA, password, createdUsers);
     const userB = await makeUser(admin, emailB, password, createdUsers);
 

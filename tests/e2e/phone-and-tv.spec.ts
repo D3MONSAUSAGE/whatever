@@ -16,99 +16,130 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
   const phone = await phoneContext.newPage();
   const tv = await tvContext.newPage();
   const created: string[] = [];
+  const accountA = account();
+  const accountB = account();
+  created.push(accountA.email, accountB.email);
+
+  let code = "";
+  let firstUrl = "";
+  let secondUrl = "";
+  let lunchId = "";
+  let token = "";
 
   try {
-    const accountA = account();
-    const accountB = account();
-    created.push(accountA.email, accountB.email);
-
-    await signUp(phone, accountA);
-    await phone.getByRole("link", { name: "Settings" }).click();
-    await phone.getByRole("button", { name: "Sign out" }).click();
-    await phone.waitForURL("**/login**");
-    await signIn(phone, accountA);
-
-    await tv.goto("/player");
-    await expect(tv).toHaveTitle("Pantalla");
-    const code = await readCode(tv);
-
-    await phone.goto("/dashboard/media");
-    await upload(phone, "lunch-menu.png");
-    await expect(phone.getByText("lunch-menu.png")).toBeVisible();
-
-    await phone.goto("/dashboard/displays");
-    await phone.getByLabel("Code on the TV").fill(code);
-    await phone.getByLabel("TV name").fill("Front counter");
-    await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
-    await expect(phone.getByRole("heading", { name: "Front counter" })).toBeVisible();
-    await expect(tv.locator("#empty")).toHaveClass(/on/, { timeout: 20_000 });
-
-    await phone.getByRole("button", { name: "Change image" }).click();
-    await phone.getByRole("button", { name: "lunch-menu.png" }).click();
-    const firstUrl = await waitForImage(tv);
-
-    await phone.goto("/dashboard/media");
-    await upload(phone, "dinner-menu.png");
-    await expect(phone.getByText("dinner-menu.png")).toBeVisible();
-    const library = await authed(phone, "/api/media");
-    const items = library.body as { id: string; fileName: string }[];
-    const lunchId = items.find((item) => item.fileName === "lunch-menu.png")?.id;
-    const dinnerId = items.find((item) => item.fileName === "dinner-menu.png")?.id;
-    expect(lunchId).toBeTruthy();
-    expect(dinnerId).toBeTruthy();
-
-    await phone.goto("/dashboard/displays");
-    await phone.getByRole("button", { name: "Change image" }).click();
-    await phone.getByRole("button", { name: "dinner-menu.png" }).click();
-    const secondUrl = await waitForReplacement(tv, firstUrl);
-    expect(secondUrl).not.toBe(firstUrl);
-
-    await tvContext.setOffline(true);
-    await expect(tv.locator("#status")).toContainText("Reconnecting", { timeout: 30_000 });
-    expect(await shownUrl(tv)).toBe(secondUrl);
-    await expect(tv.locator("#connecting")).not.toHaveClass(/on/);
-    await tvContext.setOffline(false);
-    await expect(tv.locator("#status")).not.toHaveClass(/on/, { timeout: 30_000 });
-    expect(await shownUrl(tv)).toBe(secondUrl);
-
-    const token = await tv.evaluate(() => localStorage.getItem("pantalla_display_token"));
-    expect(token).toEqual(expect.any(String));
-    phone.once("dialog", (dialog) => dialog.accept());
-    await phone.getByRole("button", { name: "Disconnect" }).click();
-    await expect(tv.locator("#pair")).toHaveClass(/on/, { timeout: 25_000 });
-    expect(await tv.evaluate(() => localStorage.getItem("pantalla_display_token"))).toBeNull();
-    const revoked = await fetch(new URL("/api/player/state", baseURL), { headers: { "X-Display-Token": token || "" } });
-    expect(revoked.status).toBe(401);
-
-    await phone.getByRole("link", { name: "Settings" }).click();
-    await phone.getByRole("button", { name: "Sign out" }).click();
-    await phone.waitForURL("**/login**");
-    await signUp(phone, accountB);
-    await phone.goto("/dashboard/media");
-    await expect(phone.getByText("No images yet")).toBeVisible();
-    const foreignList = await authed(phone, "/api/media");
-    expect(foreignList.status).toBe(200);
-    expect(JSON.stringify(foreignList.body)).not.toContain(lunchId);
-    expect(JSON.stringify(foreignList.body)).not.toContain("lunch-menu.png");
-    const foreignDelete = await authed(phone, `/api/media/${lunchId}`, { method: "DELETE" });
-    expect(foreignDelete.status).toBe(404);
-
-    const nextCode = await readCode(tv);
-    expect(nextCode).not.toBe(code);
-    await phone.goto("/dashboard/displays");
-    await phone.getByLabel("Code on the TV").fill(nextCode);
-    await phone.getByLabel("TV name").fill("Other counter");
-    await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
-    await expect(phone.getByRole("heading", { name: "Other counter" })).toBeVisible();
-    const displays = await authed(phone, "/api/displays");
-    expect(displays.status).toBe(200);
-    const displayId = (displays.body as { id: string }[])[0]?.id;
-    expect(displayId).toBeTruthy();
-    const cross = await authed(phone, `/api/displays/${displayId}`, {
-      method: "PATCH",
-      json: { mediaId: lunchId },
+    await test.step("sign up", async () => {
+      await signUp(phone, accountA);
     });
-    expect(cross.status).toBe(404);
+
+    await test.step("sign out and sign in", async () => {
+      await phone.getByRole("link", { name: "Settings" }).click();
+      await phone.getByRole("button", { name: "Sign out" }).click();
+      await phone.waitForURL("**/login**");
+      await signIn(phone, accountA);
+    });
+
+    await test.step("TV shows a pairing code", async () => {
+      await tv.goto("/player");
+      await expect(tv).toHaveTitle("Pantalla");
+      code = await readCode(tv);
+    });
+
+    await test.step("upload the first menu", async () => {
+      await phone.goto("/dashboard/media");
+      await upload(phone, "lunch-menu.png");
+      await expect(phone.getByText("lunch-menu.png")).toBeVisible();
+    });
+
+    await test.step("pair the TV", async () => {
+      await phone.goto("/dashboard/displays");
+      await phone.getByLabel("Code on the TV").fill(code);
+      await phone.getByLabel("TV name").fill("Front counter");
+      await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
+      await expect(phone.getByRole("heading", { name: "Front counter" })).toBeVisible();
+      await expect(tv.locator("#empty")).toHaveClass(/on/, { timeout: 20_000 });
+    });
+
+    await test.step("publish the first menu", async () => {
+      await phone.getByRole("button", { name: "Change image" }).click();
+      await phone.getByRole("button", { name: "lunch-menu.png" }).click();
+      firstUrl = await waitForImage(tv);
+    });
+
+    await test.step("upload the replacement menu", async () => {
+      await phone.goto("/dashboard/media");
+      await upload(phone, "dinner-menu.png");
+      await expect(phone.getByText("dinner-menu.png")).toBeVisible();
+      const library = await authed(phone, "/api/media");
+      const items = library.body as { id: string; fileName: string }[];
+      lunchId = items.find((item) => item.fileName === "lunch-menu.png")?.id || "";
+      const dinnerId = items.find((item) => item.fileName === "dinner-menu.png")?.id;
+      expect(lunchId).toBeTruthy();
+      expect(dinnerId).toBeTruthy();
+    });
+
+    await test.step("replace the image on the TV", async () => {
+      await phone.goto("/dashboard/displays");
+      await phone.getByRole("button", { name: "Change image" }).click();
+      await phone.getByRole("button", { name: "dinner-menu.png" }).click();
+      secondUrl = await waitForReplacement(tv, firstUrl);
+      expect(secondUrl).not.toBe(firstUrl);
+    });
+
+    await test.step("network loss keeps the displayed image", async () => {
+      await tvContext.setOffline(true);
+      await expect(tv.locator("#status")).toContainText("Reconnecting", { timeout: 30_000 });
+      expect(await shownUrl(tv)).toBe(secondUrl);
+      await expect(tv.locator("#connecting")).not.toHaveClass(/on/);
+      await tvContext.setOffline(false);
+      await expect(tv.locator("#status")).not.toHaveClass(/on/, { timeout: 30_000 });
+      expect(await shownUrl(tv)).toBe(secondUrl);
+    });
+
+    await test.step("disconnect revokes the display token", async () => {
+      token = (await tv.evaluate(() => localStorage.getItem("pantalla_display_token"))) || "";
+      expect(token).toEqual(expect.any(String));
+      expect(token.length).toBeGreaterThan(0);
+      phone.once("dialog", (dialog) => dialog.accept());
+      await phone.getByRole("button", { name: "Disconnect" }).click();
+      await expect(tv.locator("#pair")).toHaveClass(/on/, { timeout: 25_000 });
+      expect(await tv.evaluate(() => localStorage.getItem("pantalla_display_token"))).toBeNull();
+      const revoked = await fetch(new URL("/api/player/state", baseURL), { headers: { "X-Display-Token": token } });
+      expect(revoked.status).toBe(401);
+    });
+
+    await test.step("another account cannot read the menu", async () => {
+      await phone.getByRole("link", { name: "Settings" }).click();
+      await phone.getByRole("button", { name: "Sign out" }).click();
+      await phone.waitForURL("**/login**");
+      await signUp(phone, accountB);
+      await phone.goto("/dashboard/media");
+      await expect(phone.getByText("No images yet")).toBeVisible();
+      const foreignList = await authed(phone, "/api/media");
+      expect(foreignList.status).toBe(200);
+      expect(JSON.stringify(foreignList.body)).not.toContain(lunchId);
+      expect(JSON.stringify(foreignList.body)).not.toContain("lunch-menu.png");
+      const foreignDelete = await authed(phone, `/api/media/${lunchId}`, { method: "DELETE" });
+      expect(foreignDelete.status).toBe(404);
+    });
+
+    await test.step("another account cannot publish the first account's image", async () => {
+      const nextCode = await readCode(tv);
+      expect(nextCode).not.toBe(code);
+      await phone.goto("/dashboard/displays");
+      await phone.getByLabel("Code on the TV").fill(nextCode);
+      await phone.getByLabel("TV name").fill("Other counter");
+      await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
+      await expect(phone.getByRole("heading", { name: "Other counter" })).toBeVisible();
+      const displays = await authed(phone, "/api/displays");
+      expect(displays.status).toBe(200);
+      const displayId = (displays.body as { id: string }[])[0]?.id;
+      expect(displayId).toBeTruthy();
+      const cross = await authed(phone, `/api/displays/${displayId}`, {
+        method: "PATCH",
+        json: { mediaId: lunchId },
+      });
+      expect(cross.status).toBe(404);
+    });
   } finally {
     await phoneContext.close();
     await tvContext.close();
@@ -118,7 +149,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
 
 function account() {
   return {
-    email: `pantalla-e2e-${Date.now()}-${randomUUID().slice(0, 8)}@example.com`,
+    email: `pantalla-e2e-${randomUUID()}@mailinator.com`,
     password: `Pantalla-${randomUUID()}`,
   };
 }

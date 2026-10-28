@@ -66,7 +66,7 @@ npx playwright install chromium
 BASE_URL=https://YOUR-APP.vercel.app npm run test:e2e
 ```
 
-`test:e2e` signs up two users through the UI, so Confirm email must be off and `${BASE_URL}/dashboard` must be a redirect URL. If `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL` are also set in that shell, the test deletes the users it created (`pantalla-e2e-...@example.com`).
+`test:e2e` signs up two users through the UI, so Confirm email must be off and `${BASE_URL}/dashboard` must be a redirect URL. If `SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_SUPABASE_URL` are also set in that shell, the test deletes the users it created (`pantalla-e2e-...@mailinator.com`).
 
 `npm test` always runs the unit tests, the API tests, and the player simulation. The RLS file is part of that run and skips itself when the Supabase variables are absent.
 
