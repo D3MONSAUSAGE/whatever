@@ -6,13 +6,14 @@ Pantalla needs one Supabase project and one Vercel project. Nothing is shared wi
 
 1. Create a new project at [supabase.com](https://supabase.com).
 2. Open the SQL Editor and run [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) once. It creates the tables, row-level security, the private `media` bucket, and the server-only functions. Running it twice fails with "relation already exists". That is expected. See [RECOVERY.md](RECOVERY.md).
-3. In **Authentication → URL Configuration**:
+3. For playlists, run [`supabase/migrations/0002_playlists.sql`](supabase/migrations/0002_playlists.sql) once after that. Until it is applied, sign-in, pairing, and single-image publishing keep working, and the Playlists page says the migration is missing. Rollback steps are in [docs/PHASE_2A_PLAN.md](docs/PHASE_2A_PLAN.md).
+4. In **Authentication → URL Configuration**:
    - **Site URL:** `https://YOUR-APP.vercel.app` (use `http://localhost:3000` while you are only developing locally).
    - **Redirect URLs:** add each of these that you use:
      - `http://localhost:3000/dashboard`
      - `https://YOUR-APP.vercel.app/dashboard`
-4. For the first TV test and for `npm run test:e2e`, open **Authentication → Providers → Email** and turn **Confirm email** off. You can turn it back on later. With it on, sign-up shows "Check your email" and does not create a session until the link is opened.
-5. In **Project Settings → API keys**, copy:
+5. For the first TV test and for `npm run test:e2e`, open **Authentication → Providers → Email** and turn **Confirm email** off. You can turn it back on later. With it on, sign-up shows "Check your email" and does not create a session until the link is opened.
+6. In **Project Settings → API keys**, copy:
    - the project URL
    - the **publishable** key (`sb_publishable_...`), or the legacy `anon` key if the project has not created new keys yet
    - a **secret** key (`sb_secret_...`), or the legacy `service_role` key

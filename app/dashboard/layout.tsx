@@ -8,6 +8,7 @@ const NAV = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/media", label: "Media" },
   { href: "/dashboard/displays", label: "Displays" },
+  { href: "/dashboard/playlists", label: "Playlists" },
   { href: "/dashboard/settings", label: "Settings" },
 ];
 
@@ -40,10 +41,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ))}
       </nav>
       <main className="flex-1 px-4 pt-6 pb-28 md:px-10 md:pb-10 max-w-5xl">{children}</main>
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         {NAV.map((n) => (
           <Link key={n.href} href={n.href}
-            className={`py-4 text-center text-sm font-medium ${isActive(n.href) ? "text-ink" : "text-muted"}`}>
+            className={`px-1 py-3 text-center text-xs font-medium ${isActive(n.href) ? "text-ink" : "text-muted"}`}>
             <span className={isActive(n.href) ? "border-b-2 border-ink pb-1" : ""}>{n.label}</span>
           </Link>
         ))}

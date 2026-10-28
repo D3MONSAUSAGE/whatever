@@ -13,6 +13,8 @@
     background-repeat: no-repeat; background-position: center center;
     -webkit-background-size: contain; background-size: contain; visibility: hidden; }
   .layer.on { visibility: visible; }
+  .layer.fade { opacity: 0; -webkit-transition: opacity 0.6s linear; transition: opacity 0.6s linear; }
+  .layer.fade.on { opacity: 1; }
   .screen { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #000;
     display: none; z-index: 2000000; }
   .screen.on { display: block; }
@@ -61,6 +63,8 @@
   var mode = '', gen = 0, timer = null;
   var shownVersion = null, loadingVersion = null, preloadImg = null, hasImage = false;
   var memToken = null;
+  var playlist = null, slideIndex = 0, slideToken = 0, slideTimer = null;
+  var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
 
   // ---- token storage (memory fallback if localStorage is unavailable)
   function getToken() {
@@ -134,23 +138,125 @@
     hasImage = false;
   }
   // The new image is already fully loaded; put it on top of the old one, then hide the old one.
-  function swapTo(url) {
+  // fade is only used between playlist slides. A single image keeps the original swap.
+  function swapTo(url, fade) {
     var next = layers[1 - active], prev = layers[active];
+    var hold = 1500;
     next.style.backgroundImage = 'url("' + url + '")';
     z++;
     next.style.zIndex = z;
-    next.className = 'layer on';
+    if (fade) {
+      next.className = 'layer fade';
+      if (next.offsetWidth < 0) next.className = 'layer fade';
+      next.className = 'layer fade on';
+      hold = 900;
+    } else {
+      next.className = 'layer on';
+    }
     active = 1 - active;
     hasImage = true;
     showScreen('');
     setTimeout(function () {
       if (layers[active] !== prev) { prev.className = 'layer'; prev.style.backgroundImage = 'none'; }
-    }, 1500);
+    }, hold);
+  }
+
+  function clearSlideTimer() {
+    if (slideTimer) { clearTimeout(slideTimer); slideTimer = null; }
+  }
+  function stopPlaylist() {
+    playlist = null;
+    clearSlideTimer();
+    slideToken++;
+    needRefresh = false;
+    urlRefreshAt = 0;
+    loadedUrls = {};
+  }
+  function cached(url) { return loadedUrls[url] === 1; }
+  function remember(url) { loadedUrls[url] = 1; }
+  function preloadIndex(index) {
+    if (!playlist) return;
+    var url = playlist.items[index].url;
+    if (cached(url)) return;
+    var img = new Image();
+    var token = slideToken;
+    img.onload = function () { if (token === slideToken) remember(url); };
+    img.onerror = function () {};
+    img.src = url;
+  }
+  function present(index, versionOrNull) {
+    if (!playlist) return;
+    var item = playlist.items[index];
+    var token = slideToken;
+    function commit() {
+      if (token !== slideToken || !playlist) return;
+      swapTo(item.url, playlist.transition === 'fade');
+      slideIndex = index;
+      if (typeof versionOrNull === 'number') shownVersion = versionOrNull;
+      preloadIndex((index + 1) % playlist.items.length);
+      clearSlideTimer();
+      var waitToken = slideToken;
+      slideTimer = setTimeout(function () {
+        if (waitToken !== slideToken || !playlist) return;
+        present((index + 1) % playlist.items.length, null);
+      }, item.durationMs);
+    }
+    if (cached(item.url)) { commit(); return; }
+    var img = new Image();
+    img.onload = function () { remember(item.url); commit(); };
+    img.onerror = function () {
+      if (token !== slideToken) return;
+      needRefresh = true;
+      clearSlideTimer();
+      slideTimer = setTimeout(function () {
+        if (token !== slideToken) return;
+        present(index, versionOrNull);
+      }, 3000);
+    };
+    img.src = item.url;
+  }
+  function refreshPlaylistUrls(items) {
+    var i;
+    if (!playlist) return;
+    for (i = 0; i < playlist.items.length && i < items.length; i++) {
+      if (playlist.items[i].mediaId === items[i].mediaId && playlist.items[i].url !== items[i].url) {
+        delete loadedUrls[playlist.items[i].url];
+        playlist.items[i].url = items[i].url;
+        playlist.items[i].durationMs = items[i].durationMs;
+      }
+    }
+    needRefresh = false;
+    urlRefreshAt = new Date().getTime() + 1800000;
+  }
+  function beginPlaylist(version, incoming) {
+    var items = [], list = incoming.items || [], i, it, ms;
+    for (i = 0; i < list.length; i++) {
+      it = list[i];
+      ms = it && it.durationMs;
+      if (!it || !it.url || typeof ms !== 'number' || ms < 1000) continue;
+      items.push({ url: it.url, durationMs: ms, mediaId: it.mediaId || '' });
+    }
+    if (!items.length) return;
+    if (playlist && shownVersion === version && playlist.id === (incoming.id || '')) {
+      refreshPlaylistUrls(items);
+      return;
+    }
+    preloadImg = null;
+    loadingVersion = null;
+    stopPlaylist();
+    playlist = {
+      id: incoming.id || '',
+      transition: incoming.transition === 'fade' ? 'fade' : 'none',
+      items: items
+    };
+    urlRefreshAt = new Date().getTime() + 1800000;
+    present(0, version);
   }
 
   // ---- pairing
   function startPairing() {
     var g = enter('pairing');
+    stopPlaylist();
     clearImages();
     setStatus('');
     shownVersion = null; loadingVersion = null; preloadImg = null;
@@ -189,7 +295,9 @@
     var token = getToken();
     if (!token) { startPairing(); return; }
     var v = shownVersion === null ? '' : String(shownVersion);
-    var url = '/api/player/state?v=' + encodeURIComponent(v) + '&_=' + new Date().getTime();
+    var refresh = '';
+    if (playlist && (needRefresh || (urlRefreshAt && new Date().getTime() > urlRefreshAt))) refresh = '&refresh=1';
+    var url = '/api/player/state?v=' + encodeURIComponent(v) + refresh + '&_=' + new Date().getTime();
     request('GET', url, null, token, function (status, data) {
       if (g !== gen) return;
       if (status === 401) { clearToken(); startPairing(); return; } // disconnected from dashboard
@@ -208,6 +316,11 @@
   }
   function apply(d) {
     if (typeof d.version !== 'number') return;
+    if (d.playlist && d.playlist.items && d.playlist.items.length) {
+      beginPlaylist(d.version, d.playlist);
+      return;
+    }
+    stopPlaylist();
     if (!d.url) {
       preloadImg = null; loadingVersion = null;
       clearImages();

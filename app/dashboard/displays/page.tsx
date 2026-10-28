@@ -38,7 +38,9 @@ export default function Displays() {
                 <h2 className="font-semibold truncate">{d.name}</h2>
                 <Status display={d} />
               </div>
-              <p className="text-sm text-muted truncate">{d.media ? `Showing ${d.media.fileName}` : "Nothing published yet"}</p>
+              <p className="text-sm text-muted truncate">
+                {d.media ? `Showing ${d.media.fileName}` : d.playlist ? `Showing playlist ${d.playlist.name}` : "Nothing published yet"}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button className="btn btn-primary flex-1" onClick={() => setPicking(d)}>Change image</button>
                 <button className="btn btn-quiet" onClick={() => rename(d)}>Rename</button>
@@ -109,7 +111,10 @@ function Picker({ display, onClose, onPublished, onError }: {
           <h2 className="text-lg font-semibold">Publish to {display.name}</h2>
           <button className="btn px-3" onClick={onClose} aria-label="Close">Close</button>
         </div>
-        <p className="text-sm text-muted mb-4">Tap an image. The TV updates within about 10 seconds.</p>
+        <p className="text-sm text-muted mb-4">
+          Tap an image. The TV updates within about 10 seconds.
+          {display.playlist ? " This replaces the playlist on this TV." : ""}
+        </p>
         {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : media.data.length === 0 ? (
           <p className="text-muted">Upload an image in Media first.</p>
         ) : (

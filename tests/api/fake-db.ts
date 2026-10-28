@@ -8,13 +8,15 @@ export type Store = {
   locations: Row[];
   media: Row[];
   displays: Row[];
+  playlists: Row[];
+  playlist_items: Row[];
   pairing_sessions: Row[];
   rate_limits: Row[];
   objects: Map<string, Uint8Array>;
   users: Map<string, { id: string; email: string }>;
 };
 
-const TABLE_NAMES = ["accounts", "locations", "media", "displays", "pairing_sessions", "rate_limits"] as const;
+const TABLE_NAMES = ["accounts", "locations", "media", "displays", "playlists", "playlist_items", "pairing_sessions", "rate_limits"] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
 function isTable(name: string): name is TableName {
@@ -50,6 +52,13 @@ function insertRow(store: Store, table: TableName, row: Row) {
   if (table === "displays") {
     if (!row.status) row.status = "active";
     if (row.content_version == null) row.content_version = 0;
+    if (row.assigned_playlist_id === undefined) row.assigned_playlist_id = null;
+  }
+  if (table === "playlists") {
+    if (row.default_duration_ms == null) row.default_duration_ms = 10000;
+    if (!row.transition) row.transition = "none";
+    if (row.revision == null) row.revision = 0;
+    if (!row.updated_at) row.updated_at = row.created_at;
   }
   store[table].push(row);
   return { row, error: null as null };
@@ -60,6 +69,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     type: "select" | "insert" | "update";
     select?: string;
     filters: [string, unknown][];
+    inFilters: [string, unknown[]][];
     order?: { col: string; ascending: boolean };
     insert?: Row;
     update?: Row;
@@ -68,7 +78,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
   private done: Promise<{ data: unknown; error: { message: string; code?: string } | null }> | null = null;
 
   constructor(private store: Store, private table: TableName) {
-    this.op = { type: "select", filters: [], mode: "many" };
+    this.op = { type: "select", filters: [], inFilters: [], mode: "many" };
   }
 
   select(cols = "*") {
@@ -87,6 +97,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
   }
   eq(key: string, value: unknown) {
     this.op.filters.push([key, value]);
+    return this;
+  }
+  in(key: string, values: unknown[]) {
+    this.op.inFilters.push([key, values]);
     return this;
   }
   order(col: string, opts?: { ascending?: boolean }) {
@@ -111,7 +125,9 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
 
   private async exec() {
     const rows = this.store[this.table];
-    const match = () => rows.filter((row) => this.op.filters.every(([key, value]) => row[key] === value));
+    const match = () => rows.filter((row) =>
+      this.op.filters.every(([key, value]) => row[key] === value) &&
+      this.op.inFilters.every(([key, values]) => values.includes(row[key])));
 
     if (this.op.type === "insert") {
       const result = insertRow(this.store, this.table, { ...(this.op.insert ?? {}) });
@@ -130,7 +146,12 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     let found = match().map((row) => project(this.store, row, this.op.select));
     if (this.op.order) {
       const { col, ascending } = this.op.order;
-      found = found.sort((a, b) => String(a[col] ?? "").localeCompare(String(b[col] ?? "")) * (ascending ? 1 : -1));
+      found = found.sort((a, b) => {
+        const av = a[col];
+        const bv = b[col];
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * (ascending ? 1 : -1);
+        return String(av ?? "").localeCompare(String(bv ?? "")) * (ascending ? 1 : -1);
+      });
     }
     return shape(found, this.op.mode);
   }
@@ -193,6 +214,7 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
       location_id: location?.id ?? null,
       name: args.p_name,
       assigned_media_id: null,
+      assigned_playlist_id: null,
       content_version: 0,
       token_hash: null,
       status: "active",
@@ -225,10 +247,14 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
       item.id === args.p_display_id && item.account_id === args.p_account_id && item.status === "active");
     if (!display) return false;
     display.assigned_media_id = args.p_media_id;
+    display.assigned_playlist_id = null;
     display.content_version = Number(display.content_version) + 1;
     return true;
   }
   if (name === "delete_media") {
+    if (store.playlist_items.some((item) => item.media_id === args.p_media_id && item.account_id === args.p_account_id)) {
+      throw new Error("media_in_playlist");
+    }
     for (const display of store.displays) {
       if (display.assigned_media_id === args.p_media_id && display.account_id === args.p_account_id) {
         display.assigned_media_id = null;
@@ -241,7 +267,119 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     store.media.splice(index, 1);
     return path;
   }
+  if (name === "save_playlist") return savePlaylist(store, args);
+  if (name === "publish_playlist") return publishPlaylist(store, args);
+  if (name === "delete_playlist") return deletePlaylist(store, args);
+  if (name === "player_playlist") return playerPlaylist(store, args);
   throw new Error(`Unknown rpc ${name}`);
+}
+
+function savePlaylist(store: Store, args: Record<string, unknown>) {
+  const playlist = store.playlists.find((item) => item.id === args.p_playlist_id && item.account_id === args.p_account_id);
+  if (!playlist) return false;
+  const name = String(args.p_name ?? "").trim();
+  const duration = Number(args.p_default_duration_ms);
+  const transition = String(args.p_transition ?? "");
+  const items = Array.isArray(args.p_items) ? args.p_items as { mediaId?: string; durationMs?: number | null }[] : null;
+  if (!name || name.length > 80 || !Number.isInteger(duration) || duration < 1000 || duration > 600000) return false;
+  if (transition !== "none" && transition !== "fade") return false;
+  if (!items || items.length > 40) return false;
+  for (const item of items) {
+    if (!store.media.some((media) => media.id === item.mediaId && media.account_id === args.p_account_id)) return false;
+    if (item.durationMs != null && (!Number.isInteger(item.durationMs) || item.durationMs < 1000 || item.durationMs > 600000)) return false;
+  }
+  playlist.name = name;
+  playlist.default_duration_ms = duration;
+  playlist.transition = transition;
+  playlist.updated_at = new Date().toISOString();
+  store.playlist_items = store.playlist_items.filter((item) => !(item.playlist_id === playlist.id && item.kind === "draft"));
+  items.forEach((item, index) => {
+    store.playlist_items.push({
+      id: crypto.randomUUID(),
+      playlist_id: playlist.id,
+      account_id: playlist.account_id,
+      media_id: item.mediaId,
+      kind: "draft",
+      position: index,
+      duration_ms: item.durationMs ?? null,
+      created_at: new Date().toISOString(),
+    });
+  });
+  return true;
+}
+
+function publishPlaylist(store: Store, args: Record<string, unknown>) {
+  const playlist = store.playlists.find((item) => item.id === args.p_playlist_id && item.account_id === args.p_account_id);
+  const displayIds = Array.isArray(args.p_display_ids) ? args.p_display_ids as string[] : [];
+  if (!playlist || displayIds.length < 1 || displayIds.length > 50) return false;
+  const displays = displayIds.map((id) => store.displays.find((item) => item.id === id && item.account_id === args.p_account_id && item.status === "active"));
+  if (displays.some((item) => !item)) return false;
+  const draft = store.playlist_items
+    .filter((item) => item.playlist_id === playlist.id && item.kind === "draft")
+    .sort((a, b) => Number(a.position) - Number(b.position));
+  if (!draft.length) return false;
+  store.playlist_items = store.playlist_items.filter((item) => !(item.playlist_id === playlist.id && item.kind === "published"));
+  for (const item of draft) {
+    store.playlist_items.push({
+      ...item,
+      id: crypto.randomUUID(),
+      kind: "published",
+      duration_ms: item.duration_ms ?? playlist.default_duration_ms,
+    });
+  }
+  const now = new Date().toISOString();
+  playlist.published_at = now;
+  playlist.published_transition = playlist.transition;
+  playlist.revision = Number(playlist.revision ?? 0) + 1;
+  playlist.updated_at = now;
+  const chosen = new Set(displayIds);
+  for (const display of store.displays) {
+    if (display.account_id !== args.p_account_id || display.status !== "active") continue;
+    if (chosen.has(String(display.id))) {
+      display.assigned_playlist_id = playlist.id;
+      display.assigned_media_id = null;
+      display.content_version = Number(display.content_version) + 1;
+    } else if (display.assigned_playlist_id === playlist.id) {
+      display.assigned_playlist_id = null;
+      display.content_version = Number(display.content_version) + 1;
+    }
+  }
+  return true;
+}
+
+function deletePlaylist(store: Store, args: Record<string, unknown>) {
+  const index = store.playlists.findIndex((item) => item.id === args.p_playlist_id && item.account_id === args.p_account_id);
+  if (index < 0) return false;
+  for (const display of store.displays) {
+    if (display.account_id === args.p_account_id && display.assigned_playlist_id === args.p_playlist_id) {
+      display.assigned_playlist_id = null;
+      display.content_version = Number(display.content_version) + 1;
+    }
+  }
+  store.playlist_items = store.playlist_items.filter((item) => item.playlist_id !== args.p_playlist_id);
+  store.playlists.splice(index, 1);
+  return true;
+}
+
+function playerPlaylist(store: Store, args: Record<string, unknown>) {
+  const display = store.displays.find((item) => item.token_hash === args.p_token_hash && item.status === "active");
+  if (!display || !display.assigned_playlist_id || display.assigned_media_id) return [];
+  const playlist = store.playlists.find((item) => item.id === display.assigned_playlist_id);
+  if (!playlist) return [];
+  return store.playlist_items
+    .filter((item) => item.playlist_id === playlist.id && item.kind === "published")
+    .sort((a, b) => Number(a.position) - Number(b.position))
+    .map((item) => {
+      const media = store.media.find((row) => row.id === item.media_id);
+      return {
+        playlist_id: playlist.id,
+        transition: playlist.published_transition,
+        position: item.position,
+        media_id: item.media_id,
+        storage_path: media?.storage_path ?? null,
+        duration_ms: item.duration_ms,
+      };
+    });
 }
 
 export function createFakeDb() {
@@ -250,6 +388,8 @@ export function createFakeDb() {
     locations: [],
     media: [],
     displays: [],
+    playlists: [],
+    playlist_items: [],
     pairing_sessions: [],
     rate_limits: [],
     objects: new Map(),

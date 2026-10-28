@@ -33,7 +33,7 @@ export default function MediaLibrary() {
   }
 
   async function remove(m: MediaItem) {
-    if (!confirm(`Delete “${m.fileName}”? Any TV showing it will switch to “No content assigned”.`)) return;
+    if (!confirm(`Delete “${m.fileName}”? Any TV showing it will switch to “No content assigned”. Images used in a playlist must be removed from that playlist first.`)) return;
     try {
       await api(`/api/media/${m.id}`, { method: "DELETE" });
       toast.show("Deleted");

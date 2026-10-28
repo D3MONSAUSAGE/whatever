@@ -34,7 +34,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
     await test.step("sign out and sign in", async () => {
       await phone.getByRole("link", { name: "Settings" }).click();
       await phone.getByRole("button", { name: "Sign out" }).click();
-      await phone.waitForURL("**/login**");
+      await expect(phone).toHaveURL(/\/login/);
       await signIn(phone, accountA);
     });
 
@@ -110,7 +110,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
     await test.step("another account cannot read the menu", async () => {
       await phone.getByRole("link", { name: "Settings" }).click();
       await phone.getByRole("button", { name: "Sign out" }).click();
-      await phone.waitForURL("**/login**");
+      await expect(phone).toHaveURL(/\/login/);
       await signUp(phone, accountB);
       await phone.goto("/dashboard/media");
       await expect(phone.getByText("No images yet")).toBeVisible();
@@ -238,6 +238,129 @@ async function authed(page: Page, path: string, init?: { method?: string; json?:
     try { body = await res.json(); } catch { body = null; }
     return { status: res.status, body };
   }, { path, init });
+}
+
+test("a playlist loops three slides, then a single image holds", async ({ browser }) => {
+  const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const tvContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const phone = await phoneContext.newPage();
+  const tv = await tvContext.newPage();
+  const created: string[] = [];
+  const owner = account();
+  created.push(owner.email);
+
+  try {
+    await signUp(phone, owner);
+    await tv.goto("/player");
+    const code = await readCode(tv);
+    await phone.goto("/dashboard/media");
+    for (const name of ["slide-a.png", "slide-b.png", "slide-c.png"]) {
+      await upload(phone, name);
+      await expect(phone.getByText(name)).toBeVisible();
+    }
+    await phone.goto("/dashboard/displays");
+    await phone.getByLabel("Code on the TV").fill(code);
+    await phone.getByLabel("TV name").fill("Front counter");
+    await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
+    await expect(phone.getByRole("heading", { name: "Front counter" })).toBeVisible();
+    await expect(tv.locator("#empty")).toHaveClass(/on/, { timeout: 20_000 });
+
+    const library = await authed(phone, "/api/media");
+    const items = library.body as { id: string; fileName: string }[];
+    const idOf = (name: string) => items.find((item) => item.fileName === name)?.id || "";
+    const ids = { a: idOf("slide-a.png"), b: idOf("slide-b.png"), c: idOf("slide-c.png") };
+    expect(ids.a && ids.b && ids.c).toBeTruthy();
+
+    await phone.getByRole("link", { name: "Playlists" }).click();
+    await phone.getByLabel("Playlist name").fill("Lunch loop");
+    await phone.getByRole("button", { name: "Create playlist" }).click();
+    await expect(phone.getByRole("heading", { name: "Edit playlist" })).toBeVisible();
+    for (const name of ["slide-a.png", "slide-b.png", "slide-c.png"]) {
+      await phone.getByRole("button", { name: "Add images" }).click();
+      await phone.getByRole("checkbox", { name }).check();
+      await phone.getByRole("button", { name: "Add selected" }).click();
+    }
+    await phone.getByLabel("Seconds for slide-a.png").fill("2");
+    await phone.getByLabel("Seconds for slide-b.png").fill("3");
+    await phone.getByLabel("Seconds for slide-c.png").fill("4");
+    await phone.getByLabel("Transition").selectOption("none");
+    await phone.getByRole("checkbox", { name: "Front counter" }).check();
+    await phone.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+    await phone.setViewportSize({ width: 1280, height: 800 });
+    await expect(phone.locator("nav").first().getByRole("link", { name: "Playlists" })).toBeVisible();
+    await expect(phone.getByRole("button", { name: "Publish", exact: true })).toBeVisible();
+    await phone.setViewportSize({ width: 390, height: 844 });
+
+    const firstLoop = await slideChanges(tv, ids, 4, 40_000);
+    expect(firstLoop.map((event) => event.id)).toEqual([ids.a, ids.b, ids.c, ids.a]);
+    const gap = (index: number) => firstLoop[index].at - firstLoop[index - 1].at;
+    expect(gap(1)).toBeGreaterThan(1000);
+    expect(gap(1)).toBeLessThan(4500);
+    expect(gap(2)).toBeGreaterThan(1800);
+    expect(gap(2)).toBeLessThan(5500);
+    expect(gap(3)).toBeGreaterThan(2500);
+    expect(gap(3)).toBeLessThan(7000);
+
+    await phone.goto("/dashboard/media");
+    await upload(phone, "slide-d.png");
+    await expect(phone.getByText("slide-d.png")).toBeVisible();
+    const again = await authed(phone, "/api/media");
+    const dId = (again.body as { id: string; fileName: string }[]).find((item) => item.fileName === "slide-d.png")?.id || "";
+    expect(dId).toBeTruthy();
+    await phone.goto("/dashboard/playlists");
+    await phone.getByRole("link", { name: "Lunch loop" }).click();
+    await phone.getByRole("button", { name: "Add images" }).click();
+    await phone.getByRole("checkbox", { name: "slide-d.png" }).check();
+    await phone.getByRole("button", { name: "Add selected" }).click();
+    for (let step = 0; step < 3; step++) await phone.getByRole("button", { name: "Move slide-d.png up" }).click();
+    await phone.getByRole("checkbox", { name: "Front counter" }).check();
+    await phone.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+    expect(tv.url()).toContain("/player");
+    await expect.poll(async () => (await shownUrl(tv)).includes(dId), { timeout: 25_000 }).toBe(true);
+    const updated = await slideChanges(tv, { a: ids.a, d: dId }, 2, 20_000);
+    expect(updated.map((event) => event.id)).toEqual([dId, ids.a]);
+
+    await phone.goto("/dashboard/media");
+    await upload(phone, "slide-e.png");
+    await expect(phone.getByText("slide-e.png")).toBeVisible();
+    const withStill = await authed(phone, "/api/media");
+    const stillId = (withStill.body as { id: string; fileName: string }[]).find((item) => item.fileName === "slide-e.png")?.id || "";
+    expect(stillId).toBeTruthy();
+    await phone.goto("/dashboard/displays");
+    await phone.getByRole("button", { name: "Change image" }).click();
+    await phone.getByRole("button", { name: "slide-e.png" }).click();
+    await expect.poll(async () => (await shownUrl(tv)).includes(stillId), { timeout: 20_000 }).toBe(true);
+    const holdUntil = Date.now() + 5000;
+    while (Date.now() < holdUntil) {
+      const url = await shownUrl(tv);
+      expect(url).toContain(stillId);
+      expect(url).not.toContain(ids.a);
+      expect(url).not.toContain(dId);
+      await tv.waitForTimeout(400);
+    }
+  } finally {
+    await phoneContext.close();
+    await tvContext.close();
+    await deleteTestUsers(created);
+  }
+});
+
+async function slideChanges(tv: Page, ids: Record<string, string>, count: number, timeout: number) {
+  const events: { id: string; at: number }[] = [];
+  let last = "";
+  const start = Date.now();
+  while (events.length < count && Date.now() - start < timeout) {
+    const url = await shownUrl(tv);
+    const id = Object.keys(ids).map((key) => ids[key]).find((mediaId) => mediaId && url.includes(mediaId)) || "";
+    if (id && id !== last) {
+      events.push({ id, at: Date.now() });
+      last = id;
+    }
+    await tv.waitForTimeout(100);
+  }
+  return events;
 }
 
 async function deleteTestUsers(emails: string[]) {

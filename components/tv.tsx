@@ -2,7 +2,7 @@
 import { timeAgo, type DisplayItem } from "@/lib/api";
 
 export function Tv({ display, onClick }: { display: DisplayItem; onClick?: () => void }) {
-  const url = display.media?.url;
+  const url = display.media?.url || display.playlist?.url || null;
   return (
     <button type="button" onClick={onClick} disabled={!url || !onClick}
       aria-label={url ? `Preview what ${display.name} shows` : undefined}

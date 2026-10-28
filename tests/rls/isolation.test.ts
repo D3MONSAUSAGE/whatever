@@ -6,7 +6,15 @@ import { jpeg } from "../helpers/bytes";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const configured = url.startsWith("https://") && anon.length > 20 && service.length > 20 && !anon.includes("your-");
+const localUrl = (() => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" && (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost");
+  } catch {
+    return false;
+  }
+})();
+const configured = (url.startsWith("https://") || localUrl) && anon.length > 20 && service.length > 20 && !anon.includes("your-");
 
 if (!configured) {
   console.log(
@@ -82,6 +90,67 @@ describe.skipIf(!configured)("RLS account isolation", () => {
     expect(adminLimits.error).toBeNull();
     const limits = await userB.client.from("rate_limits").select("*");
     expect(limits.data ?? []).toEqual([]);
+
+    const playlistId = randomUUID();
+    const { error: playlistError } = await admin.from("playlists").insert({
+      id: playlistId,
+      account_id: accountA,
+      name: "Secret loop",
+      default_duration_ms: 5000,
+      transition: "fade",
+    });
+    expect(playlistError).toBeNull();
+    const { error: itemError } = await admin.from("playlist_items").insert({
+      playlist_id: playlistId,
+      account_id: accountA,
+      media_id: mediaId,
+      kind: "draft",
+      position: 0,
+      duration_ms: 2000,
+    });
+    expect(itemError).toBeNull();
+    const ownPlaylists = await userA.client.from("playlists").select("id, name");
+    expect(ownPlaylists.data?.map((row) => row.id)).toContain(playlistId);
+    const ownItems = await userA.client.from("playlist_items").select("playlist_id, media_id");
+    expect(ownItems.data?.map((row) => row.playlist_id)).toContain(playlistId);
+    const otherPlaylists = await userB.client.from("playlists").select("id, name");
+    expect(otherPlaylists.data ?? []).toEqual([]);
+    const otherItems = await userB.client.from("playlist_items").select("id, media_id");
+    expect(otherItems.data ?? []).toEqual([]);
+    const stolenPlaylist = await userB.client.from("playlists").insert({
+      account_id: accountA,
+      name: "Stolen",
+      default_duration_ms: 1000,
+      transition: "none",
+    }).select("id");
+    expect(stolenPlaylist.data ?? []).toEqual([]);
+    const stolenItem = await userB.client.from("playlist_items").insert({
+      playlist_id: playlistId,
+      account_id: accountA,
+      media_id: mediaId,
+      kind: "draft",
+      position: 1,
+    }).select("id");
+    expect(stolenItem.data ?? []).toEqual([]);
+    const playlistRename = await userA.client.from("playlists").update({ name: "hacked" }).eq("id", playlistId).select("id");
+    expect(playlistRename.data ?? []).toEqual([]);
+    const itemRewrite = await userA.client.from("playlist_items").update({ position: 4 }).eq("playlist_id", playlistId).select("id");
+    expect(itemRewrite.data ?? []).toEqual([]);
+    const { data: playlistStill } = await admin.from("playlists").select("name").eq("id", playlistId).single();
+    expect(playlistStill?.name).toBe("Secret loop");
+    const { data: itemStill } = await admin.from("playlist_items").select("position").eq("playlist_id", playlistId).single();
+    expect(itemStill?.position).toBe(0);
+    const blockedPlaylistFn = await userA.client.rpc("player_playlist", { p_token_hash: tokenHash });
+    expect(blockedPlaylistFn.error).toBeTruthy();
+    const blockedSave = await userB.client.rpc("save_playlist", {
+      p_account_id: accountA,
+      p_playlist_id: playlistId,
+      p_name: "Nope",
+      p_default_duration_ms: 1000,
+      p_transition: "none",
+      p_items: [],
+    });
+    expect(blockedSave.error).toBeTruthy();
 
     const renamed = await userA.client.from("media").update({ file_name: "hacked" }).eq("id", mediaId).select("id");
     expect(renamed.data ?? []).toEqual([]);
