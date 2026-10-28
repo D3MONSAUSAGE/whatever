@@ -149,7 +149,7 @@ const shownVideo = () => {
   ids.sort((x, y) => (Number(els[y].style.zIndex) || 0) - (Number(els[x].style.zIndex) || 0));
   return ids.length ? els[ids[0]].src : "";
 };
-let mustShowImage = false, blankFrames = 0, slideLog = null, mediaLog = null;
+let mustShowImage = false, blankFrames = 0, slideLog = null, mediaLog = null, timedLog = null;
 function run(ms) {
   const end = now + ms;
   while (true) {
@@ -165,6 +165,10 @@ function run(ms) {
     if (mediaLog) {
       const current = shownVideo() || shownUrl() || "";
       if (current && current !== mediaLog[mediaLog.length - 1]) mediaLog.push(current);
+    }
+    if (timedLog) {
+      const name = clipName(shownVideo() || shownUrl() || "");
+      if (name && (!timedLog.length || timedLog[timedLog.length - 1].name !== name)) timedLog.push({ name, at: now });
     }
   }
   now = end;
@@ -306,6 +310,32 @@ mediaLog = [];
 run(15000);
 check("mixed playlist plays image, video, image, then loops", mediaLog.map(clipName).join(",").indexOf("a,v1,c,a") !== -1);
 
+S.version = 11.5;
+S.playlist = {
+  id: "mixed-bad",
+  transition: "none",
+  items: [
+    { mediaId: "a", url: "https://cdn/a.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "bad", url: "https://cdn/bad.mp4", durationMs: 2000, kind: "video" },
+    { mediaId: "c", url: "https://cdn/c.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+run(8000);
+timedLog = [];
+mustShowImage = true;
+blankFrames = 0;
+run(12000);
+{
+  const names = timedLog.map((entry) => entry.name).join(",");
+  const gaps = timedLog.slice(1).map((entry, i) => entry.at - timedLog[i].at);
+  const held = gaps.slice(1);
+  check("broken video is skipped and the images keep alternating", names.indexOf("a,c,a,c") !== -1 && names.indexOf("bad") === -1);
+  check("broken video does not hold the previous image past its duration", held.length >= 2 && held.every((gap) => gap >= 1500 && gap <= 3500));
+  check("broken video never leaves the screen blank", blankFrames === 0 && shownUrl() && shownUrl().indexOf(".jpg") !== -1);
+}
+mustShowImage = false;
+timedLog = null;
+
 S.version = 12;
 S.playerError = "";
 S.playlist = {
@@ -316,7 +346,7 @@ S.playlist = {
     { mediaId: "a", url: "https://cdn/a.jpg", durationMs: 4000, kind: "image" },
   ],
 };
-run(8000);
+run(15000);
 check("unsupported video is reported and the next image stays up", S.playerError.indexOf("can't play") !== -1 && (shownUrl() || "").indexOf("a.jpg") !== -1 && S.playerErrorPosts > 0);
 
 S.version = 13;

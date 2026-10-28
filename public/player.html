@@ -70,7 +70,7 @@
   var playlist = null, slideIndex = 0, slideToken = 0, slideTimer = null;
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
   var videos = [el('va'), el('vb')];
-  var shownVideo = null, stableSrc = {}, videoFails = 0, watchTimer = null, attempt = 0, reportedError = false;
+  var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0;
 
   // ---- token storage (memory fallback if localStorage is unavailable)
   function getToken() {
@@ -178,6 +178,9 @@
     needRefresh = false;
     urlRefreshAt = 0;
     loadedUrls = {};
+    badSkips = {};
+    badLevel = {};
+    skipBurst = 0;
     releaseAllVideos();
   }
   function clearWatch() {
@@ -263,10 +266,33 @@
   }
   function clearReportedError() {
     var token = getToken();
-    videoFails = 0;
     if (!token || !reportedError) return;
     reportedError = false;
     request('POST', '/api/player/state', { error: '' }, token, function () {});
+  }
+  function itemKey(item) {
+    if (!item) return '';
+    return item.mediaId || item.url || '';
+  }
+  // Known-bad clips are skipped for a few passes, then tried once. A failed retry waits longer.
+  function markBad(item) {
+    var key = itemKey(item);
+    if (!key) return;
+    badLevel[key] = (badLevel[key] || 0) + 1;
+    badSkips[key] = badLevel[key] * 4;
+  }
+  function skipKnownBad(item) {
+    var key = itemKey(item);
+    if (!key || !badSkips[key]) return false;
+    badSkips[key] -= 1;
+    if (badSkips[key] <= 0) delete badSkips[key];
+    return true;
+  }
+  function failCap(item) {
+    var ms = item && item.durationMs;
+    if (typeof ms !== 'number' || ms < 1500) return 4000;
+    if (ms > 4000) return 4000;
+    return ms;
   }
   function preloadVideo(index) {
     var item, idle;
@@ -276,11 +302,16 @@
     if (!idle || idle === shownVideo) return;
     armVideo(idle, item);
   }
-  function preloadIndex(index) {
+  function preloadIndex(index, depth) {
     if (!playlist) return;
+    if (depth > playlist.items.length) return;
     var item = playlist.items[index];
     var url, img, token;
     if (!item) return;
+    if (badSkips[itemKey(item)]) {
+      preloadIndex((index + 1) % playlist.items.length, (depth || 0) + 1);
+      return;
+    }
     if (item.kind === 'video') { preloadVideo(index); return; }
     url = resolveUrl(item);
     if ((item.mediaId && stableSrc[item.mediaId]) || loadedUrls[url] === 1) return;
@@ -304,28 +335,20 @@
     if (other && other.className.indexOf('on') !== -1) other.className = 'stage';
   }
   function failVideo(index, item, message) {
-    var token = slideToken, next;
+    var token = slideToken;
     dropPin(item);
-    videoFails += 1;
+    markBad(item);
     reportError(message);
     if (!playlist) return;
     clearWatch();
     clearSlideTimer();
-    if (playlist.items.length < 2 || videoFails >= playlist.items.length) {
-      setStatus("This video can't play on this TV.");
-      slideTimer = setTimeout(function () {
-        if (token !== slideToken || !playlist) return;
-        videoFails = 0;
-        present(index % playlist.items.length, null);
-      }, 10000);
-      return;
-    }
     setStatus('');
-    next = (index + 1) % playlist.items.length;
+    // Leave the previous slide up only until the next good item is ready. Do not
+    // hold it for a retry of this clip; present() skips items already marked bad.
     slideTimer = setTimeout(function () {
       if (token !== slideToken || !playlist) return;
-      present(next, null);
-    }, 1200);
+      present((index + 1) % playlist.items.length, null);
+    }, 0);
   }
   function presentVideo(index, versionOrNull) {
     if (!playlist) return;
@@ -356,7 +379,7 @@
         if (nowT <= lastTime + 0.05) stuckFor += 2000;
         else stuckFor = 0;
         lastTime = nowT;
-        if (stuckFor >= 12000) { failOnce('This video stalled.'); return; }
+        if (stuckFor >= failCap(item)) { failOnce('This video stalled.'); return; }
         watchTimer = setTimeout(tick, 2000);
       }
       clearWatch();
@@ -392,7 +415,7 @@
       present((index + 1) % playlist.items.length, null);
     };
     v.onerror = function () { failOnce("This video can't play on this TV."); };
-    startTimer = setTimeout(function () { failOnce('This video did not start in time.'); }, 20000);
+    startTimer = setTimeout(function () { failOnce('This video did not start in time.'); }, failCap(item));
     try {
       var playResult = v.play();
       if (playResult && typeof playResult.then === 'function') {
@@ -408,6 +431,22 @@
     var token = slideToken;
     var src, nextItem;
     if (!item) return;
+    if (skipKnownBad(item)) {
+      skipBurst += 1;
+      clearSlideTimer();
+      if (skipBurst > playlist.items.length) {
+        skipBurst = 0;
+        setStatus("This video can't play on this TV.");
+        slideTimer = setTimeout(function () {
+          if (token !== slideToken || !playlist) return;
+          present(index, null);
+        }, 8000);
+        return;
+      }
+      present((index + 1) % playlist.items.length, null);
+      return;
+    }
+    skipBurst = 0;
     if (item.kind === 'video') { presentVideo(index, versionOrNull); return; }
     src = resolveUrl(item);
     function commit() {
@@ -481,7 +520,6 @@
     };
     urlRefreshAt = new Date().getTime() + 1800000;
     shownVersion = version;
-    videoFails = 0;
     present(0, version);
   }
 
@@ -490,7 +528,8 @@
     var g = enter('pairing');
     stopPlaylist();
     stableSrc = {};
-    videoFails = 0;
+    badSkips = {};
+    badLevel = {};
     clearImages();
     setStatus('');
     shownVersion = null; loadingVersion = null; preloadImg = null;

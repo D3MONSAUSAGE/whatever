@@ -124,7 +124,7 @@ A video slide:
 - Plays until `ended`, then advances. It does not use the slide's seconds. A one-clip playlist seeks to 0 instead of tearing down the element.
 - The previous image or frame stays up until `playing`.
 - The other element preloads the next clip. Elements that are neither current nor next get `pause()`, `removeAttribute('src')`, and `load()`.
-- If `play()` rejects, the element errors, the start takes longer than 20 seconds, or `timeupdate` freezes for 12 seconds, the player skips to the next slide (10 second backoff if every slide fails), keeps the last good frame, and `POST /api/player/state` with a short error. The displays page shows `playerError`. A new playlist version or a successful single image clears it.
+- If `play()` rejects, the element errors, the clip has not started within its slide duration (capped at 4 seconds), or playback freezes for that same cap, the player marks the clip bad and moves to the next item immediately. The previous image stays only until that next item is ready, so a 2 second slide is not held for a retry. A known-bad clip is skipped for several loops, then tried once; a failed retry waits longer. If every item is bad, the player waits 8 seconds and tries again. The last good frame stays up. The failure is `POST /api/player/state`. The displays page shows `playerError`. A new playlist version or a successful single image clears it.
 - A failed poll shows "Reconnecting..." and does not clear the video that is already playing.
 - Signed URL refresh updates the stored URL but does not change `src` for a `mediaId` that already played.
 
@@ -137,7 +137,7 @@ Media gains "Upload video", a progress bar, a `<video>` preview with the thumbna
 - Unit: real fixtures in `tests/fixtures/` (`h264-aac.mp4`, `h264-aac-moov-end.mp4`, `h264-silent.mp4`, `hevc.mp4`, `vp9-renamed.mp4`).
 - API: image playlist unchanged; video upload, codec rejection, playlist kind, delete protection, cross-account, player error, single image replacing a playlist.
 - Player simulation: image-only loop, video-only loop, image→video→image, completion and auto-advance, unsupported / blocked / stall / timeout, connection loss, single image hold.
-- RLS: when the bucket accepts `video/mp4` and `kind` exists, the other account cannot read the row or download the video or the thumbnail. Cleanup removes the account prefix even if the test fails.
+- RLS: the other account cannot read a video row or download the video or the thumbnail. If `0003_video.sql` is not applied the test fails, unless `PANTALLA_VIDEO_MIGRATION=absent` is set, which skips it with that reason. Cleanup removes the account prefix even if the test fails.
 - Playwright: image pairing and image playlists unchanged. Video cases skip on a deployment that has no video control, or when `0003` is not applied yet.
 
 ## Rollback
@@ -252,6 +252,6 @@ After the migration and this deployment, reload `/player` once on each TV so it 
 - Profile and level come from `avcC`. A file without that box is rejected even if the video track is `avc1`.
 - 50 MB and 3 minutes are hard caps. A quieter, longer clip needs a lower bitrate or a trim, not a bucket change, unless the Supabase plan's global limit is raised first.
 - Signed URLs still change when they are reissued. The player avoids a re-download by keeping the previous URL. A full page reload after the URL has expired downloads again. That is the reboot row in the cost table.
-- A TV that never fires `timeupdate` will not be skipped for a mid-playback stall. The 20 second start timeout and the element `error` / `play()` rejection still run.
+- A TV that never fires `timeupdate` will not be skipped for a mid-playback stall. The start cap (at most 4 seconds) and the element `error` / `play()` rejection still run.
 - Orphan objects from an upload that never calls `complete` are not swept in production. They are private and the signed URL expires in two hours.
 - Thumbnails are a single JPEG frame, not a filmstrip. The library `<video>` uses it as `poster` and does not download the MP4 until play (`preload="none"`).
