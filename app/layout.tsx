@@ -1,0 +1,13 @@
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = { title: "Pantalla", description: "Put a menu image on your TVs." };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#17201c" };
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="antialiased">{children}</body>
+    </html>
+  );
+}

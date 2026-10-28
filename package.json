@@ -1,0 +1,41 @@
+{
+  "name": "pantalla",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "node scripts/ensure-next-env.mjs && tsc --noEmit",
+    "check:player": "node scripts/check-player.mjs",
+    "test:player": "node scripts/check-player.mjs && node scripts/simulate-player.mjs",
+    "test:unit": "vitest run tests/unit",
+    "test:api": "vitest run tests/api",
+    "test:rls": "vitest run tests/rls",
+    "test": "vitest run && npm run test:player",
+    "test:e2e": "node scripts/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.64.1",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "acorn": "^8.12.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.13.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^3.2.7"
+  }
+}
