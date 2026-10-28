@@ -53,6 +53,7 @@ function makeVideo(id) {
               return;
             }
             if (src.indexOf("stall") !== -1) return;
+            this.currentTime = 0.2;
             if (this.onplaying) this.onplaying();
             if (ok) ok();
             if (src.indexOf("freeze") !== -1) {
@@ -332,6 +333,7 @@ run(12000);
   check("broken video is skipped and the images keep alternating", names.indexOf("a,c,a,c") !== -1 && names.indexOf("bad") === -1);
   check("broken video does not hold the previous image past its duration", held.length >= 2 && held.every((gap) => gap >= 1500 && gap <= 3500));
   check("broken video never leaves the screen blank", blankFrames === 0 && shownUrl() && shownUrl().indexOf(".jpg") !== -1);
+  check("known-bad video is not loaded into a video element", !els.va.src && !els.vb.src && els.va.className.indexOf("on") === -1 && els.vb.className.indexOf("on") === -1);
 }
 mustShowImage = false;
 timedLog = null;

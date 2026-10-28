@@ -519,7 +519,9 @@ test("a broken video between two images does not stretch them or go blank", asyn
       c: idOf(items, "hold-c.png"),
     };
     expect(ids.a && ids.v && ids.c).toBeTruthy();
-    await replaceStoredMedia(ids.v, "tests/fixtures/vp9-renamed.mp4");
+    // Chrome plays the renamed VP9 file for its full second, so that fixture never
+// fails on the TV. HEVC is refused before playback starts.
+await replaceStoredMedia(ids.v, "tests/fixtures/hevc.mp4");
 
     await ctx.tv.goto("/player");
     await pairTv(ctx.phone, ctx.tv, "Hold screen");

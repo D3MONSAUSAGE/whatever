@@ -244,6 +244,7 @@
     v.style.top = Math.round((sh - h) / 2) + 'px';
   }
   function armVideo(v, item) {
+    if (badSkips[itemKey(item)]) return '';
     var url = resolveUrl(item);
     v.muted = true;
     try { v.playsInline = true; } catch (e) {}
@@ -272,7 +273,18 @@
   }
   function itemKey(item) {
     if (!item) return '';
-    return item.mediaId || item.url || '';
+    if (item.mediaId) return item.mediaId;
+    return item.url || '';
+  }
+  function nextGoodItem(index) {
+    var count, step, item;
+    if (!playlist) return null;
+    count = playlist.items.length;
+    for (step = 1; step <= count; step++) {
+      item = playlist.items[(index + step) % count];
+      if (item && !badSkips[itemKey(item)]) return item;
+    }
+    return null;
   }
   // Known-bad clips are skipped for a few passes, then tried once. A failed retry waits longer.
   function markBad(item) {
@@ -298,9 +310,18 @@
     var item, idle;
     if (!playlist || playlist.items.length < 2) return;
     item = playlist.items[index];
+    if (badSkips[itemKey(item)]) return;
     idle = shownVideo ? otherVideo(shownVideo) : videos[0];
     if (!idle || idle === shownVideo) return;
     armVideo(idle, item);
+  }
+  function releaseItemVideo(item) {
+    var key = item ? (item.mediaId || '') : '';
+    var i;
+    for (i = 0; i < videos.length; i++) {
+      if (!key || videos[i].getAttribute('data-id') === key) releaseVideo(videos[i]);
+    }
+    if (shownVideo && (!key || shownVideo.getAttribute('data-id') === key)) shownVideo = null;
   }
   function preloadIndex(index, depth) {
     if (!playlist) return;
@@ -322,7 +343,12 @@
     img.src = url;
   }
   function showVideo(v) {
-    var other;
+    var other, liveId;
+    liveId = v.getAttribute('data-id') || '';
+    if (liveId && badSkips[liveId]) {
+      releaseVideo(v);
+      return;
+    }
     fitVideo(v);
     z += 1;
     v.style.zIndex = String(z);
@@ -338,6 +364,7 @@
     var token = slideToken;
     dropPin(item);
     markBad(item);
+    releaseItemVideo(item);
     reportError(message);
     if (!playlist) return;
     clearWatch();
@@ -354,6 +381,10 @@
     if (!playlist) return;
     var item = playlist.items[index];
     var token = slideToken;
+    if (badSkips[itemKey(item)]) {
+      releaseItemVideo(item);
+      return;
+    }
     var my = ++attempt;
     var v = shownVideo ? otherVideo(shownVideo) : videos[0];
     var i, started = false, failed = false, sawTime = false, lastTime = 0, stuckFor = 0, url, startTimer;
@@ -396,8 +427,18 @@
       preloadIndex((index + 1) % playlist.items.length);
       watchPlayback();
     }
-    v.onplaying = function () { if (!gone()) go(); };
-    v.ontimeupdate = function () { sawTime = true; lastTime = v.currentTime || 0; stuckFor = 0; };
+    v.onplaying = function () {
+      // Reveal only once the element has started. A rejected play() or an error
+      // before this never adds the visible class. Known-bad clips never get here
+      // because their src is not set.
+      if (!gone()) go();
+    };
+    v.ontimeupdate = function () {
+      if (gone()) return;
+      lastTime = v.currentTime || 0;
+      sawTime = true;
+      stuckFor = 0;
+    };
     v.onended = function () {
       var again;
       if (gone()) return;
@@ -434,6 +475,7 @@
     if (skipKnownBad(item)) {
       skipBurst += 1;
       clearSlideTimer();
+      releaseItemVideo(item);
       if (skipBurst > playlist.items.length) {
         skipBurst = 0;
         setStatus("This video can't play on this TV.");
@@ -451,9 +493,9 @@
     src = resolveUrl(item);
     function commit() {
       if (token !== slideToken || !playlist) return;
-      nextItem = playlist.items[(index + 1) % playlist.items.length];
+      nextItem = nextGoodItem(index);
       swapTo(src, playlist.transition === 'fade');
-      buryVideos(nextItem && nextItem.kind === 'video' ? (nextItem.mediaId || '') : '');
+      buryVideos(nextItem && nextItem.kind === 'video' && !badSkips[itemKey(nextItem)] ? (nextItem.mediaId || '') : '');
       slideIndex = index;
       if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
       preloadIndex((index + 1) % playlist.items.length);
