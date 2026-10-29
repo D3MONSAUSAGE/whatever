@@ -1,10 +1,12 @@
 openapi: 3.0.3
 info:
   title: Pantalla HTTP API
-  version: 2c
+  version: 2d
   description: |
-    Existing routes as of main `c64b8cc` (Phase 2C). This file documents the
-    API the website and the TV already call. It does not add routes.
+    HTTP API as of Phase 2D (scheduling, locations, screen groups), based on
+    main `9855107`. New fields and routes are additive. Paths that existed in
+    Phase 2C keep their previous fields, status codes, and error strings.
+    When a display has no schedule rules, `GET /api/player/state` is unchanged.
 
     Admin routes require `Authorization: Bearer <Supabase access token>`.
     They do not read cookies. `requireAdmin` (`lib/server/auth.ts`) verifies
@@ -25,6 +27,9 @@ tags:
   - name: media
   - name: displays
   - name: playlists
+  - name: locations
+  - name: groups
+  - name: schedules
   - name: player
     description: TV only. Not for the mobile app.
 security:
@@ -436,7 +441,10 @@ paths:
         screen) and `name` is ignored. `assign_media` refuses video, requires
         the image and an active display in this account, clears
         `assigned_playlist_id`, and increments `content_version`. Otherwise a
-        string `name` is trimmed and sliced to 60. Any other body is 400.
+        string `name` is trimmed and sliced to 60. Phase 2D also accepts
+        `locationId` (an active location in this account) in that same branch,
+        alone or with `name`. `mediaId` still wins and ignores both. Any other
+        body is 400.
       operationId: updateDisplay
       parameters:
         - $ref: "#/components/parameters/Id"
@@ -454,9 +462,10 @@ paths:
                       format: uuid
                       nullable: true
                 - type: object
-                  required: [name]
                   properties:
                     name: { type: string }
+                    locationId: { type: string, format: uuid }
+                  description: At least one of name or locationId.
       responses:
         "200":
           description: Updated
@@ -756,6 +765,458 @@ paths:
               example: { error: "Couldn't publish the playlist." }
         "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
 
+  /api/locations:
+    get:
+      tags: [locations]
+      summary: Locations in this account
+      operationId: listLocations
+      description: |
+        Oldest first. `displayCount` counts active screens. `timezone` is an
+        IANA name. Before migration 0004 the column is missing and the route
+        returns `UTC` for every location. Writes that need the column return 503.
+      responses:
+        "200":
+          description: Locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Location" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Read failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load locations." }
+    post:
+      tags: [locations]
+      summary: Create a location
+      operationId: createLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: Trimmed, sliced to 80. }
+                timezone:
+                  type: string
+                  description: IANA name. Omitted means UTC.
+                  example: America/Los_Angeles
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: Empty name, unknown timezone, or 50 locations already
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                name: { value: { error: "Give this location a name." } }
+                zone: { value: { error: "That timezone isn't an IANA name like America/Los_Angeles." } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: Migration 0004 is not applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Schedules aren't available yet. Apply migration 0004_scheduling.sql, then reload." }
+
+  /api/locations/{id}:
+    patch:
+      tags: [locations]
+      summary: Rename a location or set its timezone
+      operationId: updateLocation
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                timezone: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Empty name, bad timezone, or neither field
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Location not found." }
+        "503":
+          description: Timezone column is missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [locations]
+      summary: Delete a location that has no active screens
+      operationId: deleteLocation
+      description: |
+        Refuses while any active display uses the location. Revoked displays
+        are detached (`location_id` set null) and the location row is deleted.
+        Location rows and other columns are otherwise untouched.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Location not found." }
+        "409":
+          description: An active screen still uses it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "That location still has screens. Move them first." }
+
+  /api/screen-groups:
+    get:
+      tags: [groups]
+      summary: Screen groups
+      operationId: listScreenGroups
+      responses:
+        "200":
+          description: Groups, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ScreenGroup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: Migration 0004 is not applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Schedules aren't available yet. Apply migration 0004_scheduling.sql, then reload." }
+    post:
+      tags: [groups]
+      summary: Create a screen group
+      operationId: createScreenGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                displayIds:
+                  type: array
+                  maxItems: 100
+                  items: { type: string, format: uuid }
+                  description: Active displays in this account. Omitted means an empty group.
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: Empty name or a screen that is not active in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: Name already used in this account, case-insensitive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "A group with that name already exists." }
+        "503":
+          description: Migration 0004 is not applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/screen-groups/{id}:
+    patch:
+      tags: [groups]
+      summary: Rename a group or replace its screens
+      operationId: updateScreenGroup
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                displayIds:
+                  type: array
+                  items: { type: string, format: uuid }
+                  description: Replaces the membership when present.
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Bad name or a screen that is not active in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Screen group not found." }
+        "409":
+          description: Name already used
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [groups]
+      summary: Delete a screen group
+      operationId: deleteScreenGroup
+      description: Membership rows and schedules that target the group are deleted with it.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Screen group not found." }
+
+  /api/schedules:
+    get:
+      tags: [schedules]
+      summary: Schedule rules
+      operationId: listSchedules
+      description: Newest `updated_at` first. Includes paused rules.
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Schedule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503":
+          description: Migration 0004 is not applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Schedules aren't available yet. Apply migration 0004_scheduling.sql, then reload." }
+    post:
+      tags: [schedules]
+      summary: Create a schedule rule
+      operationId: createSchedule
+      description: |
+        Exactly one of `displayId` or `groupId`. Weekdays are ISO numbers,
+        1 Monday through 7 Sunday. `startTime` and `endTime` are `HH:MM` in the
+        screen's location timezone. `24:00` is allowed only as an end. An end
+        earlier than the start crosses midnight and continues into the next
+        morning. The playlist must already have published slides. Publish with
+        `POST /api/playlists/{id}/publish` (assigns screens) or
+        `POST /api/playlists/{id}/snapshot` (does not assign screens).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScheduleInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: Invalid window, or the playlist has no published slides
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                unpublished: { value: { error: "Publish that playlist before scheduling it. Screens play its published slides, and publishing slides does not have to assign the playlist as the everyday default." } }
+                window: { value: { error: "The start and end are the same. A window has to cover some time." } }
+                weekdays: { value: { error: "Pick at least one weekday." } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Playlist, screen, or group is not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Migration 0004 is not applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/schedules/preview:
+    get:
+      tags: [schedules]
+      summary: What plays on one screen over the next several days
+      operationId: previewSchedule
+      parameters:
+        - name: displayId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 14, default: 7 }
+      responses:
+        "200":
+          description: Timeline in the screen's location timezone
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SchedulePreview" }
+        "400":
+          description: days is outside 1 to 14
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Preview covers 1 to 14 days." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Display is not an active screen in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Display not found." }
+        "503":
+          description: Migration 0004 is not applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/schedules/{id}:
+    patch:
+      tags: [schedules]
+      summary: Update a schedule rule
+      operationId: updateSchedule
+      description: |
+        Send the fields to change. The stored rule is filled in for the rest
+        and checked again. `enabled: false` pauses the rule without deleting it.
+        `updated_at` changes, which matters when two rules tie on priority.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScheduleInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: The merged rule is not a valid window
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not in this account, or the new target is not
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Schedule not found." }
+    delete:
+      tags: [schedules]
+      summary: Delete a schedule rule
+      operationId: deleteSchedule
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Schedule not found." }
+
+  /api/playlists/{id}/snapshot:
+    post:
+      tags: [playlists]
+      summary: Publish slides without assigning screens
+      operationId: snapshotPlaylist
+      description: |
+        Copies the draft into the published snapshot and increments `revision`.
+        Does not assign or clear displays. Active displays already assigned
+        this playlist get a `content_version` bump so they reload. A schedule
+        plays this snapshot. `POST /api/playlists/{id}/publish` is unchanged
+        and still assigns the screens in `displayIds`.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Snapshot stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: The draft has no slides, or the playlist is missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Add at least one slide, then publish the slides." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not a UUID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Playlist not found." }
+        "503":
+          description: Playlists or snapshot_playlist are missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /api/player/pair:
     post:
       tags: [player]
@@ -843,6 +1304,20 @@ paths:
         `refresh=1` forces a playlist URL refresh even when the version matches.
         A single assigned image never includes `playlist`. Signed URLs last
         3600 seconds.
+
+        Phase 2D resolves schedules on the server during this poll. The player
+        file is unchanged. If no enabled rule targets the display, the JSON is
+        the same as before, including `version` equal to `content_version`.
+        If rules exist, `version` stays `content_version` while the saved
+        assignment is showing and becomes a stable playback version while a
+        rule is active (rule id, playlist id, and published revision). That
+        version changes when the winner changes, so the TV picks up the
+        transition on its next poll, about 10 seconds, without a reload.
+        `nextTransitionAt` is added only when a rule targets the display and
+        the winner changes within 8 days. An active rule plays that playlist's
+        published slides and overrides a single assigned image. An empty
+        published playlist shows nothing until the window ends. It does not
+        fall through to the saved assignment.
       operationId: playerState
       parameters:
         - name: v
@@ -867,15 +1342,27 @@ paths:
                   - type: object
                     required: [version, unchanged]
                     properties:
-                      version: { type: integer }
+                      version:
+                        type: integer
+                        description: content_version, or a playback version above 1000000000000 while a schedule rule is active.
                       unchanged: { type: boolean, enum: [true] }
+                      nextTransitionAt:
+                        type: string
+                        format: date-time
+                        description: Present only when a schedule targets this screen and the winner changes within 8 days.
                   - type: object
                     required: [version, mediaId, url]
                     properties:
-                      version: { type: integer }
+                      version:
+                        type: integer
+                        description: content_version, or a playback version above 1000000000000 while a schedule rule is active.
                       mediaId: { type: string, format: uuid, nullable: true }
                       url: { type: string, format: uri, nullable: true }
                       playlist: { $ref: "#/components/schemas/PlayerPlaylist" }
+                      nextTransitionAt:
+                        type: string
+                        format: date-time
+                        description: Present only when a schedule targets this screen and the winner changes within 8 days.
         "401":
           description: Missing, malformed, or revoked token
           content:
@@ -1025,6 +1512,11 @@ components:
         online: { type: boolean }
         lastSeenAt: { type: string, format: date-time, nullable: true }
         playerError: { type: string, nullable: true }
+        location:
+          allOf:
+            - $ref: "#/components/schemas/LocationRef"
+          nullable: true
+          description: Phase 2D. Null when the screen has no location. Older clients ignore it.
         media:
           allOf:
             - $ref: "#/components/schemas/DisplayMedia"
@@ -1033,6 +1525,102 @@ components:
           allOf:
             - $ref: "#/components/schemas/DisplayPlaylist"
           nullable: true
+    LocationRef:
+      type: object
+      required: [id, name, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        timezone: { type: string, description: IANA name. UTC until someone sets one. }
+    Location:
+      allOf:
+        - $ref: "#/components/schemas/LocationRef"
+        - type: object
+          required: [displayCount]
+          properties:
+            displayCount: { type: integer, description: Active screens at this location. }
+    ScreenGroup:
+      type: object
+      required: [id, name, displayIds, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        displayIds:
+          type: array
+          items: { type: string, format: uuid }
+        updatedAt: { type: string, format: date-time }
+    Schedule:
+      type: object
+      required: [id, name, playlistId, playlistName, displayId, displayName, groupId, groupName, weekdays, startTime, endTime, startsOn, endsOn, priority, enabled, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        playlistId: { type: string, format: uuid }
+        playlistName: { type: string }
+        displayId: { type: string, format: uuid, nullable: true }
+        displayName: { type: string, nullable: true }
+        groupId: { type: string, format: uuid, nullable: true }
+        groupName: { type: string, nullable: true }
+        weekdays:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+          description: ISO weekdays. 1 is Monday, 7 is Sunday.
+        startTime: { type: string, example: "11:00" }
+        endTime: { type: string, example: "14:00", description: "24:00 is the end of the local day." }
+        startsOn: { type: string, format: date, nullable: true }
+        endsOn: { type: string, format: date, nullable: true }
+        priority: { type: integer, minimum: -1000, maximum: 1000 }
+        enabled: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+    ScheduleInput:
+      type: object
+      properties:
+        name: { type: string }
+        playlistId: { type: string, format: uuid }
+        displayId: { type: string, format: uuid, nullable: true }
+        groupId: { type: string, format: uuid, nullable: true }
+        weekdays:
+          type: array
+          items: { type: integer, minimum: 1, maximum: 7 }
+        startTime: { type: string }
+        endTime: { type: string }
+        startsOn: { type: string, format: date, nullable: true }
+        endsOn: { type: string, format: date, nullable: true }
+        priority: { type: integer, minimum: -1000, maximum: 1000 }
+        enabled: { type: boolean }
+    SchedulePreview:
+      type: object
+      required: [displayId, timezone, from, until, resolution, defaultAssignment, segments]
+      properties:
+        displayId: { type: string, format: uuid }
+        timezone: { type: string }
+        from: { type: string, format: date-time }
+        until: { type: string, format: date-time }
+        resolution: { type: string }
+        defaultAssignment:
+          type: object
+          required: [playlistId, playlistName, mediaId, mediaName]
+          properties:
+            playlistId: { type: string, format: uuid, nullable: true }
+            playlistName: { type: string, nullable: true }
+            mediaId: { type: string, format: uuid, nullable: true }
+            mediaName: { type: string, nullable: true }
+        segments:
+          type: array
+          items:
+            type: object
+            required: [start, end, date, source, scheduleId, scheduleName, playlistId, playlistName, target, priority]
+            properties:
+              start: { type: string, format: date-time }
+              end: { type: string, format: date-time }
+              date: { type: string, format: date, description: Local calendar date of the segment start. }
+              source: { type: string, enum: [schedule, default] }
+              scheduleId: { type: string, format: uuid, nullable: true }
+              scheduleName: { type: string, nullable: true }
+              playlistId: { type: string, format: uuid, nullable: true }
+              playlistName: { type: string, nullable: true }
+              target: { type: string, enum: [display, group], nullable: true }
+              priority: { type: integer, nullable: true }
     PlaylistSummary:
       type: object
       required: [id, name, defaultDurationMs, transition, slideCount, displayCount, displayNames, thumbnailUrl, publishedAt, updatedAt, revision]

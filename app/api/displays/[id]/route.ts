@@ -36,7 +36,33 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return json({ ok: true });
   }
 
-  if (typeof body.name === "string") {
+  const hasName = typeof body.name === "string";
+  const hasLocation = "locationId" in body;
+  if (!hasName && !hasLocation) return fail("Nothing to update.", 400);
+
+  if (hasLocation) {
+    if (typeof body.locationId !== "string" || !isUuid(body.locationId)) return fail("Location not found.", 404);
+    const location = await db()
+      .from("locations")
+      .select("id")
+      .eq("id", body.locationId)
+      .eq("account_id", admin.accountId)
+      .maybeSingle();
+    if (location.error) return fail("Couldn't move the screen. Try again.", 500);
+    if (!location.data) return fail("Location not found.", 404);
+    const moved = await db()
+      .from("displays")
+      .update({ location_id: body.locationId })
+      .eq("id", id)
+      .eq("account_id", admin.accountId)
+      .eq("status", "active")
+      .select("id")
+      .maybeSingle();
+    if (moved.error) return fail("Couldn't move the screen. Try again.", 500);
+    if (!moved.data) return fail("Display not found.", 404);
+  }
+
+  if (hasName && typeof body.name === "string") {
     const name = body.name.trim().slice(0, 60);
     if (!name) return fail("Name can't be empty.", 400);
     const { data, error } = await db()
@@ -49,10 +75,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
       .maybeSingle();
     if (error) return fail("Couldn't rename. Try again.", 500);
     if (!data) return fail("Display not found.", 404);
-    return json({ ok: true });
   }
 
-  return fail("Nothing to update.", 400);
+  return json({ ok: true });
 }
 
 // Disconnect: revokes the TV's token immediately; the TV returns to its pairing screen.

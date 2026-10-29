@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api, useApi, type DisplayItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
+import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { ONLINE_HINT, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
@@ -8,6 +8,7 @@ import { LoadingBlock, PageHeader } from "@/components/ui";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
+  const locations = useApi<LocationItem[]>(fixture ? null : "/api/locations");
   const displays = fixture
     ? { data: fixture, error: null as string | null, reload: async () => {} }
     : live;
@@ -68,6 +69,32 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
             <li key={display.id}>
               <ScreenCard display={display} actions={
                 <>
+                  {locations.data && locations.data.length > 0 ? (
+                    <label className="w-full text-xs font-semibold text-muted">
+                      Location
+                      <select
+                        aria-label={`Location for ${display.name}`}
+                        className="field mt-1"
+                        value={display.location?.id ?? ""}
+                        onChange={async (event) => {
+                          const locationId = event.target.value;
+                          if (!locationId) return;
+                          try {
+                            await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ locationId }) });
+                            toast.show("Location saved");
+                            displays.reload();
+                          } catch (err) {
+                            toast.show((err as Error).message, true);
+                          }
+                        }}
+                      >
+                        {!display.location ? <option value="">Choose a location</option> : null}
+                        {locations.data.map((location) => (
+                          <option key={location.id} value={location.id}>{location.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                   <button type="button" className="btn btn-primary" onClick={() => setPicking(display)}>Change image</button>
                   <button type="button" className="btn btn-quiet" onClick={() => setAssigning([display.id])}>Assign to this screen</button>
                   <button type="button" className="btn btn-quiet" onClick={() => rename(display)}>Rename</button>

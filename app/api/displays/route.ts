@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { ONLINE_MS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json } from "@/lib/server/http";
+import { loadLocations } from "@/app/api/locations/route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function GET(req: Request) {
   type MediaJoin = { id: string; file_name: string; storage_path: string };
   type Row = {
     id: string; name: string; token_hash: string | null; last_seen_at: string | null;
+    location_id?: string | null;
     assigned_playlist_id?: string | null;
     player_error?: string | null;
     player_error_at?: string | null;
@@ -27,6 +29,10 @@ export async function GET(req: Request) {
   const list = (rows ?? []) as unknown as Row[];
   const playlistInfo = playlistColumn ? await loadPlaylists(admin.accountId, list) : new Map<string, { name: string; url: string | null }>();
   if (playlistInfo === null) return fail("Couldn't load displays.", 500);
+
+  const locations = await loadLocations(admin.accountId);
+  if (locations === "error") return fail("Couldn't load displays.", 500);
+  const locationById = new Map(locations.map((location) => [location.id, location]));
 
   const mediaOf = (media: Row["media"]): MediaJoin | null =>
     Array.isArray(media) ? media[0] ?? null : media;
@@ -48,6 +54,7 @@ export async function GET(req: Request) {
         online: !!d.last_seen_at && now - new Date(d.last_seen_at).getTime() < ONLINE_MS,
         lastSeenAt: d.last_seen_at,
         playerError: d.player_error ?? null,
+        location: d.location_id ? locationById.get(d.location_id) ?? null : null,
         media: media
           ? { id: media.id, fileName: media.file_name, url: urls.get(media.storage_path) ?? null }
           : null,
@@ -65,7 +72,7 @@ export async function GET(req: Request) {
 
 async function loadDisplayRows(accountId: string) {
   const media = "media:assigned_media_id (id, file_name, storage_path)";
-  const base = `id, name, token_hash, last_seen_at, created_at, ${media}`;
+  const base = `id, name, location_id, token_hash, last_seen_at, created_at, ${media}`;
   const attempts = [
     { columns: `${base}, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
     { columns: `${base}, assigned_playlist_id`, playlistColumn: true },
