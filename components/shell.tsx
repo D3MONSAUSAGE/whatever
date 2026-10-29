@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase-browser";
 import { ToastProvider } from "@/components/toast";
 import { UploadProgress, UploadsProvider } from "@/components/uploads";
 import { BrandLockup } from "@/components/brand";
+import { isRecoveryUrl } from "@/components/auth-frame";
 import { IconCalendar, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
 
 const NAV = [
@@ -25,10 +26,12 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
 
   useEffect(() => {
     if (preview) return;
+    if (isRecoveryUrl()) { location.replace(`/reset-password${location.search}${location.hash}`); return; }
     let sub: { unsubscribe: () => void } | null = null;
     try {
       getSupabase().auth.getSession().then(({ data }) => (data.session ? setReady(true) : router.replace("/login")));
-      sub = getSupabase().auth.onAuthStateChange((_event, session) => {
+      sub = getSupabase().auth.onAuthStateChange((event, session) => {
+        if (event === "PASSWORD_RECOVERY") { router.replace("/reset-password"); return; }
         if (!session) router.replace("/login");
       }).data.subscription;
     } catch {

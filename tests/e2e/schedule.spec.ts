@@ -119,7 +119,7 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await expect(page.getByText("Saved assignment").first()).toBeVisible();
 
     await page.getByRole("link", { name: "Settings" }).click();
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await signUp(page, other);
     const foreign = await authed(page, "/api/locations");
     expect(JSON.stringify(foreign.body)).not.toContain("Kitchen");

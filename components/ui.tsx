@@ -1,16 +1,29 @@
 "use client";
+import { LogoMark, WaveBackdrop } from "@/components/brand";
 
-export function PageHeader({ title, lede, icon, children }: { title: string; lede?: React.ReactNode; icon?: React.ReactNode; children?: React.ReactNode }) {
+/**
+ * Brand hero used at the top of every dashboard page: dark ink panel with the
+ * blue wave, an eyebrow, the page title (h1), a short lede, and the S mark.
+ * Actions sit below the panel so buttons keep their normal colours.
+ */
+export function PageHeader({ title, eyebrow, lede, icon, children }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-      <div className="min-w-0 flex items-start gap-3">
-        {icon ? <span className="icon-tile size-11 rounded-2xl">{icon}</span> : null}
-        <div className="min-w-0">
-          <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight">{title}</h1>
-          {lede ? <div className="text-muted mt-1 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
+    <div className="mb-6">
+      <div className="banner-dark hero-gradient px-5 py-6 md:px-8 md:py-7">
+        <WaveBackdrop tone="dark" className="h-[85%]" />
+        <div className="relative flex items-center justify-between gap-5">
+          <div className="min-w-0 flex items-start gap-3">
+            {icon ? <span className="icon-tile icon-tile-hero size-11 rounded-2xl">{icon}</span> : null}
+            <div className="min-w-0">
+              {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">{eyebrow}</p> : null}
+              <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words">{title}</h1>
+              {lede ? <div className="text-white/85 mt-1.5 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
+            </div>
+          </div>
+          <LogoMark className="hidden sm:block size-14 md:size-16 shrink-0" />
         </div>
       </div>
-      {children ? <div className="flex flex-wrap gap-2">{children}</div> : null}
+      {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
     </div>
   );
 }

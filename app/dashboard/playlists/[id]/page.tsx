@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi, type MediaItem, type PlaylistDetail } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
+import { PageHeader } from "@/components/ui";
+import { IconList } from "@/components/icons";
 
 type Slide = {
   key: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl: string | null;
@@ -192,13 +194,10 @@ export default function PlaylistEditor() {
   return (
     <section>
       <p className="text-sm mb-3"><Link href="/dashboard/playlists" className="underline">Playlists</Link></p>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Edit playlist</h1>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>Duplicate</button>
-          <button type="button" className="btn btn-quiet text-danger" onClick={remove}>Delete</button>
-        </div>
-      </div>
+      <PageHeader title="Edit playlist" eyebrow="Playlists" icon={<IconList />} lede="Drafts never change a screen. Publish to send this order to every screen that plays it.">
+        <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>Duplicate</button>
+        <button type="button" className="btn btn-quiet text-danger" onClick={remove}>Delete</button>
+      </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="grid gap-6">

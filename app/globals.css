@@ -94,3 +94,11 @@ body {
   background: #fdecea;
   border-color: #f3c7c3;
 }
+
+/* Hero: ink to brand blue, matching the approved Overview banner. */
+.hero-gradient { background-image: linear-gradient(120deg, #0b1220 0%, #0b1a3a 55%, #0a3d8f 100%); }
+.icon-tile-hero { background: rgb(255 255 255 / 0.14); color: #fff; }
+.auth-card { width: 100%; max-width: 26rem; }
+.form-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--color-muted); margin-bottom: 0.25rem; }
+.note-error { border-radius: 12px; padding: 0.625rem 0.875rem; background: #fdecea; color: var(--color-danger); font-size: 0.875rem; }
+.note-ok { border-radius: 12px; padding: 0.625rem 0.875rem; background: color-mix(in srgb, var(--color-live) 18%, white); color: var(--color-live-ink); font-size: 0.875rem; }

@@ -147,3 +147,8 @@ Limits: 50 locations, 100 groups, 200 schedules, 100 screens in one group. Prior
 - `snapshot_playlist` does not rewind `content_version` on rollback.
 - There is no staff role. One owner per account, as in the mobile plan.
 - No new paid service and no new runtime dependency. Time zones are `Intl` in Node.
+
+## Milestone 3 additions
+- `GET /api/displays` now returns two additive fields per screen: `activeSchedules[]` and `currentSchedule` (with `until`). See `docs/api/openapi.yaml` → `Display`. The resolution is the same as the player's.
+- The Displays page shows a "Scheduled" line when a rule is playing, and its location picker can now clear the location ("No location (UTC)" sends `locationId: null`).
+- Deleting a screen group cascades to its schedules. The API never blocks this, so clients should warn first.

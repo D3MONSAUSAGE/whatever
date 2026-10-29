@@ -16,7 +16,11 @@ export type DisplayItem = {
   playlist: { id: string; name: string; url: string | null } | null;
   playerError?: string | null;
   location?: { id: string; name: string; timezone: string } | null;
+  activeSchedules?: ScheduleSummary[];
+  currentSchedule?: (ScheduleSummary & { until: string | null }) | null;
 };
+
+export type ScheduleSummary = { id: string; name: string; playlistId: string; playlistName: string; target: "display" | "group"; priority: number };
 
 export type LocationItem = { id: string; name: string; timezone: string; displayCount: number };
 

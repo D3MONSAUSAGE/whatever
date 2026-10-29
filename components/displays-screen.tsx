@@ -5,7 +5,7 @@ import { ONLINE_HINT, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
-import { LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
@@ -63,13 +63,20 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
       {!displays.data ? (
         <div className="mt-8"><LoadingBlock label={displays.error || "Loading…"} /></div>
       ) : displays.data.length === 0 ? (
-        <p className="text-muted mt-8">No screens yet. Connect a TV with the code it shows.</p>
+        <div className="mt-8"><EmptyState title="No screens yet">Open the TV address on a smart TV or browser, then type the code it shows into the box above.</EmptyState></div>
       ) : (
         <ul className="mt-8 grid gap-4 lg:grid-cols-2">
           {displays.data.map((display) => (
             <li key={display.id}>
               <ScreenCard display={display} actions={
                 <>
+                  {display.currentSchedule ? (
+                    <p className="w-full text-xs text-muted" data-testid="current-schedule">
+                      <span className="badge badge-live mr-1">Scheduled</span>
+                      {display.currentSchedule.name} plays {display.currentSchedule.playlistName || "a playlist"}
+                      {display.currentSchedule.until ? ` until ${new Date(display.currentSchedule.until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}
+                    </p>
+                  ) : null}
                   {locations.data && locations.data.length > 0 ? (
                     <label className="w-full text-xs font-semibold text-muted">
                       Location
@@ -78,8 +85,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
                         className="field mt-1"
                         value={display.location?.id ?? ""}
                         onChange={async (event) => {
-                          const locationId = event.target.value;
-                          if (!locationId) return;
+                          const locationId = event.target.value || null;
                           try {
                             await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ locationId }) });
                             toast.show("Location saved");
@@ -89,7 +95,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
                           }
                         }}
                       >
-                        {!display.location ? <option value="">Choose a location</option> : null}
+                        <option value="">No location (UTC)</option>
                         {locations.data.map((location) => (
                           <option key={location.id} value={location.id}>{location.name}</option>
                         ))}

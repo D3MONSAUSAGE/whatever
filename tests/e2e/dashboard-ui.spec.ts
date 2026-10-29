@@ -56,7 +56,7 @@ test("login, logout, and navigation at desktop, tablet, and mobile", async ({ br
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("link", { name: "Settings" }).click();
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page).toHaveURL(/\/login/);
     await signIn(page, owner);
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
@@ -161,7 +161,7 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await expectStatus(phone, "Published");
 
     await phone.getByRole("link", { name: "Settings" }).click();
-    await phone.getByRole("button", { name: "Sign out" }).click();
+    await phone.getByRole("button", { name: "Sign out", exact: true }).click();
     await signUp(phone, other);
     await phone.goto("/dashboard/media");
     await expect(phone.getByText("No images yet")).toBeVisible();

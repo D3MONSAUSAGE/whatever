@@ -1703,6 +1703,29 @@ components:
           allOf:
             - $ref: "#/components/schemas/DisplayPlaylist"
           nullable: true
+        activeSchedules:
+          type: array
+          description: Milestone 3, additive. Enabled schedule rules matching this screen right now, winner first (screen rule > group rule > higher priority > most recently updated > lowest id). Empty when none.
+          items: { $ref: "#/components/schemas/ScheduleSummary" }
+        currentSchedule:
+          description: Milestone 3, additive. The winning rule (what the TV plays now), or null when the saved assignment plays.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ScheduleSummary"
+            - type: object
+              required: [until]
+              properties:
+                until: { type: string, format: date-time, nullable: true, description: Next time what plays changes, if within 8 days. }
+    ScheduleSummary:
+      type: object
+      required: [id, name, playlistId, playlistName, target, priority]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        playlistId: { type: string, format: uuid }
+        playlistName: { type: string }
+        target: { type: string, enum: [display, group] }
+        priority: { type: integer }
     LocationRef:
       type: object
       required: [id, name, timezone]
