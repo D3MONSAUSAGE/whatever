@@ -211,9 +211,18 @@ paths:
         Downloads `{accountId}/{mediaId}.mp4`, runs `inspectMp4` and
         `enforceVideoLimits`, stores a JPEG thumbnail, and inserts `media`.
         The row's duration, width, and height come from the MP4, not from the
-        body. The body values are a pre-check only. If the row already exists,
-        returns 200 and does not re-read the object. A failed check deletes
-        the object. A thumbnail upload that fails also deletes the MP4.
+        body. The body values are a pre-check only. Retrying is safe and does
+        not create a second row. If the row already exists, returns 200 `{id}`
+        and does not re-read the object. If the thumbnail is already stored
+        and the row is not, the route keeps that thumbnail and inserts the
+        row (201). A caller that loses the insert to a concurrent complete
+        gets 200 and leaves both objects in place. A failed check deletes the
+        MP4 and a thumbnail at the same id, unless a row for this account was
+        saved while this call was running, in which case the route returns
+        200 and does not delete. A thumbnail upload that fails for a reason
+        other than "already exists" also deletes the MP4 and thumbnail when
+        no row was saved. The route allows 300 seconds, which covers
+        downloading and checking a 50 MB object.
       operationId: completeVideoUpload
       requestBody:
         required: true
@@ -235,12 +244,16 @@ paths:
                     Decoded size 4 through 200000 bytes. Magic bytes FF D8 FF.
       responses:
         "200":
-          description: Row already existed
+          description: |
+            The row already existed, or another complete inserted it while
+            this call was running. Body is `{id}`. Objects are left in place.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Id" }
         "201":
-          description: Inserted
+          description: |
+            Inserted. Also returned when the thumbnail was already stored and
+            this call created the single row.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Id" }
@@ -252,7 +265,10 @@ paths:
               example: { error: "Upload didn't arrive. Try again." }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "413":
-          description: Stored object is over 50 MB. The object is deleted.
+          description: |
+            Stored object is over 50 MB. The MP4 and a thumbnail at the same id
+            are deleted, unless a row for this account was saved while this
+            call was running.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -260,8 +276,9 @@ paths:
         "415":
           description: |
             Codec, profile, duration, dimensions, metadata, or thumbnail rejected.
-            The object is deleted. Messages come from `mp4ErrorMessage` or the
-            thumbnail checks.
+            The MP4 and a thumbnail at the same id are deleted, unless a row
+            for this account was saved while this call was running. Messages
+            come from `mp4ErrorMessage` or the thumbnail checks.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -275,7 +292,9 @@ paths:
                 type: { value: { error: "That file isn't an H.264 MP4. Export it as MP4 with H.264 video and AAC audio, or with no audio." } }
                 thumb: { value: { error: "Couldn't save the preview image for that video. Try again." } }
         "500":
-          description: Thumbnail upload or insert failed
+          description: |
+            Thumbnail upload or insert failed, and this account has no row.
+            The MP4 and thumbnail are removed.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
