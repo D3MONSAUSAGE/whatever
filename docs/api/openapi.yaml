@@ -1,0 +1,1106 @@
+openapi: 3.0.3
+info:
+  title: Pantalla HTTP API
+  version: 2c
+  description: |
+    Existing routes as of main `c64b8cc` (Phase 2C). This file documents the
+    API the website and the TV already call. It does not add routes.
+
+    Admin routes require `Authorization: Bearer <Supabase access token>`.
+    They do not read cookies. `requireAdmin` (`lib/server/auth.ts`) verifies
+    the JWT and resolves the caller's account.
+
+    Player routes are for `public/player.html` only. A mobile app must not
+    call them and must not store the display token they return.
+
+    Error bodies are `{ "error": "<message>" }` with `Cache-Control: no-store`.
+    Successful JSON uses the same cache header (`lib/server/http.ts`).
+  license:
+    name: Proprietary
+servers:
+  - url: https://pantalla-teamtegrate.vercel.app
+    description: Production
+tags:
+  - name: account
+  - name: media
+  - name: displays
+  - name: playlists
+  - name: player
+    description: TV only. Not for the mobile app.
+security:
+  - bearerAuth: []
+paths:
+  /api/me:
+    get:
+      tags: [account]
+      summary: Current owner
+      description: |
+        Verifies the JWT and calls `ensure_account`, which creates the account
+        and its `Main location` on first use. Account name is derived from the
+        email local-part (control characters stripped, trimmed, max 80) or
+        `My business`.
+      operationId: getMe
+      responses:
+        "200":
+          description: Owner profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email, accountName]
+                properties:
+                  email: { type: string }
+                  accountName: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Account lookup failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load your account. Try again." }
+
+  /api/media:
+    get:
+      tags: [media]
+      summary: Library
+      description: |
+        Newest first. Signed URLs expire after 3600 seconds. `kind` null in
+        the database is returned as `image`. `usedIn` lists playlists that
+        reference the file on a draft or published slide (Phase 2C). A failed
+        usage lookup yields an empty `usedIn` rather than an error.
+      operationId: listMedia
+      responses:
+        "200":
+          description: Media rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MediaItem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Read failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load images." }
+    post:
+      tags: [media]
+      summary: Upload an image through the function
+      description: |
+        Multipart body. The server sniffs bytes with `checkImage` and ignores
+        the browser Content-Type. JPG, PNG, or WebP, at most 15 MB, each edge
+        at most 7680, at most 7680×4320 pixels. The website resizes to a JPEG
+        under 4 MB first because Vercel rejects request bodies over about 4.5 MB.
+        A 413 from the platform may have an empty body; the website maps any
+        413 to "That image is too large to upload."
+      operationId: uploadImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image bytes. Field name `file`.
+                name:
+                  type: string
+                  description: |
+                    Original file name. Control characters stripped, trimmed,
+                    sliced to 200. Empty becomes `image`.
+      responses:
+        "201":
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: Missing file or empty body
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Upload a JPG, PNG, or WebP image." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413":
+          description: Over 15 MB (app) or over the platform body limit
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Images must be 15 MB or smaller." }
+        "415":
+          description: Not a JPEG, PNG, or WebP, or dimensions are too large
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                type: { value: { error: "That file isn't a JPG, PNG, or WebP image." } }
+                dimensions: { value: { error: "That image is too large. Use 7680×4320 or smaller." } }
+        "500":
+          description: Storage or insert failed. A failed insert removes the object.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Upload failed. Try again." }
+
+  /api/media/upload:
+    post:
+      tags: [media]
+      summary: Mint a signed video upload URL
+      description: |
+        Service role calls `createSignedUploadUrl` for `{accountId}/{mediaId}.mp4`.
+        The bytes must not be posted to this route. The URL is a capability for
+        about 2 hours (Supabase default; this route does not pass an expiry).
+        PUT it as multipart: header `x-upsert: false`, field `cacheControl` =
+        `86400`, and a file part with an empty name and filename `video.mp4`
+        (`uploadToSignedUrl` in `lib/prepare-video.ts`).
+      operationId: createVideoUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileName: { type: string, description: Ignored by this route. The complete route stores the name. }
+                sizeBytes:
+                  type: number
+                  description: Finite byte length, 1 through 52428800.
+      responses:
+        "201":
+          description: Signed upload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mediaId, path, token, signedUrl]
+                properties:
+                  mediaId: { type: string, format: uuid }
+                  path: { type: string, example: "account-uuid/media-uuid.mp4" }
+                  token: { type: string }
+                  signedUrl: { type: string, format: uri }
+        "400":
+          description: sizeBytes missing or not a positive finite number
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "That file isn't an H.264 MP4. Export it as MP4 with H.264 video and AAC audio, or with no audio." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413":
+          description: Over 50 MB
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Videos must be 50 MB or smaller." }
+        "500":
+          description: Could not mint the URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't start the upload. Try again." }
+        "503": { $ref: "#/components/responses/VideoUnavailable" }
+
+  /api/media/upload/complete:
+    post:
+      tags: [media]
+      summary: Validate a direct video upload and insert the library row
+      description: |
+        Downloads `{accountId}/{mediaId}.mp4`, runs `inspectMp4` and
+        `enforceVideoLimits`, stores a JPEG thumbnail, and inserts `media`.
+        The row's duration, width, and height come from the MP4, not from the
+        body. The body values are a pre-check only. If the row already exists,
+        returns 200 and does not re-read the object. A failed check deletes
+        the object. A thumbnail upload that fails also deletes the MP4.
+      operationId: completeVideoUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mediaId, durationMs, width, height, thumbnailBase64]
+              properties:
+                mediaId: { type: string, format: uuid }
+                fileName: { type: string }
+                durationMs: { type: integer, minimum: 1, description: Pre-check. Rejected above 180000. }
+                width: { type: integer, minimum: 1, description: Pre-check. Rejected above 1920. }
+                height: { type: integer, minimum: 1, description: Pre-check. Rejected above 1920. }
+                thumbnailBase64:
+                  type: string
+                  description: |
+                    JPEG, optionally prefixed with `data:image/jpeg;base64,`.
+                    Decoded size 4 through 200000 bytes. Magic bytes FF D8 FF.
+      responses:
+        "200":
+          description: Row already existed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "201":
+          description: Inserted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: mediaId is not a UUID, or the object is not in storage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Upload didn't arrive. Try again." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413":
+          description: Stored object is over 50 MB. The object is deleted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Videos must be 50 MB or smaller." }
+        "415":
+          description: |
+            Codec, profile, duration, dimensions, metadata, or thumbnail rejected.
+            The object is deleted. Messages come from `mp4ErrorMessage` or the
+            thumbnail checks.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                unreadable: { value: { error: "This browser couldn't read that video. Export it as H.264 MP4." } }
+                duration: { value: { error: "Videos must be 3 minutes or shorter." } }
+                dimensions: { value: { error: "Videos must be 1920×1920 or smaller." } }
+                profile: { value: { error: "Use H.264 Baseline, Main, or High profile at level 4.2 or below. High 10, 4:2:2, and 4:4:4 are not supported." } }
+                codec: { value: { error: "This video isn't H.264 with AAC audio (or no audio). HEVC, VP9, and AV1 can't play on these TVs." } }
+                metadata: { value: { error: "This MP4's metadata is too large to check. Re-export a smaller file." } }
+                type: { value: { error: "That file isn't an H.264 MP4. Export it as MP4 with H.264 video and AAC audio, or with no audio." } }
+                thumb: { value: { error: "Couldn't save the preview image for that video. Try again." } }
+        "500":
+          description: Thumbnail upload or insert failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't save that video. Try again." }
+        "503": { $ref: "#/components/responses/VideoUnavailable" }
+
+  /api/media/{id}:
+    delete:
+      tags: [media]
+      summary: Delete a library file
+      description: |
+        409 while any `playlist_items` row (draft or published) still points at
+        the file. The message names those playlists. Otherwise `delete_media`
+        clears displays that showed it, bumps their `content_version`, deletes
+        the row, and the route removes the object and a same-account thumbnail.
+      operationId: deleteMedia
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Id is not a UUID, or no row in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "File not found." }
+        "409":
+          description: Still used by a playlist
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error: "This file is in a playlist (Lunch loop). Remove it from the playlist and publish again before deleting it."
+        "500":
+          description: Lookup or delete failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't delete. Try again." }
+
+  /api/displays:
+    get:
+      tags: [displays]
+      summary: Active screens
+      description: |
+        `status = active`, oldest first. `connected` is true when `token_hash`
+        is set. The hash is not returned. `online` is true when `lastSeenAt`
+        is within 60000 ms. Signed media and playlist URLs expire after 3600
+        seconds. Playlist URL is the first published slide (a video uses its
+        thumbnail).
+      operationId: listDisplays
+      responses:
+        "200":
+          description: Screens
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Display" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Read failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load displays." }
+
+  /api/displays/pair:
+    post:
+      tags: [displays]
+      summary: Claim the code shown on a TV
+      description: |
+        HMAC-hashes the code with `PAIRING_CODE_SECRET` and calls `claim_pairing`.
+        Counts the attempt before the lookup: 10 per user and 30 per IP per
+        15 minutes. A blank code is 400 and does not count. Creates a display
+        with no token. The TV collects the token on its own poll.
+      operationId: claimPairing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code:
+                  type: string
+                  description: Non-digits are stripped. Exactly 6 digits must remain.
+                  example: "123 456"
+                name:
+                  type: string
+                  description: Control characters stripped, trimmed, sliced to 60. Must be non-empty.
+                  example: "Front counter"
+      responses:
+        "200":
+          description: Display created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: Code or name rejected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                code: { value: { error: "Enter the 6-digit code shown on the TV." } }
+                name: { value: { error: "Give this TV a name, like “Front counter”." } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: No pending unexpired session for that code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "That code doesn't match a TV. Check the screen — codes expire after 10 minutes." }
+        "429":
+          description: Claim rate limit
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Too many attempts. Wait 15 minutes, then try again." }
+        "500":
+          description: claim_pairing failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't connect the TV. Try again." }
+
+  /api/displays/{id}:
+    patch:
+      tags: [displays]
+      summary: Rename a screen or assign a single image
+      description: |
+        If the JSON object has `mediaId`, that branch runs (`null` clears the
+        screen) and `name` is ignored. `assign_media` refuses video, requires
+        the image and an active display in this account, clears
+        `assigned_playlist_id`, and increments `content_version`. Otherwise a
+        string `name` is trimmed and sliced to 60. Any other body is 400.
+      operationId: updateDisplay
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [mediaId]
+                  properties:
+                    mediaId:
+                      type: string
+                      format: uuid
+                      nullable: true
+                - type: object
+                  required: [name]
+                  properties:
+                    name: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Empty name, video assignment, or neither field
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                empty: { value: { error: "Name can't be empty." } }
+                video: { value: { error: "Publish a video from a playlist. A single screen assignment has to be an image." } }
+                none: { value: { error: "Nothing to update." } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Bad id, or the display or image is not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                display: { value: { error: "Display not found." } }
+                image: { value: { error: "Image not found." } }
+                either: { value: { error: "Display or image not found." } }
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                publish: { value: { error: "Couldn't publish. Try again." } }
+                rename: { value: { error: "Couldn't rename. Try again." } }
+    delete:
+      tags: [displays]
+      summary: Disconnect a screen
+      description: |
+        Sets `status` to `revoked` and `token_hash` to null. The TV's next
+        `GET /api/player/state` is 401 and the player returns to pairing.
+        The row is kept and disappears from `GET /api/displays`.
+      operationId: disconnectDisplay
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not a UUID or not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Display not found." }
+        "500":
+          description: Update failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't disconnect. Try again." }
+
+  /api/playlists:
+    get:
+      tags: [playlists]
+      summary: Playlist summaries
+      description: |
+        Newest `updated_at` first. `slideCount` counts draft items.
+        `displayCount` and `displayNames` are active displays assigned to the
+        playlist. `displayNames` order follows the displays query (not sorted).
+        `thumbnailUrl` is the draft slide with the lowest position, signed for
+        3600 seconds. A video at that position uses its thumbnail. Null when
+        the draft is empty.
+      operationId: listPlaylists
+      responses:
+        "200":
+          description: Summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PlaylistSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Read failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load playlists." }
+        "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
+    post:
+      tags: [playlists]
+      summary: Create an empty playlist
+      description: |
+        Inserts a draft with `default_duration_ms` 10000, `transition` `none`,
+        and `revision` 0. Does not publish.
+      operationId: createPlaylist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Control characters stripped, trimmed, sliced to 80. Must be non-empty.
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400":
+          description: Empty name
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Give the playlist a name." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: Insert failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't create the playlist." }
+        "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
+
+  /api/playlists/{id}:
+    get:
+      tags: [playlists]
+      summary: Draft editor payload
+      description: |
+        Draft items only, by position. Signed file and thumbnail URLs last
+        3600 seconds. `displays` is every active screen, with `assigned` true
+        when `assigned_playlist_id` is this playlist. Published slide rows are
+        not included; `publishedAt`, `publishedTransition`, and `revision`
+        describe the last publish.
+      operationId: getPlaylist
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlaylistDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not a UUID or not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Playlist not found." }
+        "500":
+          description: Read failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load the playlist." }
+        "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
+    patch:
+      tags: [playlists]
+      summary: Replace the draft
+      description: |
+        Calls `save_playlist`. Does not change published items, `revision`,
+        or any screen. Last write wins. `durationMs` null is stored null and
+        resolved to the playlist default at publish. The website sends null
+        for every video slide.
+      operationId: savePlaylist
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaylistDraft" }
+      responses:
+        "200":
+          description: Draft replaced
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Validation failed, or a media id is not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                name: { value: { error: "Give the playlist a name." } }
+                transition: { value: { error: "Choose a transition." } }
+                durationType: { value: { error: "Set a default duration in seconds." } }
+                durationRange: { value: { error: "Default duration must be between 1 and 600 seconds." } }
+                items: { value: { error: "Check the slides and try again." } }
+                missing: { value: { error: "Couldn't save the playlist. Check that the images are still in your library." } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Playlist not found." }
+        "500":
+          description: save_playlist failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't save the playlist." }
+        "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
+    delete:
+      tags: [playlists]
+      summary: Delete a playlist
+      description: |
+        `delete_playlist` clears `assigned_playlist_id` on screens that were
+        playing it, bumps their `content_version`, then deletes the playlist.
+        Items cascade. Those screens show no content on the next poll.
+      operationId: deletePlaylist
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not a UUID or not in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Playlist not found." }
+        "500":
+          description: delete_playlist failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't delete the playlist." }
+        "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
+
+  /api/playlists/{id}/publish:
+    post:
+      tags: [playlists]
+      summary: Publish the saved draft to screens
+      description: |
+        `publish_playlist` copies draft items to `kind = published` with
+        duration `coalesce(slide, default)`, sets `published_at` and
+        `published_transition`, increments `revision`, assigns the listed
+        active displays (clearing `assigned_media_id` and bumping
+        `content_version`), and unassigns active displays that had this
+        playlist and were omitted. The draft must contain at least one item.
+        Unsaved editor state is not read; call PATCH first.
+      operationId: publishPlaylist
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayIds]
+              properties:
+                displayIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "400":
+          description: Display list rejected, empty draft, or a display is not active in this account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                choose: { value: { error: "Choose at least one TV." } }
+                empty: { value: { error: "Add at least one image, then choose TVs from this account." } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Id is not a UUID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Playlist not found." }
+        "500":
+          description: publish_playlist failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't publish the playlist." }
+        "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
+
+  /api/player/pair:
+    post:
+      tags: [player]
+      summary: TV asks for a pairing code
+      security: []
+      description: |
+        TV only. Unauthenticated. 30 requests per IP per hour. Inserts a
+        pending session (code HMAC, secret SHA-256, 600 second TTL) and
+        returns the raw code and secret once.
+      operationId: createPairingCode
+      responses:
+        "200":
+          description: Code minted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessionId, code, secret, expiresInSeconds]
+                properties:
+                  sessionId: { type: string, format: uuid }
+                  code: { type: string, pattern: "^[0-9]{6}$" }
+                  secret: { type: string }
+                  expiresInSeconds: { type: integer, example: 600 }
+        "429":
+          description: Create rate limit
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Too many pairing requests. Try again later." }
+        "500":
+          description: Insert failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't create a pairing code." }
+
+  /api/player/pair/status:
+    post:
+      tags: [player]
+      summary: TV polls to collect its display token
+      security: []
+      description: |
+        TV only. Returns `paired` and the raw token once, when the session
+        is `claimed` and the secret matches. The token is then stored only as
+        SHA-256 on the display. A second poll, a bad secret, or an unknown
+        session is `{ "status": "expired" }` with HTTP 200.
+      operationId: pollPairing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, secret]
+              properties:
+                sessionId: { type: string, format: uuid }
+                secret: { type: string, minLength: 20 }
+      responses:
+        "200":
+          description: Always 200. Branch on `status`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [pending, expired, paired]
+                  token:
+                    type: string
+                    description: Present only when status is paired.
+
+  /api/player/state:
+    get:
+      tags: [player]
+      summary: TV heartbeat and content
+      security:
+        - displayToken: []
+      description: |
+        TV only. Header `X-Display-Token` (length 20–200). `player_state`
+        writes `last_seen_at` at most once every 30 seconds. Query `v` is the
+        content version the TV is showing. When it matches, the body is
+        `{ version, unchanged: true }` and no signed URL is minted.
+        `refresh=1` forces a playlist URL refresh even when the version matches.
+        A single assigned image never includes `playlist`. Signed URLs last
+        3600 seconds.
+      operationId: playerState
+      parameters:
+        - name: v
+          in: query
+          schema: { type: string }
+          description: Content version currently on screen. Empty on the first poll.
+        - name: refresh
+          in: query
+          schema: { type: string, enum: ["1"] }
+          description: Re-sign playlist URLs even when `v` matches.
+        - name: _
+          in: query
+          schema: { type: string }
+          description: Cache buster sent by the player. Ignored.
+      responses:
+        "200":
+          description: State
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [version, unchanged]
+                    properties:
+                      version: { type: integer }
+                      unchanged: { type: boolean, enum: [true] }
+                  - type: object
+                    required: [version, mediaId, url]
+                    properties:
+                      version: { type: integer }
+                      mediaId: { type: string, format: uuid, nullable: true }
+                      url: { type: string, format: uri, nullable: true }
+                      playlist: { $ref: "#/components/schemas/PlayerPlaylist" }
+        "401":
+          description: Missing, malformed, or revoked token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: unauthorized }
+        "503":
+          description: player_state or signing failed. The TV keeps the last picture.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: unavailable }
+    post:
+      tags: [player]
+      summary: TV reports a clip it could not play
+      security:
+        - displayToken: []
+      description: |
+        TV only. Empty or missing `error` clears `player_error`. Otherwise the
+        text is trimmed and sliced to 180 characters. Before migration 0003
+        this is a no-op 200.
+      operationId: reportPlayerError
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Recorded, or ignored because the column is missing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ok" }
+        "401":
+          description: Token does not match an active display
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: unauthorized }
+        "503":
+          description: report_player_error failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: unavailable }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase Auth access token. Not a display token.
+    displayToken:
+      type: apiKey
+      in: header
+      name: X-Display-Token
+      description: Raw display token from pairing. TV only.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Unauthorized:
+      description: Missing or rejected Supabase access token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Sign in to continue." }
+    PlaylistsUnavailable:
+      description: Migration 0002 is not applied
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Playlists aren't available yet. Apply migration 0002_playlists.sql, then reload." }
+    VideoUnavailable:
+      description: Migration 0003 is not applied
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Video isn't available yet. Apply migration 0003_video.sql, then reload." }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, enum: [true] }
+    Id:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
+    MediaUse:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    MediaItem:
+      type: object
+      required: [id, fileName, sizeBytes, createdAt, url, kind, durationMs, width, height, thumbnailUrl, usedIn]
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: string }
+        sizeBytes: { type: integer }
+        createdAt: { type: string, format: date-time }
+        url: { type: string, format: uri, nullable: true }
+        kind: { type: string, enum: [image, video] }
+        durationMs: { type: integer, nullable: true }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        thumbnailUrl: { type: string, format: uri, nullable: true }
+        usedIn:
+          type: array
+          items: { $ref: "#/components/schemas/MediaUse" }
+    DisplayMedia:
+      type: object
+      required: [id, fileName, url]
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: string }
+        url: { type: string, format: uri, nullable: true }
+    DisplayPlaylist:
+      type: object
+      required: [id, name, url]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        url: { type: string, format: uri, nullable: true }
+    Display:
+      type: object
+      required: [id, name, connected, online, lastSeenAt, playerError, media, playlist]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        connected: { type: boolean }
+        online: { type: boolean }
+        lastSeenAt: { type: string, format: date-time, nullable: true }
+        playerError: { type: string, nullable: true }
+        media:
+          allOf:
+            - $ref: "#/components/schemas/DisplayMedia"
+          nullable: true
+        playlist:
+          allOf:
+            - $ref: "#/components/schemas/DisplayPlaylist"
+          nullable: true
+    PlaylistSummary:
+      type: object
+      required: [id, name, defaultDurationMs, transition, slideCount, displayCount, displayNames, thumbnailUrl, publishedAt, updatedAt, revision]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        defaultDurationMs: { type: integer }
+        transition: { type: string, enum: [none, fade] }
+        slideCount: { type: integer }
+        displayCount: { type: integer }
+        displayNames:
+          type: array
+          items: { type: string }
+        thumbnailUrl: { type: string, format: uri, nullable: true }
+        publishedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time }
+        revision: { type: integer }
+    PlaylistItem:
+      type: object
+      required: [id, mediaId, fileName, url, thumbnailUrl, kind, mediaDurationMs, durationMs, position]
+      properties:
+        id: { type: string, format: uuid }
+        mediaId: { type: string, format: uuid }
+        fileName: { type: string }
+        url: { type: string, format: uri, nullable: true }
+        thumbnailUrl: { type: string, format: uri, nullable: true }
+        kind: { type: string, enum: [image, video] }
+        mediaDurationMs: { type: integer, nullable: true }
+        durationMs: { type: integer, nullable: true, description: Null means the playlist default, resolved at publish. }
+        position: { type: integer, minimum: 0, maximum: 39 }
+    PlaylistDisplay:
+      type: object
+      required: [id, name, assigned]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        assigned: { type: boolean }
+    PlaylistDetail:
+      type: object
+      required: [id, name, defaultDurationMs, transition, publishedAt, publishedTransition, revision, updatedAt, items, displays]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        defaultDurationMs: { type: integer }
+        transition: { type: string, enum: [none, fade] }
+        publishedAt: { type: string, format: date-time, nullable: true }
+        publishedTransition: { type: string, enum: [none, fade], nullable: true }
+        revision: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PlaylistItem" }
+        displays:
+          type: array
+          items: { $ref: "#/components/schemas/PlaylistDisplay" }
+    PlaylistDraft:
+      type: object
+      required: [name, transition, defaultDurationMs, items]
+      properties:
+        name: { type: string }
+        transition: { type: string, enum: [none, fade] }
+        defaultDurationMs: { type: integer, minimum: 1000, maximum: 600000 }
+        items:
+          type: array
+          maxItems: 40
+          items:
+            type: object
+            required: [mediaId, durationMs]
+            properties:
+              mediaId: { type: string, format: uuid }
+              durationMs: { type: integer, minimum: 1000, maximum: 600000, nullable: true }
+    PlayerPlaylistItem:
+      type: object
+      required: [mediaId, url, durationMs, kind, width, height]
+      properties:
+        mediaId: { type: string, format: uuid }
+        url: { type: string, format: uri }
+        durationMs: { type: integer }
+        kind: { type: string, enum: [image, video] }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+    PlayerPlaylist:
+      type: object
+      required: [id, transition, items]
+      properties:
+        id: { type: string, format: uuid }
+        transition: { type: string, enum: [none, fade] }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PlayerPlaylistItem" }
