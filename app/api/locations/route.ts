@@ -4,6 +4,7 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { isValidTimeZone } from "@/lib/server/schedule";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
+import { loadLocations } from "@/lib/server/locations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,19 +55,4 @@ export async function POST(req: Request) {
     return fail("Couldn't add the location.", 500);
   }
   return json({ id: inserted.data.id }, 201);
-}
-
-export async function loadLocations(accountId: string) {
-  const rich = await db().from("locations").select("id, name, timezone, created_at").eq("account_id", accountId).order("created_at");
-  if (!rich.error) {
-    return (rich.data ?? []).map((row) => ({
-      id: String(row.id),
-      name: String(row.name),
-      timezone: typeof row.timezone === "string" && row.timezone ? row.timezone : "UTC",
-    }));
-  }
-  if (!isMissingSchema(rich.error)) return "error" as const;
-  const plain = await db().from("locations").select("id, name, created_at").eq("account_id", accountId).order("created_at");
-  if (plain.error) return "error" as const;
-  return (plain.data ?? []).map((row) => ({ id: String(row.id), name: String(row.name), timezone: "UTC" }));
 }

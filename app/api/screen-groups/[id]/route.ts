@@ -5,7 +5,7 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
 import { replaceMembers } from "../members";
-import { parseDisplayIds } from "../route";
+import { parseDisplayIds } from "@/lib/server/screen-groups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

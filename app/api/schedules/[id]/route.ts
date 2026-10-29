@@ -4,7 +4,7 @@ import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { parseScheduleBody, type ScheduleDraft } from "@/lib/server/schedule";
 import { fail, json, readJson } from "@/lib/server/http";
-import { assertTarget } from "../route";
+import { assertTarget } from "@/lib/server/schedule-target";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

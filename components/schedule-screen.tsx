@@ -405,14 +405,13 @@ function Rules({
         <label className="text-sm font-semibold">Schedule name
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
         </label>
-        <label className="text-sm font-semibold">Playlist
-          <select className="field mt-1" value={playlistId} onChange={(event) => setPlaylistId(event.target.value)} required>
-            <option value="">Choose a playlist</option>
-            {playlists.map((playlist) => (
-              <option key={playlist.id} value={playlist.id}>{playlist.name}{playlist.publishedAt ? "" : " (not published)"}</option>
-            ))}
-          </select>
-        </label>
+        <label className="text-sm font-semibold" htmlFor="schedule-playlist">Playlist</label>
+        <select id="schedule-playlist" className="field" aria-label="Playlist" value={playlistId} onChange={(event) => setPlaylistId(event.target.value)} required>
+          <option value="">Choose a playlist</option>
+          {playlists.map((playlist) => (
+            <option key={playlist.id} value={playlist.id}>{playlist.name}{playlist.publishedAt ? "" : " (not published)"}</option>
+          ))}
+        </select>
         {playlistId ? (
           <div className="text-sm text-muted leading-relaxed">
             Screens play the published slides, not a draft.

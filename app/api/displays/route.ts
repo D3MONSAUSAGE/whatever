@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { ONLINE_MS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json } from "@/lib/server/http";
-import { loadLocations } from "@/app/api/locations/route";
+import { loadLocations } from "@/lib/server/locations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

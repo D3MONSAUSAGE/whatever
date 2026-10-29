@@ -8,6 +8,8 @@ import { libraryFile, waitForLibraryFile } from "./media-locators";
  * Phase 2D dashboard flows at 1440 and 390.
  * Skips unless BASE_URL is set. Skips, and does not count as a pass, when
  * migration 0004_scheduling.sql is not applied on that origin's database.
+ * On Node 20, run with NODE_OPTIONS=--experimental-websocket so the Supabase
+ * cleanup client can open Realtime. Node 22 already includes that websocket.
  */
 
 const pendingEmails: string[] = [];
@@ -41,7 +43,7 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await page.goto("/dashboard/schedule");
     await expect(page.getByRole("heading", { name: "Schedule", exact: true })).toBeVisible();
     await page.getByLabel("Location name").fill("Kitchen");
-    await page.getByRole("textbox", { name: "Timezone", exact: true }).fill("America/Los_Angeles");
+    await page.getByRole("combobox", { name: "Timezone", exact: true }).fill("America/Los_Angeles");
     await page.getByRole("button", { name: "Add location" }).click();
     await expect(page.getByRole("status")).toContainText("Location added");
     await expect(page.getByLabel("Name for Kitchen")).toBeVisible();
@@ -72,7 +74,9 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await expect(page.getByRole("status")).toContainText("Draft saved");
 
     await page.goto("/dashboard/schedule");
-    await page.getByLabel("Playlist", { exact: true }).selectOption({ label: "Lunch specials (not published)" });
+    const playlist = page.getByRole("combobox", { name: "Playlist", exact: true });
+    await playlist.selectOption({ label: "Lunch specials (not published)" });
+    await expect(playlist).toHaveValue(/.+/);
     await page.getByRole("button", { name: "Publish slides" }).click();
     await expect(page.getByRole("status")).toContainText("Published slides updated");
     await page.getByLabel("Group name").fill("Front of house");
@@ -81,8 +85,8 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await expect(page.getByRole("status")).toContainText("Group added");
 
     await page.getByLabel("Schedule name").fill("Weekday lunch");
-    await page.getByLabel("Playlist", { exact: true }).selectOption({ label: "Lunch specials" });
-    await page.getByLabel("Screen").selectOption({ label: "Front counter" });
+    await page.getByRole("combobox", { name: "Playlist", exact: true }).selectOption({ label: "Lunch specials" });
+    await page.getByRole("combobox", { name: "Screen", exact: true }).selectOption({ label: "Front counter" });
     await page.getByRole("button", { name: "Add schedule" }).click();
     await expect(page.getByRole("status")).toContainText("Schedule added");
     await expect(page.getByText("Weekday lunch").first()).toBeVisible();

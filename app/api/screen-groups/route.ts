@@ -1,10 +1,10 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
-import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
 import { replaceMembers } from "./members";
+import { parseDisplayIds } from "@/lib/server/screen-groups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,16 +84,4 @@ export async function POST(req: Request) {
     if (saved === "error") return fail("Couldn't add the group.", 500);
   }
   return json({ id: inserted.data.id }, 201);
-}
-
-export function parseDisplayIds(input: unknown): string[] | "invalid" {
-  if (input == null) return [];
-  if (!Array.isArray(input)) return "invalid";
-  const ids: string[] = [];
-  for (const value of input) {
-    if (!isUuid(value)) return "invalid";
-    if (!ids.includes(value)) ids.push(value);
-  }
-  if (ids.length > 100) return "invalid";
-  return ids;
 }
