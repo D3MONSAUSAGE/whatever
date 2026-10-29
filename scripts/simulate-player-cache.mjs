@@ -13,7 +13,7 @@ const flush = () => new Promise((r) => setImmediate(r));
 // ---- persistent device state (survives a "restart")
 const storage = {};
 const cacheStore = new Map(); // key -> { size, url }
-let fetches = [], blobCount = 0, revoked = 0, videoBlobBroken = false;
+let fetches = [], blobCount = 0, videoBlobBroken = false;
 
 // ---- fake server
 const S = { online: true, token: "tok".repeat(10), version: 0, playlist: null, url: null, mediaId: null, pollMs: null, stateCalls: 0, next: null, revoked: false, sig: 0 };
@@ -103,7 +103,7 @@ function boot() {
       resolve({ ok: true, _size: 1000, headers: { get: (h) => (h === "content-length" ? "1000" : null) } });
     }, 500);
   });
-  const URL_ = { createObjectURL: (b) => `blob:${b.key}#${++blobCount}`, revokeObjectURL: () => { revoked++; } };
+  const URL_ = { createObjectURL: (b) => `blob:${b.key}#${++blobCount}`, revokeObjectURL: () => {} };
   const window_ = {
     innerWidth: 1280, innerHeight: 720,
     localStorage: { getItem: (k) => storage[k] ?? null, setItem: (k, v) => (storage[k] = String(v)), removeItem: (k) => delete storage[k] },
