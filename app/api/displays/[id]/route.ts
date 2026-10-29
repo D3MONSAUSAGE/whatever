@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
-// Rename ({ name }) or publish ({ mediaId }, null clears the screen).
+// Rename ({ name }), move or clear a location ({ locationId }, null clears),
+// or publish ({ mediaId }, null clears the screen). A body with mediaId ignores the rest.
 export async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -41,25 +42,23 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (!hasName && !hasLocation) return fail("Nothing to update.", 400);
 
   if (hasLocation) {
-    if (typeof body.locationId !== "string" || !isUuid(body.locationId)) return fail("Location not found.", 404);
-    const location = await db()
-      .from("locations")
-      .select("id")
-      .eq("id", body.locationId)
-      .eq("account_id", admin.accountId)
-      .maybeSingle();
-    if (location.error) return fail("Couldn't move the screen. Try again.", 500);
-    if (!location.data) return fail("Location not found.", 404);
-    const moved = await db()
-      .from("displays")
-      .update({ location_id: body.locationId })
-      .eq("id", id)
-      .eq("account_id", admin.accountId)
-      .eq("status", "active")
-      .select("id")
-      .maybeSingle();
-    if (moved.error) return fail("Couldn't move the screen. Try again.", 500);
-    if (!moved.data) return fail("Display not found.", 404);
+    if (body.locationId === null) {
+      const cleared = await updateLocation(admin.accountId, id, null);
+      if (cleared) return cleared;
+    } else if (typeof body.locationId !== "string" || !isUuid(body.locationId)) {
+      return fail("Location not found.", 404);
+    } else {
+      const location = await db()
+        .from("locations")
+        .select("id")
+        .eq("id", body.locationId)
+        .eq("account_id", admin.accountId)
+        .maybeSingle();
+      if (location.error) return fail("Couldn't move the screen. Try again.", 500);
+      if (!location.data) return fail("Location not found.", 404);
+      const moved = await updateLocation(admin.accountId, id, body.locationId);
+      if (moved) return moved;
+    }
   }
 
   if (hasName && typeof body.name === "string") {
@@ -78,6 +77,20 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
 
   return json({ ok: true });
+}
+
+async function updateLocation(accountId: string, displayId: string, locationId: string | null) {
+  const moved = await db()
+    .from("displays")
+    .update({ location_id: locationId })
+    .eq("id", displayId)
+    .eq("account_id", accountId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+  if (moved.error) return fail("Couldn't move the screen. Try again.", 500);
+  if (!moved.data) return fail("Display not found.", 404);
+  return null;
 }
 
 // Disconnect: revokes the TV's token immediately; the TV returns to its pairing screen.

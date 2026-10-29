@@ -8,6 +8,12 @@ info:
     Phase 2C keep their previous fields, status codes, and error strings.
     When a display has no schedule rules, `GET /api/player/state` is unchanged.
 
+    Hardening 1 (docs/HARDENING_1.md) adds `GET /api/overview`,
+    `{ "locationId": null }` on display update, per-user 429 limits on uploads,
+    publish, snapshot, and creates, and `GET /api/cron/orphan-uploads`.
+    Success bodies stay the same. A rejected body does not consume a limit.
+    Counters are per route, keyed by user id, using `rate_limit_hit`.
+
     Admin routes require `Authorization: Bearer <Supabase access token>`.
     They do not read cookies. `requireAdmin` (`lib/server/auth.ts`) verifies
     the JWT and resolves the caller's account.
@@ -32,6 +38,8 @@ tags:
   - name: schedules
   - name: player
     description: TV only. Not for the mobile app.
+  - name: ops
+    description: Scheduled jobs. Not for the mobile app.
 security:
   - bearerAuth: []
 paths:
@@ -63,6 +71,39 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Couldn't load your account. Try again." }
+
+  /api/overview:
+    get:
+      tags: [account]
+      summary: Dashboard counts for this account
+      description: |
+        Active screens only (revoked screens are omitted), matching
+        `GET /api/displays`. `online` uses the same 60 second `last_seen_at`
+        window. `offline` is `screens - online`, including screens that have
+        never polled. `activeSchedules` counts enabled rules only.
+        `playlists` counts every playlist, draft or published. No signed URLs
+        and no row payloads.
+      operationId: getOverview
+      responses:
+        "200":
+          description: Counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Overview" }
+              example:
+                screens: 2
+                online: 1
+                offline: 1
+                media: 4
+                playlists: 1
+                activeSchedules: 1
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500":
+          description: A count failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't load the overview." }
 
   /api/media:
     get:
@@ -150,6 +191,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Upload failed. Try again." }
+        "429": { $ref: "#/components/responses/UploadLimited" }
 
   /api/media/upload:
     post:
@@ -206,6 +248,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Couldn't start the upload. Try again." }
+        "429": { $ref: "#/components/responses/UploadLimited" }
         "503": { $ref: "#/components/responses/VideoUnavailable" }
 
   /api/media/upload/complete:
@@ -304,6 +347,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Couldn't save that video. Try again." }
+        "429": { $ref: "#/components/responses/UploadLimited" }
         "503": { $ref: "#/components/responses/VideoUnavailable" }
 
   /api/media/{id}:
@@ -443,8 +487,9 @@ paths:
         `assigned_playlist_id`, and increments `content_version`. Otherwise a
         string `name` is trimmed and sliced to 60. Phase 2D also accepts
         `locationId` (an active location in this account) in that same branch,
-        alone or with `name`. `mediaId` still wins and ignores both. Any other
-        body is 400.
+        alone or with `name`. `locationId: null` clears the location. The
+        screen then uses the existing UTC fallback. `mediaId` still wins and
+        ignores both. Any other body is 400.
       operationId: updateDisplay
       parameters:
         - $ref: "#/components/parameters/Id"
@@ -464,7 +509,11 @@ paths:
                 - type: object
                   properties:
                     name: { type: string }
-                    locationId: { type: string, format: uuid }
+                    locationId:
+                      type: string
+                      format: uuid
+                      nullable: true
+                      description: An active location in this account. Null clears it.
                   description: At least one of name or locationId.
       responses:
         "200":
@@ -491,6 +540,7 @@ paths:
                 display: { value: { error: "Display not found." } }
                 image: { value: { error: "Image not found." } }
                 either: { value: { error: "Display or image not found." } }
+                location: { value: { error: "Location not found." } }
         "500":
           description: Update failed
           content:
@@ -499,6 +549,7 @@ paths:
               examples:
                 publish: { value: { error: "Couldn't publish. Try again." } }
                 rename: { value: { error: "Couldn't rename. Try again." } }
+                move: { value: { error: "Couldn't move the screen. Try again." } }
     delete:
       tags: [displays]
       summary: Disconnect a screen
@@ -763,6 +814,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Couldn't publish the playlist." }
+        "429": { $ref: "#/components/responses/PublishLimited" }
         "503": { $ref: "#/components/responses/PlaylistsUnavailable" }
 
   /api/locations:
@@ -821,6 +873,7 @@ paths:
                 name: { value: { error: "Give this location a name." } }
                 zone: { value: { error: "That timezone isn't an IANA name like America/Los_Angeles." } }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/CreateLimited" }
         "503":
           description: Migration 0004 is not applied
           content:
@@ -953,6 +1006,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "A group with that name already exists." }
+        "429": { $ref: "#/components/responses/CreateLimited" }
         "503":
           description: Migration 0004 is not applied
           content:
@@ -1081,6 +1135,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/CreateLimited" }
         "503":
           description: Migration 0004 is not applied
           content:
@@ -1211,6 +1266,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Playlist not found." }
+        "429": { $ref: "#/components/responses/PublishLimited" }
         "503":
           description: Playlists or snapshot_playlist are missing
           content:
@@ -1412,6 +1468,73 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: unavailable }
 
+  /api/cron/orphan-uploads:
+    get:
+      tags: [ops]
+      summary: Delete orphaned upload objects older than 24 hours
+      operationId: cleanupOrphanUploads
+      security: []
+      description: |
+        Not for the mobile app. Vercel Cron calls this once a day
+        (`0 7 * * *` in vercel.json; Hobby allows a daily job) with
+        `Authorization: Bearer <CRON_SECRET>`.
+
+        Lists objects in the private `media` bucket. Deletes a file only when
+        it is older than 24 hours and no `media` row has that path as
+        `storage_path` or `thumbnail_path`. That covers a signed upload that
+        never completed, and a thumbnail left without a row. A missing or
+        unparseable `created_at` is kept. If `CRON_SECRET` is unset the route
+        returns 503 and deletes nothing. If listing or reading `media` fails,
+        it deletes nothing.
+
+        `dryRun=1` or `dryRun=true` logs each path it would delete and does
+        not remove objects.
+      parameters:
+        - name: dryRun
+          in: query
+          required: false
+          schema: { type: string, enum: ["1", "true"] }
+          description: Log the paths that would be deleted and delete nothing.
+      responses:
+        "200":
+          description: Scan finished. `deleted` is empty when `dryRun` is true.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, dryRun, scanned, deleted, wouldDelete, truncated]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  dryRun: { type: boolean }
+                  scanned: { type: integer, description: File objects seen. Folders are not counted. }
+                  deleted:
+                    type: array
+                    items: { type: string }
+                    description: Paths removed. Empty on a dry run.
+                  wouldDelete:
+                    type: array
+                    items: { type: string }
+                    description: Paths that were eligible after the media-row check.
+                  truncated: { type: boolean, description: True when a folder page cap stopped the walk. }
+        "401":
+          description: CRON_SECRET is set and the Bearer token does not match
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Unauthorized." }
+        "500":
+          description: Listing or deletion failed. Objects that still have a media row were not removed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Couldn't clean up uploads." }
+        "503":
+          description: CRON_SECRET is unset. Nothing is listed or deleted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "Cleanup isn't configured." }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1449,6 +1572,51 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
           example: { error: "Video isn't available yet. Apply migration 0003_video.sql, then reload." }
+    UploadLimited:
+      description: |
+        60 requests per user per 15 minutes for this route. Image upload,
+        video upload init, and video upload complete each have their own
+        counter. Counted only after the body is accepted (an image must also
+        pass the byte check). `Retry-After` is the seconds left in the window.
+      headers:
+        Retry-After:
+          description: Seconds until the window ends.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Too many uploads. Wait 15 minutes, then try again." }
+    PublishLimited:
+      description: |
+        60 requests per user per 15 minutes for this route. Publish and
+        snapshot do not share a counter. Counted only after the id and, for
+        publish, `displayIds` are accepted.
+      headers:
+        Retry-After:
+          description: Seconds until the window ends.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Too many publishes. Wait 15 minutes, then try again." }
+    CreateLimited:
+      description: |
+        Per user per 15 minutes, and above the account cap, so filling
+        locations (80 vs 50), screen groups (150 vs 100), or schedules
+        (240 vs 200) does not return 429. Each create route has its own
+        counter. Counted only after the body parses. The message names the
+        resource. `Retry-After` is the seconds left in the window.
+      headers:
+        Retry-After:
+          description: Seconds until the window ends.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          examples:
+            location: { value: { error: "Too many locations. Wait 15 minutes, then try again." } }
+            group: { value: { error: "Too many screen groups. Wait 15 minutes, then try again." } }
+            schedule: { value: { error: "Too many schedules. Wait 15 minutes, then try again." } }
   schemas:
     Error:
       type: object
@@ -1465,6 +1633,16 @@ components:
       required: [id]
       properties:
         id: { type: string, format: uuid }
+    Overview:
+      type: object
+      required: [screens, online, offline, media, playlists, activeSchedules]
+      properties:
+        screens: { type: integer, description: Active screens in this account. }
+        online: { type: integer, description: Active screens seen within 60 seconds. }
+        offline: { type: integer, description: Active screens that are not online. }
+        media: { type: integer }
+        playlists: { type: integer }
+        activeSchedules: { type: integer, description: Enabled schedule rows. }
     MediaUse:
       type: object
       required: [id, name]

@@ -3,7 +3,8 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { formatMinute, parseScheduleBody } from "@/lib/server/schedule";
 import { assertTarget } from "@/lib/server/schedule-target";
-import { fail, json, readJson } from "@/lib/server/http";
+import { CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export async function POST(req: Request) {
   if (admin instanceof Response) return admin;
   const parsed = parseScheduleBody(await readJson(req));
   if (!parsed.ok) return fail(parsed.error, 400);
+  const limited = await enforceLimit(`create-schedule:${admin.userId}`, CREATE_WINDOW_SECONDS, CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE);
+  if (limited) return limited;
 
   const count = await db().from("schedules").select("id").eq("account_id", admin.accountId);
   if (count.error) {

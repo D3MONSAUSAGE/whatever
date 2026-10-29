@@ -16,6 +16,8 @@ export type Store = {
   screen_group_members: Row[];
   schedules: Row[];
   objects: Map<string, Uint8Array>;
+  /** Missing key means "uploaded now". Null means the storage listing has no created_at. */
+  objectTimes: Map<string, string | null>;
   users: Map<string, { id: string; email: string }>;
 };
 
@@ -100,6 +102,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     filters: [string, unknown][];
     inFilters: [string, unknown[]][];
     order?: { col: string; ascending: boolean };
+    limit?: number;
+    range?: { from: number; to: number };
+    count?: "exact";
+    head?: boolean;
     insert?: Row;
     update?: Row;
     mode: Mode;
@@ -110,8 +116,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     this.op = { type: "select", filters: [], inFilters: [], mode: "many" };
   }
 
-  select(cols = "*") {
+  select(cols = "*", opts?: { count?: "exact"; head?: boolean }) {
     this.op.select = String(cols);
+    this.op.count = opts?.count;
+    this.op.head = opts?.head === true;
     return this;
   }
   insert(row: Row) {
@@ -140,7 +148,12 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     this.op.order = { col, ascending: opts?.ascending !== false };
     return this;
   }
-  limit(_count: number) {
+  limit(count: number) {
+    this.op.limit = count;
+    return this;
+  }
+  range(from: number, to: number) {
+    this.op.range = { from, to };
     return this;
   }
   single() {
@@ -209,6 +222,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
         return String(av ?? "").localeCompare(String(bv ?? "")) * (ascending ? 1 : -1);
       });
     }
+    const total = found.length;
+    if (this.op.range) found = found.slice(this.op.range.from, this.op.range.to + 1);
+    else if (this.op.limit != null) found = found.slice(0, this.op.limit);
+    if (this.op.count) return { data: this.op.head ? null : found, error: null, count: total };
     return shape(found, this.op.mode);
   }
 }
@@ -500,6 +517,7 @@ export function createFakeDb() {
     screen_group_members: [],
     schedules: [],
     objects: new Map(),
+    objectTimes: new Map(),
     users: new Map(),
   };
 
@@ -535,6 +553,7 @@ export function createFakeDb() {
             }
             const bytes = body instanceof Uint8Array ? body : new Uint8Array(await body.arrayBuffer());
             store.objects.set(path, Uint8Array.from(bytes));
+            if (!store.objectTimes.has(path)) store.objectTimes.set(path, new Date().toISOString());
             return { data: { path }, error: null };
           },
           async download(path: string) {
@@ -554,8 +573,43 @@ export function createFakeDb() {
             };
           },
           async remove(paths: string[]) {
-            for (const path of paths) store.objects.delete(path);
+            for (const path of paths) {
+              store.objects.delete(path);
+              store.objectTimes.delete(path);
+            }
             return { data: paths, error: null };
+          },
+          async list(prefix = "", options?: { limit?: number; offset?: number }) {
+            const limit = options?.limit ?? 100;
+            const offset = options?.offset ?? 0;
+            const normalized = prefix.replace(/^\/+|\/+$/g, "");
+            const folders = new Map<string, { name: string; id: null; created_at: null; updated_at: null; metadata: null }>();
+            const files: { name: string; id: string; created_at: string | null; updated_at: string | null; metadata: { size: number } }[] = [];
+            for (const path of store.objects.keys()) {
+              let rest = path;
+              if (normalized) {
+                const lead = `${normalized}/`;
+                if (!path.startsWith(lead)) continue;
+                rest = path.slice(lead.length);
+              }
+              if (!rest) continue;
+              const slash = rest.indexOf("/");
+              if (slash === -1) {
+                const created = store.objectTimes.has(path) ? store.objectTimes.get(path) ?? null : new Date().toISOString();
+                files.push({
+                  name: rest,
+                  id: path,
+                  created_at: created,
+                  updated_at: created,
+                  metadata: { size: store.objects.get(path)?.byteLength ?? 0 },
+                });
+              } else {
+                const name = rest.slice(0, slash);
+                if (name) folders.set(name, { name, id: null, created_at: null, updated_at: null, metadata: null });
+              }
+            }
+            const all = [...folders.values(), ...files].sort((a, b) => a.name.localeCompare(b.name));
+            return { data: all.slice(offset, offset + limit), error: null };
           },
           async createSignedUrl(path: string, ttl: number) {
             if (!store.objects.has(path)) return { data: null, error: { message: "not found" } };

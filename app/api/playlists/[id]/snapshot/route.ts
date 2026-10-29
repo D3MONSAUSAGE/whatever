@@ -2,7 +2,8 @@ import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
-import { fail, json } from "@/lib/server/http";
+import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS } from "@/lib/server/limits";
+import { enforceLimit, fail, json } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export async function POST(req: Request, { params }: Ctx) {
   if (admin instanceof Response) return admin;
   const { id } = await params;
   if (!isUuid(id)) return fail("Playlist not found.", 404);
+  const limited = await enforceLimit(`snapshot:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
+  if (limited) return limited;
 
   const { data, error } = await db().rpc("snapshot_playlist", {
     p_account_id: admin.accountId,

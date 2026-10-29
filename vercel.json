@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/orphan-uploads",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}

@@ -3,7 +3,8 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { isValidTimeZone } from "@/lib/server/schedule";
 import { normalizePlaylistName } from "@/lib/server/validate";
-import { fail, json, readJson } from "@/lib/server/http";
+import { CREATE_LOCATION_MAX_PER_USER, CREATE_LOCATION_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { loadLocations } from "@/lib/server/locations";
 
 export const runtime = "nodejs";
@@ -40,6 +41,8 @@ export async function POST(req: Request) {
   if (!name) return fail("Give this location a name.", 400);
   const timezone = body.timezone == null || body.timezone === "" ? "UTC" : String(body.timezone);
   if (!isValidTimeZone(timezone)) return fail("That timezone isn't an IANA name like America/Los_Angeles.", 400);
+  const limited = await enforceLimit(`create-location:${admin.userId}`, CREATE_WINDOW_SECONDS, CREATE_LOCATION_MAX_PER_USER, CREATE_LOCATION_RATE_MESSAGE);
+  if (limited) return limited;
 
   const existing = await db().from("locations").select("id").eq("account_id", admin.accountId);
   if (existing.error) return fail("Couldn't add the location.", 500);
