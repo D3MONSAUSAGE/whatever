@@ -71,6 +71,165 @@
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
   var videos = [el('va'), el('vb')];
   var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0;
+  // Polling: the server may send pollMs (older servers do not; then STATE_MS stays).
+  var pollMs = STATE_MS, wakeAt = 0;
+
+  // ---- persistent media cache (only where the TV browser supports it; otherwise nothing changes)
+  // Files are kept by mediaId, which never changes for an upload, so each file is
+  // downloaded once and reused across loops, restarts and short outages.
+  var CACHE_NAME = 'seemple-media-v1', LAST_KEY = 'seemple_last_state', INDEX_KEY = 'seemple_media_index';
+  var CACHE_MAX_BYTES = 60 * 1024 * 1024, CACHE_KEEP_MS = 14 * 86400000;
+  var blobs = {}, cacheQueue = [], cacheQueued = {}, cacheBusy = false, blobVideoBad = false, triedOffline = false;
+  // Read-only map of saved files (mediaId -> local URL), for support and automated checks.
+  try { window.seempleSavedMedia = blobs; } catch (eSaved) {}
+  var canCache = (function () {
+    try {
+      return !!(window.caches && window.fetch && window.Promise && window.URL && window.URL.createObjectURL);
+    } catch (e) { return false; }
+  })();
+  if (canCache) {
+    try { if (window.navigator && window.navigator.storage && window.navigator.storage.persist) window.navigator.storage.persist(); } catch (e) {}
+    // Lets the player page itself open with no internet (network first; see player-sw.js).
+    try {
+      if (window.navigator && window.navigator.serviceWorker && window.navigator.serviceWorker.register) {
+        window.navigator.serviceWorker.register('/player-sw.js', { scope: '/player' }).then(null, function () {});
+      }
+    } catch (e2) {}
+  }
+  function mediaKey(id) { return '/__seemple_media/' + encodeURIComponent(id); }
+  function readJsonKey(key) {
+    try { var raw = window.localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  function writeJsonKey(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+  function blobFor(item) {
+    var b = item && item.mediaId ? blobs[item.mediaId] : '';
+    if (!b) return '';
+    if (item.kind === 'video' && blobVideoBad) return '';
+    return b;
+  }
+  function dropBlob(id) {
+    if (!id || !blobs[id]) return;
+    try { window.URL.revokeObjectURL(blobs[id]); } catch (e) {}
+    delete blobs[id];
+  }
+  // Calls cb(true) once blobs[id] holds a local URL for a cached file.
+  function loadBlob(id, cb) {
+    if (blobs[id]) { cb(true); return; }
+    window.caches.open(CACHE_NAME).then(function (c) { return c.match(mediaKey(id)); })
+      .then(function (r) { return r ? r.blob() : null; })
+      .then(function (b) {
+        if (b && b.size > 0 && !blobs[id]) blobs[id] = window.URL.createObjectURL(b);
+        cb(!!blobs[id]);
+      }, function () { cb(false); });
+  }
+  function mediaList(d) {
+    var out = [], i, it;
+    if (!d) return out;
+    if (d.playlist && d.playlist.items) {
+      for (i = 0; i < d.playlist.items.length; i++) {
+        it = d.playlist.items[i];
+        if (it && it.mediaId && it.url) out.push({ mediaId: it.mediaId, url: it.url });
+      }
+    } else if (d.mediaId && d.url) {
+      out.push({ mediaId: d.mediaId, url: d.url });
+    }
+    return out;
+  }
+  // Downloads only files this TV does not have yet, one at a time.
+  function cacheMedia(d) {
+    var list = mediaList(d), index = readJsonKey(INDEX_KEY) || {}, now = new Date().getTime(), keep = {}, id, i;
+    if (!canCache) return;
+    for (i = 0; i < list.length; i++) {
+      keep[list[i].mediaId] = 1;
+      index[list[i].mediaId] = now;
+      if (!cacheQueued[list[i].mediaId]) { cacheQueued[list[i].mediaId] = 1; cacheQueue.push(list[i]); }
+      else {
+        for (var q = 0; q < cacheQueue.length; q++) if (cacheQueue[q].mediaId === list[i].mediaId) cacheQueue[q].url = list[i].url;
+      }
+    }
+    for (id in index) {
+      if (Object.prototype.hasOwnProperty.call(index, id) && !keep[id] && now - index[id] > CACHE_KEEP_MS) {
+        delete index[id];
+        dropBlob(id);
+        (function (gone) {
+          window.caches.open(CACHE_NAME).then(function (c) { return c['delete'](mediaKey(gone)); }).then(null, function () {});
+        })(id);
+      }
+    }
+    writeJsonKey(INDEX_KEY, index);
+    pumpCache();
+  }
+  function pumpCache() {
+    var job;
+    if (cacheBusy || !cacheQueue.length) return;
+    job = cacheQueue.shift();
+    cacheBusy = true;
+    function next() { cacheBusy = false; delete cacheQueued[job.mediaId]; pumpCache(); }
+    loadBlob(job.mediaId, function (have) {
+      if (have) { next(); return; }
+      var store;
+      window.caches.open(CACHE_NAME).then(function (c) {
+        store = c;
+        return window.fetch(job.url, { mode: 'cors', credentials: 'omit' });
+      }).then(function (r) {
+        var size = Number(r && r.headers && r.headers.get ? r.headers.get('content-length') : 0) || 0;
+        if (!r || !r.ok || size > CACHE_MAX_BYTES) return null;
+        return store.put(mediaKey(job.mediaId), r);
+      }).then(function () {
+        loadBlob(job.mediaId, function () { next(); });
+      }, function () {
+        next(); // offline or storage full: keep streaming from the network
+      });
+    });
+  }
+  function clearCache() {
+    var id;
+    for (id in blobs) if (Object.prototype.hasOwnProperty.call(blobs, id)) dropBlob(id);
+    cacheQueue = []; cacheQueued = {};
+    try { window.localStorage.removeItem(LAST_KEY); window.localStorage.removeItem(INDEX_KEY); } catch (e) {}
+    if (canCache) { try { window.caches['delete'](CACHE_NAME).then(null, function () {}); } catch (e2) {} }
+  }
+  function rememberState(d) {
+    if (!d || typeof d.version !== 'number') return;
+    if (!canCache) return;
+    writeJsonKey(LAST_KEY, { version: d.version, mediaId: d.mediaId || null, url: d.url || null, playlist: d.playlist || null });
+    cacheMedia(d);
+  }
+  // No server on start-up: play what this TV showed last, from its saved files.
+  function playSaved(g) {
+    var last, list, pending, i;
+    if (!canCache || triedOffline) return;
+    triedOffline = true;
+    last = readJsonKey(LAST_KEY);
+    list = mediaList(last);
+    if (!last || typeof last.version !== 'number' || !list.length) return;
+    pending = list.length;
+    for (i = 0; i < list.length; i++) loadBlob(list[i].mediaId, done);
+    function done() {
+      pending -= 1;
+      if (pending > 0) return;
+      if (g !== gen || shownVersion !== null || hasImage) return; // the server answered meanwhile
+      var copy = { version: last.version, mediaId: last.mediaId, url: null }, items = [], k, it;
+      if (last.playlist && last.playlist.items) {
+        for (k = 0; k < last.playlist.items.length; k++) {
+          it = last.playlist.items[k];
+          if (it && it.mediaId && blobs[it.mediaId] && !(it.kind === 'video' && blobVideoBad)) {
+            items.push({ mediaId: it.mediaId, url: blobs[it.mediaId], durationMs: it.durationMs, kind: it.kind });
+          }
+        }
+        if (!items.length) return;
+        copy.playlist = { id: last.playlist.id, transition: last.playlist.transition, items: items };
+        copy.url = items[0].url;
+      } else if (last.mediaId && blobs[last.mediaId]) {
+        copy.url = blobs[last.mediaId];
+      } else {
+        return;
+      }
+      apply(copy);
+    }
+  }
 
   // ---- token storage (memory fallback if localStorage is unavailable)
   function getToken() {
@@ -188,6 +347,8 @@
   }
   function otherVideo(v) { return v === videos[0] ? videos[1] : videos[0]; }
   function resolveUrl(item) {
+    var local = blobFor(item);
+    if (local) return local;
     if (item.mediaId && stableSrc[item.mediaId]) return stableSrc[item.mediaId];
     return item.url;
   }
@@ -399,6 +560,17 @@
       failed = true;
       attempt += 1;
       clearTimeout(startTimer);
+      if (url && url.indexOf('blob:') === 0) {
+        // This TV can't play saved video files: stream videos from the network instead.
+        blobVideoBad = true;
+        releaseItemVideo(item);
+        clearSlideTimer();
+        slideTimer = setTimeout(function () {
+          if (token !== slideToken || !playlist) return;
+          present(index, versionOrNull);
+        }, 0);
+        return;
+      }
       failVideo(index, item, message);
     }
     function watchPlayback() {
@@ -511,6 +683,7 @@
     img.onload = function () { pinUrl(item, src); commit(); };
     img.onerror = function () {
       if (token !== slideToken) return;
+      if (src.indexOf('blob:') === 0) dropBlob(item.mediaId);
       dropPin(item);
       needRefresh = true;
       clearSlideTimer();
@@ -615,18 +788,28 @@
     var url = '/api/player/state?v=' + encodeURIComponent(v) + refresh + '&_=' + new Date().getTime();
     request('GET', url, null, token, function (status, data) {
       if (g !== gen) return;
-      if (status === 401) { clearToken(); startPairing(); return; } // disconnected from dashboard
+      if (status === 401) { clearToken(); clearCache(); startPairing(); return; } // disconnected from dashboard
+      var wait = STATE_MS;
       if (status === 200 && data) {
         setStatus('');
-        if (!data.unchanged) apply(data);
+        if (typeof data.pollMs === 'number' && data.pollMs >= 5000 && data.pollMs <= 120000) pollMs = data.pollMs;
+        wait = pollMs;
+        wakeAt = data.nextTransitionAt ? Date.parse(data.nextTransitionAt) || 0 : 0;
+        if (wakeAt) {
+          // Ask again just after a scheduled switch, so schedules stay on time.
+          var until = wakeAt - new Date().getTime() + 1500;
+          if (until > 0 && until < wait) wait = Math.max(1000, until);
+        }
+        if (!data.unchanged) { rememberState(data); apply(data); }
       } else if (!hasImage && shownVersion === null) {
         setStatus('');
         showScreen('connecting'); // nothing on screen yet
+        if (status === 0 || status >= 500) playSaved(g);
       } else {
         // Keep the last image (or the empty state) and say we're retrying.
         setStatus('Reconnecting...');
       }
-      later(g, function () { pollState(g); }, STATE_MS);
+      later(g, function () { pollState(g); }, wait);
     });
   }
   function apply(d) {
@@ -645,7 +828,7 @@
       return;
     }
     if (loadingVersion === d.version) return; // already downloading this one
-    var img = new Image(), v = d.version, src = d.url;
+    var img = new Image(), v = d.version, src = (d.mediaId && blobs[d.mediaId]) || d.url;
     loadingVersion = v;
     preloadImg = img;
     var giveUp = setTimeout(function () {
@@ -662,6 +845,7 @@
     img.onerror = function () {
       // Keep the last image; next poll gets a fresh URL and retries.
       clearTimeout(giveUp);
+      if (src.indexOf('blob:') === 0) dropBlob(d.mediaId);
       if (preloadImg === img) { preloadImg = null; loadingVersion = null; }
     };
     img.src = src;

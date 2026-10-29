@@ -208,7 +208,13 @@ async function shownUrl(tv: Page) {
     const layers = [document.getElementById("a"), document.getElementById("b")].filter(Boolean) as HTMLElement[];
     const visible = layers.filter((layer) => layer.className.indexOf("on") !== -1);
     visible.sort((a, b) => (parseInt(b.style.zIndex, 10) || 0) - (parseInt(a.style.zIndex, 10) || 0));
-    return visible[0] ? visible[0].style.backgroundImage : "";
+    return withSavedId(visible[0] ? visible[0].style.backgroundImage : "");
+    // Files the TV has saved play from local blob: URLs; tag them with their media id.
+    function withSavedId(url: string) {
+      const saved = ((window as unknown as { seempleSavedMedia?: Record<string, string> }).seempleSavedMedia) || {};
+      for (const id of Object.keys(saved)) if (saved[id] && url.includes(saved[id])) return url + " saved:" + id;
+      return url;
+    }
   });
 }
 
@@ -626,8 +632,13 @@ async function screenState(tv: Page) {
     return {
       visible: (videoOn || imageOn) && !blocked,
       videoOn,
-      url: videoOn ? video!.currentSrc : image ? image.style.backgroundImage : "",
+      url: withSavedId(videoOn ? video!.currentSrc : image ? image.style.backgroundImage : ""),
     };
+    function withSavedId(url: string) {
+      const saved = ((window as unknown as { seempleSavedMedia?: Record<string, string> }).seempleSavedMedia) || {};
+      for (const id of Object.keys(saved)) if (saved[id] && url.includes(saved[id])) return url + " saved:" + id;
+      return url;
+    }
   });
 }
 
@@ -690,3 +701,39 @@ async function deleteTestUsers(emails: string[]) {
   const admin = createClient(supabaseUrl, service, { auth: { persistSession: false, autoRefreshToken: false } });
   await removeCreatedTestEmails(admin, emails);
 }
+
+test("a TV keeps its media and restarts with no internet", async ({ browser }) => {
+  const ctx = await openPhoneAndTv(browser);
+  const { phone, tv } = ctx;
+  try {
+    await signUp(phone, ctx.owner);
+    await tv.goto("/player");
+    await phone.goto("/dashboard/media");
+    await upload(phone, "offline-a.png");
+    await pairTv(phone, tv, "Offline screen");
+    await publishSlides(phone, "Offline loop", [{ name: "offline-a.png", seconds: "3" }], "Offline screen");
+    await waitForImage(tv);
+
+    // The file is saved on the TV once, and the player page is saved by its service worker.
+    await expect.poll(() => tv.evaluate(async () => (await (await caches.open("seemple-media-v1")).keys()).length), { timeout: 30_000 }).toBe(1);
+    await tv.evaluate(async () => { await navigator.serviceWorker.ready; });
+    // One online reload lets the service worker take over the page and save it.
+    await tv.reload();
+    await waitForImage(tv);
+    await expect.poll(() => tv.evaluate(async () => !!(await (await caches.open("seemple-player-v1")).match("/player"))), { timeout: 15_000 }).toBe(true);
+
+    await ctx.tvContext.setOffline(true);
+    await tv.reload();
+    const offlineUrl = await waitForImage(tv);
+    expect(offlineUrl).toContain("blob:");
+    await expect(tv.locator("#pair")).not.toHaveClass(/on/);
+
+    await ctx.tvContext.setOffline(false);
+    await expect.poll(() => shownUrl(tv), { timeout: 45_000 }).toContain("url(");
+    await expect(tv.locator("#status")).not.toHaveClass(/on/, { timeout: 45_000 });
+  } finally {
+    await ctx.phoneContext.close();
+    await ctx.tvContext.close();
+    await deleteTestUsers([ctx.owner.email]);
+  }
+});

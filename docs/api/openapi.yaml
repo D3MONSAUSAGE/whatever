@@ -1368,12 +1368,18 @@ paths:
         assignment is showing and becomes a stable playback version while a
         rule is active (rule id, playlist id, and published revision). That
         version changes when the winner changes, so the TV picks up the
-        transition on its next poll, about 10 seconds, without a reload.
+        transition on its next poll (or right after `nextTransitionAt`), without a reload.
         `nextTransitionAt` is added only when a rule targets the display and
         the winner changes within 8 days. An active rule plays that playlist's
         published slides and overrides a single assigned image. An empty
         published playlist shows nothing until the window ends. It does not
         fall through to the saved assignment.
+
+        Milestone B: every 200 body also carries `pollMs`, the interval the
+        server asks the TV to poll at (default 30000, set by `PLAYER_POLL_MS`,
+        clamped 5000–120000). Players older than this field ignore it and keep
+        polling every 10 seconds. The current player also polls just after
+        `nextTransitionAt`, so schedule switches stay on time.
       operationId: playerState
       parameters:
         - name: v
@@ -1402,6 +1408,11 @@ paths:
                         type: integer
                         description: content_version, or a playback version above 1000000000000 while a schedule rule is active.
                       unchanged: { type: boolean, enum: [true] }
+                      pollMs:
+                        type: integer
+                        minimum: 5000
+                        maximum: 120000
+                        description: How often the TV should poll, in milliseconds. Default 30000.
                       nextTransitionAt:
                         type: string
                         format: date-time
@@ -1415,6 +1426,11 @@ paths:
                       mediaId: { type: string, format: uuid, nullable: true }
                       url: { type: string, format: uri, nullable: true }
                       playlist: { $ref: "#/components/schemas/PlayerPlaylist" }
+                      pollMs:
+                        type: integer
+                        minimum: 5000
+                        maximum: 120000
+                        description: How often the TV should poll, in milliseconds. Default 30000.
                       nextTransitionAt:
                         type: string
                         format: date-time

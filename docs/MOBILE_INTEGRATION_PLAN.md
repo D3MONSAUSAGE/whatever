@@ -273,7 +273,7 @@ The flow that already ships:
 4. The TV's next status poll flips `claimed` to `completed` and sets `token_hash` to the SHA-256 of a new random token. The raw token is in that one response. The TV stores it under `pantalla_display_token`. A second poll is `expired`.
 5. Playback is `GET /api/player/state` every 10 seconds (`STATE_MS`) with `X-Display-Token` and `?v=<content_version>`. `player_state` updates `last_seen_at` only when it is null or older than 30 seconds (`HEARTBEAT_SECONDS`). When `v` matches, the body is `{ version, unchanged: true }` and no new signed URL is minted. A playlist URL is refreshed about every 30 minutes (`urlRefreshAt` in the player) while the signature lasts 3600 seconds. The player keeps the previous URL string for an unchanged `mediaId` so a loop does not re-download.
 6. Disconnect (`DELETE /api/displays/:id`) nulls `token_hash`. The next state poll is 401. The player clears the token and shows a new code.
-7. Publish and single-image assign bump `content_version` in SQL. The following poll, within about 10 seconds, is how a TV changes picture. Draft saves do not bump it.
+7. Publish and single-image assign bump `content_version` in SQL. The following poll, within about 30 seconds (10 s for older players), is how a TV changes picture. Draft saves do not bump it.
 
 `connected` becomes true at step 4, not at step 3. The screen list can show a row that is not connected yet. That is the "waiting" state in `docs/PHASE_2C_PLAN.md`.
 
@@ -325,10 +325,10 @@ Column checks live in the three migration files. `media.duration_ms` is 1–1800
 | Signed read URL | 3600 s | `createSignedUrls` in the media, display, and playlist routes; `URL_TTL_SECONDS` in the player route |
 | Online window | 60000 ms | `ONLINE_MS` |
 | Heartbeat write interval | 30 s | `player_state`, `HEARTBEAT_SECONDS` |
-| Player poll | 10 s | `STATE_MS` in `public/player.html` |
+| Player poll | 30 s (server `pollMs`; 10 s for players older than Milestone B) | `PLAYER_POLL_MS`, `STATE_MS` in `public/player.html` |
 | Dashboard screen poll | 10 s | `useApi(..., 10_000)` |
 
-`online` is true when `lastSeenAt` is non-null and `now - lastSeenAt < 60_000`. A TV that polls every 10 seconds and whose heartbeat is written at most every 30 seconds stays online. A TV that stops polling drops off within 60 seconds of the last write, which can be up to 30 seconds after the last poll that actually wrote. There is no separate presence service.
+`online` is true when `lastSeenAt` is non-null and `now - lastSeenAt < 90_000` (was 60 s before Milestone B). A TV that polls every 30 seconds and whose heartbeat is written at most every 30 seconds stays online. A TV that stops polling drops off within 90 seconds of the last write, which can be up to 30 seconds after the last poll that actually wrote. There is no separate presence service.
 
 ### Realtime
 

@@ -20,7 +20,7 @@
 Vercel log drains and alerting rules need a paid Vercel plan, so they're not used.
 
 ## 3. Offline screens (live)
-- A screen is **online** if its player sent a heartbeat in the last 60 s. The player polls about every 10 s.
+- A screen is **online** if its player sent a heartbeat in the last 90 s. The player polls about every 30 s (`PLAYER_POLL_MS`; older cached players every 10 s), so a published change reaches a TV within about 30 s.
 - Overview and Displays refresh every 10 s. They show a red "N screens are offline" box naming each screen and how long it has been silent, and put "(N offline)" in the browser tab title. Each offline badge reads "Offline · 19 h".
 - Screens still waiting to pair aren't counted as offline. This changes only the dashboard Offline tile; `/api/overview` is unchanged.
 
