@@ -4,6 +4,7 @@ import { ONLINE_MS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json } from "@/lib/server/http";
 import { loadLocations } from "@/lib/server/locations";
+import { loadDisplaySchedules } from "@/lib/server/display-schedules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,12 @@ export async function GET(req: Request) {
   const locations = await loadLocations(admin.accountId);
   if (locations === "error") return fail("Couldn't load displays.", 500);
   const locationById = new Map(locations.map((location) => [location.id, location]));
+
+  const scheduleInfo = await loadDisplaySchedules(
+    admin.accountId,
+    list.map((d) => ({ id: d.id, timeZone: d.location_id ? locationById.get(d.location_id)?.timezone ?? null : null })),
+  );
+  if (scheduleInfo === null) return fail("Couldn't load displays.", 500);
 
   const mediaOf = (media: Row["media"]): MediaJoin | null =>
     Array.isArray(media) ? media[0] ?? null : media;
@@ -65,6 +72,9 @@ export async function GET(req: Request) {
               url: playlistInfo.get(d.assigned_playlist_id)!.url,
             }
           : null,
+        // Additive (milestone 3): the rules playing now, winner first, and the winner with its end time.
+        activeSchedules: scheduleInfo.get(d.id)?.activeSchedules ?? [],
+        currentSchedule: scheduleInfo.get(d.id)?.currentSchedule ?? null,
       };
     }),
   );

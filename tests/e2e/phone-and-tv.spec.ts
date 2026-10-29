@@ -43,7 +43,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
 
     await test.step("sign out and sign in", async () => {
       await phone.getByRole("link", { name: "Settings" }).click();
-      await phone.getByRole("button", { name: "Sign out" }).click();
+      await phone.getByRole("button", { name: "Sign out", exact: true }).click();
       await expect(phone).toHaveURL(/\/login/);
       await signIn(phone, accountA);
     });
@@ -119,7 +119,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
 
     await test.step("another account cannot read the menu", async () => {
       await phone.getByRole("link", { name: "Settings" }).click();
-      await phone.getByRole("button", { name: "Sign out" }).click();
+      await phone.getByRole("button", { name: "Sign out", exact: true }).click();
       await expect(phone).toHaveURL(/\/login/);
       await signUp(phone, accountB);
       await phone.goto("/dashboard/media");

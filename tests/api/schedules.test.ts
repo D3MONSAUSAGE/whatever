@@ -208,6 +208,13 @@ describe("scheduling API", () => {
     expect(playing.body.playlist.items[0].mediaId).toBe(special.body.id);
     expect(playing.body.version).not.toBe(contentVersion);
     expect(playing.body.nextTransitionAt).toBe("2026-10-28T21:00:00.000Z");
+    const listedNow = await call(listDisplays, "http://localhost/api/displays", auth("token-a"));
+    expect(listedNow.body[0].currentSchedule).toEqual({
+      id: made.body.id, name: "Weekday lunch", playlistId, playlistName: "Lunch specials",
+      target: "display", priority: 0, until: "2026-10-28T21:00:00.000Z",
+    });
+    expect(listedNow.body[0].activeSchedules).toHaveLength(1);
+    expect(listedNow.body[0].media.id).toBe(everyday.body.id);
     const again = await call(playerState, `http://localhost/api/player/state?v=${playing.body.version}`, { headers: { "X-Display-Token": token } });
     expect(again.body.unchanged).toBe(true);
     expect(again.body.version).toBe(playing.body.version);
@@ -217,6 +224,9 @@ describe("scheduling API", () => {
     expect(back.body.version).toBe(contentVersion);
     expect(back.body.playlist).toBeUndefined();
     expect(back.body.mediaId).toBe(everyday.body.id);
+    const listedLater = await call(listDisplays, "http://localhost/api/displays", auth("token-a"));
+    expect(listedLater.body[0].currentSchedule).toBeNull();
+    expect(listedLater.body[0].activeSchedules).toEqual([]);
     expect(store.displays[0].assigned_media_id).toBe(everyday.body.id);
     expect(store.displays[0].content_version).toBe(contentVersion);
   });
