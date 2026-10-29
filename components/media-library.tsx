@@ -4,6 +4,7 @@ import { api, formatDuration, formatSize, useApi, type MediaItem } from "@/lib/a
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
+import { IconImage } from "@/components/icons";
 import { EmptyState, LoadingBlock, PageHeader, formatNameList } from "@/components/ui";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
@@ -61,7 +62,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Media library" lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller, 0.5 seconds to 3 minutes, and 1920 pixels or less on each edge.">
+      <PageHeader title="Media library" icon={<IconImage />} lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller, 0.5 seconds to 3 minutes, and 1920 pixels or less on each edge.">
         <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
           Upload image
           <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}

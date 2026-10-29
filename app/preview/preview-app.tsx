@@ -86,8 +86,8 @@ export function PreviewApp() {
   const empty = params.get("empty") === "1";
   const path = screen === "overview" ? "/dashboard" : `/dashboard/${screen}`;
   const overview = empty
-    ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, origin: "https://pantalla.example" }
-    : { displays, mediaCount: media.length, playlists, origin: "https://pantalla.example" };
+    ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
+    : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
   return (
     <DashboardShell preview pathOverride={path}>
       {screen === "media" ? <MediaLibrary fixture={media} /> : null}

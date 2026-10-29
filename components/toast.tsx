@@ -85,7 +85,7 @@ function useLocalToast(): ToastApi {
 
 function ToastView({ message, onDismiss }: { message: ToastMessage; onDismiss: () => void }) {
   return (
-    <div role="status" className={`fixed left-4 right-4 bottom-24 md:bottom-8 md:left-auto md:right-8 md:w-[24rem] z-[70] rounded-xl px-4 py-3 text-sm font-medium shadow-lg flex items-start gap-3 ${message.error ? "bg-danger text-white" : "bg-ink text-white"}`}>
+    <div role="status" className={`fixed left-4 right-4 bottom-24 md:bottom-8 md:left-auto md:right-8 md:w-[24rem] z-[70] rounded-xl px-4 py-3 text-sm font-medium shadow-lg flex items-start gap-3 ${message.error ? "bg-danger text-white" : "bg-primary text-white"}`}>
       <p className="flex-1 leading-relaxed">{message.text}</p>
       <button type="button" className="shrink-0 underline underline-offset-2" onClick={onDismiss}>Dismiss</button>
     </div>
