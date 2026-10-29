@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { timeAgo, type DisplayItem } from "@/lib/api";
 import { ONLINE_MS } from "@/lib/server/limits";
 
@@ -40,7 +41,7 @@ export function Status({ display }: { display: DisplayItem }) {
   return (
     <span className="badge badge-danger" title={ONLINE_HINT}>
       <span className="size-1.5 rounded-full bg-danger" aria-hidden />
-      Offline
+      Offline{display.lastSeenAt ? ` · ${offlineFor(display.lastSeenAt)}` : ""}
     </span>
   );
 }
@@ -77,4 +78,51 @@ export function ScreenCard({
 function displayPreview(display: DisplayItem) {
   const url = display.media?.url || display.playlist?.url;
   if (url) window.open(url, "_blank", "noopener");
+}
+
+/** "19 h", "3 min", "2 days": how long since the last heartbeat. */
+export function offlineFor(iso: string) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min`;
+  if (s < 86400) return `${Math.round(s / 3600)} h`;
+  const d = Math.round(s / 86400);
+  return `${d} day${d === 1 ? "" : "s"}`;
+}
+
+/** Paired screens that stopped sending heartbeats. Unpaired screens are not counted. */
+export function offlineScreens(displays: DisplayItem[]) {
+  return displays.filter((d) => d.connected && !d.online);
+}
+
+/** Shows which screens are offline, and puts the count in the browser tab title. */
+export function OfflineAlert({ displays, linkToDisplays = false }: { displays: DisplayItem[]; linkToDisplays?: boolean }) {
+  const offline = offlineScreens(displays);
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+ offline\) /, "");
+    document.title = offline.length ? `(${offline.length} offline) ${base}` : base;
+    return () => { document.title = document.title.replace(/^\(\d+ offline\) /, ""); };
+  }, [offline.length]);
+  if (offline.length === 0) return null;
+  const names = offline.slice(0, 4);
+  return (
+    <div role="status" data-testid="offline-alert" className="note-error mb-6 flex flex-col gap-1.5">
+      <p className="font-semibold">
+        {offline.length === 1 ? "1 screen is offline" : `${offline.length} screens are offline`}
+      </p>
+      <ul className="text-sm">
+        {names.map((d) => (
+          <li key={d.id}>
+            <a href={`/dashboard/displays#${d.id}`} className="underline">{d.name}</a>
+            {d.lastSeenAt ? ` — no heartbeat for ${offlineFor(d.lastSeenAt)}` : " — never sent a heartbeat"}
+          </li>
+        ))}
+        {offline.length > names.length ? <li>and {offline.length - names.length} more</li> : null}
+      </ul>
+      <p className="text-sm text-ink/80">
+        Check that the TV is on, connected to Wi-Fi, and showing the Seemple player.
+        {linkToDisplays ? <> <a href="/dashboard/displays" className="underline">Open Displays</a>.</> : null}
+        {" "}This page refreshes every 10 seconds.
+      </p>
+    </div>
+  );
 }

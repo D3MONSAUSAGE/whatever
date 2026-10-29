@@ -19,6 +19,10 @@ export function AuthFrame({ title, lede, children, footer }: { title: string; le
           {children}
         </div>
         {footer ? <div className="mt-6 text-center text-sm">{footer}</div> : null}
+        <nav className="mt-6 flex justify-center gap-4 text-xs text-muted" aria-label="Legal">
+          <Link href="/terms" className="hover:underline">Terms</Link>
+          <Link href="/privacy" className="hover:underline">Privacy</Link>
+        </nav>
       </div>
     </main>
   );
