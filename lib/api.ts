@@ -2,10 +2,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSupabase } from "./supabase-browser";
 
+export type MediaUse = { id: string; name: string };
+
 export type MediaItem = {
   id: string; fileName: string; sizeBytes: number; createdAt: string; url: string | null;
   kind?: "image" | "video"; durationMs?: number | null; width?: number | null; height?: number | null;
   thumbnailUrl?: string | null;
+  usedIn?: MediaUse[];
 };
 export type DisplayItem = {
   id: string; name: string; connected: boolean; online: boolean; lastSeenAt: string | null;
@@ -17,6 +20,8 @@ export type DisplayItem = {
 export type PlaylistSummary = {
   id: string; name: string; defaultDurationMs: number; transition: "none" | "fade";
   slideCount: number; displayCount: number; publishedAt: string | null; updatedAt: string; revision: number;
+  displayNames?: string[];
+  thumbnailUrl?: string | null;
 };
 
 export type PlaylistDetail = {
@@ -26,13 +31,50 @@ export type PlaylistDetail = {
   displays: { id: string; name: string; assigned: boolean }[];
 };
 
-export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+export async function authToken() {
   const { data } = await getSupabase().auth.getSession();
   const token = data.session?.access_token;
   if (!token) {
     window.location.href = "/login";
     throw new Error("Sign in to continue.");
   }
+  return token;
+}
+
+export function uploadForm(path: string, form: FormData, token: string, onProgress: (percent: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", path);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    };
+    xhr.onload = () => {
+      let body: { error?: string } = {};
+      try { body = JSON.parse(xhr.responseText) as { error?: string }; } catch { body = {}; }
+      if (xhr.status === 401) {
+        window.location.href = "/login";
+        reject(new Error("Sign in to continue."));
+        return;
+      }
+      if (xhr.status === 413) {
+        reject(new Error("That image is too large to upload."));
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(body.error || "Something went wrong. Try again."));
+        return;
+      }
+      onProgress(100);
+      resolve();
+    };
+    xhr.onerror = () => reject(new Error("Upload failed. Check your connection and try again."));
+    xhr.send(form);
+  });
+}
+
+export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = await authToken();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -49,11 +91,12 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   return body as T;
 }
 
-/** Fetch a list, optionally refreshing on an interval. */
-export function useApi<T>(path: string, refreshMs?: number) {
+/** Fetch a list, optionally refreshing on an interval. A null path skips the request (preview fixtures). */
+export function useApi<T>(path: string | null, refreshMs?: number) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
+    if (!path) return;
     try {
       setData(await api<T>(path));
       setError(null);
@@ -62,11 +105,12 @@ export function useApi<T>(path: string, refreshMs?: number) {
     }
   }, [path]);
   useEffect(() => {
+    if (!path) return;
     reload();
     if (!refreshMs) return;
     const t = setInterval(reload, refreshMs);
     return () => clearInterval(t);
-  }, [reload, refreshMs]);
+  }, [reload, refreshMs, path]);
   return { data, error, reload };
 }
 

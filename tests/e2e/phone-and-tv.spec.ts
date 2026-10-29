@@ -107,8 +107,8 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
       token = (await tv.evaluate(() => localStorage.getItem("pantalla_display_token"))) || "";
       expect(token).toEqual(expect.any(String));
       expect(token.length).toBeGreaterThan(0);
-      phone.once("dialog", (dialog) => dialog.accept());
-      await phone.getByRole("button", { name: "Disconnect" }).click();
+      await phone.getByRole("button", { name: "Disconnect", exact: true }).click();
+      await phone.getByRole("button", { name: "Disconnect this TV" }).click();
       await expect(tv.locator("#pair")).toHaveClass(/on/, { timeout: 25_000 });
       expect(await tv.evaluate(() => localStorage.getItem("pantalla_display_token"))).toBeNull();
       const revoked = await fetch(new URL("/api/player/state", baseURL), { headers: { "X-Display-Token": token } });

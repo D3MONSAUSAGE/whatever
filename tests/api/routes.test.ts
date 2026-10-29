@@ -444,6 +444,7 @@ describe("API", () => {
     const blocked = await call(deleteMedia, `http://localhost/api/media/${ids[2]}`, auth("token-a", { method: "DELETE" }), ids[2]);
     expect(blocked.status).toBe(409);
     expect(blocked.body.error).toMatch(/playlist/i);
+    expect(blocked.body.error).toMatch(/Lunch loop/);
     expect(store.media.some((item) => item.id === ids[2])).toBe(true);
 
     const image = await call(updateDisplay, `http://localhost/api/displays/${displayId}`, auth("token-a", {

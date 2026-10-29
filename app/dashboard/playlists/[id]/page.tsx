@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi, type MediaItem, type PlaylistDetail } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { useConfirm } from "@/components/confirm";
 
 type Slide = {
   key: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl: string | null;
@@ -15,6 +16,7 @@ export default function PlaylistEditor() {
   const id = params.id;
   const playlist = useApi<PlaylistDetail>(`/api/playlists/${id}`);
   const toast = useToast();
+  const confirm = useConfirm();
   const router = useRouter();
   const [name, setName] = useState("");
   const [defaultSeconds, setDefaultSeconds] = useState("10");
@@ -22,6 +24,9 @@ export default function PlaylistEditor() {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [chosen, setChosen] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const dragRef = useRef<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -128,9 +133,36 @@ export default function PlaylistEditor() {
     }
   }
 
+  async function duplicate() {
+    const body = payload();
+    const problem = invalidTiming(body);
+    if (problem) return toast.show(problem, true);
+    const copyName = `Copy of ${body.name}`.slice(0, 80);
+    setBusy("Duplicating…");
+    let createdId = "";
+    try {
+      const created = await api<{ id: string }>("/api/playlists", { method: "POST", body: JSON.stringify({ name: copyName }) });
+      createdId = created.id;
+      await api(`/api/playlists/${created.id}`, { method: "PATCH", body: JSON.stringify({ ...body, name: copyName }) });
+      toast.show("Duplicated as a draft");
+      router.push(`/dashboard/playlists/${created.id}`);
+    } catch (err) {
+      if (createdId) await api(`/api/playlists/${createdId}`, { method: "DELETE" }).catch(() => undefined);
+      toast.show((err as Error).message, true);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function remove() {
     if (!playlist.data) return;
-    if (!confirm(`Delete “${playlist.data.name}”? TVs showing it will switch to “No content assigned”.`)) return;
+    const ok = await confirm.ask({
+      title: "Delete this playlist?",
+      body: `Delete “${playlist.data.name}”? TVs showing it will switch to “No content assigned”.`,
+      confirmLabel: "Delete playlist",
+      danger: true,
+    });
+    if (ok !== true) return;
     try {
       await api(`/api/playlists/${id}`, { method: "DELETE" });
       router.push("/dashboard/playlists");
@@ -139,43 +171,51 @@ export default function PlaylistEditor() {
     }
   }
 
-  function move(index: number, direction: -1 | 1) {
-    const next = index + direction;
-    if (next < 0 || next >= slides.length) return;
+  function moveTo(from: number, to: number) {
+    if (!Number.isInteger(from) || from === to || from < 0 || to < 0 || from >= slides.length || to >= slides.length) return;
     const copy = slides.slice();
-    const [row] = copy.splice(index, 1);
-    copy.splice(next, 0, row);
+    const [row] = copy.splice(from, 1);
+    copy.splice(to, 0, row);
     setSlides(copy);
+  }
+
+  function move(index: number, direction: -1 | 1) {
+    moveTo(index, index + direction);
   }
 
   if (!playlist.data || !ready) {
     return <p className="text-muted">{playlist.error || "Loading…"}</p>;
   }
 
+  const using = playlist.data.displays.filter((display) => display.assigned);
+
   return (
     <section>
       <p className="text-sm mb-3"><Link href="/dashboard/playlists" className="underline">Playlists</Link></p>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Edit playlist</h1>
-        <button type="button" className="btn btn-quiet text-danger" onClick={remove}>Delete</button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>Duplicate</button>
+          <button type="button" className="btn btn-quiet text-danger" onClick={remove}>Delete</button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="grid gap-6">
-          <div className="rounded-lg bg-white border border-line p-4 grid gap-4">
+          <div className="card p-4 grid gap-4">
             <label className="grid gap-1">
               <span className="text-sm font-medium">Name</span>
-              <input className="field" maxLength={80} aria-label="Playlist name" value={name} onChange={(e) => setName(e.target.value)} />
+              <input className="field" maxLength={80} aria-label="Playlist name" value={name} onChange={(event) => setName(event.target.value)} />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1">
                 <span className="text-sm font-medium">Default seconds</span>
                 <input className="field" type="number" min={1} max={600} inputMode="numeric" aria-label="Default seconds"
-                  value={defaultSeconds} onChange={(e) => setDefaultSeconds(e.target.value)} />
+                  value={defaultSeconds} onChange={(event) => setDefaultSeconds(event.target.value)} />
               </label>
               <label className="grid gap-1">
                 <span className="text-sm font-medium">Transition</span>
-                <select className="field" aria-label="Transition" value={transition} onChange={(e) => setTransition(e.target.value as "none" | "fade")}>
+                <select className="field" aria-label="Transition" value={transition} onChange={(event) => setTransition(event.target.value as "none" | "fade")}>
                   <option value="none">None</option>
                   <option value="fade">Fade</option>
                 </select>
@@ -184,16 +224,30 @@ export default function PlaylistEditor() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <h2 className="font-semibold">Slides</h2>
-              <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>Add images</button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn-quiet" disabled={!slides.length} onClick={() => setPreviewing(true)}>Full preview</button>
+                <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>Add images</button>
+              </div>
             </div>
+            <p className="text-sm text-muted mb-3">Drag a slide to reorder. On a phone, use Up and Down.</p>
             {slides.length === 0 ? (
               <p className="text-sm text-muted">Nothing in this playlist yet. Add images or videos from your library.</p>
             ) : (
               <ol className="grid gap-3">
                 {slides.map((slide, index) => (
-                  <li key={slide.key} className="rounded-lg bg-white border border-line p-3 grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                  <li key={slide.key}
+                    className={`card p-3 grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)] ${dragFrom === index ? "opacity-60" : ""}`}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const raw = event.dataTransfer.getData("text/plain");
+                      const from = raw === "" ? dragRef.current : Number(raw);
+                      if (from !== null) moveTo(from, index);
+                      dragRef.current = null;
+                      setDragFrom(null);
+                    }}>
                     <span className="block aspect-video bg-black rounded-md overflow-hidden">
                       {slide.kind === "video" ? (
                         <video poster={slide.thumbnailUrl || undefined} src={slide.url || undefined} muted playsInline preload="none" className="size-full object-contain" />
@@ -206,15 +260,23 @@ export default function PlaylistEditor() {
                       {slide.kind === "video" ? (
                         <p className="mt-2 text-sm text-muted">Plays until the end{slide.mediaDurationMs ? ` (${Math.round(slide.mediaDurationMs / 1000)}s)` : ""}.</p>
                       ) : (
-                      <label className="mt-2 grid gap-1">
-                        <span className="text-xs text-muted">Seconds (blank uses the default)</span>
-                        <input className="field" type="number" min={1} max={600} inputMode="numeric"
-                          aria-label={`Seconds for ${slide.fileName}`} placeholder={defaultSeconds || "10"}
-                          value={slide.seconds}
-                          onChange={(e) => setSlides(slides.map((row, i) => i === index ? { ...row, seconds: e.target.value } : row))} />
-                      </label>
+                        <label className="mt-2 grid gap-1">
+                          <span className="text-xs text-muted">Seconds (blank uses the default)</span>
+                          <input className="field" type="number" min={1} max={600} inputMode="numeric"
+                            aria-label={`Seconds for ${slide.fileName}`} placeholder={defaultSeconds || "10"}
+                            value={slide.seconds}
+                            onChange={(event) => setSlides(slides.map((row, i) => i === index ? { ...row, seconds: event.target.value } : row))} />
+                        </label>
                       )}
                       <div className="mt-2 flex flex-wrap gap-2">
+                        <button type="button" className="btn btn-quiet cursor-grab" draggable aria-label={`Drag ${slide.fileName}`}
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", String(index));
+                            dragRef.current = index;
+                            setDragFrom(index);
+                          }}
+                          onDragEnd={() => { dragRef.current = null; setDragFrom(null); }}>Drag</button>
                         <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</button>
                         <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} down`} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>Down</button>
                         <button type="button" className="btn btn-quiet text-danger" aria-label={`Remove ${slide.fileName}`}
@@ -227,9 +289,14 @@ export default function PlaylistEditor() {
             )}
           </div>
 
-          <div className="rounded-lg bg-white border border-line p-4">
+          <div className="card p-4">
             <h2 className="font-semibold mb-1">Publish</h2>
-            <p className="text-sm text-muted mb-4">Choose one or more TVs. They switch within about 10 seconds. A single image published later replaces this playlist on that TV.</p>
+            <p className="text-sm text-muted mb-3">Choose one or more screens. They switch within about 10 seconds. A single image published later replaces this playlist on that screen.</p>
+            <p className="text-sm mb-4">
+              {using.length
+                ? <>On {using.map((display) => display.name).join(", ")}.</>
+                : "Not on a screen yet."}
+            </p>
             {playlist.data.displays.length === 0 ? (
               <p className="text-sm text-muted">Connect a TV under Displays first.</p>
             ) : (
@@ -238,7 +305,7 @@ export default function PlaylistEditor() {
                   <li key={display.id}>
                     <label className="flex items-center gap-3 min-h-11">
                       <input type="checkbox" className="size-5" checked={!!chosen[display.id]} aria-label={display.name}
-                        onChange={(e) => setChosen({ ...chosen, [display.id]: e.target.checked })} />
+                        onChange={(event) => setChosen({ ...chosen, [display.id]: event.target.checked })} />
                       <span>{display.name}</span>
                     </label>
                   </li>
@@ -253,9 +320,21 @@ export default function PlaylistEditor() {
         </div>
 
         <div className="order-first lg:order-none">
-          <Preview slides={previewSlides} transition={transition} />
+          <Preview slides={previewSlides} transition={transition} label="Slideshow preview" />
         </div>
       </div>
+
+      {previewing && (
+        <div className="fixed inset-0 z-50 bg-ink/80 flex items-center justify-center p-4" onClick={() => setPreviewing(false)}>
+          <div role="dialog" aria-label="Full playlist preview" className="bg-paper w-full max-w-4xl rounded-2xl p-4 md:p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold">Full preview</h2>
+              <button type="button" className="btn btn-quiet" onClick={() => setPreviewing(false)}>Close</button>
+            </div>
+            <Preview slides={previewSlides} transition={transition} label="Full playlist preview" large />
+          </div>
+        </div>
+      )}
 
       {adding && (
         <AddImages
@@ -268,11 +347,17 @@ export default function PlaylistEditor() {
         />
       )}
       {toast.node}
+      {confirm.node}
     </section>
   );
 }
 
-function Preview({ slides, transition }: { slides: { url: string; fileName: string; durationMs: number; kind: "image" | "video"; thumbnailUrl: string | null }[]; transition: "none" | "fade" }) {
+function Preview({ slides, transition, label, large = false }: {
+  slides: { url: string; fileName: string; durationMs: number; kind: "image" | "video"; thumbnailUrl: string | null }[];
+  transition: "none" | "fade";
+  label: string;
+  large?: boolean;
+}) {
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [slides]);
   useEffect(() => {
@@ -284,9 +369,9 @@ function Preview({ slides, transition }: { slides: { url: string; fileName: stri
   }, [slides, index]);
   const current = slides[index];
   return (
-    <div aria-label="Slideshow preview">
-      <h2 className="font-semibold mb-2">Preview</h2>
-      <div className="relative aspect-video bg-black rounded-md overflow-hidden border border-ink">
+    <div aria-label={label}>
+      {!large && <h2 className="font-semibold mb-2">Preview</h2>}
+      <div className={`relative aspect-video bg-black rounded-md overflow-hidden border border-ink ${large ? "max-h-[70dvh]" : ""}`}>
         {slides.length === 0 ? (
           <p className="absolute inset-0 grid place-items-center text-sm text-white/70 px-4 text-center">Add images or videos to preview the loop.</p>
         ) : slides.map((slide, i) => slide.kind === "video" ? (
@@ -298,7 +383,7 @@ function Preview({ slides, transition }: { slides: { url: string; fileName: stri
                 void event.currentTarget.play();
                 return;
               }
-              setIndex((current) => (current + 1) % slides.length);
+              setIndex((currentIndex) => (currentIndex + 1) % slides.length);
             }}
             className={`absolute inset-0 size-full object-contain ${i === index ? "opacity-100" : "opacity-0"}`} />
         ) : (
@@ -319,12 +404,12 @@ function AddImages({ existing, onClose, onAdd }: {
   const media = useApi<MediaItem[]>("/api/media");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
       <div role="dialog" aria-label="Add images" className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-        onClick={(e) => e.stopPropagation()}>
+        onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Add images</h2>
-          <button type="button" className="btn px-3" onClick={onClose}>Close</button>
+          <button type="button" className="btn btn-quiet px-3" onClick={onClose}>Close</button>
         </div>
         {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : media.data.length === 0 ? (
           <p className="text-muted">Upload an image in Media first.</p>
@@ -340,9 +425,9 @@ function AddImages({ existing, onClose, onAdd }: {
                       item.url && <img src={item.url} alt="" className="size-full object-contain" />
                     )}
                   </span>
-                  <span className="mt-1 flex items-center gap-2 text-sm">
+                  <span className="mt-1 flex items-center gap-2 text-sm min-h-11">
                     <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]}
-                      onChange={(e) => setPicked({ ...picked, [item.id]: e.target.checked })} />
+                      onChange={(event) => setPicked({ ...picked, [item.id]: event.target.checked })} />
                     <span className="truncate">{item.fileName}</span>
                   </span>
                 </label>
