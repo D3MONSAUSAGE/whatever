@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
 import { libraryFile, waitForLibraryFile } from "./media-locators";
+import { expectStatus } from "./status";
 
 /**
  * Phase 2D dashboard flows at 1440 and 390.
@@ -45,17 +46,17 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await page.getByLabel("Location name").fill("Kitchen");
     await page.getByRole("combobox", { name: "Timezone", exact: true }).fill("America/Los_Angeles");
     await page.getByRole("button", { name: "Add location" }).click();
-    await expect(page.getByRole("status")).toContainText("Location added");
+    await expectStatus(page, "Location added");
     await expect(page.getByLabel("Name for Kitchen")).toBeVisible();
     await page.getByLabel("Name for Kitchen").fill("Kitchen line");
     await page.getByRole("button", { name: "Save Kitchen" }).click();
-    await expect(page.getByRole("status")).toContainText("Location saved");
+    await expectStatus(page, "Location saved");
     await expect(page.getByLabel("Name for Kitchen line")).toHaveValue("Kitchen line");
 
     await tv.goto("/player");
     await pair(page, tv, "Front counter");
     await page.getByLabel("Location for Front counter").selectOption({ label: "Kitchen line" });
-    await expect(page.getByRole("status")).toContainText("Location saved");
+    await expectStatus(page, "Location saved");
     await expect(page.getByText("Kitchen line · America/Los_Angeles")).toBeVisible();
 
     await page.goto("/dashboard/media");
@@ -71,24 +72,24 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await page.getByRole("checkbox", { name: "lunch-menu.png" }).check();
     await page.getByRole("button", { name: "Add selected" }).click();
     await page.getByRole("button", { name: "Save draft" }).click();
-    await expect(page.getByRole("status")).toContainText("Draft saved");
+    await expectStatus(page, "Draft saved");
 
     await page.goto("/dashboard/schedule");
     const playlist = page.getByRole("combobox", { name: "Playlist", exact: true });
     await playlist.selectOption({ label: "Lunch specials (not published)" });
     await expect(playlist).toHaveValue(/.+/);
     await page.getByRole("button", { name: "Publish slides" }).click();
-    await expect(page.getByRole("status")).toContainText("Published slides updated");
+    await expectStatus(page, "Published slides updated");
     await page.getByLabel("Group name").fill("Front of house");
     await page.getByRole("checkbox", { name: "Include Front counter" }).first().check();
     await page.getByRole("button", { name: "Create group" }).click();
-    await expect(page.getByRole("status")).toContainText("Group added");
+    await expectStatus(page, "Group added");
 
     await page.getByLabel("Schedule name").fill("Weekday lunch");
     await page.getByRole("combobox", { name: "Playlist", exact: true }).selectOption({ label: "Lunch specials" });
     await page.getByRole("combobox", { name: "Screen", exact: true }).selectOption({ label: "Front counter" });
     await page.getByRole("button", { name: "Add schedule" }).click();
-    await expect(page.getByRole("status")).toContainText("Schedule added");
+    await expectStatus(page, "Schedule added");
     await expect(page.getByText("Weekday lunch").first()).toBeVisible();
 
     await page.getByLabel("Preview screen").selectOption({ label: "Front counter" });
@@ -98,13 +99,13 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await expect(page.getByText("Saved assignment").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Delete Kitchen line" }).click();
-    await expect(page.getByRole("status")).toContainText("still has screens");
+    await expectStatus(page, "still has screens");
     await page.getByLabel("Location name").fill("Pop-up");
     await page.getByRole("button", { name: "Add location" }).click();
-    await expect(page.getByRole("status")).toContainText("Location added");
+    await expectStatus(page, "Location added");
     await page.getByRole("button", { name: "Delete Pop-up" }).click();
     await page.getByRole("button", { name: "Delete location" }).click();
-    await expect(page.getByRole("status")).toContainText("Location deleted");
+    await expectStatus(page, "Location deleted");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard/schedule");

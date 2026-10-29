@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
 import { libraryFile, waitForLibraryFile } from "./media-locators";
+import { expectStatus } from "./status";
 
 /**
  * Phase 2C dashboard coverage at desktop (1440), tablet (768), and phone (390).
@@ -136,11 +137,11 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await expect(phone.getByRole("dialog", { name: "Full playlist preview" })).toBeVisible();
     await phone.getByRole("dialog", { name: "Full playlist preview" }).getByRole("button", { name: "Close" }).click();
     await phone.getByRole("button", { name: "Save draft" }).click();
-    await expect(phone.getByRole("status")).toContainText("Draft saved");
+    await expectStatus(phone, "Draft saved");
     await phone.getByRole("checkbox", { name: "Front counter" }).check();
     await phone.getByRole("checkbox", { name: "Bar TV" }).check();
     await phone.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(phone.getByRole("status")).toContainText("Published");
+    await expectStatus(phone, "Published");
     await expect.poll(async () => shownUrl(tv), { timeout: 25_000 }).toContain("http");
 
     await phone.goto("/dashboard/playlists");
@@ -157,7 +158,7 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await expect(phone.getByLabel("Assign Front counter")).toBeChecked();
     await expect(phone.getByLabel("Assign Bar TV")).toBeChecked();
     await phone.getByRole("button", { name: "Publish to selected screens" }).click();
-    await expect(phone.getByRole("status")).toContainText("Published");
+    await expectStatus(phone, "Published");
 
     await phone.getByRole("link", { name: "Settings" }).click();
     await phone.getByRole("button", { name: "Sign out" }).click();
@@ -206,7 +207,7 @@ test("video upload and playback, or an explicit skip when the database cannot st
     await expect(ctx.phone.getByText("Plays until the end")).toBeVisible();
     await ctx.phone.getByRole("checkbox", { name: "Video screen" }).check();
     await ctx.phone.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(ctx.phone.getByRole("status")).toContainText("Published");
+    await expectStatus(ctx.phone, "Published");
     await expect.poll(async () => playingVideo(ctx.tv), { timeout: 25_000 }).toBe(true);
   } finally {
     await ctx.phoneContext.close();

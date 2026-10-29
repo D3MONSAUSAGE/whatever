@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
+import { ToastProvider } from "@/components/toast";
 import { UploadProgress, UploadsProvider } from "@/components/uploads";
 
 const NAV = [
@@ -40,6 +41,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   const current = NAV.find((item) => isActive(item.href))?.label ?? "Pantalla";
 
   return (
+    <ToastProvider>
     <UploadsProvider>
     <div className="min-h-dvh md:flex">
       <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
@@ -72,6 +74,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
       </nav>
     </div>
     </UploadsProvider>
+    </ToastProvider>
   );
 }
 
