@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { checkImage } from "@/lib/server/images";
 import { MAX_UPLOAD_BYTES } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
+import { usageByMedia } from "@/lib/server/media-usage";
 import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
 import { fail, json } from "@/lib/server/http";
 
@@ -40,6 +41,7 @@ export async function GET(req: Request) {
   }
   if (error) return fail("Couldn't load images.", 500);
 
+  const usage = await usageByMedia(admin.accountId);
   const urls = new Map<string, string>();
   const paths = [...new Set((rows ?? []).flatMap((row) => [row.storage_path, row.thumbnail_path].filter(Boolean)))] as string[];
   if (paths.length) {
@@ -58,6 +60,7 @@ export async function GET(req: Request) {
       width: r.width ?? null,
       height: r.height ?? null,
       thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
+      usedIn: usage?.get(r.id) ?? [],
     })),
   );
 }

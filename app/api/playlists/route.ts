@@ -1,4 +1,4 @@
-import { db } from "@/lib/server/supabase";
+import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { PLAYLIST_DEFAULT_DURATION_MS } from "@/lib/server/limits";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
@@ -25,20 +25,37 @@ export async function GET(req: Request) {
   const ids = (lists ?? []).map((list) => list.id);
   const slideCount = new Map<string, number>();
   const displayCount = new Map<string, number>();
+  const displayNames = new Map<string, string[]>();
+  const thumbnailUrl = new Map<string, string>();
   if (ids.length) {
     const { data: items, error: itemError } = await db()
       .from("playlist_items")
-      .select("playlist_id")
+      .select("playlist_id, media_id, position")
       .eq("account_id", admin.accountId)
       .eq("kind", "draft")
-      .in("playlist_id", ids);
+      .in("playlist_id", ids)
+      .order("position", { ascending: true });
     if (itemError) return fail("Couldn't load playlists.", 500);
+    const firstMedia = new Map<string, { mediaId: string; position: number }>();
     for (const item of items ?? []) {
-      slideCount.set(item.playlist_id, (slideCount.get(item.playlist_id) ?? 0) + 1);
+      const playlistId = String(item.playlist_id);
+      slideCount.set(playlistId, (slideCount.get(playlistId) ?? 0) + 1);
+      // Thumbnail is the draft slide with the lowest position. A video at position 0 is the thumbnail.
+      const position = Number(item.position);
+      if (!Number.isFinite(position)) continue;
+      const prev = firstMedia.get(playlistId);
+      if (!prev || position < prev.position) firstMedia.set(playlistId, { mediaId: String(item.media_id), position });
+    }
+    const thumbs = await draftThumbnails(admin.accountId, [...firstMedia.values()].map((item) => item.mediaId));
+    if (thumbs) {
+      for (const [playlistId, media] of firstMedia) {
+        const url = thumbs.get(media.mediaId);
+        if (url) thumbnailUrl.set(playlistId, url);
+      }
     }
     const { data: displays, error: displayError } = await db()
       .from("displays")
-      .select("assigned_playlist_id")
+      .select("name, assigned_playlist_id")
       .eq("account_id", admin.accountId)
       .eq("status", "active")
       .in("assigned_playlist_id", ids);
@@ -47,6 +64,9 @@ export async function GET(req: Request) {
       const playlistId = display.assigned_playlist_id as string | null;
       if (!playlistId) continue;
       displayCount.set(playlistId, (displayCount.get(playlistId) ?? 0) + 1);
+      const names = displayNames.get(playlistId) ?? [];
+      names.push(String(display.name));
+      displayNames.set(playlistId, names);
     }
   }
 
@@ -58,11 +78,47 @@ export async function GET(req: Request) {
       transition: list.transition,
       slideCount: slideCount.get(list.id) ?? 0,
       displayCount: displayCount.get(list.id) ?? 0,
+      displayNames: displayNames.get(list.id) ?? [],
+      thumbnailUrl: thumbnailUrl.get(list.id) ?? null,
       publishedAt: list.published_at,
       updatedAt: list.updated_at,
       revision: list.revision,
     })),
   );
+}
+
+async function draftThumbnails(accountId: string, mediaIds: string[]) {
+  const ids = [...new Set(mediaIds)];
+  if (!ids.length) return new Map<string, string>();
+  const rich = await db()
+    .from("media")
+    .select("id, storage_path, thumbnail_path, kind")
+    .eq("account_id", accountId)
+    .in("id", ids);
+  let rows = rich.data as { id: string; storage_path: string; thumbnail_path?: string | null; kind?: string | null }[] | null;
+  let error = rich.error;
+  if (error && isMissingSchema(error)) {
+    const plain = await db().from("media").select("id, storage_path").eq("account_id", accountId).in("id", ids);
+    rows = plain.data as typeof rows;
+    error = plain.error;
+  }
+  if (error || !rows) return null;
+  const pathByMedia = new Map(rows.map((media) => [
+    media.id,
+    media.kind === "video" && media.thumbnail_path ? media.thumbnail_path : media.storage_path,
+  ]));
+  const paths = [...new Set([...pathByMedia.values()].filter(Boolean))] as string[];
+  const urls = new Map<string, string>();
+  if (paths.length) {
+    const { data } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
+    data?.forEach((item) => item.path && item.signedUrl && urls.set(item.path, item.signedUrl));
+  }
+  const result = new Map<string, string>();
+  for (const [mediaId, path] of pathByMedia) {
+    const url = path ? urls.get(path) : undefined;
+    if (url) result.set(mediaId, url);
+  }
+  return result;
 }
 
 export async function POST(req: Request) {

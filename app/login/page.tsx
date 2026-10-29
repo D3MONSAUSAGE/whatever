@@ -36,7 +36,7 @@ export default function Login() {
 
   return (
     <main className="min-h-dvh grid place-items-center px-5">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm card p-6 md:p-8">
         <div className="tv mb-8 grid place-items-center">
           <span className="text-white text-2xl font-semibold tracking-tight">Pantalla</span>
         </div>
