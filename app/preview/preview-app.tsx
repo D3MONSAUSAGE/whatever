@@ -5,6 +5,7 @@ import { OverviewScreen } from "@/components/overview-screen";
 import { MediaLibrary } from "@/components/media-library";
 import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
+import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 
 const lunch = poster("Lunch menu", "#1c3d32");
@@ -92,10 +93,62 @@ export function PreviewApp() {
       {screen === "media" ? <MediaLibrary fixture={media} /> : null}
       {screen === "playlists" ? <Playlists fixture={playlists} /> : null}
       {screen === "displays" ? <Displays fixture={displays} /> : null}
+      {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
     </DashboardShell>
   );
 }
+
+const scheduleFixture: ScheduleFixture = {
+  locations: [
+    { id: "loc-main", name: "Main location", timezone: "UTC", displayCount: 0 },
+    { id: "loc-kitchen", name: "Kitchen", timezone: "America/Los_Angeles", displayCount: 2 },
+  ],
+  groups: [
+    { id: "group-front", name: "Front of house", displayIds: ["screen-front", "screen-bar"], updatedAt: "2026-10-28T18:00:00.000Z" },
+  ],
+  schedules: [
+    {
+      id: "sched-lunch",
+      name: "Weekday lunch",
+      playlistId: "pl-lunch",
+      playlistName: "Lunch loop",
+      displayId: null,
+      displayName: null,
+      groupId: "group-front",
+      groupName: "Front of house",
+      weekdays: [1, 2, 3, 4, 5],
+      startTime: "11:00",
+      endTime: "14:00",
+      startsOn: null,
+      endsOn: null,
+      priority: 0,
+      enabled: true,
+      updatedAt: "2026-10-28T18:00:00.000Z",
+    },
+  ],
+  displays: [
+    { ...displays[0], location: { id: "loc-kitchen", name: "Kitchen", timezone: "America/Los_Angeles" } },
+    { ...displays[1], location: { id: "loc-kitchen", name: "Kitchen", timezone: "America/Los_Angeles" } },
+  ],
+  playlists,
+  preview: {
+    displayId: "screen-front",
+    timezone: "America/Los_Angeles",
+    from: "2026-10-28T07:00:00.000Z",
+    until: "2026-10-30T07:00:00.000Z",
+    resolution: "A rule on this screen beats a rule on a group. Higher priority wins next. The most recently updated rule wins next. The lowest id breaks a remaining tie.",
+    defaultAssignment: { playlistId: "pl-lunch", playlistName: "Lunch loop", mediaId: null, mediaName: null },
+    segments: [
+      { start: "2026-10-28T07:00:00.000Z", end: "2026-10-28T18:00:00.000Z", date: "2026-10-28", source: "default", scheduleId: null, scheduleName: null, playlistId: "pl-lunch", playlistName: "Lunch loop", target: null, priority: null },
+      { start: "2026-10-28T18:00:00.000Z", end: "2026-10-28T21:00:00.000Z", date: "2026-10-28", source: "schedule", scheduleId: "sched-lunch", scheduleName: "Weekday lunch", playlistId: "pl-happy", playlistName: "Happy hour", target: "group", priority: 0 },
+      { start: "2026-10-28T21:00:00.000Z", end: "2026-10-29T07:00:00.000Z", date: "2026-10-28", source: "default", scheduleId: null, scheduleName: null, playlistId: "pl-lunch", playlistName: "Lunch loop", target: null, priority: null },
+      { start: "2026-10-29T07:00:00.000Z", end: "2026-10-29T18:00:00.000Z", date: "2026-10-29", source: "default", scheduleId: null, scheduleName: null, playlistId: "pl-lunch", playlistName: "Lunch loop", target: null, priority: null },
+      { start: "2026-10-29T18:00:00.000Z", end: "2026-10-29T21:00:00.000Z", date: "2026-10-29", source: "schedule", scheduleId: "sched-lunch", scheduleName: "Weekday lunch", playlistId: "pl-happy", playlistName: "Happy hour", target: "group", priority: 0 },
+      { start: "2026-10-29T21:00:00.000Z", end: "2026-10-30T07:00:00.000Z", date: "2026-10-29", source: "default", scheduleId: null, scheduleName: null, playlistId: "pl-lunch", playlistName: "Lunch loop", target: null, priority: null },
+    ],
+  },
+};
 
 function poster(label: string, color: string) {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><rect fill='${color}' width='100%' height='100%'/><text x='50%' y='54%' fill='white' font-family='sans-serif' font-size='36' text-anchor='middle'>${label}</text></svg>`;

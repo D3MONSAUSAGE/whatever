@@ -15,6 +15,29 @@ export type DisplayItem = {
   media: { id: string; fileName: string; url: string | null } | null;
   playlist: { id: string; name: string; url: string | null } | null;
   playerError?: string | null;
+  location?: { id: string; name: string; timezone: string } | null;
+};
+
+export type LocationItem = { id: string; name: string; timezone: string; displayCount: number };
+
+export type ScreenGroupItem = { id: string; name: string; displayIds: string[]; updatedAt: string };
+
+export type ScheduleItem = {
+  id: string; name: string; playlistId: string; playlistName: string;
+  displayId: string | null; displayName: string | null; groupId: string | null; groupName: string | null;
+  weekdays: number[]; startTime: string; endTime: string;
+  startsOn: string | null; endsOn: string | null; priority: number; enabled: boolean; updatedAt: string;
+};
+
+export type SchedulePreview = {
+  displayId: string; timezone: string; from: string; until: string; resolution: string;
+  defaultAssignment: { playlistId: string | null; playlistName: string | null; mediaId: string | null; mediaName: string | null };
+  segments: {
+    start: string; end: string; date: string; source: "schedule" | "default";
+    scheduleId: string | null; scheduleName: string | null;
+    playlistId: string | null; playlistName: string | null;
+    target: "display" | "group" | null; priority: number | null;
+  }[];
 };
 
 export type PlaylistSummary = {

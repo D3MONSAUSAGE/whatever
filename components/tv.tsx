@@ -58,6 +58,7 @@ export function ScreenCard({
           <Status display={display} />
         </div>
         <p className="text-sm truncate">{contentLabel(display)}</p>
+        {display.location ? <p className="text-xs text-muted truncate">{display.location.name} · {display.location.timezone}</p> : null}
         <p className="text-xs text-muted">
           <time dateTime={display.lastSeenAt ?? undefined}>{heartbeatLabel(display.lastSeenAt)}</time>
         </p>

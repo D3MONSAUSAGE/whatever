@@ -12,11 +12,17 @@ export type Store = {
   playlist_items: Row[];
   pairing_sessions: Row[];
   rate_limits: Row[];
+  screen_groups: Row[];
+  screen_group_members: Row[];
+  schedules: Row[];
   objects: Map<string, Uint8Array>;
   users: Map<string, { id: string; email: string }>;
 };
 
-const TABLE_NAMES = ["accounts", "locations", "media", "displays", "playlists", "playlist_items", "pairing_sessions", "rate_limits"] as const;
+const TABLE_NAMES = [
+  "accounts", "locations", "media", "displays", "playlists", "playlist_items",
+  "pairing_sessions", "rate_limits", "screen_groups", "screen_group_members", "schedules",
+] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
 function isTable(name: string): name is TableName {
@@ -70,13 +76,26 @@ function insertRow(store: Store, table: TableName, row: Row) {
     if (row.revision == null) row.revision = 0;
     if (!row.updated_at) row.updated_at = row.created_at;
   }
+  if (table === "locations" && row.timezone == null) row.timezone = "UTC";
+  if (table === "screen_groups") {
+    const name = String(row.name ?? "").toLowerCase();
+    if (store.screen_groups.some((group) => group.account_id === row.account_id && String(group.name).toLowerCase() === name && group.id !== row.id)) {
+      return { error: { message: "duplicate key", code: "23505" } as { message: string; code: string } };
+    }
+    if (!row.updated_at) row.updated_at = row.created_at;
+  }
+  if (table === "schedules") {
+    if (row.enabled == null) row.enabled = true;
+    if (row.priority == null) row.priority = 0;
+    if (!row.updated_at) row.updated_at = row.created_at;
+  }
   store[table].push(row);
   return { row, error: null as null };
 }
 
 class Query implements PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }> {
   private op: {
-    type: "select" | "insert" | "update";
+    type: "select" | "insert" | "update" | "delete";
     select?: string;
     filters: [string, unknown][];
     inFilters: [string, unknown[]][];
@@ -103,6 +122,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
   update(patch: Row) {
     this.op.type = "update";
     this.op.update = patch;
+    return this;
+  }
+  delete() {
+    this.op.type = "delete";
     return this;
   }
   eq(key: string, value: unknown) {
@@ -156,6 +179,26 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
       return shape(found.map((row) => project(this.store, row, this.op.select)), this.op.mode);
     }
 
+    if (this.op.type === "delete") {
+      const found = match();
+      const ids = new Set(found.map((row) => row.id));
+      if (this.table === "screen_groups") {
+        this.store.screen_group_members = this.store.screen_group_members.filter((row) => !ids.has(row.group_id));
+        this.store.schedules = this.store.schedules.filter((row) => !ids.has(row.group_id));
+      }
+      if (this.table === "playlists") {
+        this.store.schedules = this.store.schedules.filter((row) => !ids.has(row.playlist_id));
+        this.store.playlist_items = this.store.playlist_items.filter((row) => !ids.has(row.playlist_id));
+      }
+      if (this.table === "displays") {
+        this.store.screen_group_members = this.store.screen_group_members.filter((row) => !found.some((item) => item.id === row.display_id));
+        this.store.schedules = this.store.schedules.filter((row) => !found.some((item) => item.id === row.display_id));
+      }
+      this.store[this.table] = rows.filter((row) => !found.includes(row));
+      if (!this.op.select) return { data: null, error: null };
+      return shape(found.map((row) => project(this.store, row, this.op.select)), this.op.mode);
+    }
+
     let found = match().map((row) => project(this.store, row, this.op.select));
     if (this.op.order) {
       const { col, ascending } = this.op.order;
@@ -196,7 +239,7 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     store.accounts.push({ id, name: args.p_name, owner_user_id: userId, created_at: now });
-    store.locations.push({ id: crypto.randomUUID(), account_id: id, name: "Main location", created_at: now });
+    store.locations.push({ id: crypto.randomUUID(), account_id: id, name: "Main location", timezone: "UTC", created_at: now });
     return id;
   }
   if (name === "rate_limit_hit") {
@@ -285,6 +328,7 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
   if (name === "publish_playlist") return publishPlaylist(store, args);
   if (name === "delete_playlist") return deletePlaylist(store, args);
   if (name === "player_playlist") return playerPlaylist(store, args);
+  if (name === "snapshot_playlist") return snapshotPlaylist(store, args);
   if (name === "report_player_error") {
     const display = store.displays.find((item) => item.token_hash === args.p_token_hash && item.status === "active");
     if (!display) return false;
@@ -379,7 +423,41 @@ function deletePlaylist(store: Store, args: Record<string, unknown>) {
     }
   }
   store.playlist_items = store.playlist_items.filter((item) => item.playlist_id !== args.p_playlist_id);
+  store.schedules = store.schedules.filter((item) => item.playlist_id !== args.p_playlist_id);
   store.playlists.splice(index, 1);
+  return true;
+}
+
+function snapshotPlaylist(store: Store, args: Record<string, unknown>) {
+  const playlist = store.playlists.find((item) => item.id === args.p_playlist_id && item.account_id === args.p_account_id);
+  if (!playlist) return false;
+  const draft = store.playlist_items
+    .filter((item) => item.playlist_id === playlist.id && item.kind === "draft")
+    .sort((a, b) => Number(a.position) - Number(b.position));
+  if (!draft.length) return false;
+  const now = new Date().toISOString();
+  store.playlist_items = store.playlist_items.filter((item) => !(item.playlist_id === playlist.id && item.kind === "published"));
+  for (const item of draft) {
+    store.playlist_items.push({
+      id: crypto.randomUUID(),
+      playlist_id: playlist.id,
+      account_id: playlist.account_id,
+      media_id: item.media_id,
+      kind: "published",
+      position: item.position,
+      duration_ms: item.duration_ms ?? playlist.default_duration_ms,
+      created_at: now,
+    });
+  }
+  playlist.published_at = now;
+  playlist.published_transition = playlist.transition;
+  playlist.revision = Number(playlist.revision ?? 0) + 1;
+  playlist.updated_at = now;
+  for (const display of store.displays) {
+    if (display.account_id === args.p_account_id && display.status === "active" && display.assigned_playlist_id === playlist.id) {
+      display.content_version = Number(display.content_version) + 1;
+    }
+  }
   return true;
 }
 
@@ -418,6 +496,9 @@ export function createFakeDb() {
     playlist_items: [],
     pairing_sessions: [],
     rate_limits: [],
+    screen_groups: [],
+    screen_group_members: [],
+    schedules: [],
     objects: new Map(),
     users: new Map(),
   };

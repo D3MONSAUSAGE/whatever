@@ -57,6 +57,10 @@ After the first deploy, set the Supabase Site URL and redirect URLs to the real 
 
 ```bash
 # Against the Supabase project. Skips when these are unset.
+# Node 20 needs the websocket flag so the Supabase client can open Realtime.
+# Node 22 and later already have it. Without the flag, RLS and e2e cleanup
+# fail while creating the client.
+NODE_OPTIONS=--experimental-websocket \
 NEXT_PUBLIC_SUPABASE_URL=... \
 NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
 SUPABASE_SERVICE_ROLE_KEY=... \

@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
 import { libraryFile, waitForLibraryFile } from "./media-locators";
+import { expectStatus } from "./status";
 
 const pendingEmails: string[] = [];
 
@@ -298,7 +299,7 @@ test("a playlist loops three slides, then a single image holds", async ({ browse
     await phone.getByLabel("Transition").selectOption("none");
     await phone.getByRole("checkbox", { name: "Front counter" }).check();
     await phone.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+    await expectStatus(phone, "Published", 20_000);
     await phone.setViewportSize({ width: 1280, height: 800 });
     await expect(phone.locator("nav").first().getByRole("link", { name: "Playlists" })).toBeVisible();
     await expect(phone.getByRole("button", { name: "Publish", exact: true })).toBeVisible();
@@ -328,7 +329,7 @@ test("a playlist loops three slides, then a single image holds", async ({ browse
     for (let step = 0; step < 3; step++) await phone.getByRole("button", { name: "Move slide-d.png up" }).click();
     await phone.getByRole("checkbox", { name: "Front counter" }).check();
     await phone.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+    await expectStatus(phone, "Published", 20_000);
     expect(tv.url()).toContain("/player");
     await expect.poll(async () => (await shownUrl(tv)).includes(dId), { timeout: 25_000 }).toBe(true);
     const updated = await slideChanges(tv, { a: ids.a, d: dId }, 2, 20_000);
@@ -385,7 +386,7 @@ test("an unsupported video is rejected in the library", async ({ browser }) => {
     const videoInput = phone.locator('input[type="file"][accept*="video"]');
     if ((await videoInput.count()) === 0) test.skip(true, "This deployment has no video upload yet.");
     await videoInput.setInputFiles("tests/fixtures/hevc.mp4");
-    await expect(phone.getByRole("status")).toContainText("H.264", { timeout: 15_000 });
+    await expectStatus(phone, "H.264", 15_000);
     await expect(phone.getByText("No images yet")).toBeVisible();
   } finally {
     await phoneContext.close();
@@ -434,7 +435,7 @@ test("a video playlist plays on the TV and survives a dropped connection", async
     await expect(phone.getByText("Plays until the end")).toBeVisible();
     await phone.getByRole("checkbox", { name: "Video screen" }).check();
     await phone.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+    await expectStatus(phone, "Published", 20_000);
 
     await expect.poll(async () => playingVideo(tv), { timeout: 25_000 }).toBe(true);
     const started = await videoTime(tv);
@@ -600,7 +601,7 @@ async function publishSlides(phone: Page, playlistName: string, slides: { name: 
   }
   await phone.getByRole("checkbox", { name: displayName }).check();
   await phone.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(phone.getByRole("status")).toContainText("Published", { timeout: 20_000 });
+  await expectStatus(phone, "Published", 20_000);
 }
 
 function idOf(items: { id: string; fileName: string }[], name: string) {

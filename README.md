@@ -2,7 +2,7 @@
 
 Pantalla puts one menu image on a TV. You upload the image from your phone, type the 6-digit code the TV is showing, and the screen updates over the internet. The phone and the TV do not have to be on the same network.
 
-This is a small standalone app: Next.js on Vercel, Supabase for Postgres, Auth, and private Storage. It does not do billing, video, or scheduling. A playlist is a loop of images.
+This is a small standalone app: Next.js on Vercel, Supabase for Postgres, Auth, and private Storage. It does not do billing. A playlist is a loop of images or H.264 video. Schedules, locations, and screen groups are in [docs/PHASE_2D_PLAN.md](docs/PHASE_2D_PLAN.md).
 
 ## How it works
 

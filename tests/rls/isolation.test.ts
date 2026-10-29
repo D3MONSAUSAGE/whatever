@@ -256,6 +256,111 @@ describe.skipIf(!configured)("RLS account isolation", () => {
     },
     90_000,
   );
+
+  it("isolates screen groups and schedules from the other account", async (ctx) => {
+    admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+    const probe = await admin.from("screen_groups").select("id").limit(1);
+    const missing = probe.error && (
+      probe.error.code === "42P01" ||
+      probe.error.code === "PGRST205" ||
+      /does not exist|schema cache|could not find the table/i.test(probe.error.message || "")
+    );
+    if (missing) {
+      console.log("RLS schedule test skipped: migration 0004_scheduling.sql is not applied. This is not a pass.");
+      ctx.skip();
+      return;
+    }
+    expect(probe.error, probe.error?.message).toBeNull();
+
+    const password = `${randomUUID()}Aa1!`;
+    const emailA = `pantalla-rls-${randomUUID()}@mailinator.com`;
+    const emailB = `pantalla-rls-${randomUUID()}@mailinator.com`;
+    const userA = await makeUser(admin, emailA, password, createdUsers);
+    const userB = await makeUser(admin, emailB, password, createdUsers);
+    const accountA = await ensure(admin, userA.id, "Cafe A schedule");
+    const accountB = await ensure(admin, userB.id, "Cafe B schedule");
+
+    const ownLocations = await userA.client.from("locations").select("id, name, timezone").eq("account_id", accountA);
+    expect(ownLocations.error).toBeNull();
+    expect(ownLocations.data?.length).toBeGreaterThan(0);
+    expect(ownLocations.data?.[0].timezone).toBeTruthy();
+    const otherLocations = await userB.client.from("locations").select("id, timezone").eq("account_id", accountA);
+    expect(otherLocations.data ?? []).toEqual([]);
+    const zoneWrite = await userA.client.from("locations").update({ timezone: "America/Los_Angeles" }).eq("account_id", accountA).select("id");
+    expect(zoneWrite.data ?? []).toEqual([]);
+
+    const playlistId = randomUUID();
+    const groupId = randomUUID();
+    const scheduleId = randomUUID();
+    const { error: playlistError } = await admin.from("playlists").insert({
+      id: playlistId,
+      account_id: accountA,
+      name: "Secret hours",
+    });
+    expect(playlistError).toBeNull();
+    const { data: display, error: displayError } = await admin.from("displays").insert({
+      account_id: accountA,
+      name: "Counter",
+    }).select("id").single();
+    expect(displayError).toBeNull();
+    const { error: groupError } = await admin.from("screen_groups").insert({
+      id: groupId,
+      account_id: accountA,
+      name: "Secret group",
+    });
+    expect(groupError).toBeNull();
+    const { error: memberError } = await admin.from("screen_group_members").insert({
+      group_id: groupId,
+      display_id: display!.id,
+      account_id: accountA,
+    });
+    expect(memberError).toBeNull();
+    const { error: scheduleError } = await admin.from("schedules").insert({
+      id: scheduleId,
+      account_id: accountA,
+      name: "Secret lunch",
+      playlist_id: playlistId,
+      display_id: display!.id,
+      weekdays: [1, 2, 3, 4, 5],
+      start_minute: 11 * 60,
+      end_minute: 14 * 60,
+    });
+    expect(scheduleError).toBeNull();
+
+    const ownGroups = await userA.client.from("screen_groups").select("id, name");
+    expect(ownGroups.data?.map((row) => row.id)).toContain(groupId);
+    const ownMembers = await userA.client.from("screen_group_members").select("group_id, display_id");
+    expect(ownMembers.data?.map((row) => row.group_id)).toContain(groupId);
+    const ownSchedules = await userA.client.from("schedules").select("id, name, weekdays");
+    expect(ownSchedules.data?.map((row) => row.id)).toContain(scheduleId);
+
+    const otherGroups = await userB.client.from("screen_groups").select("id, name");
+    expect(otherGroups.data ?? []).toEqual([]);
+    const otherMembers = await userB.client.from("screen_group_members").select("group_id");
+    expect(otherMembers.data ?? []).toEqual([]);
+    const otherSchedules = await userB.client.from("schedules").select("id, name");
+    expect(otherSchedules.data ?? []).toEqual([]);
+
+    const renamed = await userA.client.from("screen_groups").update({ name: "hacked" }).eq("id", groupId).select("id");
+    expect(renamed.data ?? []).toEqual([]);
+    const stolen = await userB.client.from("schedules").insert({
+      account_id: accountB,
+      name: "nope",
+      playlist_id: playlistId,
+      display_id: display!.id,
+      weekdays: [1],
+      start_minute: 0,
+      end_minute: 60,
+    }).select("id");
+    expect(stolen.data ?? []).toEqual([]);
+    const { data: still } = await admin.from("screen_groups").select("name").eq("id", groupId).single();
+    expect(still?.name).toBe("Secret group");
+    const blockedSnapshot = await userA.client.rpc("snapshot_playlist", {
+      p_account_id: accountA,
+      p_playlist_id: playlistId,
+    });
+    expect(blockedSnapshot.error).toBeTruthy();
+  }, 90_000);
 });
 
 async function makeUser(admin: SupabaseClient, email: string, password: string, created: string[]) {

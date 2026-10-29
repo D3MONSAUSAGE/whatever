@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
+import { ToastProvider } from "@/components/toast";
 import { UploadProgress, UploadsProvider } from "@/components/uploads";
 
 const NAV = [
@@ -10,6 +11,7 @@ const NAV = [
   { href: "/dashboard/media", label: "Media", icon: IconImage },
   { href: "/dashboard/displays", label: "Displays", icon: IconTv },
   { href: "/dashboard/playlists", label: "Playlists", icon: IconList },
+  { href: "/dashboard/schedule", label: "Schedule", icon: IconCalendar },
   { href: "/dashboard/settings", label: "Settings", icon: IconGear },
 ];
 
@@ -39,6 +41,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   const current = NAV.find((item) => isActive(item.href))?.label ?? "Pantalla";
 
   return (
+    <ToastProvider>
     <UploadsProvider>
     <div className="min-h-dvh md:flex">
       <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
@@ -60,17 +63,18 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           {children}
         </main>
       </div>
-      <nav aria-label="Mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         {NAV.map((item) => (
           <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
-            className={`flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] font-semibold leading-tight ${isActive(item.href) ? "text-ink" : "text-muted"}`}>
+            className={`flex min-w-0 flex-col items-center justify-center gap-0.5 min-h-14 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-ink" : "text-muted"}`}>
             <item.icon />
-            <span>{item.label}</span>
+            <span className="max-w-full truncate">{item.label}</span>
           </Link>
         ))}
       </nav>
     </div>
     </UploadsProvider>
+    </ToastProvider>
   );
 }
 
@@ -108,6 +112,14 @@ function IconList() {
       <circle cx="5" cy="7" r="1" fill="currentColor" stroke="none" />
       <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
       <circle cx="5" cy="17" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+function IconCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M8 3.5v3M16 3.5v3M3.5 10h17" />
     </svg>
   );
 }
