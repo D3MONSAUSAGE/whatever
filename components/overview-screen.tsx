@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApi, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { LogoMark, WaveBackdrop } from "@/components/brand";
 import { IconCalendar, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
-import { ONLINE_HINT } from "@/components/tv";
+import { ONLINE_HINT, OfflineAlert, offlineScreens } from "@/components/tv";
 import { LoadingBlock, Stat } from "@/components/ui";
 
 export type OverviewFixture = {
@@ -83,6 +83,7 @@ function OverviewBody({
   origin: string;
 }) {
   const online = displayData.filter((item) => item.online).length;
+  const offline = offlineScreens(displayData).length;
   const published = displayData.some((item) => item.media || item.playlist);
   const steps = [
     { title: "Upload media", href: "/dashboard/media", done: mediaCount > 0, body: "Add a JPG, PNG, WebP, or an H.264 MP4." },
@@ -99,15 +100,16 @@ function OverviewBody({
 
   return (
     <>
+      <OfflineAlert displays={displayData} linkToDisplays />
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
         <Stat icon={<IconTv />} label="Screens" value={displayData.length} />
         <Stat tone="live" label="Online" value={online} hint={ONLINE_HINT} />
-        <Stat tone="danger" label="Offline" value={displayData.length - online} hint={ONLINE_HINT} />
+        <Stat tone="danger" label="Offline" value={offline} hint={ONLINE_HINT} />
         <Stat icon={<IconImage />} label="Media files" value={mediaCount} />
         <Stat icon={<IconList />} label="Playlists" value={playlistCount === null ? "—" : playlistCount} hint={playlistError ?? undefined} />
         <Stat icon={<IconCalendar />} label="Scheduled" value={scheduleCount === null ? "—" : scheduleCount} hint={scheduleError ?? undefined} />
       </div>
-      <p className="text-xs text-muted -mt-4 mb-8">{ONLINE_HINT} Screens that have not finished pairing count as offline.</p>
+      <p className="text-xs text-muted -mt-4 mb-8">{ONLINE_HINT} Screens still waiting to pair are not counted as offline.</p>
 
       {showGuide && (
         <ol className="grid gap-3 mb-8">

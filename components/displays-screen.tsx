@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
-import { ONLINE_HINT, ScreenCard } from "@/components/tv";
+import { ONLINE_HINT, OfflineAlert, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
@@ -57,6 +57,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
       <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}>
         <button type="button" className="btn btn-primary" onClick={() => setAssigning([])}>Assign playlist</button>
       </PageHeader>
+      {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       <PairForm onPaired={() => { toast.show("Connected. The TV will switch over in a few seconds."); displays.reload(); }}
         onError={(message) => toast.show(message, true)} />
 
