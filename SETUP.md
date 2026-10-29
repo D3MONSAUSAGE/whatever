@@ -48,8 +48,9 @@ Import the GitHub repo as a Next.js app. Set the variables below for Production 
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes, it is in the browser | Publishable key (`sb_publishable_...`) or legacy anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | **No. Server only.** | Secret key (`sb_secret_...`) or legacy service_role key |
 | `PAIRING_CODE_SECRET` | **No. Server only.** | `openssl rand -hex 32` |
+| `CRON_SECRET` | **No. Server only.** | `openssl rand -hex 32`. Vercel Cron sends it as `Authorization: Bearer`. If unset, `GET /api/cron/orphan-uploads` returns 503 and deletes nothing. |
 
-Do not put the secret key or `PAIRING_CODE_SECRET` in a `NEXT_PUBLIC_` variable. Do not paste them into the TV page, a client component, or git.
+Do not put the secret key, `PAIRING_CODE_SECRET`, or `CRON_SECRET` in a `NEXT_PUBLIC_` variable. Do not paste them into the TV page, a client component, or git.
 
 After the first deploy, set the Supabase Site URL and redirect URLs to the real Vercel origin, then open `https://YOUR-APP.vercel.app/player` on the TV. Use the production URL on the TV. Preview URLs change.
 

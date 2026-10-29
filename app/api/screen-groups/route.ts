@@ -2,7 +2,8 @@ import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
-import { fail, json, readJson } from "@/lib/server/http";
+import { CREATE_GROUP_MAX_PER_USER, CREATE_GROUP_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { replaceMembers } from "./members";
 import { parseDisplayIds } from "@/lib/server/screen-groups";
 
@@ -54,6 +55,8 @@ export async function POST(req: Request) {
   if (!name) return fail("Give this group a name.", 400);
   const displayIds = parseDisplayIds(body.displayIds);
   if (displayIds === "invalid") return fail("One of those screens isn't in this account.", 400);
+  const limited = await enforceLimit(`create-group:${admin.userId}`, CREATE_WINDOW_SECONDS, CREATE_GROUP_MAX_PER_USER, CREATE_GROUP_RATE_MESSAGE);
+  if (limited) return limited;
 
   const existing = await db().from("screen_groups").select("id, name").eq("account_id", admin.accountId);
   if (existing.error) {

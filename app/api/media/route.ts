@@ -1,11 +1,11 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { checkImage } from "@/lib/server/images";
-import { MAX_UPLOAD_BYTES } from "@/lib/server/limits";
+import { MAX_UPLOAD_BYTES, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
 import { usageByMedia } from "@/lib/server/media-usage";
 import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
-import { fail, json } from "@/lib/server/http";
+import { enforceLimit, fail, json } from "@/lib/server/http";
 
 const MEDIA_COLUMNS = "id, file_name, storage_path, size_bytes, created_at";
 const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path`;
@@ -103,6 +103,9 @@ export async function POST(req: Request) {
       415,
     );
   }
+
+  const limited = await enforceLimit(`upload-image:${admin.userId}`, UPLOAD_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE);
+  if (limited) return limited;
 
   const fileName = normalizeFileName(form.get("name"));
   const id = crypto.randomUUID();

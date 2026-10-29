@@ -3,7 +3,8 @@ import { requireAdmin } from "@/lib/server/auth";
 import { VIDEO_UNAVAILABLE } from "@/lib/server/schema";
 import { videoSchemaReady } from "@/lib/server/video";
 import { MAX_VIDEO_BYTES, mp4ErrorMessage } from "@/lib/mp4";
-import { fail, json, readJson } from "@/lib/server/http";
+import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export async function POST(req: Request) {
   const size = body.sizeBytes;
   if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) return fail(mp4ErrorMessage("type"), 400);
   if (size > MAX_VIDEO_BYTES) return fail(mp4ErrorMessage("size"), 413);
+  const limited = await enforceLimit(`upload-init:${admin.userId}`, UPLOAD_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE);
+  if (limited) return limited;
 
   const mediaId = crypto.randomUUID();
   const path = `${admin.accountId}/${mediaId}.mp4`;

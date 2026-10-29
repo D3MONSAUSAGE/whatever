@@ -14,7 +14,8 @@ import {
   memorySource,
   mp4ErrorMessage,
 } from "@/lib/mp4";
-import { fail, json, readJson } from "@/lib/server/http";
+import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,8 @@ export async function POST(req: Request) {
   }
   if (body.durationMs > MAX_VIDEO_DURATION_MS) return fail(mp4ErrorMessage("duration"), 415);
   if (body.width > MAX_VIDEO_EDGE || body.height > MAX_VIDEO_EDGE) return fail(mp4ErrorMessage("dimensions"), 415);
+  const rateLimited = await enforceLimit(`upload-complete:${admin.userId}`, UPLOAD_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE);
+  if (rateLimited) return rateLimited;
 
   const path = `${admin.accountId}/${mediaId}.mp4`;
   const thumbPath = `${admin.accountId}/${mediaId}-thumb.jpg`;
