@@ -4,6 +4,7 @@ import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type 
 import { ONLINE_HINT, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
+import { IconTv } from "@/components/icons";
 import { LoadingBlock, PageHeader } from "@/components/ui";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
@@ -53,7 +54,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Displays" lede={ONLINE_HINT}>
+      <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}>
         <button type="button" className="btn btn-primary" onClick={() => setAssigning([])}>Assign playlist</button>
       </PageHeader>
       <PairForm onPaired={() => { toast.show("Connected. The TV will switch over in a few seconds."); displays.reload(); }}

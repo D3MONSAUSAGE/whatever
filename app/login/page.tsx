@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
+import { LogoMark, WaveBackdrop, Wordmark } from "@/components/brand";
 
 export default function Login() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!supabaseConfigured()) return;
-    getSupabase().auth.getSession().then(({ data }) => data.session && router.replace("/dashboard"));
+    getSupabase().auth.getSession().then(({ data }) => data.session && router.replace("/dashboard")).catch(() => {});
   }, [router]);
 
   async function submit(e: React.FormEvent) {
@@ -35,28 +36,34 @@ export default function Login() {
   }
 
   return (
-    <main className="min-h-dvh grid place-items-center px-5">
-      <div className="w-full max-w-sm card p-6 md:p-8">
-        <div className="tv mb-8 grid place-items-center">
-          <span className="text-white text-2xl font-semibold tracking-tight">Pantalla</span>
+    <main className="wave-surface relative min-h-dvh overflow-hidden grid place-items-center px-5 py-12">
+      <WaveBackdrop />
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="flex flex-col items-center text-center mb-8">
+          <LogoMark className="size-16" />
+          <div className="mt-4">
+            <Wordmark size="lg" align="center" />
+          </div>
+          <p className="mt-3 text-sm text-muted">making life simpler every day.</p>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight mb-1">{mode === "in" ? "Sign in" : "Create your account"}</h1>
-        <p className="text-muted mb-6">Put your menu on any TV.</p>
-        {!supabaseConfigured() && (
-          <p className="mb-4 text-sm text-danger">This deploy is missing its Supabase URL or publishable key.</p>
-        )}
-        <form onSubmit={submit} className="space-y-3">
-          <input className="field" type="email" autoComplete="email" placeholder="Email" required
-            value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="field" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"}
-            placeholder="Password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button className="btn btn-primary w-full" disabled={busy}>{busy ? "One moment…" : mode === "in" ? "Sign in" : "Create account"}</button>
-        </form>
-        {note && <p className={`mt-4 text-sm ${note.error ? "text-danger" : "text-ink"}`}>{note.text}</p>}
-        <button type="button" className="mt-6 text-sm underline underline-offset-4"
-          onClick={() => { setMode(mode === "in" ? "up" : "in"); setNote(null); }}>
-          {mode === "in" ? "New here? Create an account" : "Have an account? Sign in"}
-        </button>
+        <div className="card p-6 md:p-8">
+          <h1 className="text-xl font-semibold tracking-tight mb-5">{mode === "in" ? "Sign in" : "Create your account"}</h1>
+          {!supabaseConfigured() && (
+            <p className="mb-4 text-sm text-danger">This deploy is missing its Supabase URL or publishable key.</p>
+          )}
+          <form onSubmit={submit} className="space-y-3">
+            <input className="field" type="email" autoComplete="email" placeholder="Email" required
+              value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className="field" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"}
+              placeholder="Password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button className="btn btn-primary w-full capitalize" disabled={busy}>{busy ? "One moment…" : mode === "in" ? "Sign in" : "Create account"}</button>
+          </form>
+          {note && <p className={`mt-4 text-sm ${note.error ? "text-danger" : "text-ink"}`}>{note.text}</p>}
+          <button type="button" className="mt-6 text-sm font-semibold text-primary underline underline-offset-4"
+            onClick={() => { setMode(mode === "in" ? "up" : "in"); setNote(null); }}>
+            {mode === "in" ? "New here? Create an account" : "Have an account? Sign in"}
+          </button>
+        </div>
       </div>
     </main>
   );

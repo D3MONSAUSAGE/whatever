@@ -37,7 +37,12 @@ export function Status({ display }: { display: DisplayItem }) {
       </span>
     );
   }
-  return <span className="badge" title={ONLINE_HINT}>Offline</span>;
+  return (
+    <span className="badge badge-danger" title={ONLINE_HINT}>
+      <span className="size-1.5 rounded-full bg-danger" aria-hidden />
+      Offline
+    </span>
+  );
 }
 
 export function ScreenCard({

@@ -114,7 +114,7 @@ export function UploadProgress() {
             </span>
           </div>
           <div className="mt-2 h-2 rounded-full bg-line overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={job.progress} aria-label={job.name}>
-            <div className={`h-full ${job.state === "error" ? "bg-danger" : "bg-ink"}`} style={{ width: `${job.progress}%` }} />
+            <div className={`h-full ${job.state === "error" ? "bg-danger" : "bg-primary"}`} style={{ width: `${job.progress}%` }} />
           </div>
           {job.state === "error" ? <p className="text-sm text-danger mt-2">{job.detail}</p> : null}
         </li>

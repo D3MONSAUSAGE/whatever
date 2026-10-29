@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
+import { IconCalendar } from "@/components/icons";
 import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
 
 const DAYS: { value: number; label: string }[] = [
@@ -90,6 +91,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
     <section>
       <PageHeader
         title="Schedule"
+        icon={<IconCalendar />}
         lede="Locations keep a timezone. Groups let one rule cover several screens. A rule plays a playlist's published slides in that timezone, and the screen's saved assignment plays whenever no rule is active."
       />
       <p className="text-sm text-muted mb-6 max-w-2xl leading-relaxed">
@@ -539,7 +541,7 @@ function Preview({ displays, fixture }: { displays: DisplayItem[]; fixture: Sche
                 {day.segments.map((segment) => (
                   <div
                     key={`${segment.start}-${segment.source}`}
-                    className={segment.source === "schedule" ? "bg-ink" : "bg-line"}
+                    className={segment.source === "schedule" ? "bg-primary" : "bg-line"}
                     style={{ flexGrow: Math.max(1, Date.parse(segment.end) - Date.parse(segment.start)) }}
                     title={segmentLabel(segment, preview.timezone)}
                   />
