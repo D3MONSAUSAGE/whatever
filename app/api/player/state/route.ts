@@ -3,6 +3,7 @@ import { sha256 } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { readPlaybackSchedule } from "@/lib/server/playback";
 import { isMissingSchema } from "@/lib/server/schema";
+import { playerPollMs } from "@/lib/server/limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ type PlaylistRow = {
   height?: number | null;
 };
 
-// TV poll (every 10s) and heartbeat. `?v=` is the version the TV is showing;
+// TV poll (every pollMs; 10 s on older players) and heartbeat. `?v=` is the version the TV is showing;
 // a signed URL is only issued when it differs. A single assigned image keeps
 // the original JSON. A playlist adds a `playlist` object.
 export async function GET(req: Request) {
@@ -45,9 +46,8 @@ export async function GET(req: Request) {
   const schedule = await readPlaybackSchedule(String(row.display_id), Number(row.content_version));
   if (schedule.kind === "error") return fail("unavailable", 503);
   const version = schedule.kind === "on" ? schedule.version : Number(row.content_version);
-  const extra = schedule.kind === "on" && schedule.nextTransitionAt
-    ? { nextTransitionAt: schedule.nextTransitionAt }
-    : {};
+  const extra: { pollMs: number; nextTransitionAt?: string } = { pollMs: playerPollMs() };
+  if (schedule.kind === "on" && schedule.nextTransitionAt) extra.nextTransitionAt = schedule.nextTransitionAt;
   const overrideId = schedule.kind === "on" ? schedule.overridePlaylistId : null;
 
   const params = new URL(req.url).searchParams;

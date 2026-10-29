@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "node scripts/ensure-next-env.mjs && tsc --noEmit",
     "check:player": "node scripts/check-player.mjs",
-    "test:player": "node scripts/check-player.mjs && node scripts/simulate-player.mjs",
+    "test:player": "node scripts/check-player.mjs && node scripts/simulate-player.mjs && node scripts/simulate-player-cache.mjs",
     "test:unit": "vitest run tests/unit",
     "test:api": "vitest run tests/api",
     "test:rls": "vitest run tests/rls",

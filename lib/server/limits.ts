@@ -35,7 +35,7 @@ export const PAIR_CLAIM_MAX_PER_USER = 10;
 export const PAIR_CLAIM_MAX_PER_IP = 30;
 
 /** A display is online if the player polled within this window. */
-export const ONLINE_MS = 60_000;
+export const ONLINE_MS = 90_000; // TVs poll every 30 s (10 s on older players); heartbeats are written at most every 30 s.
 
 /** Heartbeat writes are skipped when last_seen is newer than this. */
 export const HEARTBEAT_SECONDS = 30;
@@ -50,3 +50,14 @@ export const PLAYLIST_DEFAULT_DURATION_MS = 10_000;
 /** Long-edge cap. Blocks decompression bombs without a native image library. */
 export const MAX_EDGE = 7680;
 export const MAX_PIXELS = 7680 * 4320;
+
+/**
+ * How often a TV should poll, sent to the player as `pollMs`. Players from before this
+ * field ignore it and keep polling every 10 s. 30 s cuts function calls by two thirds;
+ * schedule changes still land on time because the player also wakes at `nextTransitionAt`.
+ */
+export function playerPollMs() {
+  const raw = Number(process.env.PLAYER_POLL_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return 30_000;
+  return Math.min(120_000, Math.max(5_000, Math.round(raw)));
+}

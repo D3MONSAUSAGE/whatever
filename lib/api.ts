@@ -140,8 +140,11 @@ export function useApi<T>(path: string | null, refreshMs?: number) {
     if (!path) return;
     reload();
     if (!refreshMs) return;
-    const t = setInterval(reload, refreshMs);
-    return () => clearInterval(t);
+    // Background tabs stop polling (saves server calls); coming back refreshes at once.
+    const t = setInterval(() => { if (!document.hidden) reload(); }, refreshMs);
+    const onVisible = () => { if (!document.hidden) reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVisible); };
   }, [reload, refreshMs, path]);
   return { data, error, reload };
 }

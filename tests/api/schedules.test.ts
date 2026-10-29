@@ -101,7 +101,7 @@ describe("scheduling API", () => {
     expect(shown.body.playlist).toBeUndefined();
     expect(shown.body.nextTransitionAt).toBeUndefined();
     const unchanged = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
-    expect(unchanged.body).toEqual({ version: 1, unchanged: true });
+    expect(unchanged.body).toEqual({ version: 1, unchanged: true, pollMs: 30000 });
   });
 
   it("manages locations, moves a screen, and refuses to delete one that still has a screen", async () => {
