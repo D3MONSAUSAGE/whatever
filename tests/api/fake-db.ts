@@ -47,6 +47,16 @@ function insertRow(store: Store, table: TableName, row: Row) {
     if (dup) return { error: { message: "duplicate key", code: "23505" } as { message: string; code: string } };
   }
   if (!row.id) row.id = crypto.randomUUID();
+  // media.id is a primary key. A second insert has to fail the way Postgres does (23505)
+  // so concurrent upload completes cannot both create a row.
+  if (table === "media" && store.media.some((item) => item.id === row.id)) {
+    return {
+      error: {
+        message: 'duplicate key value violates unique constraint "media_pkey"',
+        code: "23505",
+      } as { message: string; code: string },
+    };
+  }
   if (!row.created_at) row.created_at = new Date().toISOString();
   if (table === "pairing_sessions" && !row.status) row.status = "pending";
   if (table === "displays") {
@@ -435,7 +445,13 @@ export function createFakeDb() {
       from() {
         return {
           async upload(path: string, body: Uint8Array | Blob) {
-            if (store.objects.has(path)) return { data: null, error: { message: "already exists" } };
+            // Supabase Storage replies HTTP 400 with statusCode "409" when upsert is false.
+            if (store.objects.has(path)) {
+              return {
+                data: null,
+                error: { message: "The resource already exists", status: 400, statusCode: "409", error: "Duplicate" },
+              };
+            }
             const bytes = body instanceof Uint8Array ? body : new Uint8Array(await body.arrayBuffer());
             store.objects.set(path, Uint8Array.from(bytes));
             return { data: { path }, error: null };
