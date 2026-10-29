@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabase } from "./supabase-browser";
 
 export type MediaUse = { id: string; name: string };
@@ -95,12 +95,17 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
 export function useApi<T>(path: string | null, refreshMs?: number) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const request = useRef(0);
   const reload = useCallback(async () => {
     if (!path) return;
+    const id = ++request.current;
     try {
-      setData(await api<T>(path));
+      const next = await api<T>(path);
+      if (id !== request.current) return;
+      setData(next);
       setError(null);
     } catch (e) {
+      if (id !== request.current) return;
       setError((e as Error).message);
     }
   }, [path]);

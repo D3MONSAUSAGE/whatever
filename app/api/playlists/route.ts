@@ -33,13 +33,16 @@ export async function GET(req: Request) {
       .select("playlist_id, media_id, position")
       .eq("account_id", admin.accountId)
       .eq("kind", "draft")
-      .in("playlist_id", ids);
+      .in("playlist_id", ids)
+      .order("position", { ascending: true });
     if (itemError) return fail("Couldn't load playlists.", 500);
     const firstMedia = new Map<string, { mediaId: string; position: number }>();
     for (const item of items ?? []) {
       const playlistId = String(item.playlist_id);
       slideCount.set(playlistId, (slideCount.get(playlistId) ?? 0) + 1);
+      // Thumbnail is the draft slide with the lowest position. A video at position 0 is the thumbnail.
       const position = Number(item.position);
+      if (!Number.isFinite(position)) continue;
       const prev = firstMedia.get(playlistId);
       if (!prev || position < prev.position) firstMedia.set(playlistId, { mediaId: String(item.media_id), position });
     }

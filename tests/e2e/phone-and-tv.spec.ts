@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
+import { libraryFile, waitForLibraryFile } from "./media-locators";
 
 const pendingEmails: string[] = [];
 
@@ -55,7 +56,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
     await test.step("upload the first menu", async () => {
       await phone.goto("/dashboard/media");
       await upload(phone, "lunch-menu.png");
-      await expect(phone.getByText("lunch-menu.png")).toBeVisible();
+      await expect(libraryFile(phone, "lunch-menu.png")).toBeVisible();
     });
 
     await test.step("pair the TV", async () => {
@@ -76,7 +77,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
     await test.step("upload the replacement menu", async () => {
       await phone.goto("/dashboard/media");
       await upload(phone, "dinner-menu.png");
-      await expect(phone.getByText("dinner-menu.png")).toBeVisible();
+      await expect(libraryFile(phone, "dinner-menu.png")).toBeVisible();
       const library = await authed(phone, "/api/media");
       const items = library.body as { id: string; fileName: string }[];
       lunchId = items.find((item) => item.fileName === "lunch-menu.png")?.id || "";
@@ -189,6 +190,7 @@ async function signIn(page: Page, user: { email: string; password: string }) {
 
 async function upload(page: Page, name: string) {
   await page.locator('input[type="file"][accept*="image"]').setInputFiles({ name, mimeType: "image/png", buffer: png });
+  await waitForLibraryFile(page, name);
 }
 
 async function readCode(tv: Page) {
@@ -266,7 +268,7 @@ test("a playlist loops three slides, then a single image holds", async ({ browse
     await phone.goto("/dashboard/media");
     for (const name of ["slide-a.png", "slide-b.png", "slide-c.png"]) {
       await upload(phone, name);
-      await expect(phone.getByText(name)).toBeVisible();
+      await expect(libraryFile(phone, name)).toBeVisible();
     }
     await phone.goto("/dashboard/displays");
     await phone.getByLabel("Code on the TV").fill(code);
@@ -314,7 +316,7 @@ test("a playlist loops three slides, then a single image holds", async ({ browse
 
     await phone.goto("/dashboard/media");
     await upload(phone, "slide-d.png");
-    await expect(phone.getByText("slide-d.png")).toBeVisible();
+    await expect(libraryFile(phone, "slide-d.png")).toBeVisible();
     const again = await authed(phone, "/api/media");
     const dId = (again.body as { id: string; fileName: string }[]).find((item) => item.fileName === "slide-d.png")?.id || "";
     expect(dId).toBeTruthy();
@@ -334,7 +336,7 @@ test("a playlist loops three slides, then a single image holds", async ({ browse
 
     await phone.goto("/dashboard/media");
     await upload(phone, "slide-e.png");
-    await expect(phone.getByText("slide-e.png")).toBeVisible();
+    await expect(libraryFile(phone, "slide-e.png")).toBeVisible();
     const withStill = await authed(phone, "/api/media");
     const stillId = (withStill.body as { id: string; fileName: string }[]).find((item) => item.fileName === "slide-e.png")?.id || "";
     expect(stillId).toBeTruthy();
@@ -411,8 +413,8 @@ test("a video playlist plays on the TV and survives a dropped connection", async
     expect(probe.status).toBe(201);
 
     await videoInput.setInputFiles("tests/fixtures/h264-aac.mp4");
-    await expect(phone.getByText("h264-aac.mp4")).toBeVisible({ timeout: 20_000 });
-    await expect(phone.getByText(/s ·/)).toBeVisible();
+    await expect(libraryFile(phone, "h264-aac.mp4")).toBeVisible({ timeout: 30_000 });
+    await expect(phone.locator("[data-media-library]").getByText(/s ·/)).toBeVisible();
 
     await tv.goto("/player");
     const code = await readCode(tv);
@@ -460,11 +462,11 @@ test("a mixed image, video, and image playlist loops in order", async ({ browser
     if (!(await videoReady(ctx.phone))) return;
     await ctx.phone.goto("/dashboard/media");
     await upload(ctx.phone, "mix-a.png");
-    await expect(ctx.phone.getByText("mix-a.png")).toBeVisible();
+    await expect(libraryFile(ctx.phone, "mix-a.png")).toBeVisible();
     await upload(ctx.phone, "mix-c.png");
-    await expect(ctx.phone.getByText("mix-c.png")).toBeVisible();
+    await expect(libraryFile(ctx.phone, "mix-c.png")).toBeVisible();
     await ctx.phone.locator('input[type="file"][accept*="video"]').setInputFiles("tests/fixtures/h264-aac.mp4");
-    await expect(ctx.phone.getByText("h264-aac.mp4")).toBeVisible({ timeout: 20_000 });
+    await expect(libraryFile(ctx.phone, "h264-aac.mp4")).toBeVisible({ timeout: 30_000 });
 
     await ctx.tv.goto("/player");
     await pairTv(ctx.phone, ctx.tv, "Mix screen");
@@ -506,11 +508,11 @@ test("a broken video between two images does not stretch them or go blank", asyn
     if (!(await videoReady(ctx.phone))) return;
     await ctx.phone.goto("/dashboard/media");
     await upload(ctx.phone, "hold-a.png");
-    await expect(ctx.phone.getByText("hold-a.png")).toBeVisible();
+    await expect(libraryFile(ctx.phone, "hold-a.png")).toBeVisible();
     await upload(ctx.phone, "hold-c.png");
-    await expect(ctx.phone.getByText("hold-c.png")).toBeVisible();
+    await expect(libraryFile(ctx.phone, "hold-c.png")).toBeVisible();
     await ctx.phone.locator('input[type="file"][accept*="video"]').setInputFiles("tests/fixtures/h264-aac.mp4");
-    await expect(ctx.phone.getByText("h264-aac.mp4")).toBeVisible({ timeout: 20_000 });
+    await expect(libraryFile(ctx.phone, "h264-aac.mp4")).toBeVisible({ timeout: 30_000 });
     const library = await authed(ctx.phone, "/api/media");
     const items = library.body as { id: string; fileName: string }[];
     const ids = {

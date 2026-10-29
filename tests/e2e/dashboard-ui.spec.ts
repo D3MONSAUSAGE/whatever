@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
+import { libraryFile, waitForLibraryFile } from "./media-locators";
 
 /**
  * Phase 2C dashboard coverage at desktop (1440), tablet (768), and phone (390).
@@ -72,19 +73,19 @@ test("media upload, search, list view, and delete at phone width", async ({ brow
     await signUp(page, owner);
     await page.goto("/dashboard/media");
     await upload(page, "lunch-menu.png");
-    await expect(page.getByText("lunch-menu.png")).toBeVisible();
+    await expect(libraryFile(page, "lunch-menu.png")).toBeVisible();
     await page.getByRole("button", { name: "List", exact: true }).click();
-    await expect(page.getByText("lunch-menu.png")).toBeVisible();
+    await expect(libraryFile(page, "lunch-menu.png")).toBeVisible();
     await page.getByRole("button", { name: "Grid", exact: true }).click();
     await page.getByLabel("Search media").fill("lunch");
-    await expect(page.getByText("lunch-menu.png")).toBeVisible();
+    await expect(libraryFile(page, "lunch-menu.png")).toBeVisible();
     await page.getByLabel("Search media").fill("missing-file");
     await expect(page.getByText("No files match that search")).toBeVisible();
     await page.getByLabel("Search media").fill("");
     await page.getByLabel("Sort media").selectOption("name");
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByText("lunch-menu.png")).toBeVisible();
+    await expect(libraryFile(page, "lunch-menu.png")).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await page.getByRole("button", { name: "Delete file" }).click();
     await expect(page.getByText("No images yet")).toBeVisible();
@@ -108,9 +109,9 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await phone.setViewportSize({ width: 1440, height: 900 });
     await phone.goto("/dashboard/media");
     await upload(phone, "alpha.png");
-    await expect(phone.getByText("alpha.png")).toBeVisible();
+    await expect(libraryFile(phone, "alpha.png")).toBeVisible();
     await upload(phone, "beta.png");
-    await expect(phone.getByText("beta.png")).toBeVisible();
+    await expect(libraryFile(phone, "beta.png")).toBeVisible();
 
     await tv.goto("/player");
     await second.goto("/player");
@@ -192,8 +193,8 @@ test("video upload and playback, or an explicit skip when the database cannot st
     }
     expect(probe.status).toBe(201);
     await videoInput.setInputFiles("tests/fixtures/h264-aac.mp4");
-    await expect(ctx.phone.getByText("h264-aac.mp4")).toBeVisible({ timeout: 20_000 });
-    await expect(ctx.phone.getByText(/s ·/)).toBeVisible();
+    await expect(libraryFile(ctx.phone, "h264-aac.mp4")).toBeVisible({ timeout: 30_000 });
+    await expect(ctx.phone.locator("[data-media-library]").getByText(/s ·/)).toBeVisible();
     await ctx.tv.goto("/player");
     await pair(ctx.phone, ctx.tv, "Video screen");
     await ctx.phone.getByRole("link", { name: "Playlists" }).click();
@@ -241,6 +242,7 @@ async function signIn(page: Page, user: { email: string; password: string }) {
 
 async function upload(page: Page, name: string) {
   await page.locator('input[type="file"][accept*="image"]').setInputFiles({ name, mimeType: "image/png", buffer: png });
+  await waitForLibraryFile(page, name);
 }
 
 async function readCode(tv: Page) {

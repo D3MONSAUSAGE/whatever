@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
+import { UploadProgress, UploadsProvider } from "@/components/uploads";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: IconGrid },
@@ -38,6 +39,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   const current = NAV.find((item) => isActive(item.href))?.label ?? "Pantalla";
 
   return (
+    <UploadsProvider>
     <div className="min-h-dvh md:flex">
       <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
         <Link href="/dashboard" className="font-semibold text-lg px-3 mb-6 tracking-tight">Pantalla</Link>
@@ -53,7 +55,10 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           <span className="font-semibold tracking-tight">Pantalla</span>
           <span className="text-sm text-muted">{current}</span>
         </header>
-        <main className="px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 max-w-6xl">{children}</main>
+        <main className="px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 max-w-6xl">
+          <UploadProgress />
+          {children}
+        </main>
       </div>
       <nav aria-label="Mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
         {NAV.map((item) => (
@@ -65,6 +70,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
         ))}
       </nav>
     </div>
+    </UploadsProvider>
   );
 }
 
