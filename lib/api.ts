@@ -168,3 +168,40 @@ export function formatDuration(ms: number) {
   if (!minutes) return `${seconds}s`;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+
+export type OnboardingStepId = "account" | "business" | "location" | "screen" | "media" | "playlist" | "publish" | "playing";
+export type OnboardingState = {
+  steps: { id: OnboardingStepId; done: boolean; confirmed?: boolean }[];
+  completed: number; total: number; nextStep: OnboardingStepId | null;
+  dismissed: boolean; finished: boolean; show: boolean; firstLocationId: string | null;
+};
+
+export type AnalyticsSummary = {
+  screens: { total: number; online: number; offline: number; neverConnected: number };
+  uptime: { pct7: number | null; pct30: number | null; coverageFrom: string | null };
+  playback: { confirmed: number; unconfirmed: number; nothingAssigned: number };
+  playlists: { total: number; published: number; publishes30d: number };
+  schedules: { total: number; enabled: number; changes30d: number };
+  media: { count: number; images: number; videos: number; bytes: number; inPlaylists: number; unused: number };
+  bandwidth: null;
+};
+export type UptimeScreen = {
+  id: string; name: string; online: boolean; lastSeenAt: string | null;
+  uptimePct: number | null; onlineSeconds: number; windowSeconds: number;
+  daily: { date: string; uptimePct: number | null }[];
+};
+export type UptimeReport = { days: number; coverageFrom: string | null; screens: UptimeScreen[]; overall: { uptimePct: number | null } };
+export type ScreenAnalytics = {
+  id: string; name: string; online: boolean; lastSeenAt: string | null;
+  uptime7: number | null; uptime30: number | null; coverageFrom: string | null;
+  daily: { date: string; uptimePct: number | null }[];
+  offline: { startedAt: string; endedAt: string | null; seconds: number }[];
+  playback: {
+    status: "confirmed" | "unconfirmed" | "nothing";
+    confirmed: { version: number; at: string | null } | null;
+    expected: { version: number; source: "schedule" | "playlist" | "image" | "none"; name: string | null };
+    match: boolean | null;
+    history: { version: number; at: string }[];
+  };
+};
+export type ActivityEvent = { at: string; kind: string; subjectId: string | null; subjectName: string | null; detail: Record<string, unknown> };

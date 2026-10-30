@@ -98,9 +98,16 @@ export function offlineScreens(displays: DisplayItem[]) {
 export function OfflineAlert({ displays, linkToDisplays = false }: { displays: DisplayItem[]; linkToDisplays?: boolean }) {
   const offline = offlineScreens(displays);
   useEffect(() => {
-    const base = document.title.replace(/^\(\d+ offline\) /, "");
-    document.title = offline.length ? `(${offline.length} offline) ${base}` : base;
-    return () => { document.title = document.title.replace(/^\(\d+ offline\) /, ""); };
+    const apply = () => {
+      const base = document.title.replace(/^\(\d+ offline\) /, "");
+      const next = offline.length ? `(${offline.length} offline) ${base}` : base;
+      if (document.title !== next) document.title = next;
+    };
+    apply();
+    // Next.js can set the page title after this effect on first load; re-apply when it does.
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+    return () => { observer.disconnect(); document.title = document.title.replace(/^\(\d+ offline\) /, ""); };
   }, [offline.length]);
   if (offline.length === 0) return null;
   const names = offline.slice(0, 4);

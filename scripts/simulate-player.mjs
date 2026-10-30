@@ -103,6 +103,8 @@ function server(method, url, body, headers) {
     return [200, { status: s ? "pending" : "expired" }];
   }
   if (url.startsWith("/api/player/state") && method === "POST") {
+    // Proof of play (M8) is a separate message; it never touches the error field.
+    if (body && body.playing) { S.playing = (S.playing || []).concat(body.playing.version); return [200, { ok: true }]; }
     S.playerErrorPosts++;
     S.playerError = body && body.error ? String(body.error) : "";
     return [200, { ok: true }];

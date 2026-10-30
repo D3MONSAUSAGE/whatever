@@ -64,3 +64,12 @@ export function IconChevron() {
     </svg>
   );
 }
+
+export function IconChart() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 20h16" />
+      <path d="M7 16v-5M12 16V7M17 16v-8" strokeLinecap="round" />
+    </svg>
+  );
+}

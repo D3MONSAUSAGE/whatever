@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useApi } from "@/lib/api";
+import { api, useApi } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase-browser";
 import { IconGear } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
@@ -114,6 +114,8 @@ export default function Settings() {
           )}
         </div>
 
+        <BusinessForm current={me.data?.accountName ?? null} onSaved={() => me.reload()} />
+
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
           <h2 id="name-heading" className="font-semibold">Display name</h2>
           <p className="text-sm text-muted mt-1 mb-3">Shown to you in the dashboard and the Seemple app. Leave blank to use your email.</p>
@@ -176,5 +178,40 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dt className="text-sm text-muted">{label}</dt>
       <dd className="font-medium break-words">{children}</dd>
     </div>
+  );
+}
+
+function BusinessForm({ current, onSaved }: { current: string | null; onSaved: () => void }) {
+  const toast = useToast();
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { if (current !== null) setValue(current); }, [current]);
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const name = value.trim().replace(/\s+/g, " ");
+    if (!name) return setError("Enter your business name.");
+    setBusy(true);
+    try {
+      await api("/api/me", { method: "PATCH", body: JSON.stringify({ accountName: name }) });
+      toast.show("Business name saved");
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form className="card p-5" onSubmit={save} aria-labelledby="business-heading">
+      <h2 id="business-heading" className="font-semibold">Business name</h2>
+      <p className="text-sm text-muted mt-1 mb-3">Your business as customers know it. Shown in the dashboard and the Seemple app.</p>
+      <label className="form-label" htmlFor="business-name">Business name</label>
+      <input id="business-name" className="field" maxLength={80} autoComplete="organization"
+        value={value} onChange={(e) => setValue(e.target.value)} />
+      {error ? <p role="alert" className="note-error mt-3">{error}</p> : null}
+      <button className="btn btn-primary mt-3" disabled={busy || current === null || value.trim() === current}>{busy ? "Saving…" : "Save business name"}</button>
+    </form>
   );
 }
