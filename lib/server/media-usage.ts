@@ -1,5 +1,6 @@
 import { db } from "./supabase";
 import { isMissingSchema } from "./schema";
+import { fetchAll, inChunks } from "./paging";
 
 export type PlaylistRef = { id: string; name: string };
 
@@ -17,10 +18,12 @@ export async function playlistsUsingMedia(accountId: string, mediaId: string): P
 
 /** Every file in the account, keyed by media id. Null means the lookup failed. */
 export async function usageByMedia(accountId: string): Promise<Map<string, PlaylistRef[]> | null> {
-  const used = await db()
+  const used = await fetchAll<{ media_id: string; playlist_id: string }>((from, to) => db()
     .from("playlist_items")
     .select("media_id, playlist_id")
-    .eq("account_id", accountId);
+    .eq("account_id", accountId)
+    .order("id")
+    .range(from, to));
   if (used.error) return isMissingSchema(used.error) ? new Map() : null;
 
   const byMedia = new Map<string, Set<string>>();
@@ -49,7 +52,7 @@ export async function usageByMedia(accountId: string): Promise<Map<string, Playl
 
 async function namesFor(accountId: string, ids: string[]): Promise<PlaylistRef[] | null> {
   if (!ids.length) return [];
-  const lists = await db().from("playlists").select("id, name").eq("account_id", accountId).in("id", ids);
+  const lists = await inChunks<{ id: string; name: string }>(ids, (chunk) => db().from("playlists").select("id, name").eq("account_id", accountId).in("id", chunk));
   if (lists.error) return isMissingSchema(lists.error) ? ids.map((id) => ({ id, name: "a playlist" })) : null;
   const found = new Map((lists.data ?? []).map((row) => [String(row.id), String(row.name)]));
   return ids.map((id) => ({ id, name: found.get(id) || "a playlist" }));

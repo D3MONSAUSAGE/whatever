@@ -4,6 +4,7 @@ import { PLAYLIST_DEFAULT_DURATION_MS } from "@/lib/server/limits";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
+import { fetchAll, inChunks, matches, pageOf, parseListQuery } from "@/lib/server/paging";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,14 +13,27 @@ export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
-  const { data: lists, error } = await db()
+  const query = parseListQuery(req);
+  type ListRow = { id: string; name: string; default_duration_ms: number; transition: string; published_at: string | null; updated_at: string; revision: number };
+  const loaded = await fetchAll<ListRow>((from, to) => db()
     .from("playlists")
     .select("id, name, default_duration_ms, transition, published_at, updated_at, revision")
     .eq("account_id", admin.accountId)
-    .order("updated_at", { ascending: false });
-  if (error) {
-    if (isMissingSchema(error)) return fail(PLAYLISTS_UNAVAILABLE, 503);
+    .order("updated_at", { ascending: false })
+    .order("id")
+    .range(from, to));
+  if (loaded.error) {
+    if (isMissingSchema(loaded.error)) return fail(PLAYLISTS_UNAVAILABLE, 503);
     return fail("Couldn't load playlists.", 500);
+  }
+  let lists = loaded.data ?? [];
+  let page: ReturnType<typeof pageOf<ListRow>> | null = null;
+  if (query) {
+    // M14 opt-in: search by name, optional sort=name, then one page.
+    const found = lists.filter((l) => matches(l.name, query.q));
+    if (query.sort === "name") found.sort((x, y) => x.name.localeCompare(y.name, undefined, { sensitivity: "base" }));
+    page = pageOf(found, query);
+    lists = page.items;
   }
 
   const ids = (lists ?? []).map((list) => list.id);
@@ -28,13 +42,16 @@ export async function GET(req: Request) {
   const displayNames = new Map<string, string[]>();
   const thumbnailUrl = new Map<string, string>();
   if (ids.length) {
-    const { data: items, error: itemError } = await db()
-      .from("playlist_items")
-      .select("playlist_id, media_id, position")
-      .eq("account_id", admin.accountId)
-      .eq("kind", "draft")
-      .in("playlist_id", ids)
-      .order("position", { ascending: true });
+    const { data: items, error: itemError } = await inChunks<{ playlist_id: string; media_id: string; position: number }>(ids, (chunk) =>
+      fetchAll((from, to) => db()
+        .from("playlist_items")
+        .select("playlist_id, media_id, position")
+        .eq("account_id", admin.accountId)
+        .eq("kind", "draft")
+        .in("playlist_id", chunk)
+        .order("position", { ascending: true })
+        .order("id")
+        .range(from, to)), 50);
     if (itemError) return fail("Couldn't load playlists.", 500);
     const firstMedia = new Map<string, { mediaId: string; position: number }>();
     for (const item of items ?? []) {
@@ -53,12 +70,15 @@ export async function GET(req: Request) {
         if (url) thumbnailUrl.set(playlistId, url);
       }
     }
-    const { data: displays, error: displayError } = await db()
-      .from("displays")
-      .select("name, assigned_playlist_id")
-      .eq("account_id", admin.accountId)
-      .eq("status", "active")
-      .in("assigned_playlist_id", ids);
+    const { data: displays, error: displayError } = await inChunks<{ name: string; assigned_playlist_id: string | null }>(ids, (chunk) =>
+      fetchAll((from, to) => db()
+        .from("displays")
+        .select("name, assigned_playlist_id")
+        .eq("account_id", admin.accountId)
+        .eq("status", "active")
+        .in("assigned_playlist_id", chunk)
+        .order("id")
+        .range(from, to)));
     if (displayError && !isMissingSchema(displayError)) return fail("Couldn't load playlists.", 500);
     for (const display of displays ?? []) {
       const playlistId = display.assigned_playlist_id as string | null;
@@ -70,8 +90,7 @@ export async function GET(req: Request) {
     }
   }
 
-  return json(
-    (lists ?? []).map((list) => ({
+  const out = lists.map((list) => ({
       id: list.id,
       name: list.name,
       defaultDurationMs: list.default_duration_ms,
@@ -83,8 +102,9 @@ export async function GET(req: Request) {
       publishedAt: list.published_at,
       updatedAt: list.updated_at,
       revision: list.revision,
-    })),
-  );
+    }));
+  if (!page) return json(out);
+  return json({ items: out, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
 }
 
 async function draftThumbnails(accountId: string, mediaIds: string[]) {

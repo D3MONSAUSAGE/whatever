@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, formatDuration, formatSize, useApi, type MediaItem } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, formatDuration, formatSize, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
@@ -10,15 +10,66 @@ import { EmptyState, LoadingBlock, PageHeader, formatNameList } from "@/componen
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
+type KindKey = "" | "image" | "video" | "upload" | "menu" | "promo";
+type MediaPage = { items: MediaItem[]; total: number; offset: number; limit: number; nextOffset: number | null };
+export const MEDIA_PAGE_SIZE = 48;
+
+/** M14: the library asks the server for one page at a time (search, filters and sort run server-side). */
+function usePagedMedia(enabled: boolean, query: string, sort: SortKey, kind: KindKey, unused: boolean) {
+  const [debounced, setDebounced] = useState(query);
+  const [page, setPage] = useState<MediaPage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const seq = useRef(0);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+  const url = useCallback((offset: number) => {
+    const p = new URLSearchParams({ limit: String(MEDIA_PAGE_SIZE), offset: String(offset), sort });
+    if (debounced) p.set("q", debounced);
+    if (kind) p.set("kind", kind);
+    if (unused) p.set("unused", "1");
+    return `/api/media?${p}`;
+  }, [debounced, sort, kind, unused]);
+  const reload = useCallback(async () => {
+    if (!enabled) return;
+    const id = ++seq.current;
+    try {
+      const first = await api<MediaPage>(url(0));
+      if (id === seq.current) { setPage(first); setError(null); }
+    } catch (err) {
+      if (id === seq.current) setError((err as Error).message);
+    }
+  }, [enabled, url]);
+  useEffect(() => { void reload(); }, [reload]);
+  const loadMore = useCallback(async () => {
+    if (!page || page.nextOffset === null) return;
+    setMore(true);
+    const id = seq.current;
+    try {
+      const next = await api<MediaPage>(url(page.nextOffset));
+      if (id === seq.current) setPage({ ...next, items: [...page.items, ...next.items.filter((n) => !page.items.some((o) => o.id === n.id))] });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setMore(false);
+    }
+  }, [page, url]);
+  return { page, error, reload, loadMore, loadingMore: more, filtering: debounced !== "" || kind !== "" || unused };
+}
+
 export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
-  const live = useApi<MediaItem[]>(fixture ? null : "/api/media");
-  const data = fixture ?? live.data;
-  const error = fixture ? null : live.error;
-  const reload = live.reload;
   const uploads = useUploads();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [kind, setKind] = useState<KindKey>("");
+  const [unused, setUnused] = useState(false);
+  const live = usePagedMedia(!fixture, query, sort, kind, unused);
+  const data = fixture ?? live.page?.items ?? null;
+  const error = fixture ? null : live.error;
+  const reload = live.reload;
   const toast = useToast();
   const confirm = useConfirm();
   const wasBusy = useRef(false);
@@ -29,7 +80,8 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
     wasBusy.current = uploads.busy;
   }, [uploads.busy, fixture, reload]);
 
-  const visible = useMemo(() => sortMedia(data ?? [], query, sort), [data, query, sort]);
+  const visible = useMemo(() => (fixture ? sortMedia(fixture, query, sort) : data ?? []), [fixture, data, query, sort]);
+  const libraryEmpty = fixture ? fixture.length === 0 : live.page !== null && live.page.total === 0 && !live.filtering;
 
   async function remove(item: MediaItem) {
     const used = item.usedIn ?? [];
@@ -80,14 +132,24 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
 
       {!data ? (
         <LoadingBlock label={error || "Loading…"} />
-      ) : data.length === 0 ? (
+      ) : libraryEmpty ? (
         <EmptyState title="No images yet">
           Upload a JPG, PNG, or WebP, or an H.264 MP4. Menus exported from Canva at 1920 × 1080 work well.
         </EmptyState>
       ) : (
         <>
-          <div className="grid gap-3 mb-4 lg:grid-cols-[minmax(0,1fr)_11rem_auto] lg:items-center">
-            <input className="field" aria-label="Search media" placeholder="Search files" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <div className="grid gap-3 mb-4 lg:grid-cols-[minmax(0,1fr)_11rem_11rem_auto_auto] lg:items-center">
+            <input className="field" type="search" aria-label="Search media" placeholder="Search files" value={query} onChange={(event) => setQuery(event.target.value)} />
+            {!fixture ? (
+              <select className="field" aria-label="Show" value={kind} onChange={(event) => setKind(event.target.value as KindKey)}>
+                <option value="">All files</option>
+                <option value="image">Images</option>
+                <option value="video">Videos</option>
+                <option value="upload">My uploads</option>
+                <option value="menu">Menu boards</option>
+                <option value="promo">Promos</option>
+              </select>
+            ) : null}
             <select className="field" aria-label="Sort media" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
@@ -95,13 +157,18 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
               <option value="size">Size</option>
               <option value="duration">Duration</option>
             </select>
+            {!fixture ? (
+              <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                <input type="checkbox" checked={unused} onChange={(event) => setUnused(event.target.checked)} /> Not in a playlist
+              </label>
+            ) : null}
             <div className="flex gap-2" role="group" aria-label="Layout">
               <button type="button" className={`btn ${view === "grid" ? "btn-pressed" : "btn-quiet"}`} aria-pressed={view === "grid"} onClick={() => setView("grid")}>Grid</button>
               <button type="button" className={`btn ${view === "list" ? "btn-pressed" : "btn-quiet"}`} aria-pressed={view === "list"} onClick={() => setView("list")}>List</button>
             </div>
           </div>
           {visible.length === 0 ? (
-            <EmptyState title="No files match that search">Try another name, or clear the search.</EmptyState>
+            <EmptyState title="No files match that search">Try another name, or clear the search and filters.</EmptyState>
           ) : view === "grid" ? (
             <ul data-media-library="" className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {visible.map((item) => (
@@ -129,6 +196,16 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
               ))}
             </ul>
           )}
+          {!fixture && live.page ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted" data-testid="media-count">
+              <span>Showing {visible.length} of {live.page.total} file{live.page.total === 1 ? "" : "s"}</span>
+              {live.page.nextOffset !== null ? (
+                <button type="button" className="btn btn-quiet" disabled={live.loadingMore} onClick={() => void live.loadMore()}>
+                  {live.loadingMore ? "Loading…" : "Load more"}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </>
       )}
       {toast.node}

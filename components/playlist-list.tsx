@@ -14,6 +14,7 @@ export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
   const error = fixture ? null : live.error;
   const reload = fixture ? async () => {} : live.reload;
   const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const router = useRouter();
@@ -102,15 +103,20 @@ export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
       ) : data.length === 0 ? (
         <EmptyState title="No playlists yet">Create one, add images or video from your library, then publish it to a screen.</EmptyState>
       ) : (
+        <>
+        {data.length >= SEARCH_FROM ? (
+          <input className="field mb-3" type="search" aria-label="Search playlists" placeholder="Search playlists" value={search} onChange={(e) => setSearch(e.target.value)} />
+        ) : null}
+        {byName(data, search).length === 0 ? <EmptyState title="No playlists match that search">Try another name, or clear the search.</EmptyState> : null}
         <ul className="grid gap-3">
-          {data.map((playlist) => {
+          {byName(data, search).map((playlist) => {
             const screens = playlist.displayNames?.length
               ? playlist.displayNames.join(", ")
               : playlist.displayCount
                 ? `${playlist.displayCount} ${playlist.displayCount === 1 ? "screen" : "screens"}`
                 : "";
             return (
-              <li key={playlist.id} className="card p-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+              <li key={playlist.id} className="card p-4 flex flex-col gap-3 lg:flex-row lg:items-center min-w-0">
                 <Link href={`/dashboard/playlists/${playlist.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                   <span className="block w-24 shrink-0 aspect-video bg-black rounded-md overflow-hidden">
                     {playlist.thumbnailUrl ? <img src={playlist.thumbnailUrl} alt="" className="size-full object-contain" /> : null}
@@ -133,6 +139,7 @@ export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
             );
           })}
         </ul>
+        </>
       )}
       {toast.node}
       {confirm.node}
@@ -155,4 +162,11 @@ function statusClass(playlist: PlaylistSummary) {
   if (label === "Published") return "badge badge-live";
   if (label === "Unpublished changes") return "badge badge-warn";
   return "badge";
+}
+
+/** M14: lists with this many entries get a search box. */
+export const SEARCH_FROM = 6;
+export function byName<T extends { name: string }>(items: T[], search: string) {
+  const q = search.trim().toLowerCase();
+  return q ? items.filter((item) => item.name.toLowerCase().includes(q)) : items;
 }
