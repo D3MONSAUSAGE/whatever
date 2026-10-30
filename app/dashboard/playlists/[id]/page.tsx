@@ -5,7 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi, type MediaItem, type PlaylistDetail } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
-import { PageHeader } from "@/components/ui";
+import { LimitNote, PageHeader, atLimit } from "@/components/ui";
+
+/** Same as PLAYLIST_MAX_ITEMS on the server. */
+const MAX_SLIDES = 40;
 import { IconList } from "@/components/icons";
 
 type Slide = {
@@ -227,9 +230,10 @@ export default function PlaylistEditor() {
               <h2 className="font-semibold">Slides</h2>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn btn-quiet" disabled={!slides.length} onClick={() => setPreviewing(true)}>Full preview</button>
-                <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>Add images</button>
+                <button type="button" className="btn btn-primary" disabled={atLimit(slides.length, MAX_SLIDES)} onClick={() => setAdding(true)}>Add images</button>
               </div>
             </div>
+            <div className="mb-3"><LimitNote count={slides.length} max={MAX_SLIDES} noun="slides in a playlist" /></div>
             <p className="text-sm text-muted mb-3">Drag a slide to reorder. On a phone, use Up and Down.</p>
             {slides.length === 0 ? (
               <p className="text-sm text-muted">Nothing in this playlist yet. Add images or videos from your library.</p>
@@ -340,7 +344,9 @@ export default function PlaylistEditor() {
           existing={slides}
           onClose={() => setAdding(false)}
           onAdd={(picked) => {
-            setSlides(slides.concat(picked));
+            const room = MAX_SLIDES - slides.length;
+            if (picked.length > room) toast.show(`A playlist holds up to ${MAX_SLIDES} slides, so only the first ${Math.max(0, room)} were added.`);
+            setSlides(slides.concat(picked.slice(0, Math.max(0, room))));
             setAdding(false);
           }}
         />

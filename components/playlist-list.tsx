@@ -6,7 +6,7 @@ import { api, useApi, type PlaylistDetail, type PlaylistSummary } from "@/lib/ap
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconList } from "@/components/icons";
-import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 
 export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
   const live = useApi<PlaylistSummary[]>(fixture ? null : "/api/playlists");
@@ -99,7 +99,7 @@ export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
       </form>
 
       {!data ? (
-        <LoadingBlock label={error || "Loading…"} />
+        <LoadState error={error} label="Loading…" />
       ) : data.length === 0 ? (
         <EmptyState title="No playlists yet">Create one, add images or video from your library, then publish it to a screen.</EmptyState>
       ) : (

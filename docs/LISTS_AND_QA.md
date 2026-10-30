@@ -19,3 +19,8 @@ Media pages sign URLs only for the returned page. No database migration.
 Sign-up, pair a simulated TV, upload, search/filter, publish a playlist (TV plays it), menu board, dated promo following the menu, times of day, offline alert, analytics, then every dashboard page at 390 px wide: heading visible, no sideways scroll, every visible control labelled, no page errors. Finally deletes the promo and menu in the UI and checks nothing is left for the account after cleanup.
 
 Found and fixed by the pass: Delete on menu boards and promos did nothing (confirm dialog never rendered); the Playlists page scrolled sideways on phones with long playlist names.
+
+# M15: limit messages and loading states (web dashboard only, no API change)
+- `LimitNote` (components/ui.tsx): at 80% of an account cap it shows "N of MAX used"; at the cap it says "You've reached the limit of MAX … Delete one to add another." and the add button is disabled. Used for locations (50), screen groups (100), schedules (200), menu boards (100), promos (100) and slides in a playlist (40; extra picks are trimmed with a toast). The server limits and their error messages are unchanged.
+- `LoadState`: every page shows one labelled loading status (`role="status"`), and a failed load becomes an error (`role="alert"`) with "Try again" instead of an endless "Loading…".
+- Test: tests/e2e/polish.spec.ts.

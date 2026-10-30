@@ -6,7 +6,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
-import { EmptyState, LoadingBlock, PageHeader, formatNameList } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
@@ -131,7 +131,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
       </PageHeader>
 
       {!data ? (
-        <LoadingBlock label={error || "Loading…"} />
+        <LoadState error={error} label="Loading…" />
       ) : libraryEmpty ? (
         <EmptyState title="No images yet">
           Upload a JPG, PNG, or WebP, or an H.264 MP4. Menus exported from Canva at 1920 × 1080 work well.

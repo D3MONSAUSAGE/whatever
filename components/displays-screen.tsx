@@ -5,7 +5,7 @@ import { ONLINE_HINT, OfflineAlert, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
-import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { byName, SEARCH_FROM } from "@/components/playlist-list";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
@@ -64,7 +64,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
-        <div className="mt-8"><LoadingBlock label={displays.error || "Loading…"} /></div>
+        <div className="mt-8"><LoadState error={displays.error} label="Loading…" /></div>
       ) : displays.data.length === 0 ? (
         <div className="mt-8"><EmptyState title="No screens yet">Open the TV address on a smart TV or browser, then type the code it shows into the box above.</EmptyState></div>
       ) : (
@@ -205,7 +205,7 @@ function Picker({ display, onClose, onPublished, onError }: {
           Tap an image. The TV updates within about 10 seconds.
           {display.playlist ? " This replaces the playlist on this TV." : ""}
         </p>
-        {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : images.length === 0 ? (
+        {!media.data ? <LoadState error={media.error} /> : images.length === 0 ? (
           <p className="text-muted">Upload an image in Media first. Videos play from a playlist.</p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -282,7 +282,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         <p className="text-sm text-muted mb-4">
           This publishes the playlist&apos;s saved draft to every screen you check. Screens already playing this playlist start checked. Unchecking one takes the playlist off that screen.
         </p>
-        {!playlists.data ? <p className="text-muted">{playlists.error || "Loading…"}</p> : playlists.data.length === 0 ? (
+        {!playlists.data ? <LoadState error={playlists.error} /> : playlists.data.length === 0 ? (
           <p className="text-muted">Create a playlist first.</p>
         ) : (
           <>

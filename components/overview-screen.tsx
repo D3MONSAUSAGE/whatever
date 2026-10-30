@@ -5,7 +5,7 @@ import { useApi, type OnboardingState, type DisplayItem, type PlaylistSummary, t
 import { LogoMark, WaveBackdrop } from "@/components/brand";
 import { IconCalendar, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
 import { ONLINE_HINT, OfflineAlert, offlineScreens } from "@/components/tv";
-import { LoadingBlock, Stat } from "@/components/ui";
+import { LoadState, Stat } from "@/components/ui";
 import { SetupTracker } from "@/components/setup-tracker";
 
 export type OverviewFixture = {
@@ -50,7 +50,7 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
       </div>
 
       {!ready || !displayData || mediaCount == null ? (
-        <LoadingBlock label={displaysLive.error || mediaLive.error || "Loading…"} />
+        <LoadState error={displaysLive.error || mediaLive.error} label="Loading…" />
       ) : (
         <OverviewBody
           displayData={displayData}
