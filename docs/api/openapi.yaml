@@ -2428,6 +2428,8 @@ components:
         playlistName: { type: string }
         target: { type: string, enum: [display, group] }
         priority: { type: integer }
+        managedBy: { type: string, enum: [promo], nullable: true, description: "M14. promo = created and kept in sync by a dated promo (edit the promo, not the rule). Derived, always present." }
+        promoId: { type: string, format: uuid, nullable: true, description: M14. The managing promo, else null. }
     LocationRef:
       type: object
       required: [id, name, timezone]
@@ -2475,6 +2477,8 @@ components:
         priority: { type: integer, minimum: -1000, maximum: 1000 }
         enabled: { type: boolean }
         updatedAt: { type: string, format: date-time }
+        managedBy: { type: string, enum: [promo], nullable: true, description: "M14. promo = created and kept in sync by a dated promo (edit the promo, not the rule). Derived, always present." }
+        promoId: { type: string, format: uuid, nullable: true, description: M14. The managing promo, else null. }
     ScheduleInput:
       type: object
       properties:

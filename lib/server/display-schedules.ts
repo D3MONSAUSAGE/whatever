@@ -1,5 +1,6 @@
 import { db } from "./supabase";
 import { isMissingSchema } from "./schema";
+import { ownerFields, promoByPlaylist } from "./schedule-owner";
 import { compareRules, isValidTimeZone, nextTransition, ruleFromRow, ruleMatches, scheduleNow, type ScheduleRule } from "./schedule";
 
 export type ScheduleSummary = {
@@ -9,6 +10,8 @@ export type ScheduleSummary = {
   playlistName: string;
   target: "display" | "group";
   priority: number;
+  managedBy: "promo" | null;
+  promoId: string | null;
 };
 
 export type DisplaySchedules = {
@@ -56,6 +59,8 @@ export async function loadDisplaySchedules(
   if (lists.error && !isMissingSchema(lists.error)) return null;
   for (const list of lists.data ?? []) names.set(String(list.id), String(list.name));
 
+  const owners = await promoByPlaylist(accountId);
+  if (!owners) return null;
   const now = scheduleNow();
   const summary = (rule: ScheduleRule): ScheduleSummary => ({
     id: rule.id,
@@ -64,6 +69,7 @@ export async function loadDisplaySchedules(
     playlistName: names.get(rule.playlistId) ?? "",
     target: rule.target,
     priority: rule.priority,
+    ...ownerFields(owners, rule.playlistId),
   });
   for (const display of displays) {
     const groups = groupsByDisplay.get(display.id) ?? new Set<string>();
