@@ -255,6 +255,88 @@ paths:
                 nextBefore: null
         "400": { description: Bad before date }
 
+  /api/alerts:
+    get:
+      tags: [account]
+      summary: Offline/recovery alerts feed, newest first (M9)
+      operationId: getAlerts
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: before, in: query, schema: { type: string, format: date-time } }
+        - { name: unread, in: query, schema: { type: string, enum: ["1", "true"] } }
+      description: |
+        `unread` in the body is the account's total unread count (independent
+        of paging). Page with `before=nextBefore`. Kept 90 days.
+        `kind` is screen.offline | screen.recovered. `email` is off | pending | sent | skipped | failed.
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema: { type: object }
+              example:
+                alerts: [{ id: "uuid", kind: screen.offline, screenId: "uuid", screenName: "Bar TV", at: "2026-10-31T10:12:00Z", offlineSince: "2026-10-31T10:01:30Z", offlineSeconds: null, read: false, email: skipped }]
+                unread: 1
+                nextBefore: null
+        "400": { description: Bad before date }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { description: Migration 0006 not applied }
+
+  /api/alerts/read:
+    post:
+      tags: [account]
+      summary: Mark alerts read (M9)
+      operationId: markAlertsRead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+                all: { type: boolean, enum: [true] }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              example: { ok: true, marked: 2 }
+        "400": { description: Neither ids nor all }
+
+  /api/alerts/preferences:
+    get:
+      tags: [account]
+      summary: Alert settings (M9)
+      operationId: getAlertPreferences
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertPreferences" }
+    patch:
+      tags: [account]
+      summary: Change alert settings (M9)
+      operationId: patchAlertPreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                thresholdMinutes: { type: integer, minimum: 2, maximum: 1440 }
+                emailEnabled: { type: boolean }
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertPreferences" }
+        "400": { description: Bad value or nothing to update }
+
   /api/overview:
     get:
       tags: [account]
@@ -1829,6 +1911,22 @@ components:
             group: { value: { error: "Too many screen groups. Wait 15 minutes, then try again." } }
             schedule: { value: { error: "Too many schedules. Wait 15 minutes, then try again." } }
   schemas:
+    AlertPreferences:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        thresholdMinutes: { type: integer }
+        email:
+          type: object
+          properties:
+            enabled: { type: boolean, description: The owner wants email }
+            available: { type: boolean, description: Email delivery is configured on the server }
+            address: { type: string }
+        limits:
+          type: object
+          properties:
+            minMinutes: { type: integer }
+            maxMinutes: { type: integer }
     Onboarding:
       type: object
       required: [steps, completed, total, nextStep, dismissed, finished, show]

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AlertSettings } from "@/components/alerts";
 import { api, useApi } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase-browser";
 import { IconGear } from "@/components/icons";
@@ -115,6 +116,8 @@ export default function Settings() {
         </div>
 
         <BusinessForm current={me.data?.accountName ?? null} onSaved={() => me.reload()} />
+
+        <AlertSettings />
 
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
           <h2 id="name-heading" className="font-semibold">Display name</h2>
