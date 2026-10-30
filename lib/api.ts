@@ -205,3 +205,15 @@ export type ScreenAnalytics = {
   };
 };
 export type ActivityEvent = { at: string; kind: string; subjectId: string | null; subjectName: string | null; detail: Record<string, unknown> };
+
+export type AlertKind = "screen.offline" | "screen.recovered";
+export type AlertItem = {
+  id: string; kind: AlertKind; screenId: string | null; screenName: string; at: string;
+  offlineSince: string; offlineSeconds: number | null; read: boolean; email: string;
+};
+export type AlertFeed = { alerts: AlertItem[]; unread: number; nextBefore: string | null };
+export type AlertPrefs = {
+  enabled: boolean; thresholdMinutes: number;
+  email: { enabled: boolean; available: boolean; address: string };
+  limits: { minMinutes: number; maxMinutes: number };
+};

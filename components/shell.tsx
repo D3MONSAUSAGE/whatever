@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase-browser";
 import { ToastProvider } from "@/components/toast";
 import { UploadProgress, UploadsProvider } from "@/components/uploads";
 import { BrandLockup } from "@/components/brand";
+import { AlertsBanner } from "@/components/alerts";
 import { isRecoveryUrl } from "@/components/auth-frame";
 import { IconCalendar, IconChart, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
 
@@ -72,6 +73,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
         </header>
         <main className="px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 max-w-6xl">
           <UploadProgress />
+          {preview ? null : <AlertsBanner />}
           {children}
         </main>
       </div>
