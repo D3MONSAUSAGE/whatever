@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, authToken, timeAgo, useApi, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
-import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
 import { artImages, type MenuBoard } from "@/components/menu-boards";
 import { PROMO_LIMITS, PROMO_TEMPLATES, samplePromo, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
@@ -96,7 +96,7 @@ export function PromoSlides() {
         icon={<IconImage />}
         lede="Make a happy hour, deal, or today's special slide in your brand colours, then add it to a menu board with one tap. Set dates and it shows up and comes down on its own."
       >
-        {!draft ? <button className="btn btn-primary" onClick={() => startNew()}>New promo</button> : null}
+        {!draft ? <button className="btn btn-primary" onClick={() => startNew()} disabled={atLimit(promos.data?.promos.length, 100)}>New promo</button> : null}
         <Link href="/dashboard/media/menus" className="btn btn-quiet">Menu boards</Link>
       </PageHeader>
 
@@ -110,8 +110,9 @@ export function PromoSlides() {
         />
       ) : null}
 
-      {promos.error ? <p className="text-danger" role="alert">{promos.error}</p> : null}
-      {!promos.data && !promos.error ? <LoadingBlock /> : null}
+      <LimitNote count={promos.data?.promos.length} max={100} noun="promos" />
+      {promos.data && promos.error ? <p className="text-danger" role="alert">{promos.error}</p> : null}
+      {!promos.data ? <LoadState error={promos.error} /> : null}
       {promos.data && !promos.data.available ? (
         <EmptyState title="Promos are on their way">They switch on with the next update.</EmptyState>
       ) : null}

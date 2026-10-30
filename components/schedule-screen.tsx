@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconCalendar } from "@/components/icons";
-import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
 
 const DAYS: { value: number; label: string }[] = [
   { value: 1, label: "Mon" },
@@ -244,9 +244,10 @@ function Locations({
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
         </label>
         <TimezoneField value={timezone} onChange={setTimezone} />
-        <button type="submit" className="btn btn-primary w-fit">Add location</button>
+        <LimitNote count={locations?.length} max={50} noun="locations" />
+        <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(locations?.length, 50)}>Add location</button>
       </form>
-      {!locations ? <LoadingBlock label={error || "Loading locations…"} /> : locations.length === 0 ? (
+      {!locations ? <LoadState error={error} label="Loading locations…" /> : locations.length === 0 ? (
         <EmptyState title="No locations yet">Each account starts with Main location. Add another for a second timezone.</EmptyState>
       ) : (
         <ul className="grid gap-3">
@@ -312,9 +313,10 @@ function Groups({
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
         </label>
         <DisplayChecks displays={displays} picked={picked} onChange={setPicked} legend="Screens in this new group" />
-        <button type="submit" className="btn btn-primary w-fit">Create group</button>
+        <LimitNote count={groups?.length} max={100} noun="screen groups" />
+        <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(groups?.length, 100)}>Create group</button>
       </form>
-      {!groups ? <LoadingBlock label={error || "Loading groups…"} /> : groups.length === 0 ? (
+      {!groups ? <LoadState error={error} label="Loading groups…" /> : groups.length === 0 ? (
         <EmptyState title="No screen groups yet">A group is a named set of screens a schedule can target.</EmptyState>
       ) : (
         <ul className="grid gap-3">
@@ -502,9 +504,10 @@ function Rules({
           <input className="field mt-1" type="number" min={-1000} max={1000} step={1} value={priority} onChange={(event) => setPriority(event.target.value)} />
         </label>
         <p className="text-xs text-muted">Higher priority wins between two rules of the same kind. A screen rule still beats a group rule.</p>
-        <button type="submit" className="btn btn-primary w-fit">Add schedule</button>
+        <LimitNote count={schedules?.length} max={200} noun="schedules" />
+        <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(schedules?.length, 200)}>Add schedule</button>
       </form>
-      {!schedules ? <LoadingBlock label={error || "Loading schedules…"} /> : schedules.length === 0 ? (
+      {!schedules ? <LoadState error={error} label="Loading schedules…" /> : schedules.length === 0 ? (
         <EmptyState title="No schedules yet">The saved assignment keeps playing until a rule is active.</EmptyState>
       ) : (
         <ul className="grid gap-3">
@@ -548,7 +551,7 @@ function Preview({ displays, fixture }: { displays: DisplayItem[]; fixture: Sche
         </select>
       </label>
       {!displayId ? <p className="text-sm text-muted">Choose a screen to see what plays.</p> : null}
-      {displayId && !preview ? <LoadingBlock label={live.error || "Loading the timeline…"} /> : null}
+      {displayId && !preview ? <LoadState error={live.error} label="Loading the timeline…" /> : null}
       {preview ? (
         <div className="grid gap-4">
           <p className="text-sm text-muted">{chosen?.name ?? "Screen"} · {preview.timezone}. {labelForDefault(preview)}. {preview.resolution}</p>

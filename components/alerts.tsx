@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, useApi, type AlertFeed, type AlertItem, type AlertPrefs } from "@/lib/api";
-import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { IconTv } from "@/components/icons";
 
 function when(iso: string) {
@@ -81,7 +81,7 @@ export function AlertsScreen() {
         <Link href="/dashboard/settings#alerts" className="btn btn-quiet">Alert settings</Link>
         {first.data && first.data.unread > 0 ? <button type="button" className="btn btn-quiet" onClick={markAll}>Mark all as read</button> : null}
       </div>
-      {!first.data ? <LoadingBlock label={first.error || "Loading…"} /> : alerts.length === 0 ? (
+      {!first.data ? <LoadState error={first.error} label="Loading…" /> : alerts.length === 0 ? (
         <EmptyState title="No alerts">When a screen goes offline for longer than your alert time, it shows up here.</EmptyState>
       ) : (
         <ul className="card divide-y divide-line" data-testid="alerts-list">
@@ -108,7 +108,7 @@ export function AlertSettings() {
   const [minutes, setMinutes] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  if (!prefs.data) return <div id="alerts" className="card p-4"><p className="text-sm text-muted">{prefs.error || "Loading alert settings…"}</p></div>;
+  if (!prefs.data) return <div id="alerts" className="card p-4"><p role={prefs.error ? "alert" : "status"} className="text-sm text-muted">{prefs.error || "Loading alert settings…"}</p></div>;
   const p = prefs.data;
   async function save(patch: Record<string, unknown>) {
     setBusy(true); setMsg(null);

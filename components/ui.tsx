@@ -67,7 +67,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function LoadingBlock({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="grid gap-3" aria-busy="true">
+    <div className="grid gap-3" role="status" aria-live="polite" aria-busy="true" data-testid="loading">
       <p className="text-muted">{label}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="skeleton h-36" />
@@ -81,4 +81,33 @@ export function formatNameList(names: string[]) {
   if (names.length <= 1) return names[0] ?? "";
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+/** M15: one loading/error pattern for every page. An error is never shown as "loading". */
+export function LoadState({ error, label = "Loading…" }: { error?: string | null; label?: string }) {
+  if (!error) return <LoadingBlock label={label} />;
+  return (
+    <div role="alert" data-testid="load-error" className="card p-4 grid gap-2 border-danger/40">
+      <p className="text-danger font-medium">{error}</p>
+      <p className="text-sm text-muted">Check your connection, then try again.</p>
+      <button type="button" className="btn btn-quiet w-fit" onClick={() => window.location.reload()}>Try again</button>
+    </div>
+  );
+}
+
+/** M15: warns near an account limit (80%+) and explains what to do once it is reached. */
+export function atLimit(count: number | null | undefined, max: number) {
+  return count != null && count >= max;
+}
+
+export function LimitNote({ count, max, noun }: { count: number | null | undefined; max: number; noun: string }) {
+  if (count == null || count < Math.ceil(max * 0.8)) return null;
+  const full = count >= max;
+  return (
+    <p role="status" data-testid="limit-note" className={`text-sm rounded-xl px-3 py-2 ${full ? "bg-amber-50 text-amber-900" : "text-muted"}`}>
+      {full
+        ? `You've reached the limit of ${max} ${noun}. Delete one to add another.`
+        : `${count} of ${max} ${noun} used.`}
+    </p>
+  );
 }

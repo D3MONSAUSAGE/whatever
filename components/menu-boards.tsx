@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, authToken, timeAgo, useApi, type DisplayItem, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
-import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
 import { DEFAULT_BRAND, MENU_LIMITS, MENU_TEMPLATES, normalizeHex, sampleMenu, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 
@@ -61,7 +61,7 @@ export function MenuBoards() {
         icon={<IconImage />}
         lede="Pick a template, type your items and prices, and Seemple makes a full-screen slide. Edit it any time and every screen showing it updates."
       >
-        {!draft ? <button className="btn btn-primary" onClick={startNew}>New menu board</button> : null}
+        {!draft ? <button className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button> : null}
         <Link href="/dashboard/media" className="btn btn-quiet">Back to media</Link>
         <Link href="/dashboard/schedule#day-parts" className="btn btn-quiet">Breakfast, lunch &amp; dinner times</Link>
         <Link href="/dashboard/media/promos" className="btn btn-quiet">Promos &amp; specials</Link>
@@ -80,8 +80,9 @@ export function MenuBoards() {
         />
       ) : null}
 
-      {menus.error ? <p className="text-danger" role="alert">{menus.error}</p> : null}
-      {!menus.data && !menus.error ? <LoadingBlock /> : null}
+      <LimitNote count={menus.data?.menus.length} max={100} noun="menu boards" />
+      {menus.data && menus.error ? <p className="text-danger" role="alert">{menus.error}</p> : null}
+      {!menus.data ? <LoadState error={menus.error} /> : null}
       {menus.data && !menus.data.available ? (
         <EmptyState title="Menu boards are on their way">They switch on with the next update. Your other media works as usual.</EmptyState>
       ) : null}

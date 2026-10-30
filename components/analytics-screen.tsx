@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api, useApi, type ActivityEvent, type AnalyticsSummary, type ScreenAnalytics, type UptimeReport } from "@/lib/api";
 import { IconChart, IconImage, IconList, IconTv, IconCalendar } from "@/components/icons";
-import { EmptyState, LoadingBlock, PageHeader, Stat } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader, Stat } from "@/components/ui";
 
 export type AnalyticsFixture = { summary: AnalyticsSummary; uptime: UptimeReport; activity: ActivityEvent[] };
 
@@ -54,7 +54,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
         lede="How your screens are doing: what's online, how reliable each screen has been, and what changed recently." />
       {fixture ? null : <p className="-mt-2 mb-6 text-sm"><Link href="/dashboard/alerts" className="underline font-semibold">Offline alerts</Link> · <Link href="/dashboard/settings#alerts" className="underline">alert settings</Link></p>}
       {!summary ? (
-        <LoadingBlock label={summaryLive.error || "Loading…"} />
+        <LoadState error={summaryLive.error} label="Loading…" />
       ) : summary.screens.total === 0 ? (
         <EmptyState title="No screens yet">
           Analytics starts once a TV is paired. <Link href="/dashboard/displays" className="underline font-semibold">Pair your first screen</Link>.
@@ -96,7 +96,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
                 ))}
               </div>
             </div>
-            {!uptime ? <LoadingBlock label={uptimeLive.error || "Loading…"} /> : (
+            {!uptime ? <LoadState error={uptimeLive.error} label="Loading…" /> : (
               <ul className="card divide-y divide-line overflow-hidden">
                 {uptime.screens.map((s) => <ScreenRow key={s.id} screen={s} fixture={!!fixture} />)}
               </ul>
@@ -158,7 +158,7 @@ function ScreenRow({ screen, fixture }: { screen: UptimeReport["screens"][number
 function ScreenDetail({ id, fixture }: { id: string; fixture: boolean }) {
   const detail = useApi<ScreenAnalytics>(fixture ? null : `/api/analytics/screens/${id}`);
   if (fixture) return <p className="px-4 pb-4 text-sm text-muted">Details load from your account.</p>;
-  if (!detail.data) return <p className="px-4 pb-4 text-sm text-muted">{detail.error || "Loading…"}</p>;
+  if (!detail.data) return <p role={detail.error ? "alert" : "status"} className="px-4 pb-4 text-sm text-muted">{detail.error || "Loading…"}</p>;
   const d = detail.data;
   const p = d.playback;
   const source = p.expected.source === "schedule" ? "Scheduled" : p.expected.source === "playlist" ? "Published playlist" : p.expected.source === "image" ? "Published image" : "Nothing assigned";
@@ -214,7 +214,7 @@ function Activity({ fixture }: { fixture?: ActivityEvent[] }) {
     <div>
       <h2 className="font-semibold mb-1">Recent activity</h2>
       <p className="text-sm text-muted mb-3">Publishing, screen content, schedules, and uploads. Kept for 90 days.</p>
-      {!fixture && !first.data ? <LoadingBlock label={first.error || "Loading…"} /> : events.length === 0 ? (
+      {!fixture && !first.data ? <LoadState error={first.error} label="Loading…" /> : events.length === 0 ? (
         <EmptyState title="Nothing yet">Changes you make from now on show up here.</EmptyState>
       ) : (
         <ul className="card divide-y divide-line" data-testid="activity">
