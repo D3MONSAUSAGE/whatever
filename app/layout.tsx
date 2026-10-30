@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Seemple",
-  description: "Seemple Technologies. Making life simpler every day.",
-  applicationName: "Seemple",
+  title: "Pekko",
+  description: "Pekko Technologies. Making life simpler every day.",
+  applicationName: "Pekko",
   icons: {
     icon: [
       { url: "/brand/icon-light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },

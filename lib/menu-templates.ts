@@ -8,7 +8,7 @@ export type MenuContent = { title: string; subtitle: string; footer: string; sec
 export const MENU_TEMPLATES: { id: MenuTemplate; name: string; blurb: string; swatch: [string, string] }[] = [
   { id: "classic", name: "Classic night", blurb: "Dark navy with blue accents. Easy to read from across the room.", swatch: ["#0b1220", "#4d94ff"] },
   { id: "fresh", name: "Fresh day", blurb: "Bright and clean with a blue header. Great for breakfast and cafés.", swatch: ["#f6f9fe", "#0066ff"] },
-  { id: "bold", name: "Bold blue", blurb: "Full Seemple blue with warm price tags that pop.", swatch: ["#0066ff", "#ffd34d"] },
+  { id: "bold", name: "Bold blue", blurb: "Full Pekko blue with warm price tags that pop.", swatch: ["#0066ff", "#ffd34d"] },
 ];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

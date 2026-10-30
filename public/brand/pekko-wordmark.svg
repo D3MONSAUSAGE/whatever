@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 96" role="img" aria-label="Pekko Technologies">
+  <defs>
+    <linearGradient id="pekko-mark" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00C2FF"/>
+      <stop offset="100%" stop-color="#0066FF"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(8 16)">
+    <path d="M47 17.5C35.2 9.2 18.2 12.4 16.6 24.2C15.2 34.2 27.4 39.2 42.6 35.4" fill="none" stroke="url(#pekko-mark)" stroke-width="9" stroke-linecap="round"/>
+    <path d="M22.2 33.2C36.4 28.2 51.6 34.6 48.4 46.8C45.2 59 27.6 61.6 17.2 51.4" fill="none" stroke="url(#pekko-mark)" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif" fill="#0b1220">
+    <text x="88" y="54" font-size="44" font-weight="800" letter-spacing="-1">Pekko<tspan font-size="16" font-weight="700" dy="-20" dx="3" letter-spacing="0">TM</tspan></text>
+    <text x="90" y="76" font-size="12.5" font-weight="600" letter-spacing="4.4">TECHNOLOGIES</text>
+  </g>
+</svg>

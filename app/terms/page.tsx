@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
-export const metadata: Metadata = { title: "Terms of Service · Seemple" };
+export const metadata: Metadata = { title: "Terms of Service · Pekko" };
 
 export default function Terms() {
   return (
     <LegalPage title="Terms of Service" updated="October 29, 2026">
-      <p>These terms cover your use of Seemple, a service from Seemple Technologies (&quot;we&quot;) for showing images, videos and playlists on screens (&quot;the Service&quot;). By creating an account you agree to them.</p>
+      <p>These terms cover your use of Pekko, a service from Pekko Technologies (&quot;we&quot;) for showing images, videos and playlists on screens (&quot;the Service&quot;). By creating an account you agree to them.</p>
       <h2 className="font-semibold text-lg">Your account</h2>
       <p>You must give accurate information and keep your password safe. You are responsible for what happens under your account, including the screens you pair to it. Tell us right away if you think someone else has access.</p>
       <h2 className="font-semibold text-lg">Your content</h2>

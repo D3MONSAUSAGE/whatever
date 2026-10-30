@@ -43,7 +43,7 @@ export function Wordmark({
   return (
     <span className={`inline-flex flex-col leading-none text-ink ${align === "center" ? "items-center" : "items-start"}`}>
       <span className={`font-extrabold tracking-tight ${title}`}>
-        Seemple
+        Pekko
         <span className="ml-0.5 align-super text-[0.42em] font-bold tracking-normal" aria-hidden="true">TM</span>
       </span>
       <span className={`mt-1 font-semibold uppercase text-ink ${sub}`}>Technologies</span>

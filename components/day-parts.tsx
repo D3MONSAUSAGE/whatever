@@ -46,7 +46,7 @@ export function DayPartSetup({ displays, groups, playlists, preview, onSubmit }:
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Breakfast, lunch &amp; dinner</h2>
-          <p className="text-sm text-muted max-w-xl">Pick what plays at each time of day. Seemple adds one schedule rule per part, every day, in the screen's local time.</p>
+          <p className="text-sm text-muted max-w-xl">Pick what plays at each time of day. Pekko adds one schedule rule per part, every day, in the screen's local time.</p>
         </div>
         {!open ? <button className="btn btn-primary" onClick={() => setOpen(true)}>Set up times of day</button> : null}
       </div>

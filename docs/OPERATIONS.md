@@ -1,4 +1,4 @@
-# Seemple operations: monitoring, alerts, security, backups (Milestone A)
+# Pekko operations: monitoring, alerts, security, backups (Milestone A)
 
 ## 1. Error monitoring (free, live)
 - **Server errors:** `instrumentation.ts` writes one JSON line per unhandled error to the Vercel runtime logs: `{"level":"error","event":"request_error",…}`. It records the method, path (no query string), route, digest and a 300-character message. Headers, cookies and bodies are never logged.

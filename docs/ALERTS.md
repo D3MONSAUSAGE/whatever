@@ -18,7 +18,7 @@ Pluggable provider in `lib/server/email.ts`. Nothing is sent until these Vercel 
 |---|---|
 | `EMAIL_PROVIDER` | `resend` |
 | `RESEND_API_KEY` | from the Resend dashboard |
-| `ALERT_EMAIL_FROM` | `Seemple <alerts@your-verified-domain>` |
+| `ALERT_EMAIL_FROM` | `Pekko <alerts@your-verified-domain>` |
 
 - Emails go to the account owner's sign-in email when the account has email alerts on (default on).
 - While no provider is configured, pending emails are marked `skipped`, so switching email on later never sends a backlog. Alerts older than 6 h are never emailed.

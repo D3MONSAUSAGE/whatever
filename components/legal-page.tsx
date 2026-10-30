@@ -5,7 +5,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
   return (
     <main className="min-h-dvh bg-paper px-5 py-10">
       <article className="mx-auto max-w-2xl">
-        <Link href="/login" className="inline-flex items-center gap-3 mb-8" aria-label="Seemple home">
+        <Link href="/login" className="inline-flex items-center gap-3 mb-8" aria-label="Pekko home">
           <LogoMark className="size-10" />
           <Wordmark />
         </Link>

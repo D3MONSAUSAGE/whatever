@@ -1,4 +1,4 @@
-# Seemple running costs (Milestone B)
+# Pekko running costs (Milestone B)
 
 Prices checked October 2026. Usage figures are estimates from the code paths below. Check them against the Vercel and Supabase usage pages after one month (see "Measuring usage").
 
@@ -17,20 +17,20 @@ Four TVs on 10 s polling already made ~1.04M calls a month, the Hobby limit. Pla
 
 Assumptions: ~20 ms active CPU and ~150 ms wall time per call at 2 GB memory (Fluid compute), 50 MB of new media per screen per month. Vercel Pro: $20/month with $20 usage credit; invocations $0.60/M, active CPU $0.128/h, memory $0.0106/GB-h. Total ≈ $0.19 per screen per month on Vercel.
 
-### Shared costs (already paid, not caused by Seemple)
+### Shared costs (already paid, not caused by Pekko)
 
 | | 10 | 50 | 100 | 500 screens |
 |---|---|---|---|---|
 | Supabase Pro plan (shared with Teamtegrate) | $25 | $25 | $25 | $25 |
 
-### Seemple-specific costs, per month
+### Pekko-specific costs, per month
 
 | | 10 | 50 | 100 | 500 screens |
 |---|---|---|---|---|
 | Supabase added usage (compute share, storage, egress) | ~$10 | ~$10 | ~$10 | ~$20–30 (larger compute + egress past 250 GB) |
 | Vercel Pro seat (required to sell; Hobby is non-commercial) | $20 | $20 | $20 | $20 |
 | Vercel usage after the $20 credit | $0 (~$2 used) | $0 (~$10) | $0 (~$19) | ~$75 (~$95 used) |
-| **Seemple total** | **~$30** | **~$30** | **~$30** | **~$115–125** |
+| **Pekko total** | **~$30** | **~$30** | **~$30** | **~$115–125** |
 | Same on the old 10 s polling, for comparison | ~$30 | ~$40 | ~$67 | ~$305+ (plus media egress) |
 
 Media egress after B at 500 screens: ~25 GB/month, inside Supabase Pro's 250 GB. Before B, a single video playlist on 500 screens could have reached tens of TB.

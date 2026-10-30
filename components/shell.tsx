@@ -45,7 +45,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">Loading…</div>;
 
   const isActive = (href: string) => (href === "/dashboard" ? path === href : path.startsWith(href));
-  const current = NAV.find((item) => isActive(item.href))?.label ?? "Seemple";
+  const current = NAV.find((item) => isActive(item.href))?.label ?? "Pekko";
 
   return (
     <ToastProvider>
