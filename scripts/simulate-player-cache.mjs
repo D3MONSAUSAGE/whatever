@@ -16,11 +16,14 @@ const cacheStore = new Map(); // key -> { size, url }
 let fetches = [], blobCount = 0, videoBlobBroken = false;
 
 // ---- fake server
-const S = { online: true, token: "tok".repeat(10), version: 0, playlist: null, url: null, mediaId: null, pollMs: null, stateCalls: 0, next: null, revoked: false, sig: 0 };
+const S = { online: true, token: "tok".repeat(10), version: 0, playlist: null, url: null, mediaId: null, pollMs: null, stateCalls: 0, next: null, revoked: false, sig: 0, playing: [] };
 function server(method, url, body, headers) {
   if (!S.online) return [0, ""];
   if (url.startsWith("/api/player/pair")) return [200, { sessionId: "s1", code: "123456", secret: "x".repeat(40) }];
-  if (url.startsWith("/api/player/state") && method === "POST") return [200, { ok: true }];
+  if (url.startsWith("/api/player/state") && method === "POST") {
+    if (body && body.playing) S.playing.push(body.playing.version);
+    return [200, { ok: true }];
+  }
   if (url.startsWith("/api/player/state")) {
     S.stateCalls++;
     if (S.revoked || headers["X-Display-Token"] !== S.token) return [401, { error: "unauthorized" }];
@@ -156,6 +159,8 @@ const imagesBefore = tv.net.images;
 await run(120000);
 check("looping does not re-download images from the network", tv.net.images === imagesBefore && fetches.length === 3, { images: tv.net.images - imagesBefore, fetches: fetches.length });
 
+check("TV confirms playback once for the first playlist, not on every loop or poll", S.playing.length === 1 && S.playing[0] === 1, S.playing);
+
 // 30-minute URL refresh brings new signed URLs: still no new downloads.
 await run(30 * 60000);
 check("signed-URL refresh does not re-download cached files", fetches.length === 3, fetches.length);
@@ -168,6 +173,8 @@ S.playlist = { id: "pl", transition: "none", items: [
 ] };
 await run(60000);
 check("a changed playlist downloads only the new file", fetches.length === 4 && fetches[3].indexOf("/c.jpg") !== -1, fetches.slice(3));
+
+check("TV confirms the new playlist once it is on screen", S.playing.filter((v) => v === 2).length === 1, S.playing);
 
 // Restart the TV while the internet is down: it plays the saved playlist.
 S.online = false;
@@ -183,6 +190,8 @@ check("offline playlist keeps rotating", seen.size >= 2, [...seen]);
 S.online = true;
 await run(40000);
 check("when the internet returns, unchanged content keeps playing without downloads", fetches.length === 4 && screenOf(tv.els) === "media" && tv.els.status.className.indexOf("on") === -1, { fetches: fetches.length });
+
+check("content shown while offline is confirmed after the internet returns", S.playing.filter((v) => v === 2).length === 2, S.playing);
 
 // Schedule switch: the player wakes right after nextTransitionAt, not 30 s later.
 S.next = new Date(Date.now() + 5000).toISOString();

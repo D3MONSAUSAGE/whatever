@@ -40,10 +40,10 @@ test("login, logout, and navigation at desktop, tablet, and mobile", async ({ br
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto("/dashboard");
       await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-      await expect(page.getByText("Upload media")).toBeVisible();
-      await expect(page.getByText("Create a playlist")).toBeVisible();
-      await expect(page.getByText("Assign a screen")).toBeVisible();
-      await expect(page.getByText("Publish", { exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Upload media" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Create a playlist" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Pair a screen" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Publish to your screen" })).toBeVisible();
       const sidebar = page.getByRole("navigation", { name: "Main" });
       const mobile = page.getByRole("navigation", { name: "Mobile" });
       if (viewport.width >= 768) {

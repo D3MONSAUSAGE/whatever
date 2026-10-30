@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useApi, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
+import { useApi, type OnboardingState, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { LogoMark, WaveBackdrop } from "@/components/brand";
 import { IconCalendar, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
 import { ONLINE_HINT, OfflineAlert, offlineScreens } from "@/components/tv";
 import { LoadingBlock, Stat } from "@/components/ui";
+import { SetupTracker } from "@/components/setup-tracker";
 
 export type OverviewFixture = {
   displays: DisplayItem[];
@@ -59,6 +60,7 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
           scheduleCount={scheduleCount}
           scheduleError={fixture ? null : schedulesLive.error}
           origin={origin}
+          fixture={!!fixture}
         />
       )}
     </section>
@@ -73,6 +75,7 @@ function OverviewBody({
   scheduleCount,
   scheduleError,
   origin,
+  fixture,
 }: {
   displayData: DisplayItem[];
   mediaCount: number;
@@ -81,17 +84,12 @@ function OverviewBody({
   scheduleCount: number | null;
   scheduleError: string | null;
   origin: string;
+  fixture: boolean;
 }) {
   const online = displayData.filter((item) => item.online).length;
   const offline = offlineScreens(displayData).length;
   const published = displayData.some((item) => item.media || item.playlist);
-  const steps = [
-    { title: "Upload media", href: "/dashboard/media", done: mediaCount > 0, body: "Add a JPG, PNG, WebP, or an H.264 MP4." },
-    { title: "Create a playlist", href: "/dashboard/playlists", done: (playlistCount ?? 0) > 0, body: "Order the slides. Saving a draft does not change a screen." },
-    { title: "Assign a screen", href: "/dashboard/displays", done: displayData.length > 0, body: "Open the player on the TV and enter the code it shows." },
-    { title: "Publish", href: "/dashboard/playlists", done: published, body: "Send a playlist, or one image, to the screens you choose." },
-  ];
-  const showGuide = steps.some((step) => !step.done);
+  const setupFixture: OnboardingState | undefined = fixture ? fixtureSetup(displayData, mediaCount, playlistCount ?? 0, published) : undefined;
   const recent = displayData.slice().sort((a, b) => {
     const at = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
     const bt = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
@@ -111,26 +109,7 @@ function OverviewBody({
       </div>
       <p className="text-xs text-muted -mt-4 mb-8">{ONLINE_HINT} Screens still waiting to pair are not counted as offline.</p>
 
-      {showGuide && (
-        <ol className="grid gap-3 mb-8">
-          {steps.map((step, index) => (
-            <li key={step.title} className="card p-4 flex flex-col gap-3 sm:flex-row sm:items-start">
-              <span className={`size-8 shrink-0 rounded-full grid place-items-center text-sm font-semibold ${step.done ? "bg-live-strong text-white" : "bg-primary text-white"}`}>{step.done ? "✓" : index + 1}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-semibold">{step.title}</h2>
-                  {step.done ? <span className="badge badge-live">Done</span> : null}
-                </div>
-                <p className="text-sm text-muted mt-1">
-                  {step.body}
-                  {step.title === "Assign a screen" && origin ? <> The TV opens <strong className="break-all text-ink">{origin}/player</strong>.</> : null}
-                </p>
-              </div>
-              <Link href={step.href} className="btn btn-quiet sm:shrink-0">{step.done ? "Open" : "Start"}</Link>
-            </li>
-          ))}
-        </ol>
-      )}
+      <SetupTracker fixture={setupFixture} origin={origin} />
 
       {recent.length > 0 && (
         <div>
@@ -175,4 +154,22 @@ function screenPresence(display: DisplayItem) {
 
 export default function Overview() {
   return <OverviewScreen />;
+}
+
+/** Preview only: the same steps the server derives, worked out from fixture data. */
+function fixtureSetup(displays: DisplayItem[], media: number, playlists: number, published: boolean): OnboardingState {
+  const playing = displays.some((d) => d.online && (d.media || d.playlist));
+  const steps: OnboardingState["steps"] = [
+    { id: "account", done: true },
+    { id: "business", done: displays.length > 0 },
+    { id: "location", done: displays.length > 0 },
+    { id: "screen", done: displays.length > 0 },
+    { id: "media", done: media > 0 },
+    { id: "playlist", done: playlists > 0 },
+    { id: "publish", done: published },
+    { id: "playing", done: playing, confirmed: false },
+  ];
+  const completed = steps.filter((x) => x.done).length;
+  const finished = completed === steps.length;
+  return { steps, completed, total: steps.length, nextStep: steps.find((x) => !x.done)?.id ?? null, dismissed: false, finished, show: !finished, firstLocationId: null };
 }

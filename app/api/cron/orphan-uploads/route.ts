@@ -1,6 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
 import { fail, json } from "@/lib/server/http";
 import { cleanupOrphanUploads } from "@/lib/server/orphan-uploads";
+import { db } from "@/lib/server/supabase";
+import { isMissingSchema } from "@/lib/server/schema";
+
+const ANALYTICS_RETENTION_DAYS = 90;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +18,10 @@ export async function GET(req: Request) {
   const dryRun = dryRunRequested(req);
   const result = await cleanupOrphanUploads({ dryRun });
   if (!result.ok) return fail("Couldn't clean up uploads.", 500);
-  return json(result);
+  // M8 retention: analytics older than 90 days. Dry run only counts.
+  const purge = await db().rpc("analytics_purge", { p_days: ANALYTICS_RETENTION_DAYS, p_dry_run: dryRun });
+  const analytics = purge.error ? (isMissingSchema(purge.error) ? null : { error: true }) : purge.data;
+  return json({ ...result, analytics });
 }
 
 function cronGate(req: Request) {

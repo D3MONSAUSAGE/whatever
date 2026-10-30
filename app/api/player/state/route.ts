@@ -105,6 +105,18 @@ export async function POST(req: Request) {
   const token = req.headers.get("x-display-token") || "";
   if (token.length < 20 || token.length > 200) return fail("unauthorized", 401);
   const body = await readJson(req);
+  // M8 proof of play: { playing: { version } } is sent once after the TV paints new content.
+  if (body.playing && typeof body.playing === "object") {
+    const version = Number((body.playing as { version?: unknown }).version);
+    if (!Number.isSafeInteger(version) || version < 0) return fail("bad version", 400);
+    const played = await db().rpc("report_playing", { p_token_hash: sha256(token), p_version: version });
+    if (played.error) {
+      if (isMissingSchema(played.error)) return json({ ok: true });
+      return fail("unavailable", 503);
+    }
+    if (!played.data) return fail("unauthorized", 401);
+    return json({ ok: true });
+  }
   const message = body.error == null ? "" : String(body.error).slice(0, 180);
   const { data, error } = await db().rpc("report_player_error", {
     p_token_hash: sha256(token),

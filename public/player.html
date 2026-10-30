@@ -66,6 +66,8 @@
   var active = 0, z = 1;
   var mode = '', gen = 0, timer = null;
   var shownVersion = null, loadingVersion = null, preloadImg = null, hasImage = false;
+  // Proof of play: the version actually painted, and the last one the server accepted.
+  var paintedVersion = null, confirmedVersion = null, confirmBusy = false;
   var memToken = null;
   var playlist = null, slideIndex = 0, slideToken = 0, slideTimer = null;
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
@@ -242,6 +244,7 @@
   }
   function clearToken() {
     memToken = null;
+    paintedVersion = null; confirmedVersion = null;
     try { window.localStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
 
@@ -426,6 +429,21 @@
     reportedError = true;
     request('POST', '/api/player/state', { error: String(message).substring(0, 180) }, token, function () {});
   }
+  // Tell the server once per content change that this content is really on screen.
+  function markPainted(v) {
+    paintedVersion = v;
+    confirmPlaying();
+  }
+  function confirmPlaying() {
+    var token = getToken();
+    if (!token || typeof paintedVersion !== 'number' || paintedVersion === confirmedVersion || confirmBusy) return;
+    var v = paintedVersion;
+    confirmBusy = true;
+    request('POST', '/api/player/state', { playing: { version: v } }, token, function (status) {
+      confirmBusy = false;
+      if (status === 200) confirmedVersion = v;
+    });
+  }
   function clearReportedError() {
     var token = getToken();
     if (!token || !reportedError) return;
@@ -596,6 +614,7 @@
       showVideo(v);
       slideIndex = index;
       if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
+      if (typeof shownVersion === 'number') markPainted(shownVersion);
       preloadIndex((index + 1) % playlist.items.length);
       watchPlayback();
     }
@@ -670,6 +689,7 @@
       buryVideos(nextItem && nextItem.kind === 'video' && !badSkips[itemKey(nextItem)] ? (nextItem.mediaId || '') : '');
       slideIndex = index;
       if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
+      if (typeof shownVersion === 'number') markPainted(shownVersion);
       preloadIndex((index + 1) % playlist.items.length);
       clearSlideTimer();
       var waitToken = slideToken;
@@ -801,6 +821,7 @@
           if (until > 0 && until < wait) wait = Math.max(1000, until);
         }
         if (!data.unchanged) { rememberState(data); apply(data); }
+        confirmPlaying(); // retries a confirmation that failed while offline
       } else if (!hasImage && shownVersion === null) {
         setStatus('');
         showScreen('connecting'); // nothing on screen yet
@@ -841,6 +862,7 @@
       swapTo(src);
       shownVersion = v;
       clearReportedError();
+      markPainted(v);
     };
     img.onerror = function () {
       // Keep the last image; next poll gets a fresh URL and retries.

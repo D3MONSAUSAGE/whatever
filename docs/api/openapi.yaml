@@ -71,6 +71,189 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "Couldn't load your account. Try again." }
+    patch:
+      tags: [account]
+      summary: Rename the business (M8)
+      description: |
+        `accountName` is control-stripped and trimmed, 1–80 characters. Also
+        marks the onboarding "business" step done. Does not change account IDs.
+      operationId: patchMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountName]
+              properties:
+                accountName: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email: { type: string }
+                  accountName: { type: string }
+        "400": { description: Empty or too long }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/onboarding:
+    get:
+      tags: [account]
+      summary: Setup progress (M8)
+      description: |
+        Derived from existing data; nothing is stored except `dismissed` and the
+        business confirmation. Step ids in order: account, business, location,
+        screen, media, playlist, publish, playing. `playing.confirmed` is true
+        only when the TV itself confirmed painting the content. `show` is false
+        when dismissed or finished. Accounts created before the M8 release that
+        already have a screen, media, and published content are `finished`.
+      operationId: getOnboarding
+      responses:
+        "200":
+          description: Progress
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Onboarding" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [account]
+      summary: Hide/resume setup, or confirm the business step (M8)
+      operationId: postOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dismissed: { type: boolean }
+                confirmBusiness: { type: boolean, enum: [true] }
+      responses:
+        "200":
+          description: Updated progress
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Onboarding" }
+        "400": { description: Nothing to update or bad value }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { description: Migration 0005 not applied }
+
+  /api/analytics/summary:
+    get:
+      tags: [account]
+      summary: Account analytics totals (M8)
+      description: |
+        `screens.offline` excludes `neverConnected`. Online = heartbeat within
+        90 s. `uptime.pct7/pct30` are null until there are 10 minutes of
+        coverage; `coverageFrom` is when measuring began. `playback` counts
+        screens by status: confirmed (TV-reported), unconfirmed (published or
+        scheduled, not confirmed by the TV), nothingAssigned. `media.bytes` is
+        exact stored size. `bandwidth` is always null (not measured).
+      operationId: getAnalyticsSummary
+      responses:
+        "200":
+          description: Totals
+          content:
+            application/json:
+              schema: { type: object }
+              example:
+                screens: { total: 2, online: 1, offline: 0, neverConnected: 1 }
+                uptime: { pct7: 98.2, pct30: null, coverageFrom: "2026-10-30T19:00:00Z" }
+                playback: { confirmed: 1, unconfirmed: 0, nothingAssigned: 1 }
+                playlists: { total: 2, published: 1, publishes30d: 3 }
+                schedules: { total: 1, enabled: 1, changes30d: 2 }
+                media: { count: 9, images: 8, videos: 1, bytes: 10485760, inPlaylists: 6, unused: 2 }
+                bandwidth: null
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { description: Migration 0005 not applied }
+
+  /api/analytics/uptime:
+    get:
+      tags: [account]
+      summary: Per-screen uptime (M8)
+      operationId: getAnalyticsUptime
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, enum: [7, 30], default: 7 } }
+      description: |
+        `daily` has one entry per local day (screen's location time zone),
+        oldest first; `uptimePct` null where there is no coverage.
+      responses:
+        "200":
+          description: Uptime
+          content:
+            application/json:
+              schema: { type: object }
+              example:
+                days: 7
+                coverageFrom: "2026-10-30T19:00:00Z"
+                overall: { uptimePct: 97.5 }
+                screens:
+                  - { id: "uuid", name: "Bar TV", online: true, lastSeenAt: "2026-10-31T10:00:00Z", uptimePct: 97.5, onlineSeconds: 50000, windowSeconds: 51282, daily: [{ date: "2026-10-31", uptimePct: 99.1 }] }
+        "400": { description: days not 7 or 30 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/analytics/screens/{id}:
+    get:
+      tags: [account]
+      summary: One screen's uptime, outages, and playback (M8)
+      operationId: getAnalyticsScreen
+      parameters:
+        - { $ref: "#/components/parameters/Id" }
+      description: |
+        `offline[]` is newest first; an outage still in progress has
+        `endedAt: null`. `playback.status` is confirmed | unconfirmed | nothing.
+        `expected.source` is schedule | playlist | image | none.
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema: { type: object }
+              example:
+                id: "uuid"
+                name: "Bar TV"
+                online: true
+                lastSeenAt: "2026-10-31T10:00:00Z"
+                uptime7: 99.0
+                uptime30: 97.1
+                daily: [{ date: "2026-10-31", uptimePct: 99.1 }]
+                coverageFrom: "2026-10-30T19:00:00Z"
+                offline: [{ startedAt: "2026-10-31T02:00:00Z", endedAt: "2026-10-31T02:40:00Z", seconds: 2400 }]
+                playback:
+                  status: confirmed
+                  confirmed: { version: 14, at: "2026-10-31T09:58:00Z" }
+                  expected: { version: 14, source: playlist, name: "Lunch" }
+                  match: true
+                  history: [{ version: 14, at: "2026-10-31T09:58:00Z" }]
+        "404": { description: Not this account's screen }
+
+  /api/analytics/activity:
+    get:
+      tags: [account]
+      summary: Recent activity, newest first (M8)
+      operationId: getAnalyticsActivity
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: before, in: query, schema: { type: string, format: date-time } }
+      description: |
+        Kinds: playlist.published, screen.paired, screen.removed,
+        screen.content_changed, schedule.created, schedule.updated,
+        schedule.deleted, media.uploaded, media.deleted. Page with
+        `before=nextBefore`. Kept 90 days.
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema: { type: object }
+              example:
+                events: [{ at: "2026-10-31T09:58:00Z", kind: playlist.published, subjectId: "uuid", subjectName: "Lunch", detail: {} }]
+                nextBefore: null
+        "400": { description: Bad before date }
 
   /api/overview:
     get:
@@ -1449,13 +1632,20 @@ paths:
               example: { error: unavailable }
     post:
       tags: [player]
-      summary: TV reports a clip it could not play
+      summary: TV reports a clip it could not play, or confirms what it painted
       security:
         - displayToken: []
       description: |
         TV only. Empty or missing `error` clears `player_error`. Otherwise the
         text is trimmed and sliced to 180 characters. Before migration 0003
         this is a no-op 200.
+
+        M8 proof of play: a body of `{ "playing": { "version": N } }` (safe
+        integer >= 0) is handled separately and never touches `player_error`.
+        Send it once after the TV has actually painted content version N.
+        Stores `confirmed_version`/`confirmed_at` (refreshed at most hourly
+        for the same version) and adds a `playback_events` row when the
+        version changes. 400 for a bad version; 200 no-op before migration 0005.
       operationId: reportPlayerError
       requestBody:
         required: false
@@ -1465,6 +1655,11 @@ paths:
               type: object
               properties:
                 error: { type: string, nullable: true }
+                playing:
+                  type: object
+                  required: [version]
+                  properties:
+                    version: { type: integer, minimum: 0 }
       responses:
         "200":
           description: Recorded, or ignored because the column is missing
@@ -1634,6 +1829,25 @@ components:
             group: { value: { error: "Too many screen groups. Wait 15 minutes, then try again." } }
             schedule: { value: { error: "Too many schedules. Wait 15 minutes, then try again." } }
   schemas:
+    Onboarding:
+      type: object
+      required: [steps, completed, total, nextStep, dismissed, finished, show]
+      properties:
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, enum: [account, business, location, screen, media, playlist, publish, playing] }
+              done: { type: boolean }
+              confirmed: { type: boolean, description: Only on the playing step }
+        completed: { type: integer }
+        total: { type: integer }
+        nextStep: { type: string, nullable: true }
+        dismissed: { type: boolean }
+        finished: { type: boolean }
+        show: { type: boolean }
+        firstLocationId: { type: string, nullable: true }
     Error:
       type: object
       required: [error]
