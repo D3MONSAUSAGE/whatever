@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "/api/menus": ["./assets/fonts/**"],
     "/api/menus/[id]": ["./assets/fonts/**"],
     "/api/menus/preview": ["./assets/fonts/**"],
+    "/api/health": ["./assets/fonts/**"],
   },
   // Lint runs as `npm run lint`. Skipping it here avoids a warning about the Next.js ESLint plugin.
   eslint: { ignoreDuringBuilds: true },
