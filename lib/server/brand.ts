@@ -50,7 +50,7 @@ export async function imageDataUri(accountId: string, mediaId: string | null | u
   return `data:${mime};base64,${bytes.toString("base64")}`;
 }
 
-export async function artFor(accountId: string, content: MenuContent): Promise<MenuArt> {
+export async function artFor(accountId: string, content: Pick<MenuContent, "useBrand" | "photoMediaId">): Promise<MenuArt> {
   const useBrand = content.useBrand !== false;
   const brand = useBrand ? await getBrand(accountId) : null;
   const custom = brand && brand !== "error" && brand.custom ? brand : null;

@@ -74,8 +74,8 @@ test("a customer sets their brand, adds a photo to a menu and applies the brand"
   const menu = (await admin.from("menus").select("id, media_id, content").eq("account_id", acct!.id).single()).data!;
   expect(menu.content).toMatchObject({ useBrand: true, photoMediaId: expect.any(String) });
 
-  await page.getByRole("region", { name: "Your brand" }).getByRole("button", { name: "Apply to all menus" }).click();
-  await expect(page.getByText("Updated 1 menu.")).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("region", { name: "Your brand" }).getByRole("button", { name: "Apply to all menus and promos" }).click();
+  await expect(page.getByText("Updated 1 slide.")).toBeVisible({ timeout: 20_000 });
   const after = (await admin.from("menus").select("media_id").eq("id", menu.id).single()).data!;
   expect(after.media_id).not.toBe(menu.media_id);
   await context.close();

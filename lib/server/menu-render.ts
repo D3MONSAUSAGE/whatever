@@ -37,7 +37,7 @@ export function contrast(a: string, b: string) {
   const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
   return (x + 0.05) / (y + 0.05);
 }
-function mix(a: string, b: string, t: number) {
+export function mix(a: string, b: string, t: number) {
   const [x, y] = [rgb(a), rgb(b)];
   return hex(x.map((v, i) => v + (y[i] - v) * t));
 }
@@ -50,7 +50,7 @@ export function readable(color: string, bg: string, min = 3) {
   }
   return toward;
 }
-const onColor = (bg: string) => (contrast("#ffffff", bg) >= contrast("#0b1220", bg) ? "#ffffff" : "#0b1220");
+export const onColor = (bg: string) => (contrast("#ffffff", bg) >= contrast("#0b1220", bg) ? "#ffffff" : "#0b1220");
 
 export function themeFor(template: MenuTemplate, brand?: MenuArt["brand"]): Theme {
   const base = THEMES[template];
@@ -71,7 +71,7 @@ export function themeFor(template: MenuTemplate, brand?: MenuArt["brand"]): Them
   };
 }
 
-function esc(s: string) {
+export function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 

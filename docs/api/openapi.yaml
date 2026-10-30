@@ -467,7 +467,11 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { after: { type: string, format: uuid } } }
+            schema:
+              type: object
+              properties:
+                after: { type: string, format: uuid }
+                kind: { type: string, enum: [menus, promos], default: menus, description: "M12: promos re-renders promo slides" }
       responses:
         "200":
           description: Batch result
@@ -480,6 +484,73 @@ paths:
                   skipped: { type: integer }
                   failed: { type: integer }
                   next: { type: string, format: uuid, nullable: true }
+  /api/promos:
+    get:
+      tags: [media]
+      summary: List promo slides (M12)
+      operationId: listPromos
+      responses:
+        "200": { description: "{ promos: Promo[], available: boolean }" }
+    post:
+      tags: [media]
+      summary: Create a promo slide (renders a PNG into media and its own playlist)
+      operationId: createPromo
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PromoInput" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Promo" } } } }
+        "400": { description: Invalid template, content or dates }
+        "404": { description: Photo not in this account's media }
+        "429": { description: Rate limited }
+        "503": { description: Promos not yet available }
+  /api/promos/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    get: { tags: [media], summary: One promo, operationId: getPromo, responses: { "200": { description: OK }, "404": { description: Not found } } }
+    patch:
+      tags: [media]
+      summary: Edit a promo (re-renders and swaps the slide everywhere; date changes move its schedule rules)
+      operationId: updatePromo
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/PromoInput" } } } }
+      responses:
+        "200": { description: Updated }
+        "400": { description: "Invalid input; dates on an always-on promo; or clearing both dates on a scheduled promo" }
+        "404": { description: Not found }
+    delete:
+      tags: [media]
+      summary: Delete a promo (takes it off its menu first; the image stays in media)
+      operationId: deletePromo
+      responses: { "200": { description: Deleted }, "404": { description: Not found } }
+  /api/promos/{id}/menu:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [media]
+      summary: One-tap add to a menu
+      description: Without dates the slide is appended to the menu playlist (mode added). With dates a "menu + promo" playlist is created and one all-day, every-day schedule rule (priority 5, below day parts) is added per screen showing the menu, limited to the promo's dates (mode scheduled).
+      operationId: attachPromo
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [menuId], properties: { menuId: { type: string, format: uuid } } } } }
+      responses:
+        "200": { description: "{ mode: added|scheduled, screens: integer }" }
+        "400": { description: Dated promo but no screen shows this menu, or schedule limit reached }
+        "404": { description: Promo or menu not found }
+        "429": { description: Rate limited }
+    delete:
+      tags: [media]
+      summary: Take the promo off its menu (the menu keeps playing)
+      operationId: detachPromo
+      responses: { "200": { description: Done }, "404": { description: Not found } }
+  /api/promos/preview:
+    post:
+      tags: [media]
+      summary: PNG preview of a promo (not saved)
+      operationId: previewPromo
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PromoInput" } } } }
+      responses:
+        "200": { description: PNG, content: { image/png: {} } }
+        "400": { description: Invalid input }
+        "429": { description: Rate limited }
   /api/schedules/day-parts:
     post:
       tags: [schedules]
@@ -2089,6 +2160,38 @@ components:
             group: { value: { error: "Too many screen groups. Wait 15 minutes, then try again." } }
             schedule: { value: { error: "Too many schedules. Wait 15 minutes, then try again." } }
   schemas:
+    PromoContent:
+      type: object
+      required: [headline]
+      properties:
+        tag: { type: string, maxLength: 24 }
+        headline: { type: string, maxLength: 40 }
+        subheadline: { type: string, maxLength: 80 }
+        price: { type: string, maxLength: 12 }
+        details: { type: string, maxLength: 120 }
+        footer: { type: string, maxLength: 60 }
+        photoMediaId: { type: string, format: uuid, nullable: true, description: PNG or JPEG in this account's media }
+        useBrand: { type: boolean }
+    PromoInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 80 }
+        template: { type: string, enum: [happy, deal, special] }
+        content: { $ref: "#/components/schemas/PromoContent" }
+        startsOn: { type: string, format: date, nullable: true }
+        endsOn: { type: string, format: date, nullable: true, description: Inclusive, in each screen's local date }
+    Promo:
+      allOf:
+        - $ref: "#/components/schemas/PromoInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            mediaId: { type: string, format: uuid }
+            playlistId: { type: string, format: uuid }
+            menuId: { type: string, format: uuid, nullable: true }
+            placement: { type: string, enum: [none, added, scheduled] }
+            imageUrl: { type: string }
+            expired: { type: boolean }
     Brand:
       type: object
       properties:
