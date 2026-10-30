@@ -27,7 +27,7 @@ function png(r: number, g: number, b: number, size = 8) {
 
 /** M11 (0008_brand_kits.sql) through the real handlers against the local database. */
 describe.skipIf(!configured)("brand kits", () => {
-  const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin: SupabaseClient = createClient(url || "http://127.0.0.1:54321", service || "unset", { auth: { persistSession: false, autoRefreshToken: false } });
   const created: string[] = [];
   afterAll(() => removeCreatedTestUsers(admin, created));
 

@@ -15,7 +15,7 @@ const configured = /^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url) && anon.le
 
 /** M9 (0006_alerts.sql) against the local database: detection, no duplicates, recovery, routes, email, isolation. */
 describe.skipIf(!configured)("offline alerts", () => {
-  const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin: SupabaseClient = createClient(url || "http://127.0.0.1:54321", service || "unset", { auth: { persistSession: false, autoRefreshToken: false } });
   const created: string[] = [];
   afterAll(() => removeCreatedTestUsers(admin, created));
 

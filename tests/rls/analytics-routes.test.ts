@@ -18,7 +18,7 @@ const configured = /^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url) && anon.le
 
 /** M8 routes against the local database, end to end through the real handlers. */
 describe.skipIf(!configured)("onboarding and analytics routes", () => {
-  const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin: SupabaseClient = createClient(url || "http://127.0.0.1:54321", service || "unset", { auth: { persistSession: false, autoRefreshToken: false } });
   const created: string[] = [];
   afterAll(() => removeCreatedTestUsers(admin, created));
 

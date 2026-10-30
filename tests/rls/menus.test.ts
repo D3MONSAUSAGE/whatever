@@ -15,7 +15,7 @@ const configured = /^http:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url) && anon.le
 
 /** M10 (0007_menu_boards.sql) through the real handlers against the local database. */
 describe.skipIf(!configured)("menu boards and day parts", () => {
-  const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin: SupabaseClient = createClient(url || "http://127.0.0.1:54321", service || "unset", { auth: { persistSession: false, autoRefreshToken: false } });
   const created: string[] = [];
   afterAll(() => removeCreatedTestUsers(admin, created));
 
