@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, formatDuration, formatSize, useApi, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
@@ -68,6 +69,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
           <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}
             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "image"); }} />
         </label>
+        <Link href="/dashboard/media/menus" className="btn btn-quiet">Make a menu board</Link>
         <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
           Upload video
           <input type="file" accept="video/mp4,.mp4" multiple className="sr-only" disabled={uploads.busy}
