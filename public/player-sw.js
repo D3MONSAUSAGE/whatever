@@ -1,4 +1,4 @@
-/* Seemple TV player service worker. Scope: /player only (never the dashboard).
+/* Pekko TV player service worker. Scope: /player only (never the dashboard).
    Network first, so updates to the player page reach TVs right away; the saved copy
    is used only when the network is down, letting a TV restart and play saved media offline. */
 var PLAYER_CACHE = 'seemple-player-v1';

@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { ErrorView } from "@/components/error-view";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error("Seemple page error", error.digest ?? "", error.message); }, [error]);
+  useEffect(() => { console.error("Pekko page error", error.digest ?? "", error.message); }, [error]);
   return (
     <ErrorView
       title="Something went wrong"

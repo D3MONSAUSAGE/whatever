@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Seemple",
-    short_name: "Seemple",
-    description: "Seemple Technologies. Making life simpler every day.",
+    name: "Pekko",
+    short_name: "Pekko",
+    description: "Pekko Technologies. Making life simpler every day.",
     start_url: "/",
     display: "standalone",
     background_color: "#F4F7FB",

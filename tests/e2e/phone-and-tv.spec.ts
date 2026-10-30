@@ -50,7 +50,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
 
     await test.step("TV shows a pairing code", async () => {
       await tv.goto("/player");
-      await expect(tv).toHaveTitle("Pantalla");
+      await expect(tv).toHaveTitle("Pekko");
       code = await readCode(tv);
     });
 

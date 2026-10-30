@@ -8,7 +8,7 @@ export function AuthFrame({ title, lede, children, footer }: { title: string; le
     <main className="wave-surface relative min-h-dvh overflow-hidden grid place-items-center px-5 py-12">
       <WaveBackdrop />
       <div className="relative z-10 auth-card">
-        <Link href="/login" className="flex flex-col items-center text-center mb-8" aria-label="Seemple home">
+        <Link href="/login" className="flex flex-col items-center text-center mb-8" aria-label="Pekko home">
           <LogoMark className="size-16" />
           <span className="mt-4"><Wordmark size="lg" align="center" /></span>
           <span className="mt-3 text-sm text-muted">making life simpler every day.</span>

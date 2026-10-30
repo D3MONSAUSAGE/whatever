@@ -50,7 +50,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
 
   return (
     <section>
-      <PageHeader title="Analytics" eyebrow="Seemple" icon={<IconChart />}
+      <PageHeader title="Analytics" eyebrow="Pekko" icon={<IconChart />}
         lede="How your screens are doing: what's online, how reliable each screen has been, and what changed recently." />
       {fixture ? null : <p className="-mt-2 mb-6 text-sm"><Link href="/dashboard/alerts" className="underline font-semibold">Offline alerts</Link> · <Link href="/dashboard/settings#alerts" className="underline">alert settings</Link></p>}
       {!summary ? (

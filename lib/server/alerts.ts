@@ -44,12 +44,12 @@ export function emailFor(a: Pick<AlertRow, "kind" | "display_name" | "offline_si
   const since = formatAt(a.offline_since, timeZone);
   if (a.kind === "screen.offline") {
     return {
-      subject: `Seemple: "${a.display_name}" is offline`,
+      subject: `Pekko: "${a.display_name}" is offline`,
       text: `Your screen "${a.display_name}" stopped checking in around ${since}.\n\nCheck that the TV is on and connected to the internet. Your content is saved on the TV, so it may still be showing it.\n\nSee your screens: ${appUrl}/dashboard/displays\nChange alert settings: ${appUrl}/dashboard/settings`,
     };
   }
   return {
-    subject: `Seemple: "${a.display_name}" is back online`,
+    subject: `Pekko: "${a.display_name}" is back online`,
     text: `Your screen "${a.display_name}" is back online after about ${minutes(a.offline_seconds ?? 0)} (offline since ${since}).\n\nSee your screens: ${appUrl}/dashboard/displays`,
   };
 }

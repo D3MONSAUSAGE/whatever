@@ -121,7 +121,7 @@ export default function Settings() {
 
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
           <h2 id="name-heading" className="font-semibold">Display name</h2>
-          <p className="text-sm text-muted mt-1 mb-3">Shown to you in the dashboard and the Seemple app. Leave blank to use your email.</p>
+          <p className="text-sm text-muted mt-1 mb-3">Shown to you in the dashboard and the Pekko app. Leave blank to use your email.</p>
           <label className="form-label" htmlFor="display-name">Name</label>
           <input id="display-name" className="field" maxLength={NAME_MAX} autoComplete="name" placeholder={email ?? ""}
             value={name} onChange={(e) => setName(e.target.value)} />
@@ -215,7 +215,7 @@ function BusinessForm({ current, onSaved }: { current: string | null; onSaved: (
   return (
     <form className="card p-5" onSubmit={save} aria-labelledby="business-heading">
       <h2 id="business-heading" className="font-semibold">Business name</h2>
-      <p className="text-sm text-muted mt-1 mb-3">Your business as customers know it. Shown in the dashboard and the Seemple app.</p>
+      <p className="text-sm text-muted mt-1 mb-3">Your business as customers know it. Shown in the dashboard and the Pekko app.</p>
       <label className="form-label" htmlFor="business-name">Business name</label>
       <input id="business-name" className="field" maxLength={80} autoComplete="organization"
         value={value} onChange={(e) => setValue(e.target.value)} />

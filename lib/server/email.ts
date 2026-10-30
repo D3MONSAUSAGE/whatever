@@ -1,6 +1,6 @@
 /**
  * Pluggable email. Inactive unless a provider is configured by env:
- *   EMAIL_PROVIDER=resend, RESEND_API_KEY=..., ALERT_EMAIL_FROM="Seemple <alerts@yourdomain>"
+ *   EMAIL_PROVIDER=resend, RESEND_API_KEY=..., ALERT_EMAIL_FROM="Pekko <alerts@yourdomain>"
  * Nothing here signs up for or pays for anything.
  */
 export type EmailMessage = { to: string; subject: string; text: string };

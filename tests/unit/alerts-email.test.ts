@@ -12,7 +12,7 @@ describe("alert email", () => {
 
   it("writes plain offline and recovery messages in the location's time zone", () => {
     const off = emailFor({ kind: "screen.offline", display_name: "Bar TV", offline_since: "2026-10-30T01:00:00Z", offline_seconds: null }, "America/Los_Angeles", "https://x.app");
-    expect(off.subject).toBe('Seemple: "Bar TV" is offline');
+    expect(off.subject).toBe('Pekko: "Bar TV" is offline');
     expect(off.text).toContain("6:00 PM PDT");
     expect(off.text).toContain("https://x.app/dashboard/displays");
     const back = emailFor({ kind: "screen.recovered", display_name: "Bar TV", offline_since: "2026-10-30T01:00:00Z", offline_seconds: 1500 }, "UTC", "https://x.app");

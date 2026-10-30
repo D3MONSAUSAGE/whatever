@@ -59,7 +59,7 @@ export function MenuBoards() {
         title="Menu boards"
         eyebrow="Media"
         icon={<IconImage />}
-        lede="Pick a template, type your items and prices, and Seemple makes a full-screen slide. Edit it any time and every screen showing it updates."
+        lede="Pick a template, type your items and prices, and Pekko makes a full-screen slide. Edit it any time and every screen showing it updates."
       >
         {!draft ? <button className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button> : null}
         <Link href="/dashboard/media" className="btn btn-quiet">Back to media</Link>

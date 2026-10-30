@@ -2,7 +2,7 @@
 
 ## What customers get
 - **Media → Make a menu board** (also linked from the setup tracker's "Upload media" step).
-- Three Seemple templates: *Classic night* (navy), *Fresh day* (light with blue header), *Bold blue* (blue with yellow price tags).
+- Three Pekko templates: *Classic night* (navy), *Fresh day* (light with blue header), *Bold blue* (blue with yellow price tags).
 - Title, subtitle, up to 4 sections × 12 items (24 total), each with a price and optional description, plus a footer. Live preview.
 - Optional "show on these screens now". Editing later updates every screen that shows the menu.
 - **Schedule → Breakfast, lunch & dinner**: pick a screen or group, times (default 06–11, 11–16, 16–22) and a menu board or playlist for each part.

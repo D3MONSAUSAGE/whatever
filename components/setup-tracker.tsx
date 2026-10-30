@@ -6,7 +6,7 @@ import { useToast } from "@/components/toast";
 
 const COPY: Record<OnboardingStepId, { title: string; body: string; href?: string; action?: string; altHref?: string; altAction?: string }> = {
   account: { title: "Create your account", body: "You're signed in. Your account is ready." },
-  business: { title: "Name your business", body: "The name you and your team will see in Seemple." },
+  business: { title: "Name your business", body: "The name you and your team will see in Pekko." },
   location: { title: "Add your first location", body: "Where your screens are. The time zone keeps schedules on local time." },
   screen: { title: "Pair a screen", body: "On the TV, open the player address below. Then type the 6-digit code it shows on the Displays page.", href: "/dashboard/displays", action: "Pair a screen" },
   media: { title: "Upload media", body: "Add a photo (JPG, PNG, WebP) or an MP4 video of your menu, offer, or message. No artwork? Type your items and prices into a menu board template.", href: "/dashboard/media", action: "Upload", altHref: "/dashboard/media/menus", altAction: "Make a menu board" },

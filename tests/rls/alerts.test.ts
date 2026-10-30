@@ -115,7 +115,7 @@ describe.skipIf(!configured)("offline alerts", () => {
     await deliverAlertEmails({ dryRun: false, provider });
     const mine = sent.filter((m) => m.to === a.email);
     expect(mine).toHaveLength(1);
-    expect(mine[0].subject).toBe('Seemple: "Patio" is offline');
+    expect(mine[0].subject).toBe('Pekko: "Patio" is offline');
     expect((await alertsOf(a.accountId))[0].email_status).toBe("sent");
 
     await admin.from("displays").update({ last_seen_at: new Date().toISOString() }).eq("id", d!.id);

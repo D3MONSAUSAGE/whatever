@@ -75,7 +75,7 @@ export function AlertsScreen() {
   }
   return (
     <section>
-      <PageHeader title="Alerts" eyebrow="Seemple" icon={<IconTv />}
+      <PageHeader title="Alerts" eyebrow="Pekko" icon={<IconTv />}
         lede="We let you know when a screen stops checking in, and again when it comes back. Alerts are kept for 90 days." />
       <div className="flex flex-wrap gap-2 mb-4">
         <Link href="/dashboard/settings#alerts" className="btn btn-quiet">Alert settings</Link>
@@ -139,7 +139,7 @@ export function AlertSettings() {
         <input type="checkbox" className="size-5 mt-0.5" checked={p.email.enabled} disabled={busy || !p.enabled} onChange={(e) => save({ emailEnabled: e.target.checked })} />
         <span>
           Also email me at <strong className="break-all">{p.email.address}</strong>
-          {p.email.available ? null : <span className="block text-xs text-muted">Email alerts aren&apos;t switched on for Seemple yet. Alerts still appear here in the dashboard.</span>}
+          {p.email.available ? null : <span className="block text-xs text-muted">Email alerts aren&apos;t switched on for Pekko yet. Alerts still appear here in the dashboard.</span>}
         </span>
       </label>
       {msg ? <p className="text-sm" role="status">{msg}</p> : null}

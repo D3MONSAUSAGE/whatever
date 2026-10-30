@@ -30,7 +30,7 @@ test("an offline screen raises a banner, settings save, and alerts can be marked
     await minutes.fill("15");
     await page.locator("#alerts").getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#alerts").getByText("Saved.")).toBeVisible();
-    await expect(page.locator("#alerts").getByText("aren't switched on for Seemple yet")).toBeVisible();
+    await expect(page.locator("#alerts").getByText("aren't switched on for Pekko yet")).toBeVisible();
 
     const { data: acct } = await admin.from("accounts").select("id, alert_threshold_minutes").eq("name", prefix).single();
     expect(acct!.alert_threshold_minutes).toBe(15);
