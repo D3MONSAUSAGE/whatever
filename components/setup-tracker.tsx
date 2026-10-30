@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { api, useApi, type OnboardingState, type OnboardingStepId } from "@/lib/api";
 import { useToast } from "@/components/toast";
 
-const COPY: Record<OnboardingStepId, { title: string; body: string; href?: string; action?: string }> = {
+const COPY: Record<OnboardingStepId, { title: string; body: string; href?: string; action?: string; altHref?: string; altAction?: string }> = {
   account: { title: "Create your account", body: "You're signed in. Your account is ready." },
   business: { title: "Name your business", body: "The name you and your team will see in Seemple." },
   location: { title: "Add your first location", body: "Where your screens are. The time zone keeps schedules on local time." },
   screen: { title: "Pair a screen", body: "On the TV, open the player address below. Then type the 6-digit code it shows on the Displays page.", href: "/dashboard/displays", action: "Pair a screen" },
-  media: { title: "Upload media", body: "Add a photo (JPG, PNG, WebP) or an MP4 video of your menu, offer, or message.", href: "/dashboard/media", action: "Upload" },
+  media: { title: "Upload media", body: "Add a photo (JPG, PNG, WebP) or an MP4 video of your menu, offer, or message. No artwork? Type your items and prices into a menu board template.", href: "/dashboard/media", action: "Upload", altHref: "/dashboard/media/menus", altAction: "Make a menu board" },
   playlist: { title: "Create a playlist", body: "Put your images and videos in order and choose how long each one shows.", href: "/dashboard/playlists", action: "Create playlist" },
   publish: { title: "Publish to your screen", body: "Open the playlist, tick your screen, and press Publish. Saving a draft doesn't change the TV.", href: "/dashboard/playlists", action: "Publish" },
   playing: { title: "Check it's playing", body: "Turn the TV on. Within about 30 seconds it shows your content and tells us it's on screen.", href: "/dashboard/analytics", action: "See status" },
@@ -89,7 +89,10 @@ export function SetupTracker({ fixture, origin }: { fixture?: OnboardingState; o
                 {current && step.id === "location" ? <LocationStep locationId={state.firstLocationId} disabled={!!fixture} onDone={() => live.reload()} /> : null}
               </div>
               {copy.href && !step.done ? (
-                <Link href={copy.href} className={`btn ${current ? "btn-primary" : "btn-quiet"} sm:shrink-0`}>{copy.action}</Link>
+                <div className="flex flex-wrap gap-2 sm:shrink-0">
+                  <Link href={copy.href} className={`btn ${current ? "btn-primary" : "btn-quiet"}`}>{copy.action}</Link>
+                  {copy.altHref ? <Link href={copy.altHref} className="btn btn-quiet">{copy.altAction}</Link> : null}
+                </div>
               ) : null}
             </li>
           );

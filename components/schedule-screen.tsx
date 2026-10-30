@@ -1,4 +1,5 @@
 "use client";
+import { DayPartSetup } from "@/components/day-parts";
 import { useMemo, useState } from "react";
 import {
   api,
@@ -160,6 +161,23 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
           await schedules.reload();
           toast.show("Group deleted");
         })}
+      />
+
+      <DayPartSetup
+        displays={(displays.data ?? []).filter((d) => d.connected)}
+        groups={groups.data ?? []}
+        playlists={playlists.data ?? []}
+        preview={!!fixture}
+        onSubmit={async (body) => {
+          let ok = false;
+          await run(async () => {
+            const res = await api<{ ids: string[] }>("/api/schedules/day-parts", { method: "POST", body: JSON.stringify(body) });
+            await schedules.reload();
+            toast.show(`${res.ids.length} times of day added`);
+            ok = true;
+          });
+          return ok;
+        }}
       />
 
       <Rules
