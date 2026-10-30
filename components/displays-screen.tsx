@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
 import { EmptyState, LoadingBlock, PageHeader } from "@/components/ui";
+import { byName, SEARCH_FROM } from "@/components/playlist-list";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
@@ -14,6 +15,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
     ? { data: fixture, error: null as string | null, reload: async () => {} }
     : live;
   const [picking, setPicking] = useState<DisplayItem | null>(null);
+  const [search, setSearch] = useState("");
   const [assigning, setAssigning] = useState<string[] | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
@@ -66,8 +68,13 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
       ) : displays.data.length === 0 ? (
         <div className="mt-8"><EmptyState title="No screens yet">Open the TV address on a smart TV or browser, then type the code it shows into the box above.</EmptyState></div>
       ) : (
+        <>
+        {displays.data.length >= SEARCH_FROM ? (
+          <input className="field mt-8" type="search" aria-label="Search screens" placeholder="Search screens" value={search} onChange={(e) => setSearch(e.target.value)} />
+        ) : null}
+        {byName(displays.data, search).length === 0 ? <div className="mt-8"><EmptyState title="No screens match that search">Try another name, or clear the search.</EmptyState></div> : null}
         <ul className="mt-8 grid gap-4 lg:grid-cols-2">
-          {displays.data.map((display) => (
+          {byName(displays.data, search).map((display) => (
             <li key={display.id}>
               <ScreenCard display={display} actions={
                 <>
@@ -112,6 +119,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
             </li>
           ))}
         </ul>
+        </>
       )}
 
       {picking && (

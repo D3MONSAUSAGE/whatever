@@ -211,7 +211,7 @@ describe("scheduling API", () => {
     const listedNow = await call(listDisplays, "http://localhost/api/displays", auth("token-a"));
     expect(listedNow.body[0].currentSchedule).toEqual({
       id: made.body.id, name: "Weekday lunch", playlistId, playlistName: "Lunch specials",
-      target: "display", priority: 0, until: "2026-10-28T21:00:00.000Z",
+      target: "display", priority: 0, managedBy: null, promoId: null, until: "2026-10-28T21:00:00.000Z",
     });
     expect(listedNow.body[0].activeSchedules).toHaveLength(1);
     expect(listedNow.body[0].media.id).toBe(everyday.body.id);

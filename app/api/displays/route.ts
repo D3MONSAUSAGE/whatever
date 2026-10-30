@@ -1,4 +1,5 @@
-import { BUCKET, db } from "@/lib/server/supabase";
+import { db } from "@/lib/server/supabase";
+import { fetchAll, inChunks, matches, pageOf, parseListQuery, signAll } from "@/lib/server/paging";
 import { requireAdmin } from "@/lib/server/auth";
 import { ONLINE_MS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
@@ -27,7 +28,16 @@ export async function GET(req: Request) {
     player_error_at?: string | null;
     media: MediaJoin | MediaJoin[] | null;
   };
-  const list = (rows ?? []) as unknown as Row[];
+  let list = (rows ?? []) as unknown as Row[];
+  const query = parseListQuery(req);
+  let page: ReturnType<typeof pageOf<Row>> | null = null;
+  if (query) {
+    // M14 opt-in: search by screen name, optional sort=name, then one page.
+    const found = list.filter((d) => matches(d.name, query.q));
+    if (query.sort === "name") found.sort((x, y) => x.name.localeCompare(y.name, undefined, { sensitivity: "base" }));
+    page = pageOf(found, query);
+    list = page.items;
+  }
   const playlistInfo = playlistColumn ? await loadPlaylists(admin.accountId, list) : new Map<string, { name: string; url: string | null }>();
   if (playlistInfo === null) return fail("Couldn't load displays.", 500);
 
@@ -44,15 +54,10 @@ export async function GET(req: Request) {
   const mediaOf = (media: Row["media"]): MediaJoin | null =>
     Array.isArray(media) ? media[0] ?? null : media;
   const paths = [...new Set(list.map((d) => mediaOf(d.media)?.storage_path).filter(Boolean))] as string[];
-  const urls = new Map<string, string>();
-  if (paths.length) {
-    const { data } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
-    data?.forEach((s) => s.path && s.signedUrl && urls.set(s.path, s.signedUrl));
-  }
+  const urls = await signAll(paths);
 
   const now = Date.now();
-  return json(
-    list.map((d) => {
+  const out = list.map((d) => {
       const media = mediaOf(d.media);
       return {
         id: d.id,
@@ -76,8 +81,9 @@ export async function GET(req: Request) {
         activeSchedules: scheduleInfo.get(d.id)?.activeSchedules ?? [],
         currentSchedule: scheduleInfo.get(d.id)?.currentSchedule ?? null,
       };
-    }),
-  );
+    });
+  if (!page) return json(out);
+  return json({ items: out, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
 }
 
 async function loadDisplayRows(accountId: string) {
@@ -90,12 +96,14 @@ async function loadDisplayRows(accountId: string) {
   ];
   let lastError: { code?: string; message?: string } | null = null;
   for (const attempt of attempts) {
-    const result = await db()
+    const result = await fetchAll<unknown>((from, to) => db()
       .from("displays")
       .select(attempt.columns)
       .eq("account_id", accountId)
       .eq("status", "active")
-      .order("created_at");
+      .order("created_at")
+      .order("id")
+      .range(from, to));
     if (!result.error) return { rows: result.data, playlistColumn: attempt.playlistColumn, error: null };
     lastError = result.error;
     if (!isMissingSchema(result.error)) return { rows: null, playlistColumn: false, error: result.error };
@@ -108,21 +116,24 @@ async function loadPlaylists(accountId: string, rows: { assigned_playlist_id?: s
   const info = new Map<string, { name: string; url: string | null }>();
   if (!ids.length) return info;
 
-  const { data: playlists, error } = await db()
+  const { data: playlists, error } = await inChunks<{ id: string; name: string }>(ids, (chunk) => db()
     .from("playlists")
     .select("id, name")
     .eq("account_id", accountId)
-    .in("id", ids);
+    .in("id", chunk));
   if (error) return isMissingSchema(error) ? info : null;
   for (const playlist of playlists ?? []) info.set(playlist.id, { name: playlist.name, url: null });
 
-  const { data: items, error: itemError } = await db()
-    .from("playlist_items")
-    .select("playlist_id, media_id, position")
-    .eq("account_id", accountId)
-    .eq("kind", "published")
-    .in("playlist_id", ids)
-    .order("position");
+  const { data: items, error: itemError } = await inChunks<{ playlist_id: string; media_id: string; position: number }>(ids, (chunk) =>
+    fetchAll((from, to) => db()
+      .from("playlist_items")
+      .select("playlist_id, media_id, position")
+      .eq("account_id", accountId)
+      .eq("kind", "published")
+      .in("playlist_id", chunk)
+      .order("position")
+      .order("id")
+      .range(from, to)), 50);
   if (itemError) return isMissingSchema(itemError) ? info : null;
 
   const firstMedia = new Map<string, string>();
@@ -131,15 +142,15 @@ async function loadPlaylists(accountId: string, rows: { assigned_playlist_id?: s
   }
   const mediaIds = [...new Set(firstMedia.values())];
   if (!mediaIds.length) return info;
-  const richMedia = await db()
+  const richMedia = await inChunks<{ id: string; storage_path: string; thumbnail_path?: string | null; kind?: string | null }>(mediaIds, (chunk) => db()
     .from("media")
     .select("id, storage_path, thumbnail_path, kind")
     .eq("account_id", accountId)
-    .in("id", mediaIds);
+    .in("id", chunk));
   let mediaRows = richMedia.data as { id: string; storage_path: string; thumbnail_path?: string | null; kind?: string | null }[] | null;
   let mediaError = richMedia.error;
   if (mediaError && isMissingSchema(mediaError)) {
-    const plain = await db().from("media").select("id, storage_path").eq("account_id", accountId).in("id", mediaIds);
+    const plain = await inChunks<{ id: string; storage_path: string }>(mediaIds, (chunk) => db().from("media").select("id, storage_path").eq("account_id", accountId).in("id", chunk));
     mediaRows = plain.data;
     mediaError = plain.error;
   }
@@ -149,11 +160,7 @@ async function loadPlaylists(accountId: string, rows: { assigned_playlist_id?: s
     media.kind === "video" && media.thumbnail_path ? media.thumbnail_path : media.storage_path,
   ]));
   const paths = [...new Set([...pathByMedia.values()])];
-  const urls = new Map<string, string>();
-  if (paths.length) {
-    const { data } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
-    data?.forEach((item) => item.path && item.signedUrl && urls.set(item.path, item.signedUrl));
-  }
+  const urls = await signAll(paths);
   for (const [playlistId, mediaId] of firstMedia) {
     const current = info.get(playlistId);
     const path = pathByMedia.get(mediaId);

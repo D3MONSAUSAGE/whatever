@@ -12,6 +12,8 @@ import { POST as applyPost } from "@/app/api/brand/apply/route";
 import { sampleMenu } from "@/lib/menu-templates";
 import { readPlaybackSchedule } from "@/lib/server/playback";
 import { setScheduleClock } from "@/lib/server/schedule";
+import { GET as schedulesGet, POST as schedulePost } from "@/app/api/schedules/route";
+import { GET as displaysGet } from "@/app/api/displays/route";
 import { samplePromo } from "@/lib/promo-templates";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -92,6 +94,23 @@ describe.skipIf(!configured)("promo slides", () => {
     expect(await published(menu.playlistId)).toEqual([menu.mediaId]);
     let rules = (await admin.from("schedules").select("display_id, starts_on, ends_on, priority, start_minute, end_minute, weekdays").eq("playlist_id", row.combo_playlist_id)).data!;
     expect(rules).toEqual([{ display_id: tv!.id, starts_on: "2026-12-01", ends_on: "2026-12-24", priority: 5, start_minute: 0, end_minute: 1440, weekdays: [1, 2, 3, 4, 5, 6, 7] }]);
+
+    // M14: promo-managed rules are marked in GET /api/schedules and on screens; others are null.
+    await schedulePost(post("/api/schedules", a.token, { name: "Manual", playlistId: menu.playlistId, displayId: tv!.id, weekdays: [1], startTime: "09:00", endTime: "10:00" }));
+    const scheds = await (await schedulesGet(req("/api/schedules", a.token))).json();
+    expect(scheds).toHaveLength(2);
+    for (const s of scheds) {
+      if (s.playlistId === row.combo_playlist_id) expect([s.managedBy, s.promoId]).toEqual(["promo", dated.id]);
+      else expect([s.managedBy, s.promoId]).toEqual([null, null]);
+    }
+    expect((await (await schedulesGet(req("/api/schedules", b.token))).json())).toEqual([]);
+    setScheduleClock(() => new Date("2026-12-10T18:00:00Z"));
+    try {
+      const screens = await (await displaysGet(req("/api/displays", a.token))).json();
+      const cur = screens.find((d: { id: string }) => d.id === tv!.id).currentSchedule;
+      expect([cur.managedBy, cur.promoId]).toEqual(["promo", dated.id]);
+    } finally { setScheduleClock(null); }
+    await admin.from("schedules").delete().eq("account_id", a.accountId).eq("name", "Manual");
 
     // The player gets the "menu + promo" playlist only between the dates (noon UTC is the same date in any US zone).
     const playing = async (iso: string) => {

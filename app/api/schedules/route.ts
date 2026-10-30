@@ -4,6 +4,7 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { formatMinute, parseScheduleBody } from "@/lib/server/schedule";
 import { assertTarget } from "@/lib/server/schedule-target";
 import { CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
+import { ownerFields, promoByPlaylist } from "@/lib/server/schedule-owner";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
@@ -29,6 +30,8 @@ export async function GET(req: Request) {
   const groupIds = [...new Set(rows.map((row) => row.group_id).filter(Boolean))] as string[];
   const names = await namesFor(admin.accountId, playlistIds, displayIds, groupIds);
   if (names === "error") return fail("Couldn't load schedules.", 500);
+  const owners = await promoByPlaylist(admin.accountId);
+  if (!owners) return fail("Couldn't load schedules.", 500);
   return json(rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -46,6 +49,7 @@ export async function GET(req: Request) {
     priority: row.priority,
     enabled: row.enabled,
     updatedAt: row.updated_at,
+    ...ownerFields(owners, String(row.playlist_id)),
   })));
 }
 

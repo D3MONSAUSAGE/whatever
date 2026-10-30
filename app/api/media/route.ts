@@ -1,4 +1,5 @@
 import { BUCKET, db } from "@/lib/server/supabase";
+import { fetchAll, inChunks, matches, pageOf, parseListQuery, signAll } from "@/lib/server/paging";
 import { requireAdmin } from "@/lib/server/auth";
 import { checkImage } from "@/lib/server/images";
 import { MAX_UPLOAD_BYTES, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
@@ -19,50 +20,70 @@ function asBlob(value: FormDataEntryValue | null): Blob | null {
   return value;
 }
 
+async function loadMediaRows(accountId: string, columns: string, plainColumns: string, ids?: string[]) {
+  const run = (cols: string) => ids
+    ? inChunks<MediaRow>(ids, (chunk) => db().from("media").select(cols).eq("account_id", accountId).in("id", chunk) as unknown as PromiseLike<{ data: MediaRow[] | null; error: { code?: string; message?: string } | null }>)
+    : fetchAll<MediaRow>((from, to) => db().from("media").select(cols).eq("account_id", accountId)
+      .order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: MediaRow[] | null; error: { code?: string; message?: string } | null }>);
+  const rich = await run(columns);
+  if (rich.error && isMissingSchema(rich.error)) return run(plainColumns);
+  return rich;
+}
+
+const isMenuFile = (name: string) => name.endsWith("(menu).png");
+const isPromoFile = (name: string) => name.endsWith("(promo).png");
+
 export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
-
-  const rich = await db()
-    .from("media")
-    .select(MEDIA_COLUMNS_VIDEO)
-    .eq("account_id", admin.accountId)
-    .order("created_at", { ascending: false });
-  let rows = rich.data as MediaRow[] | null;
-  let error = rich.error;
-  if (error && isMissingSchema(error)) {
-    const plain = await db()
-      .from("media")
-      .select(MEDIA_COLUMNS)
-      .eq("account_id", admin.accountId)
-      .order("created_at", { ascending: false });
-    rows = plain.data as MediaRow[] | null;
-    error = plain.error;
-  }
-  if (error) return fail("Couldn't load images.", 500);
+  const query = parseListQuery(req);
 
   const usage = await usageByMedia(admin.accountId);
-  const urls = new Map<string, string>();
-  const paths = [...new Set((rows ?? []).flatMap((row) => [row.storage_path, row.thumbnail_path].filter(Boolean)))] as string[];
-  if (paths.length) {
-    const { data } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
-    data?.forEach((s) => s.path && s.signedUrl && urls.set(s.path, s.signedUrl));
+  let rows: MediaRow[];
+  let page: ReturnType<typeof pageOf<MediaRow>> | null = null;
+  if (!query) {
+    const all = await loadMediaRows(admin.accountId, MEDIA_COLUMNS_VIDEO, MEDIA_COLUMNS);
+    if (all.error) return fail("Couldn't load images.", 500);
+    rows = all.data ?? [];
+  } else {
+    // M14 opt-in: filter and sort over light rows, then load and sign only the requested page.
+    const light = await loadMediaRows(admin.accountId, "id, file_name, size_bytes, created_at, kind, duration_ms", "id, file_name, size_bytes, created_at");
+    if (light.error) return fail("Couldn't load images.", 500);
+    let list = (light.data ?? []).filter((r) => matches(r.file_name, query.q));
+    const k = query.kind;
+    if (k === "image") list = list.filter((r) => r.kind !== "video");
+    else if (k === "video") list = list.filter((r) => r.kind === "video");
+    else if (k === "menu") list = list.filter((r) => isMenuFile(r.file_name));
+    else if (k === "promo") list = list.filter((r) => isPromoFile(r.file_name));
+    else if (k === "upload") list = list.filter((r) => !isMenuFile(r.file_name) && !isPromoFile(r.file_name));
+    if (query.unused) list = list.filter((r) => !(usage?.get(r.id)?.length));
+    if (query.sort === "oldest") list.reverse();
+    else if (query.sort === "name") list.sort((x, y) => x.file_name.localeCompare(y.file_name, undefined, { sensitivity: "base" }));
+    else if (query.sort === "size") list.sort((x, y) => y.size_bytes - x.size_bytes);
+    else if (query.sort === "duration") list.sort((x, y) => (y.duration_ms ?? -1) - (x.duration_ms ?? -1));
+    page = pageOf(list, query);
+    const full = page.items.length ? await loadMediaRows(admin.accountId, MEDIA_COLUMNS_VIDEO, MEDIA_COLUMNS, page.items.map((r) => r.id)) : { data: [], error: null };
+    if (full.error) return fail("Couldn't load images.", 500);
+    const byId = new Map((full.data ?? []).map((r) => [r.id, r]));
+    rows = page.items.map((r) => byId.get(r.id)).filter((r): r is MediaRow => Boolean(r));
   }
-  return json(
-    (rows ?? []).map((r) => ({
-      id: r.id,
-      fileName: r.file_name,
-      sizeBytes: r.size_bytes,
-      createdAt: r.created_at,
-      url: urls.get(r.storage_path) ?? null,
-      kind: r.kind === "video" ? "video" : "image",
-      durationMs: r.duration_ms ?? null,
-      width: r.width ?? null,
-      height: r.height ?? null,
-      thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
-      usedIn: usage?.get(r.id) ?? [],
-    })),
-  );
+
+  const urls = await signAll(rows.flatMap((row) => [row.storage_path, row.thumbnail_path].filter(Boolean)) as string[]);
+  const items = rows.map((r) => ({
+    id: r.id,
+    fileName: r.file_name,
+    sizeBytes: r.size_bytes,
+    createdAt: r.created_at,
+    url: urls.get(r.storage_path) ?? null,
+    kind: r.kind === "video" ? "video" : "image",
+    durationMs: r.duration_ms ?? null,
+    width: r.width ?? null,
+    height: r.height ?? null,
+    thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
+    usedIn: usage?.get(r.id) ?? [],
+  }));
+  if (!page) return json(items);
+  return json({ items, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
 }
 
 type MediaRow = {

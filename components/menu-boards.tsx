@@ -107,6 +107,7 @@ export function MenuBoards() {
           ))}
         </ul>
       ) : null}
+      {confirm.node}
     </section>
   );
 }

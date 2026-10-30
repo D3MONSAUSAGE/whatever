@@ -628,7 +628,19 @@ paths:
         the database is returned as `image`. `usedIn` lists playlists that
         reference the file on a draft or published slide (Phase 2C). A failed
         usage lookup yields an empty `usedIn` rather than an error.
+        M14: without any of `limit`, `offset`, `q`, `kind`, `unused`, `sort`
+        the response is unchanged (a plain array) and now always contains every
+        row (no ~1000-row cap). With any of them it returns a page envelope
+        `{ items, total, offset, limit, nextOffset }` (see ListPage).
+        `sort`: newest (default), oldest, name, size, duration.
       operationId: listMedia
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: q, in: query, description: Case-insensitive name search, schema: { type: string, maxLength: 100 } }
+        - { name: sort, in: query, schema: { type: string } }
+        - { name: kind, in: query, schema: { type: string, enum: [image, video, upload, menu, promo] } }
+        - { name: unused, in: query, description: "1 = only files not in any playlist", schema: { type: string, enum: ["1", "true"] } }
       responses:
         "200":
           description: Media rows
@@ -913,7 +925,17 @@ paths:
         is within 60000 ms. Signed media and playlist URLs expire after 3600
         seconds. Playlist URL is the first published slide (a video uses its
         thumbnail).
+        M14: without any of `limit`, `offset`, `q`, `kind`, `unused`, `sort`
+        the response is unchanged (a plain array) and now always contains every
+        row (no ~1000-row cap). With any of them it returns a page envelope
+        `{ items, total, offset, limit, nextOffset }` (see ListPage).
+        `sort`: default order, or name.
       operationId: listDisplays
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: q, in: query, description: Case-insensitive name search, schema: { type: string, maxLength: 100 } }
+        - { name: sort, in: query, schema: { type: string } }
       responses:
         "200":
           description: Screens
@@ -1105,7 +1127,17 @@ paths:
         `thumbnailUrl` is the draft slide with the lowest position, signed for
         3600 seconds. A video at that position uses its thumbnail. Null when
         the draft is empty.
+        M14: without any of `limit`, `offset`, `q`, `kind`, `unused`, `sort`
+        the response is unchanged (a plain array) and now always contains every
+        row (no ~1000-row cap). With any of them it returns a page envelope
+        `{ items, total, offset, limit, nextOffset }` (see ListPage).
+        `sort`: default order, or name.
       operationId: listPlaylists
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: q, in: query, description: Case-insensitive name search, schema: { type: string, maxLength: 100 } }
+        - { name: sort, in: query, schema: { type: string } }
       responses:
         "200":
           description: Summaries
@@ -2160,6 +2192,15 @@ components:
             group: { value: { error: "Too many screen groups. Wait 15 minutes, then try again." } }
             schedule: { value: { error: "Too many schedules. Wait 15 minutes, then try again." } }
   schemas:
+    ListPage:
+      type: object
+      description: M14 opt-in page envelope; `items` has the same item shape as the plain array.
+      properties:
+        items: { type: array, items: {} }
+        total: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
+        nextOffset: { type: integer, nullable: true }
     PromoContent:
       type: object
       required: [headline]
@@ -2387,6 +2428,8 @@ components:
         playlistName: { type: string }
         target: { type: string, enum: [display, group] }
         priority: { type: integer }
+        managedBy: { type: string, enum: [promo], nullable: true, description: "M14. promo = created and kept in sync by a dated promo (edit the promo, not the rule). Derived, always present." }
+        promoId: { type: string, format: uuid, nullable: true, description: M14. The managing promo, else null. }
     LocationRef:
       type: object
       required: [id, name, timezone]
@@ -2434,6 +2477,8 @@ components:
         priority: { type: integer, minimum: -1000, maximum: 1000 }
         enabled: { type: boolean }
         updatedAt: { type: string, format: date-time }
+        managedBy: { type: string, enum: [promo], nullable: true, description: "M14. promo = created and kept in sync by a dated promo (edit the promo, not the rule). Derived, always present." }
+        promoId: { type: string, format: uuid, nullable: true, description: M14. The managing promo, else null. }
     ScheduleInput:
       type: object
       properties:

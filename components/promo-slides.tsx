@@ -169,6 +169,7 @@ export function PromoSlides() {
           })}
         </ul>
       ) : null}
+      {confirm.node}
     </section>
   );
 }
