@@ -121,7 +121,7 @@ test("settings shows the email, saves a display name, changes the password, and 
 
   await page.goto("/dashboard/settings");
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-  await expect(page.getByText(user.email, { exact: true })).toBeVisible();
+  await expect(page.getByText(user.email, { exact: true }).first()).toBeVisible();
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Front of house");
   await page.getByRole("button", { name: "Save name" }).click();
   await expect(page.getByText("Name saved")).toBeVisible();

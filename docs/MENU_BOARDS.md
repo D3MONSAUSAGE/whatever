@@ -20,3 +20,13 @@
 
 ## API
 See `docs/api/openapi.yaml`: `GET/POST /api/menus`, `GET/PATCH/DELETE /api/menus/{id}`, `POST /api/menus/preview` (PNG), `POST /api/schedules/day-parts`.
+
+## Branding (M11)
+
+- **Brand kit** — one per account in `brand_kits` (migration `0008_brand_kits.sql`, additive; RLS on, no client access). Logo (`logo_media_id`, cleared automatically if the media is deleted), main colour, highlight colour.
+- **API** — `GET/PUT /api/brand`, `POST /api/brand/apply` (re-renders menus in batches of 8; menus with `useBrand: false` are skipped).
+- **Menus** — `content.photoMediaId` adds a photo on the right 38% of the slide; `content.useBrand` (default true) turns the brand on or off per menu. No change to the `menus` table.
+- **Images** — logos and photos must be PNG or JPEG from the same account, ≤15 MB. WebP is refused because the renderer can't draw it.
+- **Readability** — colours are adjusted automatically: text on a brand background is black or white, whichever contrasts more (≥4.5:1); section headings fall back to white/black when the brand colour is too close to the background.
+- **Saving the brand does not change existing screens.** Only "Apply to all menus" (or editing a menu) re-renders; screens then refresh like any menu edit. Player is unchanged.
+- **Rollback** — redeploy the previous build. The `brand_kits` table and the two optional content fields are ignored by older code.

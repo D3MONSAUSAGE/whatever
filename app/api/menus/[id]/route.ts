@@ -3,8 +3,7 @@ import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
-import { MENUS_UNAVAILABLE, dropMenuImage, isMissingSchema, menuView, parseMenuBody, storeMenuImage, type MenuRow } from "@/lib/server/menus";
-import { isMenuTemplate, parseMenuContent } from "@/lib/menu-templates";
+import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,34 +41,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (found.error) return found.error;
   const row = found.row;
 
-  const name = parsed.value.name ?? row.name;
-  const template = parsed.value.template ?? (isMenuTemplate(row.template) ? row.template : "classic");
-  const stored = parseMenuContent(row.content);
-  const content = parsed.value.content ?? (stored.ok ? stored.value : null);
-  if (!content) return fail("Add your menu items.", 400);
-
+  const photo = await checkMenuPhoto(admin.accountId, parsed.value.content);
+  if (photo) return fail(photo.error, photo.status);
   const limited = await enforceLimit(`upload-image:${admin.userId}`, UPLOAD_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE);
   if (limited) return limited;
-  const mediaId = await storeMenuImage(admin.accountId, name, template, content);
-  if (!mediaId) return fail("Couldn't create the menu image. Try again.", 500);
-
-  let playlistId = row.playlist_id;
-  if (row.media_id) {
-    const swap = await db().rpc("menu_swap_media", { p_account_id: admin.accountId, p_old_media_id: row.media_id, p_new_media_id: mediaId });
-    if (swap.error || !swap.data) {
-      await dropMenuImage(admin.accountId, mediaId);
-      return fail("Couldn't update the menu.", 500);
-    }
-  }
-  if (!playlistId) {
-    const created = await db().rpc("menu_create_playlist", { p_account_id: admin.accountId, p_name: name, p_media_id: mediaId });
-    if (!created.error && created.data) playlistId = String(created.data);
-  }
-  const updated = await db().from("menus").update({
-    name, template, content, media_id: mediaId, playlist_id: playlistId, updated_at: new Date().toISOString(),
-  }).eq("id", id).eq("account_id", admin.accountId);
-  if (updated.error) return fail("Couldn't update the menu.", 500);
-  await dropMenuImage(admin.accountId, row.media_id);
+  const result = await rerenderMenu(admin.accountId, row, parsed.value);
+  if (!("ok" in result)) return fail(result.error, result.status);
+  const { mediaId, playlistId } = result;
 
   let published: boolean | undefined;
   if (parsed.value.displayIds?.length && playlistId) {

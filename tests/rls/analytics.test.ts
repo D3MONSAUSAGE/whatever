@@ -11,7 +11,7 @@ const configured = local && anon.length > 20 && service.length > 20 && process.e
 
 /** M8 (0005_analytics.sql): triggers, proof of play, purge, and that analytics tables stay server-only. Local DB only. */
 describe.skipIf(!configured)("analytics schema", () => {
-  const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin: SupabaseClient = createClient(url || "http://127.0.0.1:54321", service || "unset", { auth: { persistSession: false, autoRefreshToken: false } });
   const created: string[] = [];
   afterAll(() => removeCreatedTestUsers(admin, created));
 
