@@ -46,11 +46,15 @@ export function parseMenuBody(body: Record<string, unknown>, partial = false):
 /** Render and store the image as a normal media row. Returns the media id. */
 export async function storeMenuImage(accountId: string, name: string, template: MenuTemplate, content: MenuContent) {
   const bytes = renderMenuPng(template, content, await artFor(accountId, content));
+  return storeRenderedImage(accountId, `${name.slice(0, 70)} (menu).png`, bytes);
+}
+
+/** Store a rendered 1920×1080 PNG as a normal media row. Returns the media id. */
+export async function storeRenderedImage(accountId: string, fileName: string, bytes: Uint8Array) {
   const id = crypto.randomUUID();
   const path = `${accountId}/${id}.png`;
   const up = await db().storage.from(BUCKET).upload(path, bytes, { contentType: "image/png", cacheControl: "3600", upsert: false });
   if (up.error) return null;
-  const fileName = `${name.slice(0, 70)} (menu).png`;
   const row = await db().from("media").insert({
     id, account_id: accountId, file_name: fileName, storage_path: path, mime_type: "image/png", size_bytes: bytes.length,
   });

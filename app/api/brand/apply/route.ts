@@ -3,6 +3,7 @@ import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { MENUS_UNAVAILABLE, isMissingSchema, rerenderMenu, type MenuRow } from "@/lib/server/menus";
+import { PROMO_COLUMNS, rerenderPromo, type PromoRow } from "@/lib/server/promos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,21 @@ export async function POST(req: Request) {
   const after = typeof body.after === "string" && isUuid(body.after) ? body.after : null;
   const limited = await enforceLimit(`brand-apply:${admin.userId}`, 60, 30, "Too many updates. Wait a minute.");
   if (limited) return limited;
+  if (body.kind === "promos") {
+    let pq = db().from("promos").select(PROMO_COLUMNS).eq("account_id", admin.accountId).order("id").limit(BATCH);
+    if (after) pq = pq.gt("id", after);
+    const prow = await pq;
+    if (prow.error) return isMissingSchema(prow.error) ? json({ updated: 0, skipped: 0, failed: 0, next: null }) : fail("Couldn't load your promos.", 500);
+    const plist = (prow.data ?? []) as PromoRow[];
+    let pu = 0, ps = 0, pf = 0;
+    for (const row of plist) {
+      const c = row.content as { useBrand?: unknown } | null;
+      if (c && c.useBrand === false) { ps++; continue; }
+      const r = await rerenderPromo(admin.accountId, row, {});
+      if ("ok" in r) pu++; else pf++;
+    }
+    return json({ updated: pu, skipped: ps, failed: pf, next: plist.length === BATCH ? plist[plist.length - 1].id : null });
+  }
   let q = db().from("menus").select("id, name, template, content, media_id, playlist_id, created_at, updated_at")
     .eq("account_id", admin.accountId).order("id").limit(BATCH);
   if (after) q = q.gt("id", after);

@@ -12,7 +12,7 @@ export type Brand = { primaryColor: string; accentColor: string; logoMediaId: st
 
 /** JPG or PNG images that can go on a menu (logos and photos). Menu slides themselves are left out. */
 export function artImages(media: MediaItem[] | null | undefined) {
-  return (media ?? []).filter((m) => m.kind !== "video" && /\.(png|jpe?g)$/i.test(m.fileName) && !m.fileName.endsWith("(menu).png"));
+  return (media ?? []).filter((m) => m.kind !== "video" && /\.(png|jpe?g)$/i.test(m.fileName) && !/\((menu|promo)\)\.png$/.test(m.fileName));
 }
 
 export type MenuBoard = {
@@ -64,6 +64,7 @@ export function MenuBoards() {
         {!draft ? <button className="btn btn-primary" onClick={startNew}>New menu board</button> : null}
         <Link href="/dashboard/media" className="btn btn-quiet">Back to media</Link>
         <Link href="/dashboard/schedule#day-parts" className="btn btn-quiet">Breakfast, lunch &amp; dinner times</Link>
+        <Link href="/dashboard/media/promos" className="btn btn-quiet">Promos &amp; specials</Link>
       </PageHeader>
 
       {!draft && menus.data?.available ? <BrandCard images={artImages(media.data)} onChanged={() => menus.reload()} /> : null}
@@ -289,7 +290,7 @@ export function BrandCard({ images, onChanged }: { images: MediaItem[]; onChange
     try {
       await api("/api/brand", { method: "PUT", body: JSON.stringify(form) });
       await brand.reload();
-      toast.show("Brand saved. New menus use it. Choose “Apply to all menus” to update the ones you have.");
+      toast.show("Brand saved. New menus use it. Choose “Apply to all menus and promos” to update the ones you have.");
     } catch (err) {
       toast.show((err as Error).message, true);
     } finally {
@@ -300,14 +301,16 @@ export function BrandCard({ images, onChanged }: { images: MediaItem[]; onChange
   async function applyAll() {
     setBusy("apply");
     try {
-      let after: string | null = null;
       let updated = 0, failed = 0;
-      do {
-        const res: { updated: number; failed: number; next: string | null } = await api("/api/brand/apply", { method: "POST", body: JSON.stringify(after ? { after } : {}) });
-        updated += res.updated; failed += res.failed; after = res.next;
-      } while (after);
+      for (const kind of ["menus", "promos"] as const) {
+        let after: string | null = null;
+        do {
+          const res: { updated: number; failed: number; next: string | null } = await api("/api/brand/apply", { method: "POST", body: JSON.stringify({ kind, ...(after ? { after } : {}) }) });
+          updated += res.updated; failed += res.failed; after = res.next;
+        } while (after);
+      }
       onChanged?.();
-      toast.show(failed ? `Updated ${updated} menus. ${failed} couldn't be updated; try again.` : `Updated ${updated} menu${updated === 1 ? "" : "s"}. Screens refresh within a minute.`, failed > 0);
+      toast.show(failed ? `Updated ${updated} slides. ${failed} couldn't be updated; try again.` : `Updated ${updated} slide${updated === 1 ? "" : "s"}. Screens refresh within a minute.`, failed > 0);
     } catch (err) {
       toast.show((err as Error).message, true);
     } finally {
@@ -343,7 +346,7 @@ export function BrandCard({ images, onChanged }: { images: MediaItem[]; onChange
       {!valid ? <p className="text-sm text-danger mt-2" role="alert">Use colours like #0066ff.</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button className="btn btn-primary" disabled={!valid || busy !== null} onClick={save}>{busy === "save" ? "Saving…" : "Save brand"}</button>
-        <button className="btn btn-quiet" disabled={!brand.data.custom || busy !== null} onClick={applyAll}>{busy === "apply" ? "Updating…" : "Apply to all menus"}</button>
+        <button className="btn btn-quiet" disabled={!brand.data.custom || busy !== null} onClick={applyAll}>{busy === "apply" ? "Updating…" : "Apply to all menus and promos"}</button>
       </div>
     </section>
   );

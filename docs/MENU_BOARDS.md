@@ -30,3 +30,13 @@ See `docs/api/openapi.yaml`: `GET/POST /api/menus`, `GET/PATCH/DELETE /api/menus
 - **Readability** — colours are adjusted automatically: text on a brand background is black or white, whichever contrasts more (≥4.5:1); section headings fall back to white/black when the brand colour is too close to the background.
 - **Saving the brand does not change existing screens.** Only "Apply to all menus" (or editing a menu) re-renders; screens then refresh like any menu edit. Player is unchanged.
 - **Rollback** — redeploy the previous build. The `brand_kits` table and the two optional content fields are ignored by older code.
+
+## Promos & specials (M12)
+
+A promo is a branded slide (templates: Happy hour, Deal, Today's special) rendered by the same server renderer as menus into a normal PNG in the media library ("<name> (promo).png") with its own playlist. Data lives in `promos` (migration `0009_promos.sql`, additive, RLS on, service-role only).
+
+- **Always on (no dates):** "Add to <menu>" appends the slide to the menu's playlist (draft + published) and bumps its screens. "Take off menu" removes it; refused if it would leave the playlist empty.
+- **Dated (start and/or end):** "Add to <menu>" creates a "menu + promo" playlist (the menu's slides plus the promo) and one ordinary schedule rule per screen currently showing the menu: every day, all day, priority 5 (day parts at 10 still win), limited to the promo's dates. Outside the dates the screen plays its assigned menu playlist as before. Changing dates moves the rules; deleting or taking off the promo removes them and the combo playlist (kept if a screen was hand-assigned to it).
+- Edits re-render and swap the image everywhere via `menu_swap_media`. "Apply to all menus and promos" in Settings re-renders promos with the brand.
+- The player (`player.html`) is unchanged; promos are plain image slides and schedule rules.
+- Rollback: redeploy the previous build. The `promos` table can stay; any promo slides already in playlists remain ordinary images.

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { parsePromoContent, parsePromoDates, samplePromo } from "@/lib/promo-templates";
+import { promoSvg, wrap } from "@/lib/server/promo-render";
 import { MENU_LIMITS, normalizeHex, parseMenuContent, sampleMenu } from "@/lib/menu-templates";
 import { columnsFor, contrast, fit, menuSvg, renderMenuPng, themeFor } from "@/lib/server/menu-render";
 
@@ -67,5 +69,25 @@ describe("brand", () => {
     const art = menuSvg("bold", sampleMenu(), { logo: "data:image/png;base64,AA", photo: "data:image/png;base64,BB" });
     expect(art.match(/<image/g)).toHaveLength(2);
     expect(menuSvg("bold", { ...sampleMenu(), useBrand: false }, { brand: { primaryColor: "#c8102e", accentColor: "#fff" } })).not.toContain("#c8102e");
+  });
+});
+
+describe("promos", () => {
+  it("validates content and dates", () => {
+    expect(parsePromoContent(samplePromo()).ok).toBe(true);
+    expect(parsePromoContent({ ...samplePromo(), headline: " " }).ok).toBe(false);
+    expect(parsePromoContent({ ...samplePromo(), price: "x".repeat(13) }).ok).toBe(false);
+    expect(parsePromoDates("2026-11-01", "2026-11-30")).toEqual({ ok: true, startsOn: "2026-11-01", endsOn: "2026-11-30" });
+    expect(parsePromoDates("", null)).toEqual({ ok: true, startsOn: null, endsOn: null });
+    expect(parsePromoDates("2026-02-30", null).ok).toBe(false);
+    expect(parsePromoDates("2026-12-02", "2026-12-01").ok).toBe(false);
+  });
+  it("wraps long headlines to two lines and renders every template", () => {
+    expect(wrap("A very long headline that goes on and on", 150, 900, 800).length).toBe(2);
+    for (const t of ["happy", "deal", "special"] as const) {
+      const svg = promoSvg(t, samplePromo(t), { brand: { primaryColor: "#ffe600", accentColor: "#111111" } });
+      expect(svg).toContain(samplePromo(t).headline.split(" ")[0]);
+      expect(svg).not.toContain("<image");
+    }
   });
 });
