@@ -40,3 +40,7 @@ A promo is a branded slide (templates: Happy hour, Deal, Today's special) render
 - Edits re-render and swap the image everywhere via `menu_swap_media`. "Apply to all menus and promos" in Settings re-renders promos with the brand.
 - The player (`player.html`) is unchanged; promos are plain image slides and schedule rules.
 - Rollback: redeploy the previous build. The `promos` table can stay; any promo slides already in playlists remain ordinary images.
+
+### M13: dated promos follow the menu
+
+Migration `0010_promos_follow_menu.sql` (additive: functions `promo_sync_display`, `promo_sync_account`, and two triggers on `displays`). Whenever a screen's assigned playlist changes, or a screen is created already showing a menu, the database adds that menu's dated promo rules to the screen and removes promo rules for menus it no longer shows. Only promo rules (schedules on a promo's "menu + promo" playlist) are touched; the 200-schedule cap is respected. A dated promo can now be added before any screen shows the menu (`screens: 0`). Deleting a menu takes its promos off first. `GET /api/promos` includes `screens` (id, name) for each promo. Rollback: redeploy the previous build; the triggers can stay, or be removed with `drop trigger displays_promo_follow_menu, displays_promo_follow_menu_new on public.displays`.

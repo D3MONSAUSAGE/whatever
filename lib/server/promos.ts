@@ -110,18 +110,40 @@ export async function detachPromo(accountId: string, row: PromoRow) {
   return !up.error;
 }
 
-export async function promoView(rows: PromoRow[]) {
+/** Which screens each promo plays on: menu screens for "added", screens with its rules for "scheduled". */
+async function promoScreens(rows: PromoRow[], accountId: string) {
+  const out = new Map<string, { id: string; name: string }[]>();
+  const placed = rows.filter((r) => r.placement !== "none");
+  if (!placed.length) return out;
+  const [displays, menus, rules] = await Promise.all([
+    db().from("displays").select("id, name, assigned_playlist_id").eq("account_id", accountId).order("name"),
+    db().from("menus").select("id, playlist_id").eq("account_id", accountId),
+    db().from("schedules").select("display_id, playlist_id").eq("account_id", accountId).not("display_id", "is", null),
+  ]);
+  const menuPlaylist = new Map((menus.data ?? []).map((m) => [String(m.id), String(m.playlist_id)]));
+  for (const r of placed) {
+    const list = (displays.data ?? []).filter((d) => r.placement === "added"
+      ? d.assigned_playlist_id && d.assigned_playlist_id === menuPlaylist.get(String(r.menu_id))
+      : (rules.data ?? []).some((x) => x.display_id === d.id && x.playlist_id === r.combo_playlist_id));
+    out.set(r.id, list.map((d) => ({ id: String(d.id), name: String(d.name) })));
+  }
+  return out;
+}
+
+export async function promoView(rows: PromoRow[], accountId: string) {
   const ids = rows.map((r) => r.media_id).filter((x): x is string => Boolean(x));
   const media = ids.length ? (await db().from("media").select("id, storage_path").in("id", ids)).data ?? [] : [];
   const urls = await signedUrls(media.map((m) => String(m.storage_path)));
   const byId = new Map(media.map((m) => [String(m.id), urls.get(String(m.storage_path)) ?? null]));
   const today = new Date().toISOString().slice(0, 10);
+  const screens = await promoScreens(rows, accountId);
   return rows.map((r) => {
     const s = stored(r);
     return {
       id: r.id, name: r.name, template: s?.template ?? "happy", content: s?.content ?? null,
       mediaId: r.media_id, playlistId: r.playlist_id, imageUrl: r.media_id ? byId.get(r.media_id) ?? null : null,
       startsOn: r.starts_on, endsOn: r.ends_on, menuId: r.menu_id, placement: r.placement,
+      screens: screens.get(r.id) ?? [],
       expired: Boolean(r.ends_on && r.ends_on < today), createdAt: r.created_at, updatedAt: r.updated_at,
     };
   });
@@ -155,7 +177,6 @@ export async function attachPromo(accountId: string, row: PromoRow, menuId: stri
     return { ok: true, mode: "added", screens: displayIds.length } as const;
   }
 
-  if (!displayIds.length) return { status: 400, error: "Show this menu on a screen first, then add the promo." } as const;
   const count = await db().from("schedules").select("id").eq("account_id", accountId);
   if (count.error) return { status: 500, error: "Couldn't add the promo." } as const;
   if ((count.data ?? []).length + displayIds.length > MAX_SCHEDULES) return { status: 400, error: "This account already has 200 schedules." } as const;
@@ -165,16 +186,14 @@ export async function attachPromo(accountId: string, row: PromoRow, menuId: stri
   });
   if (combo.error || !combo.data) return { status: 500, error: "Couldn't add the promo." } as const;
   const comboId = String(combo.data);
-  const rules = await db().from("schedules").insert(displayIds.map((displayId) => ({
-    account_id: accountId, name: `Promo: ${row.name}`.slice(0, 80), playlist_id: comboId, display_id: displayId, group_id: null,
-    weekdays: [1, 2, 3, 4, 5, 6, 7], start_minute: 0, end_minute: 1440, starts_on: row.starts_on, ends_on: row.ends_on,
-    priority: PROMO_PRIORITY, enabled: true, updated_at: now,
-  })));
-  if (rules.error) {
+  const saved = await db().from("promos").update({ placement: "scheduled", menu_id: menuId, combo_playlist_id: comboId, updated_at: now }).eq("id", row.id).eq("account_id", accountId);
+  // M13: rules are created (and later follow the menu) in the database, one per screen showing it.
+  const sync = saved.error ? saved : await db().rpc("promo_sync_account", { p_account_id: accountId });
+  if (sync.error) {
+    await db().from("promos").update({ placement: "none", menu_id: null, combo_playlist_id: null, updated_at: now }).eq("id", row.id).eq("account_id", accountId);
     await db().from("playlists").delete().eq("id", comboId).eq("account_id", accountId);
     return { status: 500, error: "Couldn't schedule the promo." } as const;
   }
-  await db().from("promos").update({ placement: "scheduled", menu_id: menuId, combo_playlist_id: comboId, updated_at: now }).eq("id", row.id).eq("account_id", accountId);
   return { ok: true, mode: "scheduled", screens: displayIds.length } as const;
 }
 

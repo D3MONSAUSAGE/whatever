@@ -1,3 +1,4 @@
+import { detachPromo, PROMO_COLUMNS, type PromoRow } from "@/lib/server/promos";
 import { requireAdmin } from "@/lib/server/auth";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
@@ -65,6 +66,9 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (admin instanceof Response) return admin;
   const { id } = await params;
   if (!isUuid(id)) return fail("Menu not found.", 404);
+  // M13: take this menu's promos off first so no "menu + promo" rules are left behind.
+  const promos = await db().from("promos").select(PROMO_COLUMNS).eq("menu_id", id).eq("account_id", admin.accountId);
+  for (const row of (promos.data ?? []) as unknown as PromoRow[]) await detachPromo(admin.accountId, row);
   const del = await db().from("menus").delete().eq("id", id).eq("account_id", admin.accountId).select("id");
   if (del.error) return isMissingSchema(del.error) ? fail(MENUS_UNAVAILABLE, 503) : fail("Couldn't delete the menu.", 500);
   if (!(del.data ?? []).length) return fail("Menu not found.", 404);

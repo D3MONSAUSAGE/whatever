@@ -24,7 +24,7 @@ export async function GET(req: Request, { params }: Ctx) {
   if (!isUuid(id)) return fail("Promo not found.", 404);
   const found = await load(admin.accountId, id);
   if (found.error) return found.error;
-  const [promo] = await promoView([found.row]);
+  const [promo] = await promoView([found.row], admin.accountId);
   return json(promo);
 }
 
