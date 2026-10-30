@@ -3,6 +3,7 @@ import { isMissingSchema } from "./schema";
 import { isUuid } from "./crypto";
 import { normalizePlaylistName } from "./validate";
 import { renderMenuPng } from "./menu-render";
+import { artFor, checkArtMedia } from "./brand";
 import { isMenuTemplate, parseMenuContent, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 
 export const MENUS_UNAVAILABLE = "Menu boards aren't available yet. Try again after the next update.";
@@ -44,7 +45,7 @@ export function parseMenuBody(body: Record<string, unknown>, partial = false):
 
 /** Render and store the image as a normal media row. Returns the media id. */
 export async function storeMenuImage(accountId: string, name: string, template: MenuTemplate, content: MenuContent) {
-  const bytes = renderMenuPng(template, content);
+  const bytes = renderMenuPng(template, content, await artFor(accountId, content));
   const id = crypto.randomUUID();
   const path = `${accountId}/${id}.png`;
   const up = await db().storage.from(BUCKET).upload(path, bytes, { contentType: "image/png", cacheControl: "3600", upsert: false });
@@ -103,3 +104,41 @@ export async function menuView(accountId: string, rows: MenuRow[]) {
 }
 
 export { isMissingSchema };
+
+/** Validate the optional photo before rendering. */
+export async function checkMenuPhoto(accountId: string, content: MenuContent | undefined) {
+  if (!content?.photoMediaId) return null;
+  return checkArtMedia(accountId, content.photoMediaId, "photo");
+}
+
+/**
+ * Re-render a menu with optional changes, swap the new image in everywhere the old one
+ * plays, and remove the old image. Shared by PATCH /api/menus/{id} and brand "apply to all".
+ */
+export async function rerenderMenu(accountId: string, row: MenuRow, patch: { name?: string; template?: MenuTemplate; content?: MenuContent }) {
+  const name = patch.name ?? row.name;
+  const template: MenuTemplate = patch.template ?? (isMenuTemplate(row.template) ? row.template : "classic");
+  const stored = parseMenuContent(row.content);
+  const content = patch.content ?? (stored.ok ? stored.value : null);
+  if (!content) return { status: 400, error: "Add your menu items." } as const;
+  const mediaId = await storeMenuImage(accountId, name, template, content);
+  if (!mediaId) return { status: 500, error: "Couldn't create the menu image. Try again." } as const;
+  let playlistId = row.playlist_id;
+  if (row.media_id) {
+    const swap = await db().rpc("menu_swap_media", { p_account_id: accountId, p_old_media_id: row.media_id, p_new_media_id: mediaId });
+    if (swap.error || !swap.data) {
+      await dropMenuImage(accountId, mediaId);
+      return { status: 500, error: "Couldn't update the menu." } as const;
+    }
+  }
+  if (!playlistId) {
+    const created = await db().rpc("menu_create_playlist", { p_account_id: accountId, p_name: name, p_media_id: mediaId });
+    if (!created.error && created.data) playlistId = String(created.data);
+  }
+  const updated = await db().from("menus").update({
+    name, template, content, media_id: mediaId, playlist_id: playlistId, updated_at: new Date().toISOString(),
+  }).eq("id", row.id).eq("account_id", accountId);
+  if (updated.error) return { status: 500, error: "Couldn't update the menu." } as const;
+  await dropMenuImage(accountId, row.media_id);
+  return { ok: true, mediaId, playlistId } as const;
+}

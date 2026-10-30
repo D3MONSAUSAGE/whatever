@@ -428,6 +428,58 @@ paths:
       responses:
         "200": { description: PNG image, content: { image/png: { schema: { type: string, format: binary } } } }
         "400": { description: Validation error }
+        "404": { description: Photo is not in this account's media }
+  /api/brand:
+    get:
+      tags: [media]
+      summary: The account's brand kit (M11)
+      description: Logo and colours used on menu boards with useBrand true. `custom` is false until saved; `available` is false before migration 0008.
+      operationId: getBrand
+      responses:
+        "200": { description: Brand, content: { application/json: { schema: { $ref: "#/components/schemas/Brand" } } } }
+    put:
+      tags: [media]
+      summary: Save the logo and colours (M11)
+      description: The logo must be a PNG or JPEG in this account's media. Existing menus change only after POST /api/brand/apply.
+      operationId: putBrand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [primaryColor, accentColor]
+              properties:
+                primaryColor: { type: string, example: "#c8102e", description: "#rgb or #rrggbb" }
+                accentColor: { type: string, example: "#ffffff" }
+                logoMediaId: { type: string, format: uuid, nullable: true }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/Brand" } } } }
+        "400": { description: Bad colour or unsupported logo format (use PNG or JPEG) }
+        "404": { description: Logo not in this account's media }
+        "503": { description: Branding not yet available }
+  /api/brand/apply:
+    post:
+      tags: [media]
+      summary: Re-render menus with the current brand, 8 at a time (M11)
+      description: Menus with useBrand false are skipped. Call again with `after` = `next` until `next` is null. Screens update like a normal menu edit.
+      operationId: applyBrand
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { after: { type: string, format: uuid } } }
+      responses:
+        "200":
+          description: Batch result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated: { type: integer }
+                  skipped: { type: integer }
+                  failed: { type: integer }
+                  next: { type: string, format: uuid, nullable: true }
   /api/schedules/day-parts:
     post:
       tags: [schedules]
@@ -2037,12 +2089,22 @@ components:
             group: { value: { error: "Too many screen groups. Wait 15 minutes, then try again." } }
             schedule: { value: { error: "Too many schedules. Wait 15 minutes, then try again." } }
   schemas:
+    Brand:
+      type: object
+      properties:
+        primaryColor: { type: string }
+        accentColor: { type: string }
+        logoMediaId: { type: string, format: uuid, nullable: true }
+        custom: { type: boolean }
+        available: { type: boolean }
     MenuContent:
       type: object
       properties:
         title: { type: string, maxLength: 40 }
         subtitle: { type: string, maxLength: 80 }
         footer: { type: string, maxLength: 80 }
+        photoMediaId: { type: string, format: uuid, nullable: true, description: "M11. PNG or JPEG from this account's media, shown on the right." }
+        useBrand: { type: boolean, default: true, description: "M11. Apply the account brand (logo, colours)." }
         sections:
           type: array
           maxItems: 4

@@ -157,6 +157,12 @@ export default function Settings() {
         </form>
 
         <div className="card p-5">
+          <h2 className="font-semibold">Your brand</h2>
+          <p className="text-sm text-muted mt-1 mb-3">Add your logo and colours to your menu boards.</p>
+          <Link href="/dashboard/media/menus#brand" className="btn btn-quiet">Set up your brand</Link>
+        </div>
+
+        <div className="card p-5">
           <h2 className="font-semibold">Sign out</h2>
           <p className="text-sm text-muted mt-1 mb-3">Lost a phone or shared a computer? Sign out everywhere. Screens keep playing.</p>
           <div className="flex flex-wrap gap-2">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MENU_LIMITS, parseMenuContent, sampleMenu } from "@/lib/menu-templates";
-import { columnsFor, fit, menuSvg, renderMenuPng } from "@/lib/server/menu-render";
+import { MENU_LIMITS, normalizeHex, parseMenuContent, sampleMenu } from "@/lib/menu-templates";
+import { columnsFor, contrast, fit, menuSvg, renderMenuPng, themeFor } from "@/lib/server/menu-render";
 
 describe("menu content", () => {
   it("accepts the sample and drops blank rows", () => {
@@ -35,5 +35,37 @@ describe("menu render", () => {
       const view = new DataView(png.buffer, png.byteOffset);
       expect([view.getUint32(16), view.getUint32(20)]).toEqual([1920, 1080]);
     }
+  });
+});
+
+describe("brand", () => {
+  it("normalizes colours", () => {
+    expect(normalizeHex("#ABC")).toBe("#aabbcc");
+    expect(normalizeHex("#C8102E")).toBe("#c8102e");
+    expect(normalizeHex("red")).toBeNull();
+    expect(normalizeHex("#12345")).toBeNull();
+  });
+  it("validates photo and useBrand", () => {
+    const ok = parseMenuContent({ ...sampleMenu(), photoMediaId: "6f1c1a9e-2b1f-4a8c-9f0e-1d2c3b4a5e6f", useBrand: false });
+    expect(ok.ok && ok.value).toMatchObject({ useBrand: false });
+    expect(parseMenuContent({ ...sampleMenu(), photoMediaId: "nope" }).ok).toBe(false);
+  });
+  it("keeps text readable on any brand colour", () => {
+    for (const primary of ["#ffe600", "#000000", "#c8102e", "#ffffff", "#00ff00"]) {
+      for (const t of ["classic", "fresh", "bold"] as const) {
+        const theme = themeFor(t, { primaryColor: primary, accentColor: "#ffffff" });
+        expect(contrast(theme.text, theme.bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(theme.title, theme.band ?? theme.bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(theme.price, theme.priceBg ?? theme.bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(theme.section, theme.bg)).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+  it("adds the logo and photo only when given", () => {
+    const plain = menuSvg("bold", sampleMenu(), {});
+    expect(plain).not.toContain("<image");
+    const art = menuSvg("bold", sampleMenu(), { logo: "data:image/png;base64,AA", photo: "data:image/png;base64,BB" });
+    expect(art.match(/<image/g)).toHaveLength(2);
+    expect(menuSvg("bold", { ...sampleMenu(), useBrand: false }, { brand: { primaryColor: "#c8102e", accentColor: "#fff" } })).not.toContain("#c8102e");
   });
 });

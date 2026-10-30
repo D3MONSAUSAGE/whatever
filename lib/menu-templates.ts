@@ -3,13 +3,25 @@
 export type MenuTemplate = "classic" | "fresh" | "bold";
 export type MenuItem = { name: string; price: string; description: string };
 export type MenuSection = { name: string; items: MenuItem[] };
-export type MenuContent = { title: string; subtitle: string; footer: string; sections: MenuSection[] };
+export type MenuContent = { title: string; subtitle: string; footer: string; sections: MenuSection[]; photoMediaId?: string | null; useBrand?: boolean };
 
 export const MENU_TEMPLATES: { id: MenuTemplate; name: string; blurb: string; swatch: [string, string] }[] = [
   { id: "classic", name: "Classic night", blurb: "Dark navy with blue accents. Easy to read from across the room.", swatch: ["#0b1220", "#4d94ff"] },
   { id: "fresh", name: "Fresh day", blurb: "Bright and clean with a blue header. Great for breakfast and cafés.", swatch: ["#f6f9fe", "#0066ff"] },
   { id: "bold", name: "Bold blue", blurb: "Full Seemple blue with warm price tags that pop.", swatch: ["#0066ff", "#ffd34d"] },
 ];
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const DEFAULT_BRAND = { primaryColor: "#0066ff", accentColor: "#ffd34d" } as const;
+
+export function normalizeHex(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(v)) return v;
+  if (/^#[0-9a-f]{3}$/.test(v)) return `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`;
+  return null;
+}
 
 export const MENU_LIMITS = {
   name: 80, title: 40, subtitle: 80, footer: 80,
@@ -69,7 +81,14 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
   }
   if (total > MENU_LIMITS.items) return { ok: false, error: `Use up to ${MENU_LIMITS.items} items in total.` };
   if (!title && total === 0) return { ok: false, error: "Add a title or at least one item." };
-  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections } };
+  let photoMediaId: string | null = null;
+  if (raw.photoMediaId != null && raw.photoMediaId !== "") {
+    if (typeof raw.photoMediaId !== "string" || !UUID.test(raw.photoMediaId)) return { ok: false, error: "Choose a photo from your media." };
+    photoMediaId = raw.photoMediaId.toLowerCase();
+  }
+  if (raw.useBrand != null && typeof raw.useBrand !== "boolean") return { ok: false, error: "Use brand has to be true or false." };
+  const useBrand = raw.useBrand !== false;
+  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand } };
 }
 
 export const DAY_PARTS = [

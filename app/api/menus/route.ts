@@ -2,7 +2,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { db } from "@/lib/server/supabase";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
-import { MAX_MENUS, MENUS_UNAVAILABLE, dropMenuImage, isMissingSchema, menuView, parseMenuBody, storeMenuImage, type MenuInput, type MenuRow } from "@/lib/server/menus";
+import { MAX_MENUS, MENUS_UNAVAILABLE, checkMenuPhoto, dropMenuImage, isMissingSchema, menuView, parseMenuBody, storeMenuImage, type MenuInput, type MenuRow } from "@/lib/server/menus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +33,8 @@ export async function POST(req: Request) {
     return fail("Couldn't create the menu.", 500);
   }
   if ((count.data ?? []).length >= MAX_MENUS) return fail(`This account already has ${MAX_MENUS} menus.`, 400);
+  const photo = await checkMenuPhoto(admin.accountId, input.content);
+  if (photo) return fail(photo.error, photo.status);
   const limited = await enforceLimit(`upload-image:${admin.userId}`, UPLOAD_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE);
   if (limited) return limited;
 
