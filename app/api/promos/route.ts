@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     if (isMissingSchema(rows.error)) return json({ promos: [], available: false });
     return fail("Couldn't load promos.", 500);
   }
-  return json({ promos: await promoView((rows.data ?? []) as PromoRow[]), available: true });
+  return json({ promos: await promoView((rows.data ?? []) as PromoRow[], admin.accountId), available: true });
 }
 
 /** Render a promo slide into media plus its own one-slide playlist. Not shown anywhere until added to a menu. */

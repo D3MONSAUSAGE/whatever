@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, describe, expect, it } from "vitest";
 import { removeCreatedTestUsers } from "../helpers/account-cleanup";
 import { POST as menuPost } from "@/app/api/menus/route";
+import { DELETE as menuDelete } from "@/app/api/menus/[id]/route";
 import { GET as listGet, POST as promoPost } from "@/app/api/promos/route";
 import { DELETE as promoDelete, PATCH as promoPatch } from "@/app/api/promos/[id]/route";
 import { DELETE as detach, POST as attach } from "@/app/api/promos/[id]/menu/route";
@@ -133,9 +134,37 @@ describe.skipIf(!configured)("promo slides", () => {
     expect((await admin.from("media").select("id").eq("id", dated.mediaId)).data).toHaveLength(1);
     expect((await admin.from("displays").select("assigned_playlist_id").eq("id", tv!.id).single()).data!.assigned_playlist_id).toBe(menu.playlistId);
 
-    // A dated promo needs a screen showing the menu.
+    // M13: a dated promo can be added before any screen shows the menu, then follows the menu.
     const lone = await (await menuPost(post("/api/menus", a.token, { name: "Unused", template: "fresh", content: sampleMenu() }))).json();
     const d2 = await (await promoPost(post("/api/promos", a.token, { name: "Soon", template: "special", content: samplePromo("special"), startsOn: "2027-01-01" }))).json();
-    expect((await attach(post(`/api/promos/${d2.id}/menu`, a.token, { menuId: lone.id }), ctx(d2.id))).status).toBe(400);
+    expect(await (await attach(post(`/api/promos/${d2.id}/menu`, a.token, { menuId: lone.id }), ctx(d2.id))).json()).toEqual({ mode: "scheduled", screens: 0 });
+    const combo2 = (await admin.from("promos").select("combo_playlist_id").eq("id", d2.id).single()).data!.combo_playlist_id;
+    const rulesFor = async () => ((await admin.from("schedules").select("display_id, starts_on, ends_on, priority").eq("playlist_id", combo2)).data ?? []);
+    expect(await rulesFor()).toEqual([]);
+    const screensOf = async () => ((await (await listGet(req("/api/promos", a.token))).json()).promos.find((p: { id: string }) => p.id === d2.id).screens);
+    expect(await screensOf()).toEqual([]);
+
+    // Switching the screen to the menu brings the promo rule; switching away removes it.
+    await admin.from("displays").update({ assigned_playlist_id: lone.playlistId }).eq("id", tv!.id);
+    expect(await rulesFor()).toEqual([{ display_id: tv!.id, starts_on: "2027-01-01", ends_on: null, priority: 5 }]);
+    expect(await screensOf()).toEqual([{ id: tv!.id, name: "Counter" }]);
+    // A new screen created already showing the menu gets it too; unrelated schedules are untouched.
+    const { data: tv2 } = await admin.from("displays").insert({ account_id: a.accountId, name: "Patio", token_hash: `h-${randomUUID()}`, assigned_playlist_id: lone.playlistId }).select("id").single();
+    const other = await admin.from("schedules").insert({ account_id: a.accountId, name: "Mine", playlist_id: menu.playlistId, display_id: tv!.id, weekdays: [1], start_minute: 0, end_minute: 60, priority: 0 }).select("id").single();
+    expect((await rulesFor()).length).toBe(2);
+    await admin.from("displays").update({ assigned_playlist_id: menu.playlistId }).eq("id", tv!.id);
+    expect((await rulesFor()).map((r) => r.display_id)).toEqual([tv2!.id]);
+    expect((await admin.from("schedules").select("id").eq("id", other.data!.id)).data).toHaveLength(1);
+    // Date changes still apply to every screen it follows.
+    await promoPatch(req(`/api/promos/${d2.id}`, a.token, { method: "PATCH", body: JSON.stringify({ startsOn: "2027-01-01", endsOn: "2027-01-31" }) }), ctx(d2.id));
+    expect((await rulesFor())[0].ends_on).toBe("2027-01-31");
+    // Another account's screens never pick it up.
+    await admin.from("displays").insert({ account_id: b.accountId, name: "B tv", token_hash: `h-${randomUUID()}`, assigned_playlist_id: lone.playlistId }).then(() => null, () => null);
+    expect((await rulesFor()).length).toBe(1);
+
+    // Deleting the menu takes its promos off first: no leftover rules or "menu + promo" playlist.
+    expect((await menuDelete(req(`/api/menus/${lone.id}`, a.token, { method: "DELETE" }), ctx(lone.id))).status).toBe(200);
+    expect(await rulesFor()).toEqual([]);
+    expect((await admin.from("promos").select("placement").eq("id", d2.id).single()).data!.placement).toBe("none");
   });
 });

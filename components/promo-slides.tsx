@@ -12,7 +12,7 @@ import { PROMO_LIMITS, PROMO_TEMPLATES, samplePromo, type PromoContent, type Pro
 export type Promo = {
   id: string; name: string; template: PromoTemplate; content: PromoContent | null; mediaId: string | null; imageUrl: string | null;
   startsOn: string | null; endsOn: string | null; menuId: string | null; placement: "none" | "added" | "scheduled";
-  expired: boolean; updatedAt: string;
+  expired: boolean; updatedAt: string; screens?: { id: string; name: string }[];
 };
 type Draft = { id: string | null; name: string; template: PromoTemplate; content: PromoContent; startsOn: string; endsOn: string };
 
@@ -47,7 +47,9 @@ export function PromoSlides() {
       const menuName = menuList.find((m) => m.id === menuId)?.name ?? "the menu";
       toast.show(res.mode === "added"
         ? `Added to ${menuName}. ${res.screens ? "Screens showing it refresh within a minute." : "It plays wherever that menu is shown."}`
-        : `Scheduled on ${res.screens} screen${res.screens === 1 ? "" : "s"} showing ${menuName}, ${dateText(promo)}.`);
+        : res.screens
+          ? `Scheduled on ${res.screens} screen${res.screens === 1 ? "" : "s"} showing ${menuName}, ${dateText(promo)}.`
+          : `Scheduled with ${menuName}, ${dateText(promo)}. It starts on any screen you switch to that menu.`);
       await promos.reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -133,6 +135,13 @@ export function PromoSlides() {
                       {p.expired ? "Ended. " : ""}
                       {p.placement === "added" ? `On ${menuName ?? "a menu"}` : p.placement === "scheduled" ? `Scheduled with ${menuName ?? "a menu"}` : "Not on a menu yet"}
                     </p>
+                    {p.placement !== "none" ? (
+                      <p className="text-sm text-muted" data-testid="promo-screens">
+                        {(p.screens ?? []).length
+                          ? `${p.placement === "scheduled" ? `Plays ${dateText(p)} on` : "Playing on"}: ${(p.screens ?? []).map((d) => d.name).join(", ")}`
+                          : `No screen shows ${menuName ?? "this menu"} yet. It starts on any screen you switch to it.`}
+                      </p>
+                    ) : null}
                   </div>
                   {p.placement === "none" ? (
                     menuList.length ? (

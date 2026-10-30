@@ -526,14 +526,14 @@ paths:
     post:
       tags: [media]
       summary: One-tap add to a menu
-      description: Without dates the slide is appended to the menu playlist (mode added). With dates a "menu + promo" playlist is created and one all-day, every-day schedule rule (priority 5, below day parts) is added per screen showing the menu, limited to the promo's dates (mode scheduled).
+      description: Without dates the slide is appended to the menu playlist (mode added). With dates a "menu + promo" playlist is created and one all-day, every-day schedule rule (priority 5, below day parts) is added per screen showing the menu, limited to the promo's dates (mode scheduled). Since M13 screens may be 0; rules then follow the menu as screens are switched to or from it.
       operationId: attachPromo
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [menuId], properties: { menuId: { type: string, format: uuid } } } } }
       responses:
         "200": { description: "{ mode: added|scheduled, screens: integer }" }
-        "400": { description: Dated promo but no screen shows this menu, or schedule limit reached }
+        "400": { description: Schedule limit reached }
         "404": { description: Promo or menu not found }
         "429": { description: Rate limited }
     delete:
@@ -2192,6 +2192,7 @@ components:
             placement: { type: string, enum: [none, added, scheduled] }
             imageUrl: { type: string }
             expired: { type: boolean }
+            screens: { type: array, description: "M13: screens it plays on", items: { type: object, properties: { id: { type: string, format: uuid }, name: { type: string } } } }
     Brand:
       type: object
       properties:

@@ -75,8 +75,14 @@ test("a promo is made, added to a menu in one tap, taken off, and a dated promo 
     await expect(holiday).toContainText("2026-12-01 to 2026-12-24");
     await holiday.getByRole("button", { name: "Add to Lunch board" }).click();
     await expect(page.getByText("Scheduled on 1 screen showing Lunch board")).toBeVisible({ timeout: 15_000 });
+    await expect(holiday.getByTestId("promo-screens")).toHaveText("Plays 2026-12-01 to 2026-12-24 on: Counter TV");
+    // M13: a screen switched to the menu later picks the promo up.
+    await admin.from("displays").insert({ account_id: acct!.id, name: "Patio TV", token_hash: `h-${randomUUID()}`, assigned_playlist_id: menu!.playlist_id });
+    await page.reload();
+    await expect(page.getByRole("list", { name: "Promos" }).getByRole("listitem").filter({ hasText: "Holiday special" }).getByTestId("promo-screens"))
+      .toHaveText("Plays 2026-12-01 to 2026-12-24 on: Counter TV, Patio TV");
     const rules = (await admin.from("schedules").select("starts_on, ends_on").eq("account_id", acct!.id)).data!;
-    expect(rules).toEqual([{ starts_on: "2026-12-01", ends_on: "2026-12-24" }]);
+    expect(rules).toEqual([{ starts_on: "2026-12-01", ends_on: "2026-12-24" }, { starts_on: "2026-12-01", ends_on: "2026-12-24" }]);
   } finally {
     await context.close();
     await removeCreatedTestEmails(admin, [user.email]);
