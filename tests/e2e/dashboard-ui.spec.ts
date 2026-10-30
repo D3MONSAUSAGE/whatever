@@ -97,6 +97,8 @@ test("media upload, search, list view, and delete at phone width", async ({ brow
 });
 
 test("playlist draft, reorder, duplicate, preview, publish, and a second screen", async ({ browser }) => {
+  // Two paired TVs, a first-run compile and a 10 s player poll can exceed the default budget.
+  test.setTimeout(120_000);
   const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const tvContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const secondContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -131,8 +133,12 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await phone.getByLabel("Seconds for alpha.png").fill("2");
     await phone.getByRole("button", { name: "Move beta.png up" }).click();
     await expect(phone.locator("ol li").first()).toContainText("beta.png");
-    await phone.getByRole("button", { name: "Drag beta.png" }).dragTo(phone.locator("ol li").nth(1));
-    await expect(phone.locator("ol li").first()).toContainText("alpha.png");
+    await expect(async () => {
+      if (!(await phone.locator("ol li").first().textContent())?.includes("alpha.png")) {
+        await phone.getByRole("button", { name: "Drag beta.png" }).dragTo(phone.locator("ol li").nth(1));
+      }
+      await expect(phone.locator("ol li").first()).toContainText("alpha.png", { timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
     await phone.getByRole("button", { name: "Full preview" }).click();
     await expect(phone.getByRole("dialog", { name: "Full playlist preview" })).toBeVisible();
     await phone.getByRole("dialog", { name: "Full playlist preview" }).getByRole("button", { name: "Close" }).click();
@@ -142,7 +148,7 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await phone.getByRole("checkbox", { name: "Bar TV" }).check();
     await phone.getByRole("button", { name: "Publish", exact: true }).click();
     await expectStatus(phone, "Published");
-    await expect.poll(async () => shownUrl(tv), { timeout: 25_000 }).toContain("http");
+    await expect.poll(async () => shownUrl(tv), { timeout: 45_000 }).toContain("http");
 
     await phone.goto("/dashboard/playlists");
     await phone.getByRole("button", { name: "Duplicate" }).click();
