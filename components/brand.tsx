@@ -1,11 +1,7 @@
 "use client";
 
-import { useId } from "react";
 
-/** Two stacked rounded diagonal strokes. Same geometry as the favicon SVGs. */
-export const SEMPLE_S_TOP = "M47 17.5C35.2 9.2 18.2 12.4 16.6 24.2C15.2 34.2 27.4 39.2 42.6 35.4";
-export const SEMPLE_S_BOTTOM = "M22.2 33.2C36.4 28.2 51.6 34.6 48.4 46.8C45.2 59 27.6 61.6 17.2 51.4";
-
+/** The official Pekko "P" (from /workspace/pekko-logo). The white variant is a white silhouette for dark/brand fills. */
 export function LogoMark({
   className = "size-12",
   variant = "gradient",
@@ -13,21 +9,9 @@ export function LogoMark({
   className?: string;
   variant?: "gradient" | "white";
 }) {
-  const id = `seemple-s-${useId().replace(/:/g, "")}`;
-  const stroke = variant === "white" ? "#FFFFFF" : `url(#${id})`;
   return (
-    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
-      {variant === "gradient" ? (
-        <defs>
-          <linearGradient id={id} x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00C2FF" />
-            <stop offset="100%" stopColor="#0066FF" />
-          </linearGradient>
-        </defs>
-      ) : null}
-      <path d={SEMPLE_S_TOP} fill="none" stroke={stroke} strokeWidth="9" strokeLinecap="round" />
-      <path d={SEMPLE_S_BOTTOM} fill="none" stroke={stroke} strokeWidth="9" strokeLinecap="round" />
-    </svg>
+    <img src="/brand/pekko-p-256.png" alt="" aria-hidden="true" width={256} height={256} draggable={false}
+      className={`${className} object-contain select-none`} style={variant === "white" ? { filter: "brightness(0) invert(1)" } : undefined} />
   );
 }
 
