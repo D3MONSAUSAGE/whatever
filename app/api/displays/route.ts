@@ -38,10 +38,17 @@ export async function GET(req: Request) {
     page = pageOf(found, query);
     list = page.items;
   }
-  const playlistInfo = playlistColumn ? await loadPlaylists(admin.accountId, list) : new Map<string, { name: string; url: string | null }>();
-  if (playlistInfo === null) return fail("Couldn't load displays.", 500);
+  const mediaOf = (media: Row["media"]): MediaJoin | null =>
+    Array.isArray(media) ? media[0] ?? null : media;
+  const paths = [...new Set(list.map((d) => mediaOf(d.media)?.storage_path).filter(Boolean))] as string[];
 
-  const locations = await loadLocations(admin.accountId);
+  // Independent reads run together (each is a network round trip to the database).
+  const [playlistInfo, locations, urls] = await Promise.all([
+    playlistColumn ? loadPlaylists(admin.accountId, list) : Promise.resolve(new Map<string, { name: string; url: string | null }>()),
+    loadLocations(admin.accountId),
+    signAll(paths),
+  ]);
+  if (playlistInfo === null) return fail("Couldn't load displays.", 500);
   if (locations === "error") return fail("Couldn't load displays.", 500);
   const locationById = new Map(locations.map((location) => [location.id, location]));
 
@@ -50,11 +57,6 @@ export async function GET(req: Request) {
     list.map((d) => ({ id: d.id, timeZone: d.location_id ? locationById.get(d.location_id)?.timezone ?? null : null })),
   );
   if (scheduleInfo === null) return fail("Couldn't load displays.", 500);
-
-  const mediaOf = (media: Row["media"]): MediaJoin | null =>
-    Array.isArray(media) ? media[0] ?? null : media;
-  const paths = [...new Set(list.map((d) => mediaOf(d.media)?.storage_path).filter(Boolean))] as string[];
-  const urls = await signAll(paths);
 
   const now = Date.now();
   const out = list.map((d) => {
