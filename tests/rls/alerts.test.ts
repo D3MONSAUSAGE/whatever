@@ -127,4 +127,33 @@ describe.skipIf(!configured)("offline alerts", () => {
     const purge = await admin.rpc("alerts_purge", { p_days: 90, p_dry_run: true });
     expect(purge.data).toEqual({ alerts: 0 });
   });
+  it("overlapping email runs send each alert once", async () => {
+    const a = await owner();
+    await admin.from("displays").insert({ account_id: a.accountId, name: "Lobby", token_hash: `h-${randomUUID()}`, last_seen_at: ago(20) });
+    await check();
+    const sent: EmailMessage[] = [];
+    const provider = { name: "test", send: async (m: EmailMessage) => { await new Promise((r) => setTimeout(r, 600)); sent.push(m); return { ok: true }; } };
+    await Promise.all([0, 150, 300, 450].map(async (ms) => { await new Promise((r) => setTimeout(r, ms)); return deliverAlertEmails({ dryRun: false, provider }); }));
+    expect(sent.filter((m) => m.to === a.email)).toHaveLength(1);
+  });
+  it("overlapping checker runs create one alert per outage", async () => {
+    const a = await owner();
+    const { data: d } = await admin.from("displays").insert({ account_id: a.accountId, name: "Door", token_hash: `h-${randomUUID()}`, last_seen_at: ago(20) }).select("id").single();
+    await Promise.all([1, 2, 3, 4, 5, 6].map(() => admin.rpc("check_offline_alerts")));
+    await check();
+    const rows = (await admin.from("alerts").select("id, kind").eq("display_id", d!.id)).data!;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].kind).toBe("screen.offline");
+  });
+
+  it("pending emails older than 30 minutes are skipped, never sent late", async () => {
+    const a = await owner();
+    const { data: d } = await admin.from("displays").insert({ account_id: a.accountId, name: "Old", token_hash: `h-${randomUUID()}`, last_seen_at: ago(20) }).select("id").single();
+    await check();
+    await admin.from("alerts").update({ at: ago(31) }).eq("display_id", d!.id);
+    const sent: EmailMessage[] = [];
+    await deliverAlertEmails({ dryRun: false, provider: { name: "test", send: async (m: EmailMessage) => { sent.push(m); return { ok: true }; } } });
+    expect(sent.filter((m) => m.to === a.email)).toHaveLength(0);
+    expect((await alertsOf(a.accountId))[0].email_status).toBe("skipped");
+  });
 });
