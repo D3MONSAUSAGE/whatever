@@ -13,10 +13,13 @@ export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
-  const displays = await activeDisplays(admin.accountId);
-  const media = await countRows("media", admin.accountId);
-  const playlists = await countRows("playlists", admin.accountId);
-  const activeSchedules = await countRows("schedules", admin.accountId, { column: "enabled", value: true });
+  // Independent reads run together: one database round trip of wait instead of four.
+  const [displays, media, playlists, activeSchedules] = await Promise.all([
+    activeDisplays(admin.accountId),
+    countRows("media", admin.accountId),
+    countRows("playlists", admin.accountId),
+    countRows("schedules", admin.accountId, { column: "enabled", value: true }),
+  ]);
   if (displays === "error" || media === "error" || playlists === "error" || activeSchedules === "error") {
     return fail("Couldn't load the overview.", 500);
   }
