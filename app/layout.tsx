@@ -9,16 +9,21 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://pantalla-chi.vercel.app"),
   title: "Pekko",
   description: "Pekko Technologies. Making life simpler every day.",
   applicationName: "Pekko",
   icons: {
     icon: [
-      { url: "/brand/icon-light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
-      { url: "/brand/icon-dark.svg", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/brand/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/favicon-48.png", sizes: "48x48", type: "image/png" },
     ],
-    apple: "/brand/icon-alt.svg",
+    apple: { url: "/brand/apple-touch-icon.png", sizes: "180x180" },
   },
+  openGraph: { title: "Pekko", description: "Pekko Technologies. Making life simpler every day.", siteName: "Pekko", type: "website" },
+  twitter: { card: "summary_large_image", title: "Pekko", description: "Pekko Technologies. Making life simpler every day." },
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0066FF" };
 
