@@ -166,10 +166,25 @@ describe.skipIf(!configured)("push devices and alert pushes", () => {
     const al = await alertFor(a.accountId);
     await clearOthers([a.accountId]);
     const m = mock();
-    const slow: PushSender = { name: "mock", async send(x) { await new Promise((r) => setTimeout(r, 150)); return m.sender.send(x); } };
-    await Promise.all([1, 2, 3, 4].map(() => deliverAlertPushes({ dryRun: false, sender: slow })));
+    const slow: PushSender = { name: "mock", async send(x) { await new Promise((r) => setTimeout(r, 600)); return m.sender.send(x); } };
+    // Runs start 0/150/300/450 ms apart: later ones read the alert while the first is mid-send.
+    await Promise.all([0, 150, 300, 450].map(async (ms) => { await new Promise((r) => setTimeout(r, ms)); return deliverAlertPushes({ dryRun: false, sender: slow }); }));
     expect(m.sent.filter((x) => x.data.alertId === al.alertId)).toHaveLength(1);
     expect(await statusOf(al.alertId)).toBe("sent");
+  });
+
+  it("pending pushes older than 30 minutes are skipped, never sent late", async () => {
+    const a = await owner();
+    const t = fcm();
+    await devPost(req("/api/devices", a.token, { method: "POST", body: JSON.stringify({ token: t, platform: "android" }) }));
+    const old = await alertFor(a.accountId);
+    await admin.from("alerts").update({ at: new Date(Date.now() - 31 * 60_000).toISOString() }).eq("id", old.alertId);
+    const fresh = await alertFor(a.accountId, "screen.recovered");
+    await clearOthers([a.accountId]);
+    const m = mock();
+    await deliverAlertPushes({ dryRun: false, sender: m.sender });
+    expect(m.sent.map((x) => x.data.alertId)).toEqual([fresh.alertId]);
+    expect(await statusOf(old.alertId)).toBe("skipped");
   });
 
   it("purges tokens the app hasn't refreshed in 60 days (dry run changes nothing)", async () => {

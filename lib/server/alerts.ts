@@ -6,7 +6,11 @@ export const THRESHOLD_MIN = 2;
 export const THRESHOLD_MAX = 1440;
 export const MAX_EMAIL_ATTEMPTS = 3;
 /** Alerts older than this are never emailed (e.g. when email is switched on later). */
-export const EMAIL_STALE_MS = 6 * 3600_000;
+/** Alerts older than this are never delivered (marked skipped), so a backlog built while delivery
+ * was off can't burst out later as outdated "offline" messages. */
+export const DELIVERY_MAX_AGE_MS = 30 * 60_000;
+/** @deprecated kept for imports; same as DELIVERY_MAX_AGE_MS. */
+export const EMAIL_STALE_MS = DELIVERY_MAX_AGE_MS;
 
 export type AlertRow = {
   id: string; display_id: string | null; display_name: string; kind: "screen.offline" | "screen.recovered";
