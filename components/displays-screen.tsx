@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { ONLINE_HINT, OfflineAlert, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
@@ -57,7 +57,11 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   return (
     <section>
       <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}>
-        <button type="button" className="btn btn-primary" onClick={() => setAssigning([])}>Assign playlist</button>
+        <a href="#add-screen" className="btn btn-primary" data-testid="add-screen"
+          onClick={(event) => { event.preventDefault(); const form = document.getElementById("add-screen"); form?.scrollIntoView({ behavior: "smooth", block: "start" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus({ preventScroll: true }); }}>
+          Add screen
+        </a>
+        <button type="button" className="btn" onClick={() => setAssigning([])}>Assign playlist</button>
       </PageHeader>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       <PairForm onPaired={() => { toast.show("Connected. The TV will switch over in a few seconds."); displays.reload(); }}
@@ -161,9 +165,15 @@ function PairForm({ onPaired, onError }: { onPaired: () => void; onError: (messa
     }
   }
   return (
-    <form onSubmit={submit} className="card p-4 md:p-5">
-      <h2 className="font-semibold">Connect a TV</h2>
-      <p className="text-sm text-muted mb-4">Open <strong>/player</strong> in the TV&apos;s browser, then enter the code it shows.</p>
+    <form id="add-screen" onSubmit={submit} className="card p-4 md:p-5 scroll-mt-20 md:scroll-mt-4" aria-labelledby="add-screen-title">
+      <h2 id="add-screen-title" className="font-semibold">Add a screen</h2>
+      <ol className="mt-2 mb-4 grid gap-2 text-sm text-muted list-decimal pl-5">
+        <li>On the TV (or any browser on it), open this address:
+          <PlayerUrl />
+        </li>
+        <li>The TV shows a 6-digit code.</li>
+        <li>Type the code and a name below, then press <strong className="text-ink">Connect TV</strong>. The TV switches over in a few seconds.</li>
+      </ol>
       <div className="grid gap-3 lg:grid-cols-[10rem_1fr_auto]">
         <input className="field text-xl tracking-[0.2em] font-semibold" inputMode="numeric" autoComplete="one-time-code"
           placeholder="123 456" maxLength={7} required value={code}
@@ -172,7 +182,35 @@ function PairForm({ onPaired, onError }: { onPaired: () => void; onError: (messa
           value={name} onChange={(event) => setName(event.target.value)} aria-label="TV name" />
         <button className="btn btn-primary" disabled={busy}>{busy ? "Connecting…" : "Connect TV"}</button>
       </div>
+      <p className="text-xs text-muted mt-3">The TV address is also in <a className="underline" href="/dashboard/settings" aria-label="Open the page with the TV address">Settings</a>.</p>
     </form>
+  );
+}
+
+function PlayerUrl() {
+  const [url, setUrl] = useState("/player");
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { setUrl(`${window.location.origin}/player`); }, []);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = url;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+  return (
+    <span className="mt-2 flex flex-wrap items-center gap-2">
+      <code data-testid="player-url" className="rounded-lg border border-line bg-white px-3 py-2 text-base font-semibold text-ink break-all">{url}</code>
+      <button type="button" className="btn" onClick={copy} aria-label="Copy TV address">{copied ? "Copied" : "Copy"}</button>
+      <span role="status" className="sr-only">{copied ? "TV address copied" : ""}</span>
+    </span>
   );
 }
 
