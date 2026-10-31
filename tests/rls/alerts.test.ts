@@ -127,4 +127,13 @@ describe.skipIf(!configured)("offline alerts", () => {
     const purge = await admin.rpc("alerts_purge", { p_days: 90, p_dry_run: true });
     expect(purge.data).toEqual({ alerts: 0 });
   });
+  it("overlapping email runs send each alert once", async () => {
+    const a = await owner();
+    await admin.from("displays").insert({ account_id: a.accountId, name: "Lobby", token_hash: `h-${randomUUID()}`, last_seen_at: ago(20) });
+    await check();
+    const sent: EmailMessage[] = [];
+    const provider = { name: "test", send: async (m: EmailMessage) => { await new Promise((r) => setTimeout(r, 150)); sent.push(m); return { ok: true }; } };
+    await Promise.all([1, 2, 3, 4].map(() => deliverAlertEmails({ dryRun: false, provider })));
+    expect(sent.filter((m) => m.to === a.email)).toHaveLength(1);
+  });
 });

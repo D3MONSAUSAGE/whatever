@@ -47,3 +47,16 @@ It only calls Vercel when an email is waiting, so it adds almost no function inv
 
 ## Rollback
 `select cron.unschedule('seemple-offline-alerts');` stops new alerts. Code rollback leaves the new tables and columns unused; nothing needs deleting.
+
+## Automatic delivery (migration 0012, M16)
+Migration `0012_alert_delivery_cron.sql` replaces the manual SQL above. Cron job `pekko-alert-delivery`
+runs every minute and calls `public.dispatch_alert_delivery()`, which does nothing unless an alert is
+pending email or push. It then calls `/api/cron/alert-emails` and/or `/api/cron/alert-push` via pg_net
+with `Bearer` + Vault secret `seemple_cron_secret` (optional Vault secret `pekko_app_origin`, default
+https://pantalla-chi.vercel.app). Without the Vault secret it is inert.
+
+No duplicates: each alert is claimed by id with a compare-and-set on `*_attempts` plus a 2-minute
+lease on `emailed_at`/`pushed_at`, so overlapping runs can't send the same alert twice.
+
+Turn on (after the migration): `select vault.create_secret('<CRON_SECRET>', 'seemple_cron_secret');`
+Rollback: `select cron.unschedule('pekko-alert-delivery'); drop function public.dispatch_alert_delivery();`

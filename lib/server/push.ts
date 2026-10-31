@@ -106,6 +106,9 @@ export type PushDelivery = {
  * compare-and-set), so overlapping runs can't push it twice. Devices are read by the alert's own
  * account_id only. Without a sender, pending alerts are marked skipped.
  */
+/** While pending, the timestamp column is a claim lease: an in-flight send blocks other runs for this long. */
+const CLAIM_LEASE_MS = 2 * 60 * 1000;
+
 export async function deliverAlertPushes(opts: { dryRun: boolean; sender?: PushSender | null; now?: number; staleDays?: number }): Promise<PushDelivery> {
   const sender = opts.sender === undefined ? pushSender() : opts.sender;
   const now = opts.now ?? Date.now();
@@ -139,8 +142,9 @@ export async function deliverAlertPushes(opts: { dryRun: boolean; sender?: PushS
       continue;
     }
     if (opts.dryRun) { out.sent++; out.devices += targets.length; continue; }
-    const claim = await db().from("alerts").update({ push_attempts: a.push_attempts + 1 })
-      .eq("id", a.id).eq("push_status", "pending").eq("push_attempts", a.push_attempts).select("id");
+    const claim = await db().from("alerts").update({ push_attempts: a.push_attempts + 1, pushed_at: new Date(now).toISOString() })
+      .eq("id", a.id).eq("push_status", "pending").eq("push_attempts", a.push_attempts)
+      .or(`pushed_at.is.null,pushed_at.lt.${new Date(now - CLAIM_LEASE_MS).toISOString()}`).select("id");
     if (claim.error || !(claim.data ?? []).length) continue;
 
     const msg = pushFor(a);

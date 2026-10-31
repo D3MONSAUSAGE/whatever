@@ -135,6 +135,43 @@ describe.skipIf(!configured)("push devices and alert pushes", () => {
     expect((await admin.from("push_devices").select("id").eq("token", t2)).data).toHaveLength(0);
   });
 
+  it("a phone that switches accounts gets only the new account's alerts; body can't pick another account", async () => {
+    const a = await owner();
+    const b = await owner();
+    const t = fcm();
+    // A registers while naming B's account/user in the body: ignored, bound to A's session.
+    await devPost(req("/api/devices", a.token, { method: "POST", body: JSON.stringify({ token: t, platform: "android", accountId: b.accountId, account_id: b.accountId, userId: b.userId }) }));
+    let rows = (await admin.from("push_devices").select("user_id, account_id").eq("token", t)).data!;
+    expect(rows).toEqual([{ user_id: a.userId, account_id: a.accountId }]);
+    // Phone logs into B: the token moves, A's binding is gone.
+    expect((await devPost(req("/api/devices", b.token, { method: "POST", body: JSON.stringify({ token: t, platform: "android" }) }))).status).toBe(200);
+    rows = (await admin.from("push_devices").select("user_id, account_id").eq("token", t)).data!;
+    expect(rows).toEqual([{ user_id: b.userId, account_id: b.accountId }]);
+    const alA = await alertFor(a.accountId);
+    const alB = await alertFor(b.accountId);
+    await clearOthers([a.accountId, b.accountId]);
+    const m = mock();
+    await deliverAlertPushes({ dryRun: false, sender: m.sender });
+    expect(m.sent.map((x) => x.data.alertId)).toEqual([alB.alertId]); // never A's alert
+    expect(m.sent[0]).toMatchObject({ token: t, data: { type: "screen_offline", alertId: alB.alertId, screenId: alB.displayId } });
+    expect(m.sent[0].title).toContain("offline");
+    expect(m.sent[0].body).toBeTruthy();
+    expect(await statusOf(alA.alertId)).toBe("skipped");
+  });
+
+  it("overlapping delivery runs send each alert once", async () => {
+    const a = await owner();
+    const t = fcm();
+    await devPost(req("/api/devices", a.token, { method: "POST", body: JSON.stringify({ token: t, platform: "android" }) }));
+    const al = await alertFor(a.accountId);
+    await clearOthers([a.accountId]);
+    const m = mock();
+    const slow: PushSender = { name: "mock", async send(x) { await new Promise((r) => setTimeout(r, 150)); return m.sender.send(x); } };
+    await Promise.all([1, 2, 3, 4].map(() => deliverAlertPushes({ dryRun: false, sender: slow })));
+    expect(m.sent.filter((x) => x.data.alertId === al.alertId)).toHaveLength(1);
+    expect(await statusOf(al.alertId)).toBe("sent");
+  });
+
   it("purges tokens the app hasn't refreshed in 60 days (dry run changes nothing)", async () => {
     const a = await owner();
     const t = fcm();
