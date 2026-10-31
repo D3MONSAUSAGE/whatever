@@ -329,6 +329,7 @@ paths:
                 enabled: { type: boolean }
                 thresholdMinutes: { type: integer, minimum: 2, maximum: 1440 }
                 emailEnabled: { type: boolean }
+                pushEnabled: { type: boolean, description: "M16: account-wide switch for push alerts" }
       responses:
         "200":
           description: Updated settings
@@ -336,6 +337,74 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AlertPreferences" }
         "400": { description: Bad value or nothing to update }
+
+  /api/devices:
+    get:
+      tags: [account]
+      summary: This login's push devices, tokens masked (M16)
+      operationId: listDevices
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices: { type: array, items: { $ref: "#/components/schemas/PushDevice" } }
+        "503": { description: Push not set up yet (migration 0011 missing) }
+    post:
+      tags: [account]
+      summary: Register or refresh an FCM token (M16). Idempotent upsert by token; call on login, app start and onTokenRefresh.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, platform]
+              properties:
+                token: { type: string, minLength: 20, maxLength: 4096, description: "FCM registration token" }
+                platform: { type: string, enum: [android, ios] }
+                appVersion: { type: string, maxLength: 40 }
+                notifyOffline: { type: boolean, description: "Per device; default true; omitted = unchanged" }
+                notifyRecovery: { type: boolean, description: "Per device; default true; omitted = unchanged" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device: { $ref: "#/components/schemas/PushDevice" }
+        "400": { description: Bad token, platform, or flag }
+        "429": { description: More than 60 registrations per hour }
+        "503": { description: Push not set up yet }
+    delete:
+      tags: [account]
+      summary: Unregister a token sent in the body {token} (M16). Same as DELETE /api/devices/{token}.
+      operationId: unregisterDeviceBody
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        "204": { description: Removed (also when it was not yours or not found) }
+        "400": { description: Bad token }
+
+  /api/devices/{token}:
+    delete:
+      tags: [account]
+      summary: Unregister on logout (M16). URL-encode the token (FCM tokens contain ':').
+      operationId: unregisterDevice
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Removed (also when it was not yours or not found) }
+        "400": { description: Bad token }
 
   /api/menus:
     get:
@@ -2285,6 +2354,17 @@ components:
         imageUrl: { type: string, nullable: true, description: Signed URL, 1 hour }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    PushDevice:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tokenSuffix: { type: string, description: Last 6 characters; full tokens are never returned }
+        platform: { type: string, enum: [android, ios] }
+        appVersion: { type: string, nullable: true }
+        notifyOffline: { type: boolean }
+        notifyRecovery: { type: boolean }
+        registeredAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
     AlertPreferences:
       type: object
       properties:
@@ -2296,6 +2376,12 @@ components:
             enabled: { type: boolean, description: The owner wants email }
             available: { type: boolean, description: Email delivery is configured on the server }
             address: { type: string }
+        push:
+          type: object
+          description: "M16. enabled = account wants push; available = FCM configured on the server and migration 0011 applied"
+          properties:
+            enabled: { type: boolean }
+            available: { type: boolean }
         limits:
           type: object
           properties:
