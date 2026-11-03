@@ -38,7 +38,7 @@ describe.skipIf(!configured)("analytics schema", () => {
     expect((buckets ?? []).reduce((s, b) => s + (b.online_seconds as number), 0)).toBe(60);
     const { data: periods } = await admin.from("display_offline_periods").select("*").eq("display_id", d.id);
     expect(periods).toHaveLength(1);
-    const { data: events } = await admin.from("activity_events").select("kind").eq("account_id", accountId);
+    const { data: events } = await admin.from("activity_events").select("kind").eq("account_id", accountId).not("kind", "like", "commercial.%");
     expect(events!.map((e) => e.kind).sort()).toEqual(["screen.content_changed", "screen.paired"]);
 
     expect((await admin.rpc("report_playing", { p_token_hash: token, p_version: 5 })).data).toBe(true);

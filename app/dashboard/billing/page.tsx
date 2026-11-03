@@ -1,4 +1,5 @@
 "use client";
+import { PLANS } from "@/lib/plans";
 import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem } from "@/lib/api";
 import { PageHeader } from "@/components/ui";
@@ -13,11 +14,6 @@ type Entitlements = {
   warning: { kind: string; message: string; action: string | null } | null;
 };
 
-const PLANS = [
-  { id: "starter", name: "Starter", price: 19, screens: 1 },
-  { id: "business", name: "Business", price: 39, screens: 3 },
-  { id: "multi", name: "Multi-screen", price: 59, screens: 5 },
-];
 const PLAN_SCREENS: Record<string, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5 };
 
 /** Dates in the viewer's own time zone, with the zone named. */

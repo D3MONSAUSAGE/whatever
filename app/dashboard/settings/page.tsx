@@ -120,6 +120,8 @@ export default function Settings() {
         <AlertSettings />
 
         <Link href="/dashboard/billing" className="card p-5 block font-semibold" data-testid="billing-link">Plan &amp; billing →</Link>
+        <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">Help &amp; support →</Link>
+        <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">Delete account →</Link>
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
           <h2 id="name-heading" className="font-semibold">Display name</h2>
           <p className="text-sm text-muted mt-1 mb-3">Shown to you in the dashboard and the Pekko app. Leave blank to use your email.</p>

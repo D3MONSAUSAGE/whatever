@@ -21,7 +21,7 @@ describe.skipIf(!local)("0013 entitlements (local database)", () => {
   afterAll(async () => { await removeCreatedTestUsers(db, users); });
 
   async function account(name = "Billing cafe") {
-    const { data: u, error } = await db.auth.admin.createUser({ email: `pekko-billing-${randomUUID()}@mailinator.com`, password: `${randomUUID()}Aa1!`, email_confirm: true });
+    const { data: u, error } = await db.auth.admin.createUser({ email: `pantalla-rls-${randomUUID()}@mailinator.com`, password: `${randomUUID()}Aa1!`, email_confirm: true });
     if (error || !u.user) throw new Error(error?.message);
     users.push(u.user.id);
     const { data } = await db.rpc("ensure_account", { p_user_id: u.user.id, p_name: name });

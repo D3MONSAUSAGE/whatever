@@ -5,8 +5,8 @@ export const metadata: Metadata = { title: "Terms of Service · Pekko" };
 
 export default function Terms() {
   return (
-    <LegalPage title="Terms of Service" updated="October 29, 2026">
-      <p>These terms cover your use of Pekko, a service from Pekko Technologies (&quot;we&quot;) for showing images, videos and playlists on screens (&quot;the Service&quot;). By creating an account you agree to them.</p>
+    <LegalPage title="Terms of Service (DRAFT)" updated="November 2, 2026">
+      <p>These terms cover your use of Pekko, a service from [Legal entity name: to be confirmed] (&quot;we&quot;) for showing images, videos and playlists on screens (&quot;the Service&quot;). By creating an account you agree to them.</p>
       <h2 className="font-semibold text-lg">Your account</h2>
       <p>You must give accurate information and keep your password safe. You are responsible for what happens under your account, including the screens you pair to it. Tell us right away if you think someone else has access.</p>
       <h2 className="font-semibold text-lg">Your content</h2>
@@ -18,7 +18,7 @@ export default function Terms() {
       <h2 className="font-semibold text-lg">Availability</h2>
       <p>We work to keep the Service running, and screens keep playing downloaded content during short outages where the device supports it, but we do not guarantee uninterrupted service. We may change or improve features over time.</p>
       <h2 className="font-semibold text-lg">Ending your account</h2>
-      <p>You can stop using the Service at any time. We may suspend or close accounts that break these terms. [Data export and deletion timelines to be confirmed.]</p>
+      <p>You can stop using the Service at any time, and the account owner can request deletion from Settings or at <a className="underline" href="/account-deletion">/account-deletion</a>. Deletion runs 7 days after the request, which can be canceled until then. We may suspend or close accounts that break these terms. [Data export terms to be confirmed.]</p>
       <h2 className="font-semibold text-lg">Disclaimers and liability</h2>
       <p>[Warranty disclaimer, limitation of liability, indemnity, governing law and dispute terms to be written by counsel.]</p>
       <h2 className="font-semibold text-lg">Contact</h2>
