@@ -1,0 +1,28 @@
+{
+  "account_id": "00000000-0000-4000-8000-000000000001",
+  "state": "active",
+  "plan": "starter",
+  "plan_name": "Starter",
+  "screen_limit": 1,
+  "active_screens": 3,
+  "total_screens": 3,
+  "can_add_screen": false,
+  "playback_allowed": true,
+  "trial": null,
+  "subscription": {
+    "status": "active",
+    "current_period_end": "2026-12-01T00:00:00.000Z",
+    "cancel_at_period_end": false
+  },
+  "grace_ends_at": null,
+  "suspend_at": null,
+  "features_locked": [],
+  "warning": {
+    "kind": "over_limit",
+    "action": "select_screens",
+    "message": "Your plan includes 1 screen but 3 are on. Choose which screens stay on; the others pause and nothing is deleted."
+  },
+  "enforced": false,
+  "billing_url": "https://pekko.example/dashboard/billing",
+  "server_time": "2026-11-02T18:00:00.000Z"
+}

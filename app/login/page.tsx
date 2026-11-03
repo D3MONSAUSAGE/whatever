@@ -17,7 +17,7 @@ export default function Login() {
     // A recovery link that fell back to the Site URL still ends on the reset page.
     if (isRecoveryUrl()) { location.replace(`/reset-password${location.search}${location.hash}`); return; }
     if (!supabaseConfigured()) return;
-    getSupabase().auth.getSession().then(({ data }) => data.session && router.replace("/dashboard")).catch(() => {});
+    getSupabase().auth.getSession().then(({ data }) => data.session && router.replace(nextPath())).catch(() => {});
   }, [router]);
 
   async function submit(e: React.FormEvent) {
@@ -33,7 +33,7 @@ export default function Login() {
         ? await getSupabase().auth.signInWithPassword({ email, password })
         : await getSupabase().auth.signUp({ email, password, options: { emailRedirectTo: `${location.origin}/dashboard` } });
       if (res.error) return setNote({ text: friendlyAuthError(res.error.message), error: true });
-      if (res.data.session) return router.replace("/dashboard");
+      if (res.data.session) return router.replace(nextPath());
       setNote({ text: "Check your email to confirm your account, then sign in." });
       setMode("in");
     } catch (err) {
@@ -71,4 +71,11 @@ export default function Login() {
       {note && <p role={note.error ? "alert" : "status"} className={`mt-4 ${note.error ? "note-error" : "note-ok"}`}>{note.text}</p>}
     </AuthFrame>
   );
+}
+
+/** Only same-site dashboard paths are honoured, so ?next= can't redirect off Pekko. */
+function nextPath() {
+  if (typeof window === "undefined") return "/dashboard";
+  const raw = new URLSearchParams(window.location.search).get("next") || "";
+  return /^\/dashboard(\/[A-Za-z0-9/_-]*)?(\?[^#]*)?$/.test(raw) ? raw : "/dashboard";
 }

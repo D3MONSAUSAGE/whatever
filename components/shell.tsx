@@ -31,7 +31,9 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     if (isRecoveryUrl()) { location.replace(`/reset-password${location.search}${location.hash}`); return; }
     let sub: { unsubscribe: () => void } | null = null;
     try {
-      getSupabase().auth.getSession().then(({ data }) => (data.session ? setReady(true) : router.replace("/login")));
+      // Return to the page after sign-in (e.g. /dashboard/billing opened from a phone browser).
+      const back = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+      getSupabase().auth.getSession().then(({ data }) => (data.session ? setReady(true) : router.replace(back)));
       sub = getSupabase().auth.onAuthStateChange((event, session) => {
         if (event === "PASSWORD_RECOVERY") { router.replace("/reset-password"); return; }
         if (!session) router.replace("/login");

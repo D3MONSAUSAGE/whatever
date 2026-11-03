@@ -1,0 +1,20 @@
+{
+  "account_id": "00000000-0000-4000-8000-000000000001",
+  "state": "grandfathered",
+  "plan": "grandfathered",
+  "plan_name": "Early customer",
+  "screen_limit": 5,
+  "active_screens": 6,
+  "total_screens": 6,
+  "can_add_screen": false,
+  "playback_allowed": true,
+  "trial": null,
+  "subscription": null,
+  "grace_ends_at": null,
+  "suspend_at": null,
+  "features_locked": [],
+  "warning": null,
+  "enforced": false,
+  "billing_url": "https://pekko.example/dashboard/billing",
+  "server_time": "2026-11-02T18:00:00.000Z"
+}

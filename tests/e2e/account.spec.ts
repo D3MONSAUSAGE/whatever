@@ -143,7 +143,7 @@ test("settings shows the email, saves a display name, changes the password, and 
 
   // Supabase revokes every other session when the password changes.
   await phone.goto("/dashboard/settings");
-  await phone.waitForURL("**/login", { timeout: 20_000 });
+  await phone.waitForURL(/\/login(\?|$)/, { timeout: 20_000 });
 
   await signIn(phone, user.email, next);
   await phone.waitForURL("**/dashboard**");
@@ -157,7 +157,7 @@ test("settings shows the email, saves a display name, changes the password, and 
   expect(refresh).toBeTruthy();
   await page.getByRole("button", { name: "Sign out of all devices" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Sign out everywhere" }).click();
-  await page.waitForURL("**/login");
+  await page.waitForURL(/\/login(\?|$)/);
   // The phone's refresh token (read before signing out) is now revoked.
   const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: "POST",

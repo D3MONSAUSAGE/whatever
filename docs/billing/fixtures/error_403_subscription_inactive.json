@@ -1,0 +1,4 @@
+{
+  "error": "Your plan isn't active, so new screens can't be added. Choose a plan to continue.",
+  "code": "subscription_inactive"
+}

@@ -49,6 +49,11 @@
   <div class="muted">Choose an image for this screen in your dashboard.</div>
 </div></div>
 
+<div id="paused" class="screen"><div class="center">
+  <div id="paused-title" class="label">This screen is paused</div>
+  <div id="paused-msg" class="muted">The Pekko plan for this screen isn't active. Your content is saved.</div>
+</div></div>
+
 <div id="connecting" class="screen"><div class="center">
   <div class="muted">Connecting&hellip;</div>
 </div></div>
@@ -289,8 +294,18 @@
 
   // ---- screens and image layers
   function showScreen(id) {
-    var ids = ['pair', 'empty', 'connecting'];
+    var ids = ['pair', 'empty', 'connecting', 'paused'];
     for (var i = 0; i < ids.length; i++) el(ids[i]).className = ids[i] === id ? 'screen on' : 'screen';
+  }
+  function showPaused(d) {
+    stopPlaylist();
+    clearCache(); // no offline replay of saved content while paused
+    clearImages();
+    shownVersion = null; // repaint fully once playback is allowed again
+    setStatus('');
+    if (d && typeof d.title === 'string') el('paused-title').textContent = d.title;
+    if (d && typeof d.message === 'string') el('paused-msg').textContent = d.message;
+    showScreen('paused');
   }
   function setStatus(text) {
     var s = el('status');
@@ -809,6 +824,13 @@
     request('GET', url, null, token, function (status, data) {
       if (g !== gen) return;
       if (status === 401) { clearToken(); clearCache(); startPairing(); return; } // disconnected from dashboard
+      if (status === 402) {
+        // Plan inactive or over the screen limit: stop playback, keep the token and the
+        // saved content, and check again so the screen resumes on its own.
+        showPaused(data);
+        later(g, function () { pollState(g); }, data && typeof data.pollMs === 'number' && data.pollMs >= 5000 && data.pollMs <= 300000 ? data.pollMs : 60000);
+        return;
+      }
       var wait = STATE_MS;
       if (status === 200 && data) {
         setStatus('');

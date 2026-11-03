@@ -15,6 +15,7 @@ export type DisplayItem = {
   media: { id: string; fileName: string; url: string | null } | null;
   playlist: { id: string; name: string; url: string | null } | null;
   playerError?: string | null;
+  entitled?: boolean;
   location?: { id: string; name: string; timezone: string } | null;
   activeSchedules?: ScheduleSummary[];
   currentSchedule?: (ScheduleSummary & { until: string | null }) | null;
@@ -62,7 +63,7 @@ export async function authToken() {
   const { data } = await getSupabase().auth.getSession();
   const token = data.session?.access_token;
   if (!token) {
-    window.location.href = "/login";
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
     throw new Error("Sign in to continue.");
   }
   return token;
@@ -80,7 +81,7 @@ export function uploadForm(path: string, form: FormData, token: string, onProgre
       let body: { error?: string } = {};
       try { body = JSON.parse(xhr.responseText) as { error?: string }; } catch { body = {}; }
       if (xhr.status === 401) {
-        window.location.href = "/login";
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
         reject(new Error("Sign in to continue."));
         return;
       }
@@ -110,7 +111,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   const body = await res.json().catch(() => ({}));
   if (res.status === 401) {
     await getSupabase().auth.signOut();
-    window.location.href = "/login";
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
     throw new Error("Sign in to continue.");
   }
   if (res.status === 413) throw new Error("That image is too large to upload.");

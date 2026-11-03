@@ -47,7 +47,7 @@ function server(method, url, body, headers) {
 function boot() {
   timers = [];
   const els = {};
-  for (const id of ["a", "b", "pair", "empty", "connecting", "code", "status"])
+  for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "code", "status"])
     els[id] = { id, className: id === "status" ? "status" : id.length === 1 ? "layer" : "screen", style: {}, innerHTML: "" };
   const makeVideo = (id) => {
     const el = {
@@ -137,7 +137,7 @@ const shown = (els) => {
   const v = ["va", "vb"].filter((k) => els[k].className.includes("on"))[0];
   return v ? els[v].src : l ? els[l].style.backgroundImage : "";
 };
-const screenOf = (els) => ["pair", "empty", "connecting"].find((k) => els[k].className.includes("on")) || "media";
+const screenOf = (els) => ["pair", "empty", "connecting", "paused"].find((k) => els[k].className.includes("on")) || "media";
 
 // ---------------------------------------------------------------------------
 storage.pantalla_display_token = S.token;

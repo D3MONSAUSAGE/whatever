@@ -1,0 +1,28 @@
+{
+  "account_id": "00000000-0000-4000-8000-000000000001",
+  "state": "canceled",
+  "plan": "multi",
+  "plan_name": "Multi-screen",
+  "screen_limit": 0,
+  "active_screens": 4,
+  "total_screens": 4,
+  "can_add_screen": false,
+  "playback_allowed": false,
+  "trial": null,
+  "subscription": {
+    "status": "canceled",
+    "current_period_end": "2026-10-30T00:00:00.000Z",
+    "cancel_at_period_end": false
+  },
+  "grace_ends_at": null,
+  "suspend_at": null,
+  "features_locked": [],
+  "warning": {
+    "kind": "canceled",
+    "action": "open_plan",
+    "message": "Your plan isn't active, so your screens are paused. Your content and settings are saved. Choose a plan to turn them back on."
+  },
+  "enforced": false,
+  "billing_url": "https://pekko.example/dashboard/billing",
+  "server_time": "2026-11-02T18:00:00.000Z"
+}
