@@ -14,7 +14,7 @@ type Entitlements = {
   warning: { kind: string; message: string; action: string | null } | null;
 };
 
-const PLAN_SCREENS: Record<string, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5 };
+const PLAN_SCREENS: Record<string, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5, comp: 5 };
 
 /** Dates in the viewer's own time zone, with the zone named. */
 function local(iso: string | null) {
