@@ -23,14 +23,11 @@ export function Wordmark({
   align?: "start" | "center";
 }) {
   const title = size === "lg" ? "text-[2rem]" : size === "sm" ? "text-lg" : "text-[1.35rem]";
-  const sub = size === "lg" ? "text-[0.7rem] tracking-[0.28em]" : size === "sm" ? "text-[0.55rem] tracking-[0.18em]" : "text-[0.62rem] tracking-[0.22em]";
   return (
     <span className={`inline-flex flex-col leading-none text-ink ${align === "center" ? "items-center" : "items-start"}`}>
       <span className={`font-extrabold tracking-tight ${title}`}>
         Pekko
-        <span className="ml-0.5 align-super text-[0.42em] font-bold tracking-normal" aria-hidden="true">TM</span>
       </span>
-      <span className={`mt-1 font-semibold uppercase text-ink ${sub}`}>Technologies</span>
     </span>
   );
 }
