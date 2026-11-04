@@ -21,7 +21,7 @@ test.beforeAll(() => { db = createClient(sbUrl, service, { auth: { persistSessio
 test.afterAll(async () => { if (emails.length) await removeCreatedTestEmails(db, emails); });
 
 async function owner() {
-  const email = `pekko-billing-e2e-${randomUUID()}@mailinator.com`;
+  const email = `pantalla-e2e-${randomUUID()}@mailinator.com`;
   const password = `Pekko-${randomUUID()}`;
   emails.push(email);
   const { data } = await db.auth.admin.createUser({ email, password, email_confirm: true });

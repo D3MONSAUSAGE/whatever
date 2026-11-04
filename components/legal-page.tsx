@@ -18,6 +18,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
         <nav className="mt-10 flex gap-4 text-sm text-muted" aria-label="Legal">
           <Link href="/terms" className="hover:underline">Terms</Link>
           <Link href="/privacy" className="hover:underline">Privacy</Link>
+          <Link href="/account-deletion" className="hover:underline">Delete your account</Link>
           <Link href="/login" className="hover:underline">Sign in</Link>
         </nav>
       </article>

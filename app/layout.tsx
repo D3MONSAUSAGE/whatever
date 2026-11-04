@@ -11,7 +11,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://pantalla-chi.vercel.app"),
   title: "Pekko",
-  description: "Pekko Technologies. Making life simpler every day.",
+  description: "Pekko. Making life simpler every day.",
   applicationName: "Pekko",
   icons: {
     icon: [
@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     ],
     apple: { url: "/brand/apple-touch-icon.png", sizes: "180x180" },
   },
-  openGraph: { title: "Pekko", description: "Pekko Technologies. Making life simpler every day.", siteName: "Pekko", type: "website" },
-  twitter: { card: "summary_large_image", title: "Pekko", description: "Pekko Technologies. Making life simpler every day." },
+  openGraph: { title: "Pekko", description: "Pekko. Making life simpler every day.", siteName: "Pekko", type: "website" },
+  twitter: { card: "summary_large_image", title: "Pekko", description: "Pekko. Making life simpler every day." },
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0066FF" };
 

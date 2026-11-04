@@ -14,6 +14,7 @@ export default function Login() {
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
 
   useEffect(() => {
+    if (new URLSearchParams(location.search).get("mode") === "up") setMode("up");
     // A recovery link that fell back to the Site URL still ends on the reset page.
     if (isRecoveryUrl()) { location.replace(`/reset-password${location.search}${location.hash}`); return; }
     if (!supabaseConfigured()) return;

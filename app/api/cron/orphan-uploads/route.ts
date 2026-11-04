@@ -4,6 +4,7 @@ import { cleanupOrphanUploads } from "@/lib/server/orphan-uploads";
 import { db } from "@/lib/server/supabase";
 import { isMissingSchema } from "@/lib/server/schema";
 import { deliverAlertEmails } from "@/lib/server/alerts";
+import { deletionEnabled, runDueDeletions } from "@/lib/server/account-deletion";
 
 const ANALYTICS_RETENTION_DAYS = 90;
 
@@ -34,7 +35,15 @@ export async function GET(req: Request) {
     const email = await deliverAlertEmails({ dryRun }).catch(() => ({ error: true }));
     alerts = { ...(alertPurge.data as object), check, email };
   }
-  return json({ ...result, analytics, alerts });
+  // M17.6: time-based commercial events (trial_expired, screens_during_trial). Skipped on dry runs.
+  let commercial: unknown = null;
+  if (!dryRun) {
+    const c = await db().rpc("record_commercial_events");
+    commercial = c.error ? (isMissingSchema(c.error) ? null : { error: true }) : c.data;
+  }
+  // M17.5: due account deletions, only when ACCOUNT_DELETION=1.
+  const deletions = deletionEnabled() ? await runDueDeletions({ dryRun }).catch(() => ({ error: true })) : { enabled: false };
+  return json({ ...result, analytics, alerts, commercial, deletions });
 }
 
 function cronGate(req: Request) {

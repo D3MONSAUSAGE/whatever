@@ -35,7 +35,7 @@ export default function ForgotPassword() {
       lede={sent
         ? <>If an account uses <strong className="text-ink">{email.trim()}</strong>, a reset link is on its way. It works once and expires in an hour. Check spam if it doesn&apos;t arrive in a few minutes.</>
         : "Enter the email you sign in with. We'll send a link to choose a new password."}
-      footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">Back to sign in</Link>}
+      footer={<><Link href="/login" className="font-semibold text-primary underline underline-offset-4">Back to sign in</Link><span className="block mt-2 text-muted">No email after 10 minutes? See <Link href="/support" className="underline">Support</Link>.</span></>}
     >
       {sent ? (
         <button type="button" className="btn btn-quiet w-full" onClick={() => { setSent(false); setError(null); }}>

@@ -83,8 +83,14 @@ export function SetupTracker({ fixture, origin }: { fixture?: OnboardingState; o
                       ? "Your TV confirmed it's showing your content."
                       : "Your screen is online with content published. Waiting for the TV to confirm it's on screen (older player pages can't; reload the TV page to update it)."
                     : copy.body}
-                  {step.id === "screen" && origin ? <> TV address: <strong className="break-all text-ink">{origin}/player</strong></> : null}
                 </p>
+                {step.id === "screen" && origin ? (
+                  <p className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="tracker-player-url">
+                    <span className="text-muted">TV address:</span>
+                    <code className="rounded-lg border border-line bg-paper px-2 py-1 text-base font-semibold text-ink break-all">{origin}/player</code>
+                    <button type="button" className="btn btn-quiet" onClick={() => navigator.clipboard?.writeText(`${origin}/player`).catch(() => {})}>Copy</button>
+                  </p>
+                ) : null}
                 {current && step.id === "business" ? <BusinessStep disabled={!!fixture} onDone={() => live.reload()} /> : null}
                 {current && step.id === "location" ? <LocationStep locationId={state.firstLocationId} disabled={!!fixture} onDone={() => live.reload()} /> : null}
               </div>
