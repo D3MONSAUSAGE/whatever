@@ -1,0 +1,28 @@
+{
+  "account_id": "00000000-0000-4000-8000-000000000001",
+  "state": "trial",
+  "plan": "trial",
+  "plan_name": "Free trial",
+  "screen_limit": 5,
+  "active_screens": 2,
+  "total_screens": 2,
+  "can_add_screen": true,
+  "playback_allowed": true,
+  "trial": {
+    "started_at": "2026-10-22T18:00:00.000Z",
+    "ends_at": "2026-11-05T18:00:00.000Z",
+    "days_left": 3
+  },
+  "subscription": null,
+  "grace_ends_at": null,
+  "suspend_at": "2026-11-08T18:00:00.000Z",
+  "features_locked": [],
+  "warning": {
+    "kind": "trial_ending",
+    "action": "open_plan",
+    "message": "3 days left in your free trial."
+  },
+  "enforced": false,
+  "billing_url": "https://pekko.example/dashboard/billing",
+  "server_time": "2026-11-02T18:00:00.000Z"
+}

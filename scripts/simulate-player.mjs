@@ -8,7 +8,7 @@ const setTimeout_ = (fn, ms) => { const id = ++tid; timers.push({ id, at: now + 
 const clearTimeout_ = (id) => { timers = timers.filter((t) => t.id !== id); };
 
 const els = {};
-for (const id of ["a", "b", "pair", "empty", "connecting", "code", "status"])
+for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "code", "status"])
   els[id] = { id, className: id === "status" ? "status" : id.length === 1 ? "layer" : "screen", style: {}, innerHTML: "" };
 function makeVideo(id) {
   const el = {
@@ -111,6 +111,7 @@ function server(method, url, body, headers) {
   }
   if (url.startsWith("/api/player/state")) {
     S.stateCalls++;
+    if (S.online && S.paused) return [402, { suspended: true, title: "This screen is paused", message: "Plan inactive.", pollMs: 60000 }];
     if (S.revoked || headers["X-Display-Token"] !== S.token) return [401, { error: "unauthorized" }];
     const v = new URL("http://x" + url).searchParams.get("v");
     const refresh = url.indexOf("refresh=1") !== -1;
@@ -145,7 +146,7 @@ new Function("window", "document", "XMLHttpRequest", "Image", "setTimeout", "cle
   window_, document_, XHR, Img, setTimeout_, clearTimeout_, window_.localStorage);
 
 const visible = () => ["a", "b", "va", "vb"].filter((k) => els[k] && els[k].className.includes("on"));
-const screen = () => ["pair", "empty", "connecting"].find((k) => els[k].className.includes("on")) || "image";
+const screen = () => ["pair", "empty", "connecting", "paused"].find((k) => els[k].className.includes("on")) || "image";
 const shownUrl = () => { const l = ["a", "b"].filter((k) => els[k].className.includes("on")).sort((x, y) => (els[y].style.zIndex || 0) - (els[x].style.zIndex || 0))[0]; return l ? els[l].style.backgroundImage : null; };
 const shownVideo = () => {
   const ids = ["va", "vb"].filter((k) => els[k].className.includes("on"));
@@ -420,6 +421,17 @@ run(15000);
 const still = shownUrl() || "";
 run(6000);
 check("a single image replaces the video playlist and holds", still.indexOf("still.jpg") !== -1 && shownUrl() === still && shownVideo() === "");
+
+// M17: plan inactive -> paused card, token kept, media stopped; resumes on its own.
+S.paused = true;
+run(35000);
+check("inactive plan shows the paused card and keeps the token", screen() === "paused" && !!storage.pantalla_display_token && visible().length === 0 && shownVideo() === "" && els["paused-title"].textContent === "This screen is paused");
+const pausedCalls = S.stateCalls;
+run(50000);
+check("a paused screen re-checks about once a minute", S.stateCalls - pausedCalls <= 1);
+S.paused = false;
+run(65000);
+check("the screen resumes playing once the plan is active again", screen() === "image" && (shownUrl() || "").indexOf("still.jpg") !== -1);
 
 S.revoked = true;
 run(12000);

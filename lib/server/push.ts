@@ -7,7 +7,9 @@ export type PushMessage = {
   token: string;
   title: string;
   body: string;
-  data: { type: "screen_offline" | "screen_online"; alertId: string; screenId: string };
+  data:
+    | { type: "screen_offline" | "screen_online"; alertId: string; screenId: string }
+    | { type: "trial_reminder"; alertId: string; daysLeft?: string };
 };
 /** `invalidToken`: FCM said the token is gone (UNREGISTERED / 404 / bad token); the device row is deleted. */
 export type PushResult = { ok: true } | { ok: false; invalidToken?: boolean; error: string };
@@ -61,6 +63,7 @@ export function fcmSender(sa: ServiceAccount, fetchImpl: typeof fetch = fetch): 
   return {
     name: "fcm",
     async send(m) {
+      const tag = "screenId" in m.data ? m.data.screenId : "trial_reminder";
       let bearer: string;
       try { bearer = await accessToken(); } catch (e) { return { ok: false, error: (e as Error).message }; }
       const r = await fetchImpl(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(sa.project_id)}/messages:send`, {
@@ -71,8 +74,8 @@ export function fcmSender(sa: ServiceAccount, fetchImpl: typeof fetch = fetch): 
             token: m.token,
             notification: { title: m.title, body: m.body },
             data: m.data,
-            android: { priority: "high", notification: { channel_id: "screen_alerts", tag: m.data.screenId } },
-            apns: { headers: { "apns-priority": "10", "apns-collapse-id": m.data.screenId.slice(0, 64) } },
+            android: { priority: "high", notification: { channel_id: "screen_alerts", tag } },
+            apns: { headers: { "apns-priority": "10", "apns-collapse-id": tag.slice(0, 64) } },
           },
         }),
       });

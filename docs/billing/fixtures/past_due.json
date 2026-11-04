@@ -1,0 +1,28 @@
+{
+  "account_id": "00000000-0000-4000-8000-000000000001",
+  "state": "past_due",
+  "plan": "business",
+  "plan_name": "Business",
+  "screen_limit": 3,
+  "active_screens": 2,
+  "total_screens": 2,
+  "can_add_screen": false,
+  "playback_allowed": true,
+  "trial": null,
+  "subscription": {
+    "status": "past_due",
+    "current_period_end": "2026-11-01T00:00:00.000Z",
+    "cancel_at_period_end": false
+  },
+  "grace_ends_at": "2026-11-08T00:00:00.000Z",
+  "suspend_at": "2026-11-08T00:00:00.000Z",
+  "features_locked": [],
+  "warning": {
+    "kind": "payment_failed",
+    "action": "open_plan",
+    "message": "We couldn't take your last payment. Update your payment method before Nov 8, 2026 (UTC) to keep your screens playing."
+  },
+  "enforced": false,
+  "billing_url": "https://pekko.example/dashboard/billing",
+  "server_time": "2026-11-02T18:00:00.000Z"
+}

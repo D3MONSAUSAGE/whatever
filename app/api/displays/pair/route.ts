@@ -6,6 +6,7 @@ import {
   PAIR_CLAIM_MAX_PER_USER,
   PAIR_CLAIM_WINDOW_SECONDS,
 } from "@/lib/server/limits";
+import { billingEnforced } from "@/lib/server/entitlements";
 import { normalizeDisplayName, normalizePairingCode } from "@/lib/server/validate";
 import { allow, clientIp, fail, json, readJson } from "@/lib/server/http";
 
@@ -28,11 +29,26 @@ export async function POST(req: Request) {
   const okIp = await allow(`pair-claim:ip:${clientIp(req)}`, PAIR_CLAIM_WINDOW_SECONDS, PAIR_CLAIM_MAX_PER_IP);
   if (!okUser || !okIp) return fail("Too many attempts. Wait 15 minutes, then try again.", 429);
 
+  const enforce = billingEnforced();
   const { data: displayId, error } = await db().rpc("claim_pairing", {
     p_code_hash: hashCode(code),
     p_account_id: admin.accountId,
     p_name: name,
+    // Only sent when enforcing, so the call is unchanged against a database without 0013.
+    ...(enforce ? { p_enforce: true } : {}),
   });
+  if (error && /screen_limit/.test(error.message || "")) {
+    return json({
+      error: "Your plan's screen limit is reached. Choose a plan with more screens, or pause another screen first.",
+      code: "screen_limit",
+    }, 403);
+  }
+  if (error && /subscription_inactive/.test(error.message || "")) {
+    return json({
+      error: "Your plan isn't active, so new screens can't be added. Choose a plan to continue.",
+      code: "subscription_inactive",
+    }, 403);
+  }
   if (error) return fail("Couldn't connect the TV. Try again.", 500);
   if (!displayId) {
     return fail("That code doesn't match a TV. Check the screen — codes expire after 10 minutes.", 404);
