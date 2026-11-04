@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PrivacyChoicesLink } from "@/components/consent";
 import { LogoMark, WaveBackdrop, Wordmark } from "@/components/brand";
 
 /** Shared frame for sign-in, forgot-password, and reset-password. */
@@ -22,6 +23,7 @@ export function AuthFrame({ title, lede, children, footer }: { title: string; le
         <nav className="mt-6 flex justify-center gap-4 text-xs text-muted" aria-label="Legal">
           <Link href="/terms" className="hover:underline">Terms</Link>
           <Link href="/privacy" className="hover:underline">Privacy</Link>
+          <PrivacyChoicesLink className="hover:underline" />
         </nav>
       </div>
     </main>

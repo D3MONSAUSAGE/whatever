@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PrivacyChoicesLink } from "@/components/consent";
 import { LogoMark, Wordmark } from "@/components/brand";
 
 export function LegalPage({ title, updated, children }: { title: string; updated: string; children: React.ReactNode }) {
@@ -20,6 +21,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
           <Link href="/privacy" className="hover:underline">Privacy</Link>
           <Link href="/account-deletion" className="hover:underline">Delete your account</Link>
           <Link href="/login" className="hover:underline">Sign in</Link>
+          <PrivacyChoicesLink className="hover:underline" />
         </nav>
       </article>
     </main>
