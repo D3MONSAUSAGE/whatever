@@ -68,3 +68,8 @@ async function must(p: PromiseLike<{ error: { message: string } | null }>) {
   const r = await p;
   if (r.error) throw new Error(r.error.message);
 }
+
+/** True only when a test key and all three price ids are configured. */
+export function checkoutAvailable(env: Record<string, string | undefined> = process.env) {
+  return !!stripeKey(env) && PAID_PLANS.every((p) => !!priceFor(p, env));
+}

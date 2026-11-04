@@ -1,7 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
-import { PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
+import { checkoutAvailable, PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,4 +33,9 @@ export async function POST(req: Request) {
     cancel_url: `${origin}/dashboard/billing?checkout=canceled`,
   });
   return json({ url: session.url });
+}
+
+// Public: whether online checkout is switched on (no secrets returned).
+export async function GET() {
+  return json({ available: checkoutAvailable() });
 }
