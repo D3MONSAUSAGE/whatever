@@ -7,7 +7,7 @@ export function billingEnforced(env: Record<string, string | undefined> = proces
 
 export type EntitlementState = "trial" | "trial_grace" | "active" | "past_due" | "grandfathered" | "canceled" | "expired";
 export const ENTITLEMENT_STATES: readonly EntitlementState[] = ["trial", "trial_grace", "active", "past_due", "grandfathered", "canceled", "expired"];
-export type PlanId = "trial" | "starter" | "business" | "multi" | "grandfathered";
+export type PlanId = "trial" | "starter" | "business" | "multi" | "grandfathered" | "comp";
 
 export const PLAN_NAMES: Record<PlanId, string> = {
   trial: "Free trial",
@@ -15,6 +15,7 @@ export const PLAN_NAMES: Record<PlanId, string> = {
   business: "Business",
   multi: "Multi-screen",
   grandfathered: "Early customer",
+  comp: "Complimentary",
 };
 
 export type EntitlementRow = {
@@ -30,7 +31,7 @@ export type Warning = {
   action: "open_plan" | "select_screens" | null;
 } | null;
 
-export const PLAN_LIMITS: Record<PlanId, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5 };
+export const PLAN_LIMITS: Record<PlanId, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5, comp: 5 };
 
 const DAY = 86_400_000;
 
