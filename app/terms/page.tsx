@@ -1,3 +1,4 @@
+import { legalOperator } from "@/lib/legal";
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
@@ -6,7 +7,7 @@ export const metadata: Metadata = { title: "Terms of Service · Pekko" };
 export default function Terms() {
   return (
     <LegalPage title="Terms of Service (DRAFT)" updated="November 2, 2026">
-      <p>These terms cover your use of Pekko, a service from [Legal entity name: to be confirmed] (&quot;we&quot;) for showing images, videos and playlists on screens (&quot;the Service&quot;). By creating an account you agree to them.</p>
+      <p>These terms cover your use of Pekko, a service from {legalOperator()} (&quot;we&quot;) for showing images, videos and playlists on screens (&quot;the Service&quot;). By creating an account you agree to them.</p>
       <h2 className="font-semibold text-lg">Your account</h2>
       <p>You must give accurate information and keep your password safe. You are responsible for what happens under your account, including the screens you pair to it. Tell us right away if you think someone else has access.</p>
       <h2 className="font-semibold text-lg">Your content</h2>

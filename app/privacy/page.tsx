@@ -1,9 +1,10 @@
+import { legalOperator } from "@/lib/legal";
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = { title: "Privacy Policy · Pekko" };
 
-const ENTITY = "[Legal entity name: to be confirmed]";
+const ENTITY = legalOperator();
 
 export default function Privacy() {
   return (
