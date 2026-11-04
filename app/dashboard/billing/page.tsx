@@ -28,6 +28,20 @@ export default function Billing() {
   const toast = useToast();
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
+  const checkout = useApi<{ available: boolean }>("/api/billing/checkout");
+  const canBuy = !!checkout.data?.available;
+  const [buying, setBuying] = useState<string | null>(null);
+
+  async function buy(plan: string) {
+    setBuying(plan);
+    try {
+      const r = await api<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan }) });
+      window.location.assign(r.url);
+    } catch (err) {
+      toast.show((err as Error).message, true);
+      setBuying(null);
+    }
+  }
 
   useEffect(() => {
     if (screens.data && picked === null) setPicked(new Set(screens.data.filter((d) => d.entitled !== false).map((d) => d.id)));
@@ -77,10 +91,19 @@ export default function Billing() {
               <div className="font-semibold">{p.name}</div>
               <div className="text-2xl font-bold">${p.price}<span className="text-sm font-normal text-muted">/month</span></div>
               <div className="text-muted">{p.screens} screen{p.screens === 1 ? "" : "s"}</div>
+              {canBuy ? (
+                <button className="btn btn-primary mt-3 w-full" data-testid={`buy-${p.id}`} disabled={!!buying || e?.plan === p.id} onClick={() => buy(p.id)}>
+                  {e?.plan === p.id ? "Current plan" : buying === p.id ? "Opening checkout…" : `Choose ${p.name}`}
+                </button>
+              ) : (
+                <button className="btn btn-quiet mt-3 w-full" data-testid={`buy-${p.id}`} disabled>Coming soon</button>
+              )}
             </li>
           ))}
         </ul>
-        <p className="text-muted mt-3 text-sm">Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed.</p>
+        <p className="text-muted mt-3 text-sm" data-testid="checkout-note">{canBuy
+          ? "You'll finish payment on Stripe's secure checkout. Nothing is charged until you confirm there."
+          : "Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed."}</p>
       </section>
 
       {list.length > 0 && (

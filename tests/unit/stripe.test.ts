@@ -24,3 +24,14 @@ describe("stripe test mode guard", () => {
     expect(() => s.webhooks.constructEvent(payload, old, secret)).toThrow();
   });
 });
+
+describe("checkout availability", () => {
+  it("needs a test key and all prices", async () => {
+    const { checkoutAvailable } = await import("@/lib/server/stripe");
+    const prices = { STRIPE_PRICE_STARTER: "a", STRIPE_PRICE_BUSINESS: "b", STRIPE_PRICE_MULTI: "c" };
+    expect(checkoutAvailable({})).toBe(false);
+    expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_live_x", ...prices })).toBe(false);
+    expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_test_x", STRIPE_PRICE_STARTER: "a" })).toBe(false);
+    expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_test_x", ...prices })).toBe(true);
+  });
+});
