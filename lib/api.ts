@@ -46,15 +46,15 @@ export type SchedulePreview = {
 };
 
 export type PlaylistSummary = {
-  id: string; name: string; defaultDurationMs: number; transition: "none" | "fade";
+  id: string; name: string; defaultDurationMs: number; transition: "none" | "fade"; playbackMode?: "auto" | "manual";
   slideCount: number; displayCount: number; publishedAt: string | null; updatedAt: string; revision: number;
   displayNames?: string[];
   thumbnailUrl?: string | null;
 };
 
 export type PlaylistDetail = {
-  id: string; name: string; defaultDurationMs: number; transition: "none" | "fade";
-  publishedAt: string | null; publishedTransition: "none" | "fade" | null; revision: number; updatedAt: string;
+  id: string; name: string; defaultDurationMs: number; transition: "none" | "fade"; playbackMode: "auto" | "manual";
+  publishedAt: string | null; publishedTransition: "none" | "fade" | null; publishedPlaybackMode?: "auto" | "manual" | null; revision: number; updatedAt: string;
   items: { id: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl?: string | null; kind?: "image" | "video"; mediaDurationMs?: number | null; durationMs: number | null; position: number }[];
   displays: { id: string; name: string; assigned: boolean }[];
 };

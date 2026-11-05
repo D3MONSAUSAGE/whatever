@@ -18,10 +18,11 @@ type PlaylistItem = {
   width: number | null;
   height: number | null;
 };
-type PlaylistPayload = { id: string; transition: "none" | "fade"; items: PlaylistItem[] };
+type PlaylistPayload = { id: string; transition: "none" | "fade"; playbackMode: "auto" | "manual"; items: PlaylistItem[] };
 type PlaylistRow = {
   playlist_id: string;
   transition: string | null;
+  playback_mode?: string | null;
   position: number;
   media_id: string;
   storage_path: string;
@@ -139,7 +140,7 @@ export async function POST(req: Request) {
 async function publishedPlaylistById(playlistId: string, accountId: string): Promise<PlaylistPayload | null | "error"> {
   const playlist = await db()
     .from("playlists")
-    .select("id, published_transition")
+    .select("id, published_transition, published_playback_mode")
     .eq("id", playlistId)
     .eq("account_id", accountId)
     .maybeSingle();
@@ -169,6 +170,7 @@ async function publishedPlaylistById(playlistId: string, accountId: string): Pro
     rows.push({
       playlist_id: playlistId,
       transition: playlist.data.published_transition,
+      playback_mode: playlist.data.published_playback_mode == null ? null : String(playlist.data.published_playback_mode),
       position: Number(item.position),
       media_id: String(item.media_id),
       storage_path: String(file.storage_path),
@@ -213,6 +215,7 @@ async function signPlaylist(rows: PlaylistRow[]): Promise<PlaylistPayload | null
   return {
     id: rows[0].playlist_id,
     transition: rows[0].transition === "fade" ? "fade" : "none",
+    playbackMode: rows[0].playback_mode === "manual" ? "manual" : "auto",
     items,
   };
 }

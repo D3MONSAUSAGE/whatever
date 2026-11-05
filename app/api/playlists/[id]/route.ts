@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { PLAYLIST_MAX_DURATION_MS, PLAYLIST_MIN_DURATION_MS } from "@/lib/server/limits";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
-import { normalizePlaylistName, normalizeTransition, parseDraftItems } from "@/lib/server/validate";
+import { normalizePlaybackMode, normalizePlaylistName, normalizeTransition, parseDraftItems } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function GET(req: Request, { params }: Ctx) {
 
   const { data: playlist, error } = await db()
     .from("playlists")
-    .select("id, name, default_duration_ms, transition, published_at, published_transition, revision, updated_at")
+    .select("id, name, default_duration_ms, transition, playback_mode, published_at, published_transition, published_playback_mode, revision, updated_at")
     .eq("id", id)
     .eq("account_id", admin.accountId)
     .maybeSingle();
@@ -90,8 +90,10 @@ export async function GET(req: Request, { params }: Ctx) {
     name: playlist.name,
     defaultDurationMs: playlist.default_duration_ms,
     transition: playlist.transition,
+    playbackMode: playlist.playback_mode === "manual" ? "manual" : "auto",
     publishedAt: playlist.published_at,
     publishedTransition: playlist.published_transition,
+    publishedPlaybackMode: playlist.published_playback_mode === "manual" ? "manual" : playlist.published_playback_mode === "auto" ? "auto" : null,
     revision: playlist.revision,
     updatedAt: playlist.updated_at,
     items: (itemRows ?? []).map((item) => {
@@ -125,10 +127,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const name = normalizePlaylistName(body.name);
   const transition = normalizeTransition(body.transition);
+  const playbackMode = body.playbackMode === undefined ? null : normalizePlaybackMode(body.playbackMode);
   const defaultDurationMs = body.defaultDurationMs;
   const items = parseDraftItems(body.items);
   if (!name) return fail("Give the playlist a name.", 400);
   if (!transition) return fail("Choose a transition.", 400);
+  if (body.playbackMode !== undefined && !playbackMode) return fail("Choose Automatic or Manual slideshow.", 400);
   if (typeof defaultDurationMs !== "number" || !Number.isInteger(defaultDurationMs)) {
     return fail("Set a default duration in seconds.", 400);
   }
@@ -144,6 +148,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     p_default_duration_ms: defaultDurationMs,
     p_transition: transition,
     p_items: items,
+    p_playback_mode: playbackMode,
   });
   if (error) {
     if (isMissingSchema(error)) return fail(PLAYLISTS_UNAVAILABLE, 503);

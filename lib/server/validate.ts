@@ -46,6 +46,10 @@ export function normalizeTransition(input: unknown): "none" | "fade" | null {
   return input === "none" || input === "fade" ? input : null;
 }
 
+export function normalizePlaybackMode(input: unknown): "auto" | "manual" | null {
+  return input === "auto" || input === "manual" ? input : null;
+}
+
 /** null means "use the playlist default". "invalid" means reject the save. */
 export function parseDurationMs(input: unknown): number | null | "invalid" {
   if (input === null) return null;

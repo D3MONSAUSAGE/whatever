@@ -8,8 +8,10 @@ const setTimeout_ = (fn, ms) => { const id = ++tid; timers.push({ id, at: now + 
 const clearTimeout_ = (id) => { timers = timers.filter((t) => t.id !== id); };
 
 const els = {};
-for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "code", "status"])
-  els[id] = { id, className: id === "status" ? "status" : id.length === 1 ? "layer" : "screen", style: {}, innerHTML: "" };
+for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "code", "status", "manual", "manual-pos", "prev", "next"]) {
+  const base = id === "status" ? "status" : id === "manual" ? "manual" : id.length === 1 ? "layer" : (["pair","empty","connecting","paused"].includes(id) ? "screen" : "");
+  els[id] = { id, className: base, style: {}, innerHTML: "", textContent: "", setAttribute() {}, getAttribute() { return null; } };
+}
 function makeVideo(id) {
   const el = {
     id,
@@ -90,7 +92,19 @@ const window_ = {
   localStorage: { getItem: (k) => storage[k] ?? null, setItem: (k, v) => (storage[k] = v), removeItem: (k) => delete storage[k] },
   addEventListener: (e, f) => (listeners[e] = f),
 };
-const document_ = { getElementById: (id) => els[id], documentElement: {}, addEventListener() {}, removeEventListener() {} };
+const docListeners = {};
+const document_ = {
+  getElementById: (id) => els[id],
+  documentElement: {},
+  body: { className: "" },
+  addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
+  removeEventListener(type, fn) {
+    docListeners[type] = (docListeners[type] || []).filter((f) => f !== fn);
+  },
+};
+function fireDoc(type, event) {
+  for (const fn of docListeners[type] || []) fn(event || {});
+}
 
 // fake server
 const S = { online: true, sessions: {}, token: null, version: 0, url: null, playlist: null, revoked: false, stateCalls: 0, playerError: "", playerErrorPosts: 0 };
@@ -421,6 +435,93 @@ run(15000);
 const still = shownUrl() || "";
 run(6000);
 check("a single image replaces the video playlist and holds", still.indexOf("still.jpg") !== -1 && shownUrl() === still && shownVideo() === "");
+
+
+// Manual slideshow: no auto-advance, Next/Previous + arrows, wrap, hold video.
+S.version = 18;
+S.url = null;
+S.playlist = {
+  id: "manual-imgs",
+  transition: "none",
+  playbackMode: "manual",
+  items: [
+    { mediaId: "m1", url: "https://cdn/m1.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "m2", url: "https://cdn/m2.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "m3", url: "https://cdn/m3.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+run(8000);
+slideLog = [];
+run(15000);
+check("manual mode shows first slide and does not auto-advance", shownUrl().indexOf("m1.jpg") !== -1 && slideLog.every((url) => url.indexOf("m2.jpg") === -1 && url.indexOf("m3.jpg") === -1));
+fireDoc("keydown", { key: "ArrowRight", preventDefault() {} });
+run(5000);
+check("manual ArrowRight advances to the next slide", shownUrl().indexOf("m2.jpg") !== -1);
+fireDoc("keydown", { key: "ArrowLeft", preventDefault() {} });
+run(5000);
+check("manual ArrowLeft goes back", shownUrl().indexOf("m1.jpg") !== -1);
+fireDoc("keydown", { key: "ArrowLeft", preventDefault() {} });
+run(5000);
+check("manual previous wraps to the last slide", shownUrl().indexOf("m3.jpg") !== -1);
+if (typeof els.next.onclick === "function") els.next.onclick({ stopPropagation() {} });
+else fireDoc("keydown", { key: "ArrowRight", preventDefault() {} });
+run(5000);
+check("manual next from last wraps to the first slide", shownUrl().indexOf("m1.jpg") !== -1);
+
+S.version = 19;
+S.playlist = {
+  id: "manual-imgs",
+  transition: "none",
+  playbackMode: "manual",
+  items: [
+    { mediaId: "m2", url: "https://cdn/m2.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "m3", url: "https://cdn/m3.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "m4", url: "https://cdn/m4.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+run(12000);
+check("manual playlist change keeps a sensible index when possible", shownUrl().indexOf("m3.jpg") !== -1 || shownUrl().indexOf("m2.jpg") !== -1 || shownUrl().indexOf("m4.jpg") !== -1);
+
+S.version = 20;
+S.playlist = {
+  id: "manual-video",
+  transition: "none",
+  playbackMode: "manual",
+  items: [
+    { mediaId: "mv1", url: "https://cdn/mv1.mp4?dur=2000", durationMs: 9000, kind: "video" },
+    { mediaId: "mi2", url: "https://cdn/mi2.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+mediaLog = [];
+run(12000);
+check("manual video plays then holds without auto-advancing", mediaLog.map(clipName).join(",").indexOf("mv1") !== -1 && mediaLog.map(clipName).join(",").indexOf("mi2") === -1 && shownVideo().indexOf("mv1") !== -1);
+fireDoc("keydown", { key: "ArrowRight", preventDefault() {} });
+run(8000);
+check("manual next after a held video shows the next image", shownUrl().indexOf("mi2.jpg") !== -1);
+
+// Automatic regression after manual: durations advance again.
+S.version = 21;
+S.playlist = {
+  id: "auto-again",
+  transition: "none",
+  playbackMode: "auto",
+  items: [
+    { mediaId: "a1", url: "https://cdn/a1.jpg", durationMs: 3000, kind: "image" },
+    { mediaId: "a2", url: "https://cdn/a2.jpg", durationMs: 3000, kind: "image" },
+  ],
+};
+run(8000);
+slideLog = [];
+run(20000);
+check("automatic mode still advances by duration after manual", slideLog.map((url) => url.replace(/.*\/(\w+)\.jpg.*/, "$1")).slice(0, 3).join(",") === "a1,a2,a1" || slideLog.map((url) => url.replace(/.*\/(\w+)\.jpg.*/, "$1")).slice(0, 3).join(",") === "a2,a1,a2");
+slideLog = null;
+mediaLog = null;
+
+// Restore a single still image so the paused/resume checks stay independent of manual tests.
+S.version = 22;
+S.playlist = null;
+S.url = "https://cdn/still.jpg";
+run(12000);
 
 // M17: plan inactive -> paused card, token kept, media stopped; resumes on its own.
 S.paused = true;

@@ -76,6 +76,7 @@ function insertRow(store: Store, table: TableName, row: Row) {
   if (table === "playlists") {
     if (row.default_duration_ms == null) row.default_duration_ms = 10000;
     if (!row.transition) row.transition = "none";
+    if (!row.playback_mode) row.playback_mode = "auto";
     if (row.revision == null) row.revision = 0;
     if (!row.updated_at) row.updated_at = row.created_at;
   }
@@ -375,6 +376,11 @@ function savePlaylist(store: Store, args: Record<string, unknown>) {
   playlist.name = name;
   playlist.default_duration_ms = duration;
   playlist.transition = transition;
+  if (args.p_playback_mode === "auto" || args.p_playback_mode === "manual") {
+    playlist.playback_mode = args.p_playback_mode;
+  } else if (playlist.playback_mode == null) {
+    playlist.playback_mode = "auto";
+  }
   playlist.updated_at = new Date().toISOString();
   store.playlist_items = store.playlist_items.filter((item) => !(item.playlist_id === playlist.id && item.kind === "draft"));
   items.forEach((item, index) => {
@@ -414,6 +420,7 @@ function publishPlaylist(store: Store, args: Record<string, unknown>) {
   const now = new Date().toISOString();
   playlist.published_at = now;
   playlist.published_transition = playlist.transition;
+  playlist.published_playback_mode = playlist.playback_mode === "manual" ? "manual" : "auto";
   playlist.revision = Number(playlist.revision ?? 0) + 1;
   playlist.updated_at = now;
   const chosen = new Set(displayIds);
@@ -469,6 +476,7 @@ function snapshotPlaylist(store: Store, args: Record<string, unknown>) {
   }
   playlist.published_at = now;
   playlist.published_transition = playlist.transition;
+  playlist.published_playback_mode = playlist.playback_mode === "manual" ? "manual" : "auto";
   playlist.revision = Number(playlist.revision ?? 0) + 1;
   playlist.updated_at = now;
   for (const display of store.displays) {
@@ -492,6 +500,7 @@ function playerPlaylist(store: Store, args: Record<string, unknown>) {
       return {
         playlist_id: playlist.id,
         transition: playlist.published_transition,
+        playback_mode: playlist.published_playback_mode === "manual" ? "manual" : "auto",
         position: item.position,
         media_id: item.media_id,
         storage_path: media?.storage_path ?? null,

@@ -14,10 +14,10 @@ export async function GET(req: Request) {
   if (admin instanceof Response) return admin;
 
   const query = parseListQuery(req);
-  type ListRow = { id: string; name: string; default_duration_ms: number; transition: string; published_at: string | null; updated_at: string; revision: number };
+  type ListRow = { id: string; name: string; default_duration_ms: number; transition: string; playback_mode?: string | null; published_at: string | null; updated_at: string; revision: number };
   const loaded = await fetchAll<ListRow>((from, to) => db()
     .from("playlists")
-    .select("id, name, default_duration_ms, transition, published_at, updated_at, revision")
+    .select("id, name, default_duration_ms, transition, playback_mode, published_at, updated_at, revision")
     .eq("account_id", admin.accountId)
     .order("updated_at", { ascending: false })
     .order("id")
@@ -95,6 +95,7 @@ export async function GET(req: Request) {
       name: list.name,
       defaultDurationMs: list.default_duration_ms,
       transition: list.transition,
+      playbackMode: list.playback_mode === "manual" ? "manual" : "auto",
       slideCount: slideCount.get(list.id) ?? 0,
       displayCount: displayCount.get(list.id) ?? 0,
       displayNames: displayNames.get(list.id) ?? [],
