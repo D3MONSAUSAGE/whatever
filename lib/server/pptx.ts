@@ -1,6 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { convertPptxToPng } from "pptx-glimpse";
+
+// Vercel file tracing omits .wasm unless referenced. Keep this resolve.
+const nodeRequire = createRequire(__filename);
+void nodeRequire.resolve("@resvg/resvg-wasm/index_bg.wasm");
 import { db } from "./supabase";
 import { isMissingSchema } from "./schema";
 import { stripControls } from "./validate";
