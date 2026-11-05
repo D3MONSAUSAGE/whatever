@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { checkoutAvailable } from "@/lib/server/stripe";
 import { PricingCards, SIGNUP_HREF, TrialCta, TrialDetails, TrialNote } from "@/components/site/sections";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Pricing · Pekko",
@@ -20,7 +23,7 @@ export default function Pricing() {
       </section>
       <section className="px-5 pb-6" aria-label="Plans">
         <div className="mx-auto max-w-5xl">
-          <PricingCards />
+          <PricingCards canBuy={checkoutAvailable()} />
           <TrialDetails />
           <p className="mt-4 text-center text-sm text-muted">Questions? See the <Link href="/faq" className="underline font-semibold">FAQ</Link>.</p>
         </div>
