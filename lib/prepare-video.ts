@@ -89,12 +89,12 @@ function probeVideo(file: File): Promise<{ durationMs: number; width: number; he
   });
 }
 
-export function uploadToSignedUrl(signedUrl: string, file: Blob, onProgress: (percent: number) => void) {
+export function uploadToSignedUrl(signedUrl: string, file: Blob, onProgress: (percent: number) => void, fileName = "video.mp4") {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const form = new FormData();
     form.append("cacheControl", "86400");
-    form.append("", file, "video.mp4");
+    form.append("", file, fileName);
     xhr.open("PUT", signedUrl);
     xhr.setRequestHeader("x-upsert", "false");
     xhr.upload.onprogress = (event) => {

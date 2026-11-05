@@ -10,7 +10,7 @@ import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
-type KindKey = "" | "image" | "video" | "upload" | "menu" | "promo";
+type KindKey = "" | "image" | "video" | "presentation" | "upload" | "menu" | "promo";
 type MediaPage = { items: MediaItem[]; total: number; offset: number; limit: number; nextOffset: number | null };
 export const MEDIA_PAGE_SIZE = 48;
 
@@ -115,11 +115,16 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Media library" icon={<IconImage />} lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller, 0.5 seconds to 3 minutes, and 1920 pixels or less on each edge.">
+      <PageHeader title="Media library" icon={<IconImage />} lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller. PowerPoint (.pptx) up to 50 MB becomes ordered slide images and a Manual playlist.">
         <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
           Upload image
           <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}
             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "image"); }} />
+        </label>
+        <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
+          Upload PowerPoint
+          <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="sr-only" disabled={uploads.busy}
+            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "presentation"); }} />
         </label>
         <Link href="/dashboard/media/menus" className="btn btn-quiet">Make a menu board</Link>
         <Link href="/dashboard/media/promos" className="btn btn-quiet">Make a promo</Link>
@@ -134,7 +139,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
         <LoadState error={error} label="Loading…" />
       ) : libraryEmpty ? (
         <EmptyState title="No images yet">
-          Upload a JPG, PNG, or WebP, or an H.264 MP4. Menus exported from Canva at 1920 × 1080 work well.
+          Upload a JPG, PNG, WebP, H.264 MP4, or a .pptx PowerPoint. Menus exported from Canva at 1920 × 1080 work well.
         </EmptyState>
       ) : (
         <>
@@ -145,6 +150,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
                 <option value="">All files</option>
                 <option value="image">Images</option>
                 <option value="video">Videos</option>
+                <option value="presentation">PowerPoint</option>
                 <option value="upload">My uploads</option>
                 <option value="menu">Menu boards</option>
                 <option value="promo">Promos</option>
@@ -220,9 +226,18 @@ export default function MediaPage() {
 
 function Thumb({ item }: { item: MediaItem }) {
   const poster = item.thumbnailUrl || undefined;
-  return item.kind === "video" ? (
-    <video poster={poster} src={item.url || undefined} muted playsInline preload="none" controls className="block aspect-video w-full bg-black object-contain" />
-  ) : (
+  if (item.kind === "video") {
+    return <video poster={poster} src={item.url || undefined} muted playsInline preload="none" controls className="block aspect-video w-full bg-black object-contain" />;
+  }
+  if (item.kind === "presentation") {
+    return (
+      <div className="flex aspect-video w-full flex-col items-center justify-center bg-black text-center text-sm text-white px-3">
+        PowerPoint
+        {item.width && item.height ? <span className="block text-xs text-muted mt-1">{item.width}×{item.height} slides</span> : null}
+      </div>
+    );
+  }
+  return (
     <a href={item.url ?? undefined} target="_blank" rel="noreferrer" className="block aspect-video bg-black overflow-hidden">
       {item.url ? <img src={item.url} alt="" className="size-full object-contain" loading="lazy" /> : null}
     </a>
@@ -232,7 +247,7 @@ function Thumb({ item }: { item: MediaItem }) {
 function Meta({ item }: { item: MediaItem }) {
   return (
     <p className="text-xs text-muted flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="badge">{item.kind === "video" ? "Video" : "Image"}</span>
+      <span className="badge">{item.kind === "video" ? "Video" : item.kind === "presentation" ? "PowerPoint" : item.slideIndex != null ? `Slide ${(item.slideIndex ?? 0) + 1}` : "Image"}</span>
       <span>
         {item.kind === "video" && item.durationMs ? `${formatDuration(item.durationMs)} · ` : ""}
         {formatSize(item.sizeBytes)}

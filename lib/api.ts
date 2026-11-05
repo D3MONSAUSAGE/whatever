@@ -6,8 +6,10 @@ export type MediaUse = { id: string; name: string };
 
 export type MediaItem = {
   id: string; fileName: string; sizeBytes: number; createdAt: string; url: string | null;
-  kind?: "image" | "video"; durationMs?: number | null; width?: number | null; height?: number | null;
+  kind?: "image" | "video" | "presentation"; durationMs?: number | null; width?: number | null; height?: number | null;
   thumbnailUrl?: string | null;
+  sourceMediaId?: string | null;
+  slideIndex?: number | null;
   usedIn?: MediaUse[];
 };
 export type DisplayItem = {

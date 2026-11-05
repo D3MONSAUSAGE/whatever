@@ -7,6 +7,7 @@ import { useToast } from "@/components/toast";
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX = 15 * 1024 * 1024;
+const PPTX_MAX = 50 * 1024 * 1024;
 
 export type UploadJob = {
   key: string;
@@ -14,12 +15,15 @@ export type UploadJob = {
   progress: number;
   state: "queued" | "active" | "done" | "error";
   detail: string;
+  playlistId?: string | null;
 };
+
+type UploadKind = "image" | "video" | "presentation";
 
 type UploadsApi = {
   jobs: UploadJob[];
   busy: boolean;
-  enqueue: (files: File[], kind: "image" | "video") => void;
+  enqueue: (files: File[], kind: UploadKind) => void;
 };
 
 const UploadsContext = createContext<UploadsApi | null>(null);
@@ -41,7 +45,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
     setJobs((current) => current.map((job) => (job.key === key ? { ...job, ...next } : job)));
   }, []);
 
-  const run = useCallback(async (files: File[], kind: "image" | "video") => {
+  const run = useCallback(async (files: File[], kind: UploadKind) => {
     const queue: UploadJob[] = files.map((file, index) => ({
       key: `${file.name}-${file.size}-${index}-${Date.now()}`,
       name: file.name,
@@ -53,13 +57,23 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
     setBusy(true);
     let failed = 0;
     let firstError = "";
+    let lastPlaylistId: string | null = null;
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
       const key = queue[index].key;
-      patch(key, { state: "active", detail: kind === "image" ? "Preparing image…" : "Checking video…" });
+      const detail =
+        kind === "image" ? "Preparing image…"
+        : kind === "video" ? "Checking video…"
+        : "Checking PowerPoint…";
+      patch(key, { state: "active", detail });
       try {
-        if (kind === "image") await uploadImage(file, (progress, detail) => patch(key, { progress, detail, state: "active" }));
-        else await uploadVideo(file, (progress, detail) => patch(key, { progress, detail, state: "active" }));
+        if (kind === "image") await uploadImage(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
+        else if (kind === "video") await uploadVideo(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
+        else {
+          const result = await uploadPresentation(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
+          lastPlaylistId = result.playlistId;
+          patch(key, { playlistId: result.playlistId });
+        }
         patch(key, { state: "done", progress: 100, detail: "Uploaded" });
       } catch (err) {
         failed += 1;
@@ -68,13 +82,20 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
         patch(key, { state: "error", detail: message });
       }
     }
-    if (failed === 0) toast.show(files.length === 1 ? "Uploaded" : `Uploaded ${files.length} files`);
-    else if (files.length === 1) toast.show(firstError, true);
+    if (failed === 0) {
+      if (kind === "presentation" && files.length === 1 && lastPlaylistId) {
+        toast.show("Presentation ready. Open the new Manual playlist to publish it.");
+      } else if (kind === "presentation") {
+        toast.show(files.length === 1 ? "Presentation uploaded" : `Uploaded ${files.length} presentations`);
+      } else {
+        toast.show(files.length === 1 ? "Uploaded" : `Uploaded ${files.length} files`);
+      }
+    } else if (files.length === 1) toast.show(firstError, true);
     else toast.show(`${failed} of ${files.length} files could not be uploaded. ${firstError}`, true);
     setBusy(false);
   }, [patch, toast]);
 
-  const enqueue = useCallback((files: File[], kind: "image" | "video") => {
+  const enqueue = useCallback((files: File[], kind: UploadKind) => {
     if (!files.length) return;
     tail.current = tail.current.then(() => run(files, kind));
   }, [run]);
@@ -104,7 +125,7 @@ export function UploadProgress() {
   const active = jobs.some((job) => job.state === "queued" || job.state === "active");
   return (
     <ul className="card mb-6 divide-y divide-line" aria-label="Upload progress">
-      {active ? <li className="px-4 py-2 text-xs text-muted">Uploads keep going if you open another page. Leaving the site stops them.</li> : null}
+      {active ? <li className="px-4 py-2 text-xs text-muted">Uploads keep going if you open another page. Leaving the site stops them. PowerPoint conversion can take a minute.</li> : null}
       {jobs.map((job) => (
         <li key={job.key} className="px-4 py-3">
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -117,6 +138,11 @@ export function UploadProgress() {
             <div className={`h-full ${job.state === "error" ? "bg-danger" : "bg-primary"}`} style={{ width: `${job.progress}%` }} />
           </div>
           {job.state === "error" ? <p className="text-sm text-danger mt-2">{job.detail}</p> : null}
+          {job.state === "done" && job.playlistId ? (
+            <p className="text-sm mt-2">
+              <a className="text-primary underline" href={`/dashboard/playlists/${job.playlistId}`}>Open playlist</a>
+            </p>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -159,4 +185,40 @@ async function uploadVideo(file: File, onProgress: (progress: number, detail: st
     }),
   });
   onProgress(100, "Uploaded");
+}
+
+async function uploadPresentation(file: File, onProgress: (progress: number, detail: string) => void) {
+  const name = file.name || "presentation.pptx";
+  if (!/\.pptx$/i.test(name)) throw new Error("Upload a .pptx PowerPoint file. Older .ppt files aren't supported yet.");
+  if (/\.pptm$/i.test(name)) throw new Error("Macro-enabled PowerPoint files (.pptm) aren't supported. Save as .pptx without macros.");
+  if (file.size > PPTX_MAX) throw new Error("PowerPoint files must be 50 MB or smaller.");
+  if (file.size <= 0) throw new Error("That PowerPoint file is empty.");
+
+  onProgress(5, "Starting upload…");
+  const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/presentation", {
+    method: "POST",
+    body: JSON.stringify({ fileName: name, sizeBytes: file.size }),
+  });
+  onProgress(10, "Uploading PowerPoint…");
+  await uploadToSignedUrl(
+    signed.signedUrl,
+    file,
+    (progress) => onProgress(Math.max(10, Math.min(55, 10 + progress * 0.45)), "Uploading PowerPoint…"),
+    name,
+  );
+  onProgress(60, "Converting slides…");
+  const done = await api<{ id: string; slideCount: number; playlistId: string | null; warnings?: string[] }>(
+    "/api/media/presentation/complete",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        mediaId: signed.mediaId,
+        fileName: name,
+        createPlaylist: true,
+        playbackMode: "manual",
+      }),
+    },
+  );
+  onProgress(100, done.slideCount === 1 ? "1 slide ready" : `${done.slideCount} slides ready`);
+  return { playlistId: done.playlistId };
 }

@@ -9,7 +9,7 @@ import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
 import { enforceLimit, fail, json } from "@/lib/server/http";
 
 const MEDIA_COLUMNS = "id, file_name, storage_path, size_bytes, created_at";
-const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path`;
+const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path, source_media_id, slide_index`;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,12 +47,13 @@ export async function GET(req: Request) {
     rows = all.data ?? [];
   } else {
     // M14 opt-in: filter and sort over light rows, then load and sign only the requested page.
-    const light = await loadMediaRows(admin.accountId, "id, file_name, size_bytes, created_at, kind, duration_ms", "id, file_name, size_bytes, created_at");
+    const light = await loadMediaRows(admin.accountId, "id, file_name, size_bytes, created_at, kind, duration_ms, source_media_id, slide_index", "id, file_name, size_bytes, created_at");
     if (light.error) return fail("Couldn't load images.", 500);
     let list = (light.data ?? []).filter((r) => matches(r.file_name, query.q));
     const k = query.kind;
-    if (k === "image") list = list.filter((r) => r.kind !== "video");
+    if (k === "image") list = list.filter((r) => r.kind !== "video" && r.kind !== "presentation");
     else if (k === "video") list = list.filter((r) => r.kind === "video");
+    else if (k === "presentation") list = list.filter((r) => r.kind === "presentation");
     else if (k === "menu") list = list.filter((r) => isMenuFile(r.file_name));
     else if (k === "promo") list = list.filter((r) => isPromoFile(r.file_name));
     else if (k === "upload") list = list.filter((r) => !isMenuFile(r.file_name) && !isPromoFile(r.file_name));
@@ -74,12 +75,14 @@ export async function GET(req: Request) {
     fileName: r.file_name,
     sizeBytes: r.size_bytes,
     createdAt: r.created_at,
-    url: urls.get(r.storage_path) ?? null,
-    kind: r.kind === "video" ? "video" : "image",
+    url: r.kind === "presentation" ? null : urls.get(r.storage_path) ?? null,
+    kind: r.kind === "video" ? "video" : r.kind === "presentation" ? "presentation" : "image",
     durationMs: r.duration_ms ?? null,
     width: r.width ?? null,
     height: r.height ?? null,
     thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
+    sourceMediaId: r.source_media_id ?? null,
+    slideIndex: r.slide_index ?? null,
     usedIn: usage?.get(r.id) ?? [],
   }));
   if (!page) return json(items);
@@ -97,6 +100,8 @@ type MediaRow = {
   width?: number | null;
   height?: number | null;
   thumbnail_path?: string | null;
+  source_media_id?: string | null;
+  slide_index?: number | null;
 };
 
 export async function POST(req: Request) {
