@@ -16,6 +16,8 @@ export type Store = {
   screen_group_members: Row[];
   schedules: Row[];
   promos: Row[];
+  display_playback: Row[];
+  display_commands: Row[];
   objects: Map<string, Uint8Array>;
   /** Missing key means "uploaded now". Null means the storage listing has no created_at. */
   objectTimes: Map<string, string | null>;
@@ -25,6 +27,7 @@ export type Store = {
 const TABLE_NAMES = [
   "accounts", "locations", "media", "displays", "playlists", "playlist_items",
   "pairing_sessions", "rate_limits", "screen_groups", "screen_group_members", "schedules", "promos",
+  "display_playback", "display_commands",
 ] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
@@ -356,6 +359,133 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     display.player_error_at = message ? new Date().toISOString() : null;
     return true;
   }
+
+  if (name === "enqueue_display_command") {
+    const display = store.displays.find((item) =>
+      item.id === args.p_display_id && item.account_id === args.p_account_id && item.status === "active" && item.assigned_playlist_id);
+    const account = store.accounts.find((item) => item.id === args.p_account_id && item.owner_user_id === args.p_user_id);
+    if (!display || !account) return [];
+    if (args.p_command !== "next" && args.p_command !== "prev") return [];
+    let pb = store.display_playback.find((item) => item.display_id === display.id);
+    if (!pb) {
+      pb = {
+        display_id: display.id,
+        account_id: display.account_id,
+        playlist_id: display.assigned_playlist_id,
+        playback_mode: "auto",
+        item_index: 0,
+        item_count: 0,
+        content_version: 0,
+        last_applied_seq: 0,
+        last_issued_seq: 0,
+        updated_at: new Date().toISOString(),
+      };
+      store.display_playback.push(pb);
+    }
+    pb.last_issued_seq = Number(pb.last_issued_seq) + 1;
+    pb.updated_at = new Date().toISOString();
+    const id = crypto.randomUUID();
+    store.display_commands.push({
+      id,
+      display_id: display.id,
+      account_id: display.account_id,
+      command: args.p_command,
+      seq: pb.last_issued_seq,
+      issued_by: args.p_user_id,
+      created_at: new Date().toISOString(),
+      applied_at: null,
+    });
+    return [{ command_id: id, seq: pb.last_issued_seq }];
+  }
+  if (name === "set_display_playlist_mode") {
+    const display = store.displays.find((item) =>
+      item.id === args.p_display_id && item.account_id === args.p_account_id && item.status === "active");
+    const account = store.accounts.find((item) => item.id === args.p_account_id && item.owner_user_id === args.p_user_id);
+    if (!display || !account || !display.assigned_playlist_id) return false;
+    if (args.p_mode !== "auto" && args.p_mode !== "manual") return false;
+    const playlist = store.playlists.find((item) => item.id === display.assigned_playlist_id && item.account_id === args.p_account_id && item.published_at);
+    if (!playlist) return false;
+    playlist.playback_mode = args.p_mode;
+    playlist.published_playback_mode = args.p_mode;
+    playlist.revision = Number(playlist.revision) + 1;
+    playlist.updated_at = new Date().toISOString();
+    for (const d of store.displays) {
+      if (d.account_id === args.p_account_id && d.status === "active" && d.assigned_playlist_id === playlist.id) {
+        d.content_version = Number(d.content_version) + 1;
+      }
+    }
+    let pb = store.display_playback.find((item) => item.display_id === display.id);
+    if (!pb) {
+      pb = {
+        display_id: display.id,
+        account_id: display.account_id,
+        playlist_id: playlist.id,
+        playback_mode: args.p_mode,
+        item_index: 0,
+        item_count: 0,
+        content_version: display.content_version,
+        last_applied_seq: 0,
+        last_issued_seq: 0,
+        updated_at: new Date().toISOString(),
+      };
+      store.display_playback.push(pb);
+    } else {
+      pb.playlist_id = playlist.id;
+      pb.playback_mode = args.p_mode;
+      pb.updated_at = new Date().toISOString();
+    }
+    return true;
+  }
+  if (name === "player_pending_commands") {
+    const display = store.displays.find((item) => item.token_hash === args.p_token_hash && item.status === "active");
+    if (!display) return [];
+    const pb = store.display_playback.find((item) => item.display_id === display.id);
+    const after = pb ? Number(pb.last_applied_seq) : 0;
+    return store.display_commands
+      .filter((item) => item.display_id === display.id && item.applied_at == null && Number(item.seq) > after)
+      .sort((a, b) => Number(a.seq) - Number(b.seq))
+      .map((item) => ({ seq: Number(item.seq), command: item.command }));
+  }
+  if (name === "player_report_playback") {
+    const display = store.displays.find((item) => item.token_hash === args.p_token_hash && item.status === "active");
+    if (!display) return false;
+    const mode = args.p_playback_mode === "manual" ? "manual" : "auto";
+    let pb = store.display_playback.find((item) => item.display_id === display.id);
+    if (!pb) {
+      pb = {
+        display_id: display.id,
+        account_id: display.account_id,
+        playlist_id: args.p_playlist_id,
+        playback_mode: mode,
+        item_index: Number(args.p_item_index) || 0,
+        item_count: Number(args.p_item_count) || 0,
+        content_version: Number(args.p_content_version) || 0,
+        last_applied_seq: Number(args.p_last_applied_seq) || 0,
+        last_issued_seq: 0,
+        updated_at: new Date().toISOString(),
+      };
+      store.display_playback.push(pb);
+    } else {
+      pb.playlist_id = args.p_playlist_id;
+      pb.playback_mode = mode;
+      pb.item_index = Number(args.p_item_index) || 0;
+      pb.item_count = Number(args.p_item_count) || 0;
+      pb.content_version = Number(args.p_content_version) || 0;
+      pb.last_applied_seq = Math.max(Number(pb.last_applied_seq) || 0, Number(args.p_last_applied_seq) || 0);
+      pb.updated_at = new Date().toISOString();
+    }
+    const through = Number(args.p_last_applied_seq) || 0;
+    if (through > 0) {
+      for (const cmd of store.display_commands) {
+        if (cmd.display_id === display.id && cmd.applied_at == null && Number(cmd.seq) <= through) {
+          cmd.applied_at = new Date().toISOString();
+        }
+      }
+    }
+    display.last_seen_at = new Date().toISOString();
+    return true;
+  }
+
   throw new Error(`Unknown rpc ${name}`);
 }
 
@@ -527,6 +657,8 @@ export function createFakeDb() {
     screen_group_members: [],
     schedules: [],
     promos: [],
+    display_playback: [],
+    display_commands: [],
     objects: new Map(),
     objectTimes: new Map(),
     users: new Map(),

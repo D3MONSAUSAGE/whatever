@@ -17,7 +17,7 @@ Images are first-class. Videos in a Manual playlist **play once, then hold** on 
 
 ## Remote control from phone/dashboard
 
-**Not in this release.** There is no player command channel today (`supabase_realtime` publishes no tables; the player only polls `/api/player/state`). Phone/browser remote Next/Previous is a follow-up, not required for local Manual control on the screen itself.
+See [REMOTE_CONTROL_API.md](./REMOTE_CONTROL_API.md). Phone apps use `/api/remote/screens` + command/playback-mode POSTs. The TV receives commands via fast poll of `/api/player/state` (no Realtime; player has no Supabase JWT).
 
 ## Mobile (Gother)
 
