@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const a = await db().from("accounts").select("id, owner_user_id, stripe_customer_id").eq("id", admin.accountId).maybeSingle();
   if (a.error || !a.data) return fail("Couldn't load your account.", 500);
   if (a.data.owner_user_id !== admin.userId) return json({ error: "Only the account owner can change the plan.", code: "not_owner" }, 403);
-  const origin = process.env.APP_URL || new URL(req.url).origin;
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || new URL(req.url).origin).replace(/\/+$/, "");
   const session = await s.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price, quantity: 1 }],
