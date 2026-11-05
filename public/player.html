@@ -30,6 +30,19 @@
     text-align: center; font-size: 22px; font-size: 2.6vh; padding: 1.6vh 0; color: #fff;
     background: rgba(0, 0, 0, 0.55); }
   .status.on { display: block; }
+  /* Manual slideshow: discreet, auto-hiding controls that sit clear of the content. */
+  .manual { position: absolute; left: 0; right: 0; bottom: 3.5vh; z-index: 2600000;
+    display: none; text-align: center; pointer-events: none; }
+  .manual.on { display: block; }
+  .manual .pad { display: inline-block; pointer-events: auto;
+    background: rgba(0, 0, 0, 0.45); border-radius: 999px; padding: 0.8vh 1.2vh; }
+  .manual button { pointer-events: auto; min-width: 7vh; min-height: 7vh; margin: 0 0.8vh;
+    border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.16); color: #fff;
+    font-size: 4.2vh; line-height: 1; cursor: pointer; }
+  .manual button:active { background: rgba(255, 255, 255, 0.28); }
+  .manual .pos { display: inline-block; min-width: 10vh; color: #e3e8e6;
+    font-size: 2.4vh; vertical-align: middle; }
+  body.manual-cursor { cursor: default; }
 </style>
 </head>
 <body>
@@ -57,6 +70,13 @@
 <div id="connecting" class="screen"><div class="center">
   <div class="muted">Connecting&hellip;</div>
 </div></div>
+<div id="manual" class="manual" aria-hidden="true">
+  <div class="pad">
+    <button type="button" id="prev" aria-label="Previous">&#8249;</button>
+    <span id="manual-pos" class="pos"></span>
+    <button type="button" id="next" aria-label="Next">&#8250;</button>
+  </div>
+</div>
 <div id="status" class="status"></div>
 
 <script>
@@ -75,6 +95,7 @@
   var paintedVersion = null, confirmedVersion = null, confirmBusy = false;
   var memToken = null;
   var playlist = null, slideIndex = 0, slideToken = 0, slideTimer = null;
+  var manualHideTimer = null, manualUiOn = false;
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
   var videos = [el('va'), el('vb')];
   var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0;
@@ -359,6 +380,7 @@
     badLevel = {};
     skipBurst = 0;
     releaseAllVideos();
+    hideManualUi(true);
   }
   function clearWatch() {
     if (watchTimer) { clearTimeout(watchTimer); watchTimer = null; }
@@ -571,6 +593,51 @@
       present((index + 1) % playlist.items.length, null);
     }, 0);
   }
+
+  function isManual() {
+    return !!(playlist && playlist.playbackMode === 'manual');
+  }
+  function updateManualPos() {
+    var pos = el('manual-pos');
+    if (!pos || !playlist) return;
+    pos.innerHTML = (slideIndex + 1) + ' / ' + playlist.items.length;
+  }
+  function hideManualUi(force) {
+    if (manualHideTimer) { clearTimeout(manualHideTimer); manualHideTimer = null; }
+    var box = el('manual');
+    if (box) { box.className = 'manual'; box.setAttribute('aria-hidden', 'true'); }
+    try { document.body.className = document.body.className.replace(/(^|\s)manual-cursor\b/g, ''); } catch (e) {}
+    manualUiOn = false;
+    if (force) {}
+  }
+  function showManualUi() {
+    if (!isManual()) { hideManualUi(true); return; }
+    var box = el('manual');
+    if (!box) return;
+    updateManualPos();
+    box.className = 'manual on';
+    box.setAttribute('aria-hidden', 'false');
+    try {
+      if ((' ' + document.body.className + ' ').indexOf(' manual-cursor ') === -1) {
+        document.body.className = (document.body.className ? document.body.className + ' ' : '') + 'manual-cursor';
+      }
+    } catch (e2) {}
+    manualUiOn = true;
+    if (manualHideTimer) clearTimeout(manualHideTimer);
+    manualHideTimer = setTimeout(function () { hideManualUi(false); }, 3500);
+  }
+  // Wrap at both ends (same as Automatic looping).
+  function stepManual(delta) {
+    var count, next;
+    if (!isManual()) return;
+    count = playlist.items.length;
+    if (!count) return;
+    next = (slideIndex + delta) % count;
+    if (next < 0) next = count - 1;
+    showManualUi();
+    present(next, null);
+  }
+
   function presentVideo(index, versionOrNull) {
     if (!playlist) return;
     var item = playlist.items[index];
@@ -649,6 +716,11 @@
       var again;
       if (gone()) return;
       clearWatch();
+      // Manual: play once, then hold on the last frame until Next/Previous.
+      if (isManual()) {
+        updateManualPos();
+        return;
+      }
       if (playlist.items.length === 1) {
         try {
           v.currentTime = 0;
@@ -707,6 +779,11 @@
       if (typeof shownVersion === 'number') markPainted(shownVersion);
       preloadIndex((index + 1) % playlist.items.length);
       clearSlideTimer();
+      updateManualPos();
+      if (isManual()) {
+        // Hold until Next/Previous or a keypress. Duration is ignored.
+        return;
+      }
       var waitToken = slideToken;
       slideTimer = setTimeout(function () {
         if (waitToken !== slideToken || !playlist) return;
@@ -743,7 +820,8 @@
     urlRefreshAt = new Date().getTime() + 1800000;
   }
   function beginPlaylist(version, incoming) {
-    var items = [], list = incoming.items || [], i, it, ms;
+    var items = [], list = incoming.items || [], i, it, ms, startAt = 0, keepId = '', mode;
+    mode = incoming && incoming.playbackMode === 'manual' ? 'manual' : 'auto';
     for (i = 0; i < list.length; i++) {
       it = list[i];
       ms = it && it.durationMs;
@@ -752,13 +830,24 @@
         items.push({ url: it.url, durationMs: typeof ms === 'number' ? ms : 0, mediaId: it.mediaId || '', kind: 'video' });
         continue;
       }
+      // Manual images may omit a usable duration; still show them.
+      if (mode === 'manual') {
+        items.push({ url: it.url, durationMs: typeof ms === 'number' && ms >= 1000 ? ms : 10000, mediaId: it.mediaId || '', kind: 'image' });
+        continue;
+      }
       if (typeof ms !== 'number' || ms < 1000) continue;
       items.push({ url: it.url, durationMs: ms, mediaId: it.mediaId || '', kind: 'image' });
     }
     if (!items.length) return;
     if (playlist && shownVersion === version && playlist.id === (incoming.id || '')) {
       refreshPlaylistUrls(items);
+      playlist.playbackMode = mode;
+      if (mode === 'manual') showManualUi();
+      else hideManualUi(true);
       return;
+    }
+    if (playlist && playlist.id === (incoming.id || '') && playlist.items && playlist.items[slideIndex]) {
+      keepId = playlist.items[slideIndex].mediaId || '';
     }
     preloadImg = null;
     loadingVersion = null;
@@ -766,11 +855,18 @@
     playlist = {
       id: incoming.id || '',
       transition: incoming.transition === 'fade' ? 'fade' : 'none',
+      playbackMode: mode,
       items: items
     };
+    if (keepId) {
+      for (i = 0; i < items.length; i++) {
+        if (items[i].mediaId === keepId) { startAt = i; break; }
+      }
+    }
     urlRefreshAt = new Date().getTime() + 1800000;
     shownVersion = version;
-    present(0, version);
+    if (mode === 'manual') showManualUi();
+    present(startAt, version);
   }
 
   // ---- pairing
@@ -905,6 +1001,30 @@
   }
   document.addEventListener('click', tryFullscreen);
   document.addEventListener('keydown', tryFullscreen);
+
+  // Manual controls + keyboard / TV remote D-pad (ArrowLeft / ArrowRight).
+  (function wireManual() {
+    var prevBtn = el('prev'), nextBtn = el('next');
+    if (prevBtn) prevBtn.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); stepManual(-1); };
+    if (nextBtn) nextBtn.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); stepManual(1); };
+    function onMove() { if (isManual()) showManualUi(); }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchstart', onMove);
+    document.addEventListener('click', function () { if (isManual()) showManualUi(); });
+    document.addEventListener('keydown', function (ev) {
+      var key = ev && ev.key ? ev.key : '';
+      if (!isManual()) return;
+      if (key === 'ArrowRight' || key === 'Right' || key === 'MediaFastForward') {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        stepManual(1);
+      } else if (key === 'ArrowLeft' || key === 'Left' || key === 'MediaRewind') {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        stepManual(-1);
+      } else {
+        showManualUi();
+      }
+    });
+  })();
 
   // Check right away when the network comes back.
   window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });

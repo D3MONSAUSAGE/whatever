@@ -26,6 +26,7 @@ export default function PlaylistEditor() {
   const [name, setName] = useState("");
   const [defaultSeconds, setDefaultSeconds] = useState("10");
   const [transition, setTransition] = useState<"none" | "fade">("none");
+  const [playbackMode, setPlaybackMode] = useState<"auto" | "manual">("auto");
   const [slides, setSlides] = useState<Slide[]>([]);
   const [chosen, setChosen] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState(false);
@@ -41,6 +42,7 @@ export default function PlaylistEditor() {
     setName(data.name);
     setDefaultSeconds(String(Math.round(data.defaultDurationMs / 1000)));
     setTransition(data.transition);
+    setPlaybackMode(data.playbackMode === "manual" ? "manual" : "auto");
     setSlides(data.items.map((item) => ({
       key: item.id,
       mediaId: item.mediaId,
@@ -82,6 +84,7 @@ export default function PlaylistEditor() {
       name: name.trim(),
       defaultDurationMs: Math.round(Number(defaultSeconds) * 1000),
       transition,
+      playbackMode,
       items,
     };
   }
@@ -213,7 +216,8 @@ export default function PlaylistEditor() {
               <label className="grid gap-1">
                 <span className="text-sm font-medium">Default seconds</span>
                 <input className="field" type="number" min={1} max={600} inputMode="numeric" aria-label="Default seconds"
-                  value={defaultSeconds} onChange={(event) => setDefaultSeconds(event.target.value)} />
+                  value={defaultSeconds} onChange={(event) => setDefaultSeconds(event.target.value)}
+                  disabled={playbackMode === "manual"} />
               </label>
               <label className="grid gap-1">
                 <span className="text-sm font-medium">Transition</span>
@@ -221,6 +225,19 @@ export default function PlaylistEditor() {
                   <option value="none">None</option>
                   <option value="fade">Fade</option>
                 </select>
+              </label>
+              <label className="grid gap-1 sm:col-span-2">
+                <span className="text-sm font-medium">Playback</span>
+                <select className="field" aria-label="Playback" value={playbackMode}
+                  onChange={(event) => setPlaybackMode(event.target.value as "auto" | "manual")}>
+                  <option value="auto">Automatic</option>
+                  <option value="manual">Manual slideshow</option>
+                </select>
+                <span className="text-xs text-muted mt-1">
+                  {playbackMode === "manual"
+                    ? "Screens show one slide until someone advances with on-screen controls or left/right keys. Image timing is ignored. Videos play once, then hold until the next advance."
+                    : "Screens advance each slide on its own using the durations above."}
+                </span>
               </label>
             </div>
           </div>
@@ -323,7 +340,7 @@ export default function PlaylistEditor() {
         </div>
 
         <div className="order-first lg:order-none">
-          <Preview slides={previewSlides} transition={transition} label="Slideshow preview" />
+          <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label="Slideshow preview" />
         </div>
       </div>
 
@@ -334,7 +351,7 @@ export default function PlaylistEditor() {
               <h2 className="font-semibold">Full preview</h2>
               <button type="button" className="btn btn-quiet" onClick={() => setPreviewing(false)}>Close</button>
             </div>
-            <Preview slides={previewSlides} transition={transition} label="Full playlist preview" large />
+            <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label="Full playlist preview" large />
           </div>
         </div>
       )}
@@ -357,22 +374,37 @@ export default function PlaylistEditor() {
   );
 }
 
-function Preview({ slides, transition, label, large = false }: {
+function Preview({ slides, transition, playbackMode, label, large = false }: {
   slides: { url: string; fileName: string; durationMs: number; kind: "image" | "video"; thumbnailUrl: string | null }[];
   transition: "none" | "fade";
+  playbackMode: "auto" | "manual";
   label: string;
   large?: boolean;
 }) {
   const [index, setIndex] = useState(0);
-  useEffect(() => { setIndex(0); }, [slides]);
+  useEffect(() => { setIndex(0); }, [slides, playbackMode]);
   useEffect(() => {
+    if (playbackMode === "manual") return;
     if (slides.length < 2) return;
     if (slides[index]?.kind === "video") return;
     const ms = Math.max(1000, slides[index]?.durationMs || 10000);
     const timer = window.setTimeout(() => setIndex((current) => (current + 1) % slides.length), ms);
     return () => window.clearTimeout(timer);
-  }, [slides, index]);
+  }, [slides, index, playbackMode]);
+  useEffect(() => {
+    if (playbackMode !== "manual") return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "ArrowRight") setIndex((current) => slides.length ? (current + 1) % slides.length : 0);
+      if (event.key === "ArrowLeft") setIndex((current) => slides.length ? (current - 1 + slides.length) % slides.length : 0);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [playbackMode, slides.length]);
   const current = slides[index];
+  function step(delta: number) {
+    if (!slides.length) return;
+    setIndex((currentIndex) => (currentIndex + delta + slides.length) % slides.length);
+  }
   return (
     <div aria-label={label}>
       {!large && <h2 className="font-semibold mb-2">Preview</h2>}
@@ -383,6 +415,7 @@ function Preview({ slides, transition, label, large = false }: {
           <video key={`${slide.url}-${i}`} src={i === index ? slide.url : undefined} poster={slide.thumbnailUrl || undefined}
             muted playsInline autoPlay={i === index} preload={i === index ? "auto" : "none"}
             onEnded={(event) => {
+              if (playbackMode === "manual") return;
               if (slides.length < 2) {
                 event.currentTarget.currentTime = 0;
                 void event.currentTarget.play();
@@ -395,8 +428,14 @@ function Preview({ slides, transition, label, large = false }: {
           <img key={`${slide.url}-${i}`} src={slide.url} alt={i === index ? `Preview slide ${i + 1} of ${slides.length}, ${slide.fileName}` : ""}
             className={`absolute inset-0 size-full object-contain motion-reduce:transition-none ${transition === "fade" ? "transition-opacity duration-700" : ""} ${i === index ? "opacity-100" : "opacity-0"}`} />
         ))}
+        {playbackMode === "manual" && slides.length > 0 ? (
+          <div className="absolute inset-x-0 bottom-2 flex items-center justify-center gap-2">
+            <button type="button" className="btn btn-quiet bg-black/50 text-white border-white/20" aria-label="Previous slide" onClick={() => step(-1)}>Previous</button>
+            <button type="button" className="btn btn-quiet bg-black/50 text-white border-white/20" aria-label="Next slide" onClick={() => step(1)}>Next</button>
+          </div>
+        ) : null}
       </div>
-      {current && <p className="text-sm text-muted mt-2 truncate">{index + 1} / {slides.length} · {current.fileName}</p>}
+      {current && <p className="text-sm text-muted mt-2 truncate">{index + 1} / {slides.length} · {current.fileName}{playbackMode === "manual" ? " · Manual" : ""}</p>}
     </div>
   );
 }

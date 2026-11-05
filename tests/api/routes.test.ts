@@ -405,6 +405,7 @@ describe("API", () => {
       [ids[2], 10000],
     ]);
     expect(playing.body.playlist.transition).toBe("none");
+    expect(playing.body.playlist.playbackMode).toBe("auto");
     expect(String(playing.body.url)).toContain("signed.test");
     expect(playing.body.mediaId).toBe(ids[0]);
     expect(playing.body.playlist.items.every((item: { kind: string }) => item.kind === "image")).toBe(true);
@@ -475,6 +476,82 @@ describe("API", () => {
     expect(store.playlists[0].name).toBe("Lunch loop");
     const foreignDelete = await call(deletePlaylistRoute, `http://localhost/api/playlists/${playlistId}`, auth("token-b", { method: "DELETE" }), playlistId);
     expect(foreignDelete.status).toBe(404);
+  });
+
+
+  it("publishes a manual slideshow playlist and exposes playbackMode to the player", async () => {
+    const created = await call(createPair, "http://localhost/api/player/pair", { method: "POST", body: "{}" });
+    const { sessionId, code, secret } = created.body as { sessionId: string; code: string; secret: string };
+    const claimed = await call(claimPair, "http://localhost/api/displays/pair", auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ code, name: "Slideshow TV" }),
+    }));
+    expect(claimed.status).toBe(200);
+    const displayId = claimed.body?.id as string;
+    const paired = await call(pairStatus, "http://localhost/api/player/pair/status", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, secret }),
+    });
+    const token = paired.body?.token as string;
+    const first = await upload("token-a", "s1.png", jpeg(8, 8));
+    const second = await upload("token-a", "s2.png", jpeg(8, 8));
+    const ids = [first.body?.id, second.body?.id] as string[];
+
+    const made = await call(createPlaylist, "http://localhost/api/playlists", auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ name: "Deck" }),
+    }));
+    const playlistId = made.body?.id as string;
+
+    const saved = await call(savePlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: "Deck",
+        defaultDurationMs: 5000,
+        transition: "fade",
+        playbackMode: "manual",
+        items: [
+          { mediaId: ids[0], durationMs: 2000 },
+          { mediaId: ids[1], durationMs: 2000 },
+        ],
+      }),
+    }), playlistId);
+    expect(saved.status).toBe(200);
+    expect(saved.body?.ok).toBe(true);
+
+    const got = await call(getPlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a"), playlistId);
+    expect(got.body?.playbackMode).toBe("manual");
+
+    const published = await call(publishPlaylist, `http://localhost/api/playlists/${playlistId}/publish`, auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ displayIds: [displayId] }),
+    }), playlistId);
+    expect(published.status).toBe(200);
+
+    const afterPublish = await call(getPlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a"), playlistId);
+    expect(afterPublish.body?.playbackMode).toBe("manual");
+    expect(afterPublish.body?.publishedPlaybackMode).toBe("manual");
+
+    const playing = await call(playerState, "http://localhost/api/player/state?v=0", { headers: { "X-Display-Token": token } });
+    expect(playing.body.playlist.playbackMode).toBe("manual");
+    expect(playing.body.playlist.items.map((item: { mediaId: string }) => item.mediaId)).toEqual(ids);
+
+    // Omitting playbackMode on save leaves manual unchanged.
+    const keep = await call(savePlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: "Deck",
+        defaultDurationMs: 5000,
+        transition: "fade",
+        items: [
+          { mediaId: ids[1], durationMs: 2000 },
+          { mediaId: ids[0], durationMs: 2000 },
+        ],
+      }),
+    }), playlistId);
+    expect(keep.status).toBe(200);
+    const kept = await call(getPlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a"), playlistId);
+    expect(kept.body?.playbackMode).toBe("manual");
   });
 
   it("stores an H.264 video, rejects other codecs, and keeps accounts apart", async () => {
