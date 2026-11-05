@@ -44,6 +44,12 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     return () => sub?.unsubscribe();
   }, [preview, router]);
 
+  async function signOut() {
+    // This device only; "Sign out everywhere" stays in Settings.
+    try { await getSupabase().auth.signOut({ scope: "local" }); } catch { /* still leave the dashboard */ }
+    location.assign("/login");
+  }
+
   if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">Loading…</div>;
 
   const isActive = (href: string) => (href === "/dashboard" ? path === href : path.startsWith(href));
@@ -65,13 +71,20 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
             {item.label}
           </Link>
         ))}
+        <button type="button" onClick={signOut} className="nav-link mt-auto text-left">
+          <span className="icon-tile size-8" aria-hidden="true">↩</span>
+          Sign out
+        </button>
       </nav>
       <div className="flex-1 min-w-0">
         <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-white/95 px-4 h-14 backdrop-blur">
           <Link href="/dashboard" className="min-w-0">
             <BrandLockup size="sm" markClassName="size-8" />
           </Link>
-          <span className="text-sm text-muted shrink-0">{current}</span>
+          <span className="flex items-center gap-3 shrink-0">
+            <span className="text-sm text-muted">{current}</span>
+            <button type="button" onClick={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</button>
+          </span>
         </header>
         <main className="px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 max-w-6xl">
           <UploadProgress />
