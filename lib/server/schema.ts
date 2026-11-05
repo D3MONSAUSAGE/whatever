@@ -4,6 +4,9 @@ export const PLAYLISTS_UNAVAILABLE =
 export const VIDEO_UNAVAILABLE =
   "Video isn't available yet. Apply migration 0003_video.sql, then reload.";
 
+export const PRESENTATION_UNAVAILABLE =
+  "PowerPoint uploads aren't available yet. Apply migration 0018_pptx_presentations.sql, then reload.";
+
 export const SCHEDULES_UNAVAILABLE =
   "Schedules aren't available yet. Apply migration 0004_scheduling.sql, then reload.";
 

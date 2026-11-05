@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Menu boards render PNGs with resvg (native, free) and bundled Inter fonts.
-  serverExternalPackages: ["@resvg/resvg-js"],
+  serverExternalPackages: ["@resvg/resvg-js", "pptx-glimpse"],
   outputFileTracingIncludes: {
     "/api/menus": ["./assets/fonts/**"],
     "/api/menus/[id]": ["./assets/fonts/**"],
@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     "/api/promos": ["./assets/fonts/**"],
     "/api/promos/[id]": ["./assets/fonts/**"],
     "/api/promos/preview": ["./assets/fonts/**"],
+    "/api/media/presentation/complete": ["./assets/fonts/**"],
   },
   // Lint runs as `npm run lint`. Skipping it here avoids a warning about the Next.js ESLint plugin.
   eslint: { ignoreDuringBuilds: true },

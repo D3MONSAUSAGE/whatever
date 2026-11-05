@@ -486,6 +486,51 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     return true;
   }
 
+  if (name === "presentation_create_playlist") {
+    const accountId = args.p_account_id;
+    const sourceId = args.p_source_media_id;
+    const mode = args.p_playback_mode === "auto" ? "auto" : "manual";
+    const rawName = String(args.p_name ?? "").trim().slice(0, 80);
+    if (!rawName) return null;
+    const source = store.media.find((item) => item.id === sourceId && item.account_id === accountId && item.kind === "presentation");
+    if (!source) return null;
+    const slides = store.media
+      .filter((item) => item.account_id === accountId && item.source_media_id === sourceId && (item.kind == null || item.kind === "image"))
+      .sort((a, b) => Number(a.slide_index) - Number(b.slide_index));
+    if (!slides.length || slides.length > 40) return null;
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    store.playlists.push({
+      id,
+      account_id: accountId,
+      name: rawName,
+      default_duration_ms: 10000,
+      transition: "none",
+      playback_mode: mode,
+      published_at: now,
+      published_transition: "none",
+      published_playback_mode: mode,
+      revision: 1,
+      created_at: now,
+      updated_at: now,
+    });
+    for (const slide of slides) {
+      for (const kind of ["draft", "published"] as const) {
+        store.playlist_items.push({
+          id: crypto.randomUUID(),
+          playlist_id: id,
+          account_id: accountId,
+          media_id: slide.id,
+          kind,
+          position: Number(slide.slide_index),
+          duration_ms: kind === "published" ? 10000 : null,
+          created_at: now,
+        });
+      }
+    }
+    return id;
+  }
+
   throw new Error(`Unknown rpc ${name}`);
 }
 
