@@ -96,6 +96,8 @@
   var memToken = null;
   var playlist = null, slideIndex = 0, slideToken = 0, slideTimer = null;
   var manualHideTimer = null, manualUiOn = false;
+  var lastAppliedSeq = 0;
+  var playbackReportTimer = null;
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
   var videos = [el('va'), el('vb')];
   var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0;
@@ -636,6 +638,46 @@
     if (next < 0) next = count - 1;
     showManualUi();
     present(next, null);
+    reportPlayback();
+  }
+
+  function reportPlayback() {
+    var token = getToken();
+    if (!token || !playlist) return;
+    var body = {
+      playback: {
+        playlistId: playlist.id || null,
+        playbackMode: playlist.playbackMode === 'manual' ? 'manual' : 'auto',
+        index: slideIndex,
+        count: playlist.items.length,
+        version: shownVersion == null ? 0 : shownVersion,
+        lastAppliedSeq: lastAppliedSeq
+      }
+    };
+    request('POST', '/api/player/state', body, token, function () {});
+  }
+
+  function schedulePlaybackReport() {
+    if (playbackReportTimer) clearTimeout(playbackReportTimer);
+    playbackReportTimer = setTimeout(function () {
+      playbackReportTimer = null;
+      reportPlayback();
+    }, 250);
+  }
+
+  function applyRemoteCommands(commands) {
+    var i, cmd, applied = false;
+    if (!commands || !commands.length || !playlist) return;
+    for (i = 0; i < commands.length; i++) {
+      cmd = commands[i];
+      if (!cmd || typeof cmd.seq !== 'number') continue;
+      if (cmd.seq <= lastAppliedSeq) continue;
+      if (cmd.command === 'next') stepManual(1);
+      else if (cmd.command === 'prev') stepManual(-1);
+      lastAppliedSeq = cmd.seq;
+      applied = true;
+    }
+    if (applied) reportPlayback();
   }
 
   function presentVideo(index, versionOrNull) {
@@ -750,6 +792,9 @@
     var token = slideToken;
     var src, nextItem;
     if (!item) return;
+    // Update immediately so remote/keyboard Next/Prev use the target index
+    // even while the image is still loading.
+    slideIndex = index;
     if (skipKnownBad(item)) {
       skipBurst += 1;
       clearSlideTimer();
@@ -865,6 +910,7 @@
     }
     urlRefreshAt = new Date().getTime() + 1800000;
     shownVersion = version;
+    slideIndex = startAt;
     if (mode === 'manual') showManualUi();
     present(startAt, version);
   }
@@ -924,13 +970,13 @@
         // Plan inactive or over the screen limit: stop playback, keep the token and the
         // saved content, and check again so the screen resumes on its own.
         showPaused(data);
-        later(g, function () { pollState(g); }, data && typeof data.pollMs === 'number' && data.pollMs >= 5000 && data.pollMs <= 300000 ? data.pollMs : 60000);
+        later(g, function () { pollState(g); }, data && typeof data.pollMs === 'number' && data.pollMs >= 1000 && data.pollMs <= 300000 ? data.pollMs : 60000);
         return;
       }
       var wait = STATE_MS;
       if (status === 200 && data) {
         setStatus('');
-        if (typeof data.pollMs === 'number' && data.pollMs >= 5000 && data.pollMs <= 120000) pollMs = data.pollMs;
+        if (typeof data.pollMs === 'number' && data.pollMs >= 1000 && data.pollMs <= 120000) pollMs = data.pollMs;
         wait = pollMs;
         wakeAt = data.nextTransitionAt ? Date.parse(data.nextTransitionAt) || 0 : 0;
         if (wakeAt) {
@@ -939,6 +985,8 @@
           if (until > 0 && until < wait) wait = Math.max(1000, until);
         }
         if (!data.unchanged) { rememberState(data); apply(data); }
+        applyRemoteCommands(data.commands);
+        schedulePlaybackReport();
         confirmPlaying(); // retries a confirmation that failed while offline
       } else if (!hasImage && shownVersion === null) {
         setStatus('');

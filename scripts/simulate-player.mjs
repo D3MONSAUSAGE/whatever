@@ -107,7 +107,7 @@ function fireDoc(type, event) {
 }
 
 // fake server
-const S = { online: true, sessions: {}, token: null, version: 0, url: null, playlist: null, revoked: false, stateCalls: 0, playerError: "", playerErrorPosts: 0 };
+const S = { online: true, sessions: {}, token: null, version: 0, url: null, playlist: null, revoked: false, stateCalls: 0, playerError: "", playerErrorPosts: 0, pendingCommands: [], playbackReports: [] };
 function server(method, url, body, headers) {
   if (!S.online) return [0, ""];
   if (url === "/api/player/pair") { S.sessions.s1 = { status: "pending" }; return [200, { sessionId: "s1", code: "123456", secret: "x".repeat(40) }]; }
@@ -119,6 +119,7 @@ function server(method, url, body, headers) {
   if (url.startsWith("/api/player/state") && method === "POST") {
     // Proof of play (M8) is a separate message; it never touches the error field.
     if (body && body.playing) { S.playing = (S.playing || []).concat(body.playing.version); return [200, { ok: true }]; }
+    if (body && body.playback) { S.playbackReports = (S.playbackReports || []).concat([body.playback]); return [200, { ok: true }]; }
     S.playerErrorPosts++;
     S.playerError = body && body.error ? String(body.error) : "";
     return [200, { ok: true }];
@@ -129,16 +130,21 @@ function server(method, url, body, headers) {
     if (S.revoked || headers["X-Display-Token"] !== S.token) return [401, { error: "unauthorized" }];
     const v = new URL("http://x" + url).searchParams.get("v");
     const refresh = url.indexOf("refresh=1") !== -1;
-    if (v !== "" && Number(v) === S.version && !refresh) return [200, { version: S.version, unchanged: true }];
+    const cmds = Array.isArray(S.pendingCommands) ? S.pendingCommands.slice() : [];
+    const mode = S.playlist && S.playlist.playbackMode === "manual" ? "manual" : "auto";
+    const pollMs = mode === "manual" || cmds.length ? 1500 : 10000;
+    if (v !== "" && Number(v) === S.version && !refresh) return [200, { version: S.version, unchanged: true, pollMs, commands: cmds }];
     if (S.playlist && !S.url) {
       return [200, {
         version: S.version,
         mediaId: S.playlist.items[0].mediaId,
         url: S.playlist.items[0].url,
         playlist: S.playlist,
+        pollMs,
+        commands: cmds,
       }];
     }
-    return [200, { version: S.version, mediaId: S.url ? "m" : null, url: S.url ? S.url + "?sig=" + now : null }];
+    return [200, { version: S.version, mediaId: S.url ? "m" : null, url: S.url ? S.url + "?sig=" + now : null, pollMs, commands: cmds }];
   }
   return [404, {}];
 }
@@ -498,6 +504,39 @@ check("manual video plays then holds without auto-advancing", mediaLog.map(clipN
 fireDoc("keydown", { key: "ArrowRight", preventDefault() {} });
 run(8000);
 check("manual next after a held video shows the next image", shownUrl().indexOf("mi2.jpg") !== -1);
+
+
+// --- remote commands (phone → TV via /api/player/state.commands)
+S.version = 40;
+S.playlist = {
+  id: "remote",
+  transition: "none",
+  playbackMode: "manual",
+  items: [
+    { mediaId: "r1", url: "https://cdn/r1.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "r2", url: "https://cdn/r2.jpg", durationMs: 2000, kind: "image" },
+    { mediaId: "r3", url: "https://cdn/r3.jpg", durationMs: 2000, kind: "image" },
+  ],
+};
+S.pendingCommands = [{ seq: 1, command: "next" }];
+slideLog = [];
+run(8000);
+slideLog = [];
+run(4000);
+check("remote next command advances the slide", shownUrl().indexOf("r2.jpg") !== -1);
+
+S.pendingCommands = [{ seq: 2, command: "prev" }];
+run(4000);
+check("remote prev command goes back", shownUrl().indexOf("r1.jpg") !== -1);
+
+S.pendingCommands = [{ seq: 2, command: "prev" }];
+run(3000);
+check("remote duplicate seq is ignored", shownUrl().indexOf("r1.jpg") !== -1);
+
+S.pendingCommands = [{ seq: 3, command: "prev" }];
+run(4000);
+check("remote prev wraps to the last slide", shownUrl().indexOf("r3.jpg") !== -1);
+S.pendingCommands = [];
 
 // Automatic regression after manual: durations advance again.
 S.version = 21;

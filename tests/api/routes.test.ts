@@ -186,9 +186,9 @@ describe("API", () => {
     expect(shown.body?.version).toBe(1);
     expect(String(shown.body?.url)).toContain("signed.test");
     const unchanged = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
-    expect(unchanged.body).toEqual({ version: 1, unchanged: true, pollMs: 30000 });
+    expect(unchanged.body).toEqual({ version: 1, unchanged: true, pollMs: 30000, commands: [] });
     const refreshIgnored = await call(playerState, "http://localhost/api/player/state?v=1&refresh=1", { headers: { "X-Display-Token": token } });
-    expect(refreshIgnored.body).toEqual({ version: 1, unchanged: true, pollMs: 30000 });
+    expect(refreshIgnored.body).toEqual({ version: 1, unchanged: true, pollMs: 30000, commands: [] });
     expect(shown.body.playlist).toBeUndefined();
 
     const replaced = await call(updateDisplay, `http://localhost/api/displays/${displayId}`, auth("token-a", {
@@ -410,7 +410,7 @@ describe("API", () => {
     expect(playing.body.mediaId).toBe(ids[0]);
     expect(playing.body.playlist.items.every((item: { kind: string }) => item.kind === "image")).toBe(true);
     const same = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
-    expect(same.body).toEqual({ version: 1, unchanged: true, pollMs: 30000 });
+    expect(same.body).toEqual({ version: 1, unchanged: true, pollMs: 30000, commands: [] });
 
     const drafted = await call(savePlaylist, `http://localhost/api/playlists/${playlistId}`, auth("token-a", {
       method: "PATCH",
@@ -426,7 +426,7 @@ describe("API", () => {
     }), playlistId);
     expect(drafted.status).toBe(200);
     const still = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
-    expect(still.body).toEqual({ version: 1, unchanged: true, pollMs: 30000 });
+    expect(still.body).toEqual({ version: 1, unchanged: true, pollMs: 30000, commands: [] });
 
     const republished = await call(publishPlaylist, `http://localhost/api/playlists/${playlistId}/publish`, auth("token-a", {
       method: "POST",

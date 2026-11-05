@@ -10,6 +10,32 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const URL_TTL_SECONDS = 3600;
 
+const MANUAL_POLL_MS = 1500;
+
+async function pendingCommands(tokenHash: string): Promise<{ seq: number; command: "next" | "prev" }[]> {
+  const { data, error } = await db().rpc("player_pending_commands", { p_token_hash: tokenHash });
+  if (error || !data) return [];
+  return (data as { seq: number; command: string }[])
+    .filter((row) => row.command === "next" || row.command === "prev")
+    .map((row) => ({ seq: Number(row.seq), command: row.command as "next" | "prev" }));
+}
+
+function pollFor(mode: "auto" | "manual" | null, commands: { seq: number }[]): number {
+  if (mode === "manual" || commands.length) return MANUAL_POLL_MS;
+  return playerPollMs();
+}
+
+async function playbackModeHint(displayId: string): Promise<"auto" | "manual" | null> {
+  const { data } = await db()
+    .from("display_playback")
+    .select("playback_mode")
+    .eq("display_id", displayId)
+    .maybeSingle();
+  if (data?.playback_mode === "manual") return "manual";
+  if (data?.playback_mode === "auto") return "auto";
+  return null;
+}
+
 type PlaylistItem = {
   mediaId: string;
   url: string;
@@ -53,7 +79,12 @@ export async function GET(req: Request) {
   const schedule = await readPlaybackSchedule(String(row.display_id), Number(row.content_version));
   if (schedule.kind === "error") return fail("unavailable", 503);
   const version = schedule.kind === "on" ? schedule.version : Number(row.content_version);
-  const extra: { pollMs: number; nextTransitionAt?: string } = { pollMs: playerPollMs() };
+  const commands = await pendingCommands(tokenHash);
+  const modeHint = await playbackModeHint(String(row.display_id));
+  const extra: { pollMs: number; nextTransitionAt?: string; commands: { seq: number; command: "next" | "prev" }[] } = {
+    pollMs: pollFor(modeHint, commands),
+    commands,
+  };
   if (schedule.kind === "on" && schedule.nextTransitionAt) extra.nextTransitionAt = schedule.nextTransitionAt;
   const overrideId = schedule.kind === "on" ? schedule.overridePlaylistId : null;
 
@@ -70,6 +101,7 @@ export async function GET(req: Request) {
     const playlist = await publishedPlaylistById(overrideId, schedule.kind === "on" ? schedule.accountId : "");
     if (playlist === "error") return fail("unavailable", 503);
     if (!playlist) return json({ version, mediaId: null, url: null, ...extra });
+    extra.pollMs = pollFor(playlist.playbackMode, commands);
     return json({
       version,
       mediaId: playlist.items[0].mediaId,
@@ -98,6 +130,7 @@ export async function GET(req: Request) {
   if (playlist === "error") return fail("unavailable", 503);
   if (!playlist) return json({ version, mediaId: null, url: null, ...extra });
 
+  extra.pollMs = pollFor(playlist.playbackMode, commands);
   return json({
     version,
     mediaId: playlist.items[0].mediaId,
@@ -122,6 +155,35 @@ export async function POST(req: Request) {
       return fail("unavailable", 503);
     }
     if (!played.data) return fail("unauthorized", 401);
+    return json({ ok: true });
+  }
+  // Remote-control heartbeat: current slide index + last applied command seq.
+  if (body.playback && typeof body.playback === "object") {
+    const pb = body.playback as Record<string, unknown>;
+    const index = Number(pb.index);
+    const count = Number(pb.count);
+    const version = Number(pb.version);
+    const lastAppliedSeq = Number(pb.lastAppliedSeq ?? 0);
+    const mode = pb.playbackMode === "manual" ? "manual" : "auto";
+    const playlistId = typeof pb.playlistId === "string" && pb.playlistId ? pb.playlistId : null;
+    if (!Number.isSafeInteger(index) || index < 0) return fail("bad index", 400);
+    if (!Number.isSafeInteger(count) || count < 0) return fail("bad count", 400);
+    if (!Number.isSafeInteger(version) || version < 0) return fail("bad version", 400);
+    if (!Number.isSafeInteger(lastAppliedSeq) || lastAppliedSeq < 0) return fail("bad seq", 400);
+    const reported = await db().rpc("player_report_playback", {
+      p_token_hash: sha256(token),
+      p_playlist_id: playlistId,
+      p_playback_mode: mode,
+      p_item_index: index,
+      p_item_count: count,
+      p_content_version: version,
+      p_last_applied_seq: lastAppliedSeq,
+    });
+    if (reported.error) {
+      if (isMissingSchema(reported.error)) return json({ ok: true });
+      return fail("unavailable", 503);
+    }
+    if (!reported.data) return fail("unauthorized", 401);
     return json({ ok: true });
   }
   const message = body.error == null ? "" : String(body.error).slice(0, 180);
