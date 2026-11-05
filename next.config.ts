@@ -13,7 +13,11 @@ const nextConfig: NextConfig = {
     "/api/promos": ["./assets/fonts/**"],
     "/api/promos/[id]": ["./assets/fonts/**"],
     "/api/promos/preview": ["./assets/fonts/**"],
-    "/api/media/presentation/complete": ["./assets/fonts/**"],
+    "/api/media/presentation/complete": [
+      "./assets/fonts/**",
+      "./node_modules/@resvg/resvg-wasm/**",
+      "./node_modules/pptx-glimpse/**",
+    ],
   },
   // Lint runs as `npm run lint`. Skipping it here avoids a warning about the Next.js ESLint plugin.
   eslint: { ignoreDuringBuilds: true },
