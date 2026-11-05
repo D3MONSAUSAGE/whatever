@@ -3,6 +3,7 @@ import path from "node:path";
 import { convertPptxToPng } from "pptx-glimpse";
 import { db } from "./supabase";
 import { isMissingSchema } from "./schema";
+import { stripControls } from "./validate";
 
 /** Open XML PowerPoint only. Legacy .ppt and macro .pptm are rejected. */
 export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -195,8 +196,7 @@ export function slideStoragePath(accountId: string, slideMediaId: string) {
 }
 
 export function normalizePptxFileName(input: unknown): string {
-  const raw = String(input ?? "presentation.pptx").trim() || "presentation.pptx";
-  const cleaned = raw.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 200);
+  const cleaned = (stripControls(String(input ?? "presentation.pptx")).trim() || "presentation.pptx").slice(0, 200);
   if (/\.pptx$/i.test(cleaned)) return cleaned;
   return `${cleaned.replace(/\.[^.]+$/, "") || "presentation"}.pptx`;
 }
