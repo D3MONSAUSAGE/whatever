@@ -19,7 +19,9 @@ alter table public.media
   add column if not exists group_revision integer not null default 0,
   add column if not exists slide_revision integer,
   add column if not exists updated_at timestamptz,
-  add column if not exists processing_token uuid;
+  add column if not exists processing_token uuid,
+  add column if not exists processing_generation integer,
+  add column if not exists claim_token uuid;
 
 -- updated_at stays null on rows that already exist. The app treats null as
 -- "never touched by a group conversion" and does not backfill it.
@@ -63,6 +65,11 @@ alter table public.media drop constraint if exists media_slide_revision_check;
 alter table public.media
   add constraint media_slide_revision_check
   check (slide_revision is null or slide_revision >= 0);
+
+alter table public.media drop constraint if exists media_processing_generation_check;
+alter table public.media
+  add constraint media_processing_generation_check
+  check (processing_generation is null or processing_generation >= 0);
 
 -- Playlist item durations for a presentation may be up to 3600s.
 -- Image and video items stay capped at 600s in save_playlist. Widening the
@@ -310,6 +317,8 @@ as $$
 declare
   v_status text;
   v_rev integer;
+  v_gen integer;
+  v_child integer;
   v_updated timestamptz;
   v_kind text;
   v_token uuid;
@@ -331,41 +340,111 @@ begin
     return jsonb_build_object('outcome', 'busy', 'revision', v_rev);
   end if;
   v_token := gen_random_uuid();
+  -- Each claim gets a generation above every committed revision and every
+  -- slide row already stored, so a previous attempt cannot share it.
+  select coalesce(max(slide_revision), 0) into v_child
+  from public.media
+  where account_id = p_account_id and source_media_id = p_media_id;
   update public.media
   set processing_status = 'processing',
       processing_token = v_token,
+      processing_generation = greatest(coalesce(processing_generation, 0), coalesce(group_revision, 0), v_child) + 1,
       processing_error = null,
       processing_done = 0,
       updated_at = now()
-  where id = p_media_id and account_id = p_account_id;
-  return jsonb_build_object('outcome', 'claimed', 'token', v_token, 'revision', v_rev);
+  where id = p_media_id and account_id = p_account_id
+  returning processing_generation into v_gen;
+  return jsonb_build_object(
+    'outcome', 'claimed',
+    'token', v_token,
+    'revision', v_rev,
+    'generation', v_gen
+  );
+end $$;
+
+-- Renews the claim while conversion is still running. A stolen token returns false.
+create or replace function public.presentation_claim_heartbeat(
+  p_account_id uuid,
+  p_media_id uuid,
+  p_token uuid
+) returns boolean
+language plpgsql
+set search_path = ''
+as $$
+begin
+  update public.media
+  set updated_at = now()
+  where id = p_media_id
+    and account_id = p_account_id
+    and processing_token = p_token
+    and processing_status = 'processing';
+  return found;
+end $$;
+
+-- Inserts one staging slide only while this token still owns this generation.
+create or replace function public.presentation_insert_slide(
+  p_account_id uuid,
+  p_source_id uuid,
+  p_slide_id uuid,
+  p_file_name text,
+  p_storage_path text,
+  p_size_bytes integer,
+  p_width integer,
+  p_height integer,
+  p_slide_index integer,
+  p_generation integer,
+  p_token uuid
+) returns uuid
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  insert into public.media (
+    id, account_id, file_name, storage_path, mime_type, size_bytes, kind,
+    width, height, source_media_id, slide_index, slide_revision, claim_token
+  )
+  select p_slide_id, p_account_id, left(p_file_name, 200), p_storage_path, 'image/png',
+         p_size_bytes, 'image', p_width, p_height, p_source_id, p_slide_index,
+         p_generation, p_token
+  where exists (
+    select 1 from public.media parent
+    where parent.id = p_source_id
+      and parent.account_id = p_account_id
+      and parent.kind = 'presentation'
+      and parent.processing_status = 'processing'
+      and parent.processing_token = p_token
+      and parent.processing_generation = p_generation
+  )
+  returning id into v_id;
+  return v_id;
 end $$;
 
 -- Deletes only this claim's uncommitted staging slides. A token that does not
 -- own the row deletes nothing. A revision that is already committed deletes nothing.
 
+-- Deletes only slides stamped with this claim token, and never the generation
+-- that is already committed on the parent. Does not require the caller to
+-- still own the parent, so a loser can remove its own orphans without
+-- touching the winner.
 create or replace function public.presentation_discard_staging(
   p_account_id uuid,
   p_media_id uuid,
-  p_token uuid,
-  p_staging_revision integer
+  p_token uuid
 ) returns text[]
 language plpgsql
 set search_path = ''
 as $$
 declare
-  v_token uuid;
   v_rev integer;
   v_paths text[];
 begin
-  select processing_token, group_revision into v_token, v_rev
+  select group_revision into v_rev
   from public.media
   where id = p_media_id and account_id = p_account_id and kind = 'presentation'
   for update;
-  if not found or v_token is distinct from p_token then
-    return array[]::text[];
-  end if;
-  if p_staging_revision is null or p_staging_revision is not distinct from v_rev then
+  if not found then
     return array[]::text[];
   end if;
 
@@ -374,13 +453,13 @@ begin
   from public.media
   where account_id = p_account_id
     and source_media_id = p_media_id
-    and slide_revision = p_staging_revision
+    and claim_token = p_token
     and slide_revision is distinct from v_rev;
 
   delete from public.media
   where account_id = p_account_id
     and source_media_id = p_media_id
-    and slide_revision = p_staging_revision
+    and claim_token = p_token
     and slide_revision is distinct from v_rev;
 
   return v_paths;
@@ -442,6 +521,7 @@ create or replace function public.presentation_commit_group(
   p_file_name text,
   p_mime_type text,
   p_storage_path text,
+  p_generation integer,
   p_token uuid
 ) returns integer
 language plpgsql
@@ -451,9 +531,12 @@ declare
   v_rev integer;
   v_kind text;
   v_token uuid;
-  v_next integer;
+  v_gen integer;
+  v_count integer;
+  v_distinct integer;
 begin
-  select group_revision, kind, processing_token into v_rev, v_kind, v_token
+  select group_revision, kind, processing_token, processing_generation
+    into v_rev, v_kind, v_token, v_gen
   from public.media
   where id = p_media_id and account_id = p_account_id
   for update;
@@ -463,25 +546,32 @@ begin
   if v_token is distinct from p_token then
     return null;
   end if;
+  if v_gen is distinct from p_generation then
+    return null;
+  end if;
   if v_rev is distinct from p_expected_revision then
     return null;
   end if;
   if p_slide_count is null or p_slide_count < 1 or p_slide_count > 40 then
     return null;
   end if;
-  v_next := p_expected_revision + 1;
-  if (
-    select count(*)
-    from public.media
-    where account_id = p_account_id
-      and source_media_id = p_media_id
-      and slide_revision = v_next
-  ) <> p_slide_count then
+  if p_generation is null or p_generation <= v_rev then
+    return null;
+  end if;
+
+  select count(*), count(distinct slide_index)
+    into v_count, v_distinct
+  from public.media
+  where account_id = p_account_id
+    and source_media_id = p_media_id
+    and claim_token = p_token
+    and slide_revision = p_generation;
+  if v_count <> p_slide_count or v_distinct <> p_slide_count then
     return null;
   end if;
 
   update public.media
-  set group_revision = v_next,
+  set group_revision = p_generation,
       processing_status = 'ready',
       processing_error = null,
       processing_done = p_slide_count,
@@ -520,7 +610,7 @@ begin
         and pi.media_id = p_media_id
     );
 
-  return v_next;
+  return p_generation;
 end $$;
 
 -- ---------------------------------------------------------------- delete
@@ -623,14 +713,20 @@ end $$;
 revoke all on function public.presentation_claim_group(uuid, uuid, integer) from public, anon, authenticated;
 grant execute on function public.presentation_claim_group(uuid, uuid, integer) to service_role;
 
-revoke all on function public.presentation_discard_staging(uuid, uuid, uuid, integer) from public, anon, authenticated;
-grant execute on function public.presentation_discard_staging(uuid, uuid, uuid, integer) to service_role;
+revoke all on function public.presentation_claim_heartbeat(uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.presentation_claim_heartbeat(uuid, uuid, uuid) to service_role;
+
+revoke all on function public.presentation_insert_slide(uuid, uuid, uuid, text, text, integer, integer, integer, integer, integer, uuid) from public, anon, authenticated;
+grant execute on function public.presentation_insert_slide(uuid, uuid, uuid, text, text, integer, integer, integer, integer, integer, uuid) to service_role;
+
+revoke all on function public.presentation_discard_staging(uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.presentation_discard_staging(uuid, uuid, uuid) to service_role;
 
 revoke all on function public.presentation_group_snapshot(uuid, uuid[]) from public, anon, authenticated;
 grant execute on function public.presentation_group_snapshot(uuid, uuid[]) to service_role;
 
-revoke all on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text, uuid) from public, anon, authenticated;
-grant execute on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text, uuid) to service_role;
+revoke all on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text, integer, uuid) from public, anon, authenticated;
+grant execute on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text, integer, uuid) to service_role;
 
 revoke all on function public.delete_presentation_group(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.delete_presentation_group(uuid, uuid) to service_role;

@@ -173,7 +173,10 @@ describe("presentation groups", () => {
       mediaId: started.mediaId, fileName: "stuck.pptx", createPlaylist: false,
     }));
     expect(done.status).toBe(201);
-    expect(store.media.some((row) => row.id === partialId)).toBe(false);
+    const parent = store.media.find((row) => row.id === started.mediaId);
+    const partial = store.media.find((row) => row.id === partialId);
+    expect(partial?.slide_revision).not.toBe(parent?.group_revision);
+    expect((done.body.slideIds as string[])).not.toContain(partialId);
     expect(store.playlist_items).toHaveLength(0);
 
     const bad = await stage("bad.pptx", new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]));

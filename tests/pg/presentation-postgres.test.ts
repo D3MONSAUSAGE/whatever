@@ -120,32 +120,109 @@ describe.skipIf(!databaseUrl)("presentation groups on PostgreSQL", () => {
       const loserToken = "99999999-9999-4999-8999-999999999999";
 
       const lostDelete = await a.query(
-        `select public.presentation_discard_staging($1, $2, $3, 2) as paths`,
+        `select public.presentation_discard_staging($1, $2, $3) as paths`,
         [account, parent, loserToken],
       );
       expect(lostDelete.rows[0].paths).toEqual([]);
-      const stillThere = await query(client, `select id, slide_revision from public.media where source_media_id = $1 order by slide_revision`, [parent]);
-      expect(stillThere.rows.map((row) => Number(row.slide_revision))).toEqual([1, 2]);
-
-      const committedDelete = await a.query(
-        `select public.presentation_discard_staging($1, $2, $3, 1) as paths`,
+      const winnerDelete = await a.query(
+        `select public.presentation_discard_staging($1, $2, $3) as paths`,
         [account, parent, winner.token],
       );
-      expect(committedDelete.rows[0].paths).toEqual([]);
-      const kept = await query(client, `select count(*)::int as n from public.media where id = $1`, [committed]);
-      expect(kept.rows[0].n).toBe(1);
-
-      const stagedDelete = await a.query(
-        `select public.presentation_discard_staging($1, $2, $3, 2) as paths`,
-        [account, parent, winner.token],
-      );
-      expect(stagedDelete.rows[0].paths).toEqual([`${account}/${staging}.png`]);
-      const after = await query(client, `select id from public.media where source_media_id = $1`, [parent]);
-      expect(after.rows.map((row) => row.id)).toEqual([committed]);
+      expect(winnerDelete.rows[0].paths).toEqual([]);
+      const stillThere = await query(client, `select id from public.media where source_media_id = $1 order by slide_revision`, [parent]);
+      expect(stillThere.rows.map((row) => row.id)).toEqual([committed, staging]);
     } finally {
       await a.end();
       await b.end();
     }
+  });
+
+  it("rejects the old worker after its claim expires and keeps the winner's slides and the source", async () => {
+    const account = "abababab-abab-4aba-8aba-abababababab";
+    const parent = "bcbcbcbc-bcbc-4bcb-8bcb-bcbcbcbcbcbc";
+    const source = `${account}/${parent}.pptx`;
+    const tokenA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
+    await query(client, `insert into auth.users (id) values ($1) on conflict do nothing`, [account]);
+    await query(client, `insert into public.accounts (id, name, owner_user_id) values ($1, 'Fence', $1)`, [account]);
+    await query(client, `
+      insert into public.media (
+        id, account_id, file_name, storage_path, mime_type, size_bytes, kind,
+        group_revision, processing_status, processing_token, processing_generation, slide_count, updated_at
+      ) values (
+        $1, $2, 'deck.pptx', $3, 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        40, 'presentation', 0, 'processing', $4, 1, 0, now()
+      )
+    `, [parent, account, source, tokenA]);
+
+    const early = "cdcdcdcd-cdcd-4cdc-8cdc-cdcdcdcdcdcd";
+    const inserted = await query(client, `
+      select public.presentation_insert_slide($1, $2, $3, 'early.png', $4, 4, 10, 10, 0, 1, $5) as id
+    `, [account, parent, early, `${account}/${early}.png`, tokenA]);
+    expect(inserted.rows[0].id).toBe(early);
+
+    await query(client, `update public.media set updated_at = now() - interval '10 minutes' where id = $1`, [parent]);
+    const takeover = await query(client, `select public.presentation_claim_group($1, $2, 0) as claim`, [account, parent]);
+    const claimB = takeover.rows[0].claim as { outcome: string; token: string; generation: number; revision: number };
+    expect(claimB.outcome).toBe("claimed");
+    expect(claimB.generation).toBe(2);
+    expect(claimB.revision).toBe(0);
+
+    const late = "dededede-dede-4ded-8ded-dededededede";
+    const rejected = await query(client, `
+      select public.presentation_insert_slide($1, $2, $3, 'late.png', $4, 4, 10, 10, 1, 1, $5) as id
+    `, [account, parent, late, `${account}/${late}.png`, tokenA]);
+    expect(rejected.rows[0].id).toBeNull();
+
+    const stolenCommit = await query(client, `
+      select public.presentation_commit_group($1, $2, 0, 1, 10, 10, 40, 'deck.pptx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation', $3, 1, $4) as rev
+    `, [account, parent, source, tokenA]);
+    expect(stolenCommit.rows[0].rev).toBeNull();
+
+    const failed = await query(client, `
+      update public.media
+      set processing_status = 'failed', processing_token = null
+      where id = $1 and account_id = $2 and processing_token = $3
+      returning id
+    `, [parent, account, tokenA]);
+    expect(failed.rowCount).toBe(0);
+    const sourceRow = await query(client, `select storage_path, processing_token from public.media where id = $1`, [parent]);
+    expect(sourceRow.rows[0].storage_path).toBe(source);
+    expect(sourceRow.rows[0].processing_token).toBe(claimB.token);
+
+    const cleaned = await query(client, `select public.presentation_discard_staging($1, $2, $3) as paths`, [account, parent, tokenA]);
+    expect(cleaned.rows[0].paths).toEqual([`${account}/${early}.png`]);
+
+    const slide0 = "e1e1e1e1-e1e1-41e1-81e1-e1e1e1e1e1e1";
+    const slide1 = "e2e2e2e2-e2e2-42e2-82e2-e2e2e2e2e2e2";
+    for (const [id, index] of [[slide0, 0], [slide1, 1]] as const) {
+      const row = await query(client, `
+        select public.presentation_insert_slide($1, $2, $3, $4, $5, 4, 1280, 720, $6, $7, $8) as id
+      `, [account, parent, id, `slide-${index}.png`, `${account}/${id}.png`, index, claimB.generation, claimB.token]);
+      expect(row.rows[0].id).toBe(id);
+    }
+    const again = await query(client, `
+      select public.presentation_insert_slide($1, $2, $3, 'nope.png', $4, 4, 10, 10, 0, 1, $5) as id
+    `, [account, parent, "e3e3e3e3-e3e3-43e3-83e3-e3e3e3e3e3e3", `${account}/nope.png`, tokenA]);
+    expect(again.rows[0].id).toBeNull();
+
+    const committed = await query(client, `
+      select public.presentation_commit_group($1, $2, 0, 2, 1280, 720, 40, 'deck.pptx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation', $3, $4, $5) as rev
+    `, [account, parent, source, claimB.generation, claimB.token]);
+    expect(Number(committed.rows[0].rev)).toBe(2);
+
+    const slides = await query(client, `
+      select id, slide_index, slide_revision, claim_token::text
+      from public.media where source_media_id = $1
+      order by slide_index
+    `, [parent]);
+    expect(slides.rows).toEqual([
+      { id: slide0, slide_index: 0, slide_revision: 2, claim_token: claimB.token },
+      { id: slide1, slide_index: 1, slide_revision: 2, claim_token: claimB.token },
+    ]);
+    const parentAfter = await query(client, `select storage_path, group_revision, slide_count from public.media where id = $1`, [parent]);
+    expect(parentAfter.rows[0]).toMatchObject({ storage_path: source, group_revision: 2, slide_count: 2 });
   });
 
   it("detach removes the group and leaves the rest of the screen's playlist playable", async () => {

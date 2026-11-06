@@ -69,10 +69,14 @@ The file becomes one group and no playlist is created. `asGroup: true` with
 presentation. It does not publish and it does not insert one item per slide.
 
 A conversion claims the row with `presentation_claim_group` (`SELECT … FOR UPDATE`
-and a `processing_token`). A second finish while that claim is fresh gets `202`
-and does not delete anything. Cleanup (`presentation_discard_staging`) deletes
-only staging slides for the token it still owns, and never a revision that is
-already committed.
+and a `processing_token`). Each claim gets its own `processing_generation`.
+Slide rows store that generation and the claim token. Inserts, cleanup, and
+commit all require that token. A heartbeat every 20 seconds renews `updated_at`
+while conversion is running, so a live finish is not taken over at 2 minutes.
+A second finish while the claim is fresh gets `202` and writes nothing.
+`presentation_discard_staging` deletes only rows stamped with that token, and
+never the generation already committed on the parent. A failed finish does not
+delete the uploaded source file, so the same id can be retried.
 
 A failed or corrupt file is stored as `processingStatus: "failed"` and creates
 **no** playlist items. A second finish after `ready` returns `200` and the same

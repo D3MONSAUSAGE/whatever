@@ -47,7 +47,15 @@ type MediaRow = {
   height?: number | null;
 };
 
-type ClaimResult = { outcome?: string; token?: string; revision?: number };
+type ClaimResult = { outcome?: string; token?: string; revision?: number; generation?: number };
+
+class LostClaim extends Error {
+  constructor() {
+    super("lost-claim");
+  }
+}
+
+const HEARTBEAT_MS = 20_000;
 
 export function deckErrorMessage(reason: PptxFailure, detail?: string, format?: DeckFormat | null) {
   if (format?.ext === "pdf" || (!format && detail)) {
@@ -86,9 +94,11 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
 
   let token: string;
   let revision: number;
+  let generation: number;
   if (!existing) {
     token = crypto.randomUUID();
     revision = 0;
+    generation = 1;
     const inserted = await db().from("media").insert({
       id: input.mediaId,
       account_id: input.accountId,
@@ -99,6 +109,7 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
       kind: "presentation",
       processing_status: "processing",
       processing_token: token,
+      processing_generation: generation,
       processing_done: 0,
       slide_count: 0,
       group_revision: 0,
@@ -111,67 +122,76 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
       if (claimed instanceof Response) return claimed;
       token = claimed.token;
       revision = claimed.revision;
+      generation = claimed.generation;
     }
   } else {
     const claimed = await claim(input.accountId, input.mediaId, Number(existing.group_revision ?? 0));
     if (claimed instanceof Response) return claimed;
     token = claimed.token;
     revision = claimed.revision;
+    generation = claimed.generation;
   }
 
-  const stagingRevision = revision + 1;
-  await discardOwned(input.accountId, input.mediaId, token, stagingRevision);
-
-  const converted = format.ext === "pdf"
-    ? await convertPdf(bytes, async (done, total) => {
-      await touch(input.accountId, input.mediaId, token, { processing_done: done, slide_count: total });
-    })
-    : await convertPptx(bytes);
-
-  if (!converted.ok) {
-    await failOwned(input.accountId, input.mediaId, token, revision, stagingRevision, deckErrorMessage(converted.reason, converted.detail, format), sourcePath);
-    const status = converted.reason === "size" ? 413 : converted.reason === "macros" || converted.reason === "type" ? 415 : 400;
-    return fail(deckErrorMessage(converted.reason, converted.detail, format), status);
-  }
-
-  await touch(input.accountId, input.mediaId, token, { slide_count: converted.slides.length, processing_done: 0 });
-
-  const storedPaths: string[] = [];
+  const stopHeartbeat = startHeartbeat(input.accountId, input.mediaId, token);
+  let committedRevision = revision;
+  let warnings: string[] = [];
   try {
-    for (const slide of converted.slides) {
-      const saved = await storeSlide(input.accountId, input.mediaId, input.fileName, slide, stagingRevision);
-      storedPaths.push(saved.path);
-      await touch(input.accountId, input.mediaId, token, {
-        processing_done: slide.index + 1,
-        slide_count: converted.slides.length,
-      });
+    await discardOwned(input.accountId, input.mediaId, token);
+
+    const converted = format.ext === "pdf"
+      ? await convertPdf(bytes, async (done, total) => {
+        await touch(input.accountId, input.mediaId, token, { processing_done: done, slide_count: total });
+      })
+      : await convertPptx(bytes);
+
+    if (!converted.ok) {
+      await failOwned(input.accountId, input.mediaId, token, revision, deckErrorMessage(converted.reason, converted.detail, format));
+      const status = converted.reason === "size" ? 413 : converted.reason === "macros" || converted.reason === "type" ? 415 : 400;
+      return fail(deckErrorMessage(converted.reason, converted.detail, format), status);
     }
-  } catch {
-    await failOwned(input.accountId, input.mediaId, token, revision, stagingRevision, "Couldn't save that presentation. Try again.", sourcePath);
-    return fail("Couldn't save that presentation. Try again.", 500);
+
+    await touch(input.accountId, input.mediaId, token, { slide_count: converted.slides.length, processing_done: 0 });
+
+    try {
+      for (const slide of converted.slides) {
+        await storeSlide(input.accountId, input.mediaId, input.fileName, slide, generation, token);
+        await touch(input.accountId, input.mediaId, token, {
+          processing_done: slide.index + 1,
+          slide_count: converted.slides.length,
+        });
+      }
+    } catch (err) {
+      await failOwned(input.accountId, input.mediaId, token, revision, "Couldn't save that presentation. Try again.");
+      return fail("Couldn't save that presentation. Try again.", err instanceof LostClaim ? 409 : 500);
+    }
+
+    const first = converted.slides[0];
+    const committed = await db().rpc("presentation_commit_group", {
+      p_account_id: input.accountId,
+      p_media_id: input.mediaId,
+      p_expected_revision: revision,
+      p_slide_count: converted.slides.length,
+      p_width: first?.width ?? null,
+      p_height: first?.height ?? null,
+      p_size_bytes: bytes.length,
+      p_file_name: input.fileName,
+      p_mime_type: format.mime,
+      p_storage_path: sourcePath,
+      p_generation: generation,
+      p_token: token,
+    });
+    if (committed.error || committed.data == null) {
+      await discardOwned(input.accountId, input.mediaId, token);
+      return fail("Couldn't save that presentation. Try again.", 409);
+    }
+
+    committedRevision = Number(committed.data);
+    warnings = converted.warnings;
+  } finally {
+    stopHeartbeat();
   }
 
-  const first = converted.slides[0];
-  const committed = await db().rpc("presentation_commit_group", {
-    p_account_id: input.accountId,
-    p_media_id: input.mediaId,
-    p_expected_revision: revision,
-    p_slide_count: converted.slides.length,
-    p_width: first?.width ?? null,
-    p_height: first?.height ?? null,
-    p_size_bytes: bytes.length,
-    p_file_name: input.fileName,
-    p_mime_type: format.mime,
-    p_storage_path: sourcePath,
-    p_token: token,
-  });
-  if (committed.error || committed.data == null) {
-    // Lost the claim or the row changed. Discard only if we still own it.
-    await discardOwned(input.accountId, input.mediaId, token, stagingRevision);
-    return fail("Couldn't save that presentation. Try again.", 500);
-  }
-
-  const slides = await listCommitted(input.accountId, input.mediaId, Number(committed.data));
+  const slides = await listCommitted(input.accountId, input.mediaId, committedRevision);
   let playlistId: string | null = null;
   if (input.createPlaylist) {
     const stem = input.fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "").slice(0, 80);
@@ -185,7 +205,7 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
   const parent = row instanceof Response || !row ? null : row;
   return json({
     ...readyBody(input.mediaId, slides, parent, playlistId, input.asGroup),
-    warnings: converted.warnings,
+    warnings,
   }, 201);
 }
 
@@ -216,7 +236,7 @@ function readyBody(
   };
 }
 
-async function claim(accountId: string, mediaId: string, expectedRevision: number): Promise<{ token: string; revision: number } | Response> {
+async function claim(accountId: string, mediaId: string, expectedRevision: number): Promise<{ token: string; revision: number; generation: number } | Response> {
   const claimed = await db().rpc("presentation_claim_group", {
     p_account_id: accountId,
     p_media_id: mediaId,
@@ -237,15 +257,29 @@ async function claim(accountId: string, mediaId: string, expectedRevision: numbe
   if (result.outcome !== "claimed" || !result.token) {
     return fail("Couldn't save that presentation. Try again.", result.outcome === "conflict" ? 409 : 500);
   }
-  return { token: String(result.token), revision: Number(result.revision ?? expectedRevision) };
+  return {
+    token: String(result.token),
+    revision: Number(result.revision ?? expectedRevision),
+    generation: Number(result.generation),
+  };
 }
 
-async function discardOwned(accountId: string, mediaId: string, token: string, stagingRevision: number) {
+function startHeartbeat(accountId: string, mediaId: string, token: string) {
+  const timer = setInterval(() => {
+    void db().rpc("presentation_claim_heartbeat", {
+      p_account_id: accountId,
+      p_media_id: mediaId,
+      p_token: token,
+    });
+  }, HEARTBEAT_MS);
+  return () => clearInterval(timer);
+}
+
+async function discardOwned(accountId: string, mediaId: string, token: string) {
   const removed = await db().rpc("presentation_discard_staging", {
     p_account_id: accountId,
     p_media_id: mediaId,
     p_token: token,
-    p_staging_revision: stagingRevision,
   });
   const paths = Array.isArray(removed.data) ? removed.data.map(String) : [];
   const owned = paths.filter((path) => path.startsWith(`${accountId}/`));
@@ -264,26 +298,19 @@ async function failOwned(
   mediaId: string,
   token: string,
   revision: number,
-  stagingRevision: number,
   message: string,
-  sourcePath: string,
 ) {
-  await discardOwned(accountId, mediaId, token, stagingRevision);
-  const still = await db()
-    .from("media")
-    .select("processing_token, group_revision")
-    .eq("id", mediaId)
-    .eq("account_id", accountId)
-    .maybeSingle();
-  if (still.data?.processing_token !== token) return;
-  const keepSlides = Number(still.data.group_revision ?? revision) > 0;
+  await discardOwned(accountId, mediaId, token);
+  const keepSlides = revision > 0;
+  // The source object stays so a retry can read it. The update is fenced by
+  // the token: a stolen claim changes zero rows and does not mark the new
+  // owner's row failed.
   await db().from("media").update({
     processing_status: keepSlides ? "ready" : "failed",
     processing_error: message.slice(0, 200),
     processing_token: null,
     updated_at: new Date().toISOString(),
-  }).eq("id", mediaId).eq("account_id", accountId).eq("processing_token", token);
-  if (!keepSlides) await removeStored([sourcePath]);
+  }).eq("id", mediaId).eq("account_id", accountId).eq("processing_token", token).select("id");
 }
 
 async function loadOwn(accountId: string, mediaId: string): Promise<MediaRow | null | Response> {
@@ -316,7 +343,8 @@ async function storeSlide(
   sourceMediaId: string,
   fileName: string,
   slide: PptxSlide,
-  slideRevision: number,
+  generation: number,
+  token: string,
 ) {
   const slideId = crypto.randomUUID();
   const slidePath = slideStoragePath(accountId, slideId);
@@ -327,23 +355,22 @@ async function storeSlide(
   });
   if (up.error) throw new Error("slide-upload");
   const stem = fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "");
-  const inserted = await db().from("media").insert({
-    id: slideId,
-    account_id: accountId,
-    file_name: `${stem} · slide ${slide.index + 1}.png`.slice(0, 200),
-    storage_path: slidePath,
-    mime_type: "image/png",
-    size_bytes: slide.png.length,
-    kind: "image",
-    width: slide.width,
-    height: slide.height,
-    source_media_id: sourceMediaId,
-    slide_index: slide.index,
-    slide_revision: slideRevision,
+  const inserted = await db().rpc("presentation_insert_slide", {
+    p_account_id: accountId,
+    p_source_id: sourceMediaId,
+    p_slide_id: slideId,
+    p_file_name: `${stem} · slide ${slide.index + 1}.png`.slice(0, 200),
+    p_storage_path: slidePath,
+    p_size_bytes: slide.png.length,
+    p_width: slide.width,
+    p_height: slide.height,
+    p_slide_index: slide.index,
+    p_generation: generation,
+    p_token: token,
   });
-  if (inserted.error) {
+  if (inserted.error || !inserted.data) {
     await removeStored([slidePath]);
-    throw new Error("slide-row");
+    throw new LostClaim();
   }
   return { id: slideId, path: slidePath };
 }

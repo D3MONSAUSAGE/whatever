@@ -543,21 +543,54 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
       && Date.now() - Date.parse(String(media.updated_at)) < 2 * 60 * 1000;
     if (fresh) return { outcome: "busy", revision };
     const token = crypto.randomUUID();
+    const childMax = store.media
+      .filter((item) => item.source_media_id === media.id)
+      .reduce((max, item) => Math.max(max, Number(item.slide_revision ?? 0)), 0);
+    const generation = Math.max(Number(media.processing_generation ?? 0), revision, childMax) + 1;
     media.processing_status = "processing";
     media.processing_token = token;
+    media.processing_generation = generation;
     media.processing_error = null;
     media.processing_done = 0;
     media.updated_at = new Date().toISOString();
-    return { outcome: "claimed", token, revision };
+    return { outcome: "claimed", token, revision, generation };
+  }
+
+  if (name === "presentation_claim_heartbeat") {
+    const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+    if (!media || media.processing_token !== args.p_token || media.processing_status !== "processing") return false;
+    media.updated_at = new Date().toISOString();
+    return true;
+  }
+
+  if (name === "presentation_insert_slide") {
+    const media = store.media.find((item) => item.id === args.p_source_id && item.account_id === args.p_account_id);
+    if (!media || media.kind !== "presentation" || media.processing_status !== "processing") return null;
+    if (media.processing_token !== args.p_token || Number(media.processing_generation) !== Number(args.p_generation)) return null;
+    store.media.push({
+      id: args.p_slide_id,
+      account_id: args.p_account_id,
+      file_name: args.p_file_name,
+      storage_path: args.p_storage_path,
+      mime_type: "image/png",
+      size_bytes: args.p_size_bytes,
+      kind: "image",
+      width: args.p_width,
+      height: args.p_height,
+      source_media_id: args.p_source_id,
+      slide_index: args.p_slide_index,
+      slide_revision: args.p_generation,
+      claim_token: args.p_token,
+      created_at: new Date().toISOString(),
+    });
+    return args.p_slide_id;
   }
 
   if (name === "presentation_discard_staging") {
     const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
-    if (!media || media.processing_token !== args.p_token) return [];
-    const staging = Number(args.p_staging_revision);
+    if (!media) return [];
     const committed = Number(media.group_revision ?? 0);
-    if (!Number.isInteger(staging) || staging === committed) return [];
-    const drop = store.media.filter((item) => item.account_id === args.p_account_id && item.source_media_id === media.id && Number(item.slide_revision) === staging);
+    const drop = store.media.filter((item) => item.account_id === args.p_account_id && item.source_media_id === media.id && item.claim_token === args.p_token && Number(item.slide_revision) !== committed);
     const paths = drop.map((item) => String(item.storage_path)).filter(Boolean);
     const ids = new Set(drop.map((item) => item.id));
     store.media = store.media.filter((item) => !ids.has(item.id));
@@ -609,10 +642,12 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     if (args.p_token && media.processing_token !== args.p_token) return null;
     const expected = Number(args.p_expected_revision);
     if (Number(media.group_revision ?? 0) !== expected) return null;
-    const next = expected + 1;
-    const slides = store.media.filter((item) => item.account_id === args.p_account_id && item.source_media_id === media.id && Number(item.slide_revision) === next);
+    const generation = Number(args.p_generation);
+    if (Number(media.processing_generation) !== generation || generation <= expected) return null;
+    const slides = store.media.filter((item) => item.account_id === args.p_account_id && item.source_media_id === media.id && item.claim_token === args.p_token && Number(item.slide_revision) === generation);
     if (slides.length !== Number(args.p_slide_count)) return null;
-    media.group_revision = next;
+    if (new Set(slides.map((item) => Number(item.slide_index))).size !== slides.length) return null;
+    media.group_revision = generation;
     media.processing_status = "ready";
     media.processing_error = null;
     media.processing_done = Number(args.p_slide_count);
@@ -640,7 +675,7 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
         display.content_version = Number(display.content_version) + 1;
       }
     }
-    return next;
+    return generation;
   }
 
   if (name === "delete_presentation_group") {
