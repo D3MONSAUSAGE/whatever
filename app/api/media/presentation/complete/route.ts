@@ -52,11 +52,10 @@ export async function POST(req: Request) {
       accountId: admin.accountId,
       mediaId,
       fileName: format.ext === "pdf" ? fileName.replace(/\.pdf$/i, "").slice(0, 180) + ".pdf" : normalizePptxFileName(fileName),
+      asGroup: options.asGroup,
       createPlaylist: options.createPlaylist,
-      expandSlides: options.expandSlides,
       playbackMode: options.playbackMode,
       playlistName: options.playlistName,
-      replace: options.replace,
     });
   }
 

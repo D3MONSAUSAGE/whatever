@@ -1,7 +1,7 @@
 -- Presentation groups: one library row owns ordered slide images.
 -- Additive. Does not rewrite existing playlist items, media rows, or player RPCs.
 -- Historical slide images stay individual playlist entries. Only new uploads
--- (and an explicit replace) advance group_revision.
+-- advance group_revision. This migration does not update existing rows.
 -- Does not touch billing, Stripe, Meta, accounts, pairing, or tokens.
 -- Apply by hand. Rollback: supabase/rollback/0019_presentation_groups.sql.
 
@@ -18,11 +18,11 @@ alter table public.media
   add column if not exists slide_duration_ms integer,
   add column if not exists group_revision integer not null default 0,
   add column if not exists slide_revision integer,
-  add column if not exists updated_at timestamptz;
+  add column if not exists updated_at timestamptz,
+  add column if not exists processing_token uuid;
 
-update public.media
-set updated_at = created_at
-where updated_at is null;
+-- updated_at stays null on rows that already exist. The app treats null as
+-- "never touched by a group conversion" and does not backfill it.
 
 alter table public.media drop constraint if exists media_processing_status_check;
 alter table public.media
@@ -295,6 +295,142 @@ end $$;
 -- publish the group. Players keep the previous payload until that version
 -- changes, so they never paint a mix of old and new slides.
 
+-- Compare-and-set for a conversion. Locks the parent row. A fresh owner keeps
+-- the row; everyone else gets outcome "busy" and must not delete anything.
+-- updated_at null is not fresh, so a claim can take a row the app never stamped.
+
+create or replace function public.presentation_claim_group(
+  p_account_id uuid,
+  p_media_id uuid,
+  p_expected_revision integer
+) returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_status text;
+  v_rev integer;
+  v_updated timestamptz;
+  v_kind text;
+  v_token uuid;
+begin
+  select kind, processing_status, group_revision, updated_at
+    into v_kind, v_status, v_rev, v_updated
+  from public.media
+  where id = p_media_id and account_id = p_account_id
+  for update;
+  if not found or v_kind <> 'presentation' then
+    return jsonb_build_object('outcome', 'missing');
+  end if;
+  if v_rev is distinct from p_expected_revision then
+    return jsonb_build_object('outcome', 'conflict', 'revision', v_rev);
+  end if;
+  if v_status = 'processing'
+     and v_updated is not null
+     and v_updated > now() - interval '2 minutes' then
+    return jsonb_build_object('outcome', 'busy', 'revision', v_rev);
+  end if;
+  v_token := gen_random_uuid();
+  update public.media
+  set processing_status = 'processing',
+      processing_token = v_token,
+      processing_error = null,
+      processing_done = 0,
+      updated_at = now()
+  where id = p_media_id and account_id = p_account_id;
+  return jsonb_build_object('outcome', 'claimed', 'token', v_token, 'revision', v_rev);
+end $$;
+
+-- Deletes only this claim's uncommitted staging slides. A token that does not
+-- own the row deletes nothing. A revision that is already committed deletes nothing.
+
+create or replace function public.presentation_discard_staging(
+  p_account_id uuid,
+  p_media_id uuid,
+  p_token uuid,
+  p_staging_revision integer
+) returns text[]
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_token uuid;
+  v_rev integer;
+  v_paths text[];
+begin
+  select processing_token, group_revision into v_token, v_rev
+  from public.media
+  where id = p_media_id and account_id = p_account_id and kind = 'presentation'
+  for update;
+  if not found or v_token is distinct from p_token then
+    return array[]::text[];
+  end if;
+  if p_staging_revision is null or p_staging_revision is not distinct from v_rev then
+    return array[]::text[];
+  end if;
+
+  select coalesce(array_agg(storage_path), array[]::text[])
+    into v_paths
+  from public.media
+  where account_id = p_account_id
+    and source_media_id = p_media_id
+    and slide_revision = p_staging_revision
+    and slide_revision is distinct from v_rev;
+
+  delete from public.media
+  where account_id = p_account_id
+    and source_media_id = p_media_id
+    and slide_revision = p_staging_revision
+    and slide_revision is distinct from v_rev;
+
+  return v_paths;
+end $$;
+
+-- One statement, so parent and children are a single snapshot.
+create or replace function public.presentation_group_snapshot(
+  p_account_id uuid,
+  p_media_ids uuid[]
+) returns table (
+  parent_id uuid,
+  file_name text,
+  group_revision integer,
+  group_duration_ms integer,
+  processing_status text,
+  account_id uuid,
+  slide_id uuid,
+  storage_path text,
+  slide_index integer,
+  slide_revision integer,
+  slide_duration_ms integer,
+  width integer,
+  height integer
+)
+language sql
+stable
+set search_path = ''
+as $$
+  select p.id,
+         p.file_name,
+         p.group_revision,
+         p.group_duration_ms,
+         p.processing_status,
+         p.account_id,
+         c.id,
+         c.storage_path,
+         c.slide_index,
+         c.slide_revision,
+         c.slide_duration_ms,
+         c.width,
+         c.height
+  from public.media p
+  left join public.media c
+    on c.account_id = p.account_id
+   and c.source_media_id = p.id
+  where p.account_id = p_account_id
+    and p.id = any(p_media_ids)
+    and p.kind = 'presentation';
+$$;
+
 create or replace function public.presentation_commit_group(
   p_account_id uuid,
   p_media_id uuid,
@@ -305,7 +441,8 @@ create or replace function public.presentation_commit_group(
   p_size_bytes integer,
   p_file_name text,
   p_mime_type text,
-  p_storage_path text
+  p_storage_path text,
+  p_token uuid
 ) returns integer
 language plpgsql
 set search_path = ''
@@ -313,13 +450,17 @@ as $$
 declare
   v_rev integer;
   v_kind text;
+  v_token uuid;
   v_next integer;
 begin
-  select group_revision, kind into v_rev, v_kind
+  select group_revision, kind, processing_token into v_rev, v_kind, v_token
   from public.media
   where id = p_media_id and account_id = p_account_id
   for update;
   if not found or v_kind <> 'presentation' then
+    return null;
+  end if;
+  if v_token is distinct from p_token then
     return null;
   end if;
   if v_rev is distinct from p_expected_revision then
@@ -352,6 +493,7 @@ begin
       mime_type = p_mime_type,
       storage_path = p_storage_path,
       group_duration_ms = coalesce(group_duration_ms, 10000),
+      processing_token = null,
       updated_at = now()
   where id = p_media_id and account_id = p_account_id;
 
@@ -478,8 +620,17 @@ begin
   return v_paths;
 end $$;
 
-revoke all on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text) from public, anon, authenticated;
-grant execute on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text) to service_role;
+revoke all on function public.presentation_claim_group(uuid, uuid, integer) from public, anon, authenticated;
+grant execute on function public.presentation_claim_group(uuid, uuid, integer) to service_role;
+
+revoke all on function public.presentation_discard_staging(uuid, uuid, uuid, integer) from public, anon, authenticated;
+grant execute on function public.presentation_discard_staging(uuid, uuid, uuid, integer) to service_role;
+
+revoke all on function public.presentation_group_snapshot(uuid, uuid[]) from public, anon, authenticated;
+grant execute on function public.presentation_group_snapshot(uuid, uuid[]) to service_role;
+
+revoke all on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text, uuid) from public, anon, authenticated;
+grant execute on function public.presentation_commit_group(uuid, uuid, integer, integer, integer, integer, integer, text, text, text, uuid) to service_role;
 
 revoke all on function public.delete_presentation_group(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.delete_presentation_group(uuid, uuid) to service_role;

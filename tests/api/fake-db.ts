@@ -533,9 +533,80 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     return id;
   }
 
+  if (name === "presentation_claim_group") {
+    const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+    if (!media || media.kind !== "presentation") return { outcome: "missing" };
+    const expected = Number(args.p_expected_revision);
+    const revision = Number(media.group_revision ?? 0);
+    if (revision !== expected) return { outcome: "conflict", revision };
+    const fresh = media.processing_status === "processing" && media.updated_at
+      && Date.now() - Date.parse(String(media.updated_at)) < 2 * 60 * 1000;
+    if (fresh) return { outcome: "busy", revision };
+    const token = crypto.randomUUID();
+    media.processing_status = "processing";
+    media.processing_token = token;
+    media.processing_error = null;
+    media.processing_done = 0;
+    media.updated_at = new Date().toISOString();
+    return { outcome: "claimed", token, revision };
+  }
+
+  if (name === "presentation_discard_staging") {
+    const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+    if (!media || media.processing_token !== args.p_token) return [];
+    const staging = Number(args.p_staging_revision);
+    const committed = Number(media.group_revision ?? 0);
+    if (!Number.isInteger(staging) || staging === committed) return [];
+    const drop = store.media.filter((item) => item.account_id === args.p_account_id && item.source_media_id === media.id && Number(item.slide_revision) === staging);
+    const paths = drop.map((item) => String(item.storage_path)).filter(Boolean);
+    const ids = new Set(drop.map((item) => item.id));
+    store.media = store.media.filter((item) => !ids.has(item.id));
+    return paths;
+  }
+
+  if (name === "presentation_group_snapshot") {
+    const ids = new Set((args.p_media_ids as string[]) ?? []);
+    const parents = store.media.filter((item) => item.account_id === args.p_account_id && ids.has(String(item.id)) && item.kind === "presentation");
+    const rows: Record<string, unknown>[] = [];
+    for (const parent of parents) {
+      const slides = store.media.filter((item) => item.account_id === parent.account_id && item.source_media_id === parent.id);
+      if (!slides.length) {
+        rows.push({
+          parent_id: parent.id,
+          file_name: parent.file_name,
+          group_revision: parent.group_revision ?? 0,
+          group_duration_ms: parent.group_duration_ms ?? null,
+          processing_status: parent.processing_status ?? null,
+          account_id: parent.account_id,
+          slide_id: null,
+        });
+        continue;
+      }
+      for (const slide of slides) {
+        rows.push({
+          parent_id: parent.id,
+          file_name: parent.file_name,
+          group_revision: parent.group_revision ?? 0,
+          group_duration_ms: parent.group_duration_ms ?? null,
+          processing_status: parent.processing_status ?? null,
+          account_id: parent.account_id,
+          slide_id: slide.id,
+          storage_path: slide.storage_path,
+          slide_index: slide.slide_index,
+          slide_revision: slide.slide_revision ?? null,
+          slide_duration_ms: slide.slide_duration_ms ?? null,
+          width: slide.width ?? null,
+          height: slide.height ?? null,
+        });
+      }
+    }
+    return rows;
+  }
+
   if (name === "presentation_commit_group") {
     const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
     if (!media || media.kind !== "presentation") return null;
+    if (args.p_token && media.processing_token !== args.p_token) return null;
     const expected = Number(args.p_expected_revision);
     if (Number(media.group_revision ?? 0) !== expected) return null;
     const next = expected + 1;
@@ -553,6 +624,7 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     media.mime_type = args.p_mime_type;
     if (args.p_storage_path) media.storage_path = args.p_storage_path;
     if (media.group_duration_ms == null) media.group_duration_ms = 10000;
+    media.processing_token = null;
     media.updated_at = new Date().toISOString();
     const playlistIds = new Set(
       store.playlist_items.filter((item) => item.media_id === media.id && item.kind === "published").map((item) => item.playlist_id),

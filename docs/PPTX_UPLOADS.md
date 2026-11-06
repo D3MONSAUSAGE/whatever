@@ -5,7 +5,9 @@ Customers upload a `.pptx` or PDF in the Media library. After migration
 Slides, durations, playlists, and the player are described in
 [PRESENTATION_GROUPS.md](./PRESENTATION_GROUPS.md). The notes below describe
 the original per-slide conversion that still runs when `0019` is not applied,
-and when a caller passes `expandSlides: true`.
+The website sends `asGroup: true`. A client that omits that flag still gets a
+published per-slide manual playlist. See
+[PRESENTATION_GROUPS.md](./PRESENTATION_GROUPS.md).
 
 ## Conversion method (cost: $0)
 

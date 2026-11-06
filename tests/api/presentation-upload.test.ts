@@ -48,7 +48,7 @@ describe("PowerPoint upload API", () => {
     expect(res.status).toBe(413);
   });
 
-  it("converts a staged .pptx into one presentation group and one playlist item", async () => {
+  it("without asGroup, finish still publishes a per-slide manual playlist", async () => {
     const bytes = fixture("pekko-demo-16x9.pptx");
     const started = await call(startPresentation, "http://localhost/api/media/presentation", auth({
       fileName: "demo.pptx",
@@ -67,7 +67,7 @@ describe("PowerPoint upload API", () => {
     }));
     expect(done.status).toBe(201);
     expect(done.body.slideCount).toBe(4);
-    expect(done.body.asGroup).toBe(true);
+    expect(done.body.asGroup).toBe(false);
     expect(Array.isArray(done.body.slideIds)).toBe(true);
     expect((done.body.slideIds as string[]).length).toBe(4);
     expect(done.body.playlistId).toBeTruthy();
@@ -79,12 +79,14 @@ describe("PowerPoint upload API", () => {
       .sort((a, b) => Number(a.slide_index) - Number(b.slide_index));
     expect(slides.map((s) => s.slide_index)).toEqual([0, 1, 2, 3]);
     expect(slides.every((s) => s.kind === "image")).toBe(true);
-    expect(store.playlist_items.filter((row) => slides.some((slide) => slide.id === row.media_id))).toHaveLength(0);
 
     const playlist = store.playlists.find((row) => row.id === done.body.playlistId);
-    expect(playlist).toMatchObject({ playback_mode: "manual" });
-    const items = store.playlist_items.filter((row) => row.playlist_id === playlist?.id);
-    expect(items.map((item) => item.media_id)).toEqual([mediaId]);
+    expect(playlist).toMatchObject({ playback_mode: "manual", published_playback_mode: "manual" });
+    const items = store.playlist_items
+      .filter((row) => row.playlist_id === playlist?.id && row.kind === "published")
+      .sort((a, b) => Number(a.position) - Number(b.position));
+    expect(items.map((item) => item.media_id)).toEqual(slides.map((slide) => slide.id));
+    expect(store.playlist_items.some((row) => row.media_id === mediaId)).toBe(false);
   }, 120_000);
 
   it("creates a playlist later from an existing presentation", async () => {

@@ -7,7 +7,6 @@ import { POST as startPresentation } from "@/app/api/media/presentation/route";
 import { POST as completePresentation } from "@/app/api/media/presentation/complete/route";
 import { GET as readPresentation, PATCH as updatePresentation } from "@/app/api/media/presentation/[id]/route";
 import { POST as presentationPlaylist } from "@/app/api/media/presentation/[id]/playlist/route";
-import { POST as replacePresentation } from "@/app/api/media/presentation/[id]/replace/route";
 import { GET as listMedia } from "@/app/api/media/route";
 import { DELETE as deleteMedia } from "@/app/api/media/[id]/route";
 import { POST as createPlaylist } from "@/app/api/playlists/route";
@@ -368,35 +367,27 @@ describe("presentation groups", () => {
     expect(store.playlist_items.some((row) => row.media_id === staged.mediaId)).toBe(false);
   }, 120_000);
 
-  it("replaces a group atomically and keeps the previous slides until commit", async () => {
-    const staged = await stage("live.pptx", pptx("pekko-demo-4x3.pptx"));
+  it("asGroup creates one draft item and leaves committed slides in place", async () => {
+    const staged = await stage("group.pptx", pptx("pekko-demo-4x3.pptx"));
     const done = await call(completePresentation, "http://localhost/api/media/presentation/complete", auth("token-a", {
-      mediaId: staged.mediaId, fileName: "live.pptx", createPlaylist: false,
+      mediaId: staged.mediaId, fileName: "group.pptx", asGroup: true, createPlaylist: true,
     }));
-    const firstIds = [...(done.body.slideIds as string[])];
-    const replacement = await call(replacePresentation, `http://localhost/api/media/presentation/${staged.mediaId}/replace`, auth("token-a", {
-      fileName: "live.pptx", sizeBytes: pptx("pekko-demo-16x9.pptx").length,
-    }), staged.mediaId);
-    expect(replacement.status).toBe(201);
-    expect(store.media.find((row) => row.id === staged.mediaId)?.group_revision).toBe(1);
-    store.objects.set(String(replacement.body.path), pptx("pekko-demo-16x9.pptx"));
-    const swapped = await call(completePresentation, "http://localhost/api/media/presentation/complete", auth("token-a", {
-      mediaId: staged.mediaId, fileName: "live.pptx", replace: true, createPlaylist: false,
-    }));
-    expect(swapped.status).toBe(201);
-    expect(swapped.body.slideIds).not.toEqual(firstIds);
-    expect(store.media.find((row) => row.id === staged.mediaId)?.group_revision).toBe(2);
-    const visible = store.media.filter((row) => row.source_media_id === staged.mediaId);
-    expect(visible.every((row) => Number(row.slide_revision) === 2)).toBe(true);
+    expect(done.status).toBe(201);
+    expect(done.body.asGroup).toBe(true);
+    const playlist = store.playlists.find((row) => row.id === done.body.playlistId);
+    expect(playlist?.published_at ?? null).toBeNull();
+    const items = store.playlist_items.filter((row) => row.playlist_id === playlist?.id);
+    expect(items.map((item) => item.media_id)).toEqual([staged.mediaId]);
+    expect(store.media.filter((row) => row.source_media_id === staged.mediaId).length).toBe(done.body.slideCount);
   }, 120_000);
 
-  it("still creates a per-slide playlist when expandSlides is set", async () => {
+  it("still creates a per-slide playlist when the caller does not opt into a group", async () => {
     const staged = await stage("legacy.pptx", pptx("pekko-demo-4x3.pptx"));
     const done = await call(completePresentation, "http://localhost/api/media/presentation/complete", auth("token-a", {
       mediaId: staged.mediaId, fileName: "legacy.pptx", createPlaylist: false,
     }));
     const created = await call(presentationPlaylist, `http://localhost/api/media/presentation/${staged.mediaId}/playlist`, auth("token-a", {
-      name: "Expanded", playbackMode: "manual", expandSlides: true,
+      name: "Expanded", playbackMode: "manual",
     }), staged.mediaId);
     expect(created.status).toBe(201);
     expect(created.body.asGroup).toBe(false);

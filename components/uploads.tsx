@@ -242,7 +242,7 @@ async function finishPresentation(
       const res = await fetch("/api/media/presentation/complete", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ mediaId, fileName, createPlaylist: false }),
+        body: JSON.stringify({ mediaId, fileName, asGroup: true, createPlaylist: false }),
       });
       const payload = await res.json().catch(() => ({})) as { error?: string; slideCount?: number; playlistId?: string | null; processingStatus?: string };
       if (res.status === 202) {

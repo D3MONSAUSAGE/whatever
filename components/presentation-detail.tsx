@@ -104,22 +104,6 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
     }
   }
 
-  async function replaceFile(file: File) {
-    if (!data) return;
-    const started = await api<{ signedUrl: string }>(`/api/media/presentation/${data.id}/replace`, {
-      method: "POST",
-      body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
-    });
-    const { uploadToSignedUrl } = await import("@/lib/prepare-video");
-    await uploadToSignedUrl(started.signedUrl, file, () => undefined, file.name);
-    await api("/api/media/presentation/complete", {
-      method: "POST",
-      body: JSON.stringify({ mediaId: data.id, fileName: file.name, replace: true, createPlaylist: false }),
-    });
-    setData(await api<PresentationDetail>(`/api/media/presentation/${data.id}`));
-    toast.show("Presentation replaced");
-  }
-
   async function remove() {
     if (!data) return;
     const names = formatNameList(data.usedIn.map((playlist) => playlist.name));
@@ -156,14 +140,6 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" className="btn btn-primary" onClick={() => void save()}>Save times</button>
-            <label className="btn btn-quiet cursor-pointer">
-              Replace file
-              <input type="file" accept=".pptx,.pdf,application/pdf" className="sr-only" onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file) void replaceFile(file).catch((err) => toast.show((err as Error).message, true));
-              }} />
-            </label>
             <button type="button" className="btn btn-quiet text-danger" onClick={() => void remove()}>Delete</button>
           </div>
         </div>

@@ -14,7 +14,6 @@ import {
   GROUP_DEFAULT_DURATION_MS,
   GROUPS_UNAVAILABLE,
   deckFormat,
-  groupProcessingFresh,
   groupSourcePath,
   presentationGroupsReady,
   type DeckFormat,
@@ -24,11 +23,11 @@ export type GroupCompleteInput = {
   accountId: string;
   mediaId: string;
   fileName: string;
+  /** Explicit opt-in from the website. Absent means the pre-group playlist. */
+  asGroup: boolean;
   createPlaylist: boolean;
-  expandSlides: boolean;
   playbackMode: "auto" | "manual";
   playlistName: string | null;
-  replace: boolean;
 };
 
 type MediaRow = {
@@ -43,9 +42,12 @@ type MediaRow = {
   group_revision?: number | null;
   group_duration_ms?: number | null;
   updated_at?: string | null;
+  processing_token?: string | null;
   width?: number | null;
   height?: number | null;
 };
+
+type ClaimResult = { outcome?: string; token?: string; revision?: number };
 
 export function deckErrorMessage(reason: PptxFailure, detail?: string, format?: DeckFormat | null) {
   if (format?.ext === "pdf" || (!format && detail)) {
@@ -70,36 +72,23 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
   const existing = await loadOwn(input.accountId, input.mediaId);
   if (existing instanceof Response) return existing;
 
-  if (!input.replace && existing && settled(existing)) {
+  if (existing && settled(existing)) {
     const slides = await listCommitted(input.accountId, input.mediaId, Number(existing.group_revision ?? 0));
     const expected = existing.slide_count == null ? slides.length : Number(existing.slide_count);
     if (slides.length > 0 && slides.length === expected) {
-      return json(readyBody(input.mediaId, slides, existing, null));
+      return json(readyBody(input.mediaId, slides, existing, null, input.asGroup));
     }
   }
 
-  if (input.replace && !existing) return fail("Presentation not found.", 404);
-  if (input.replace && existing && existing.kind !== "presentation") return fail("Presentation not found.", 404);
-
-  if (existing?.processing_status === "processing" && groupProcessingFresh(existing.updated_at)) {
-    return json({
-      id: input.mediaId,
-      processingStatus: "processing",
-      processingDone: Number(existing.processing_done ?? 0),
-      slideCount: Number(existing.slide_count ?? 0),
-    }, 202);
-  }
-
-  const revision = Number(existing?.group_revision ?? 0);
-  const stagingRevision = revision + 1;
-  const sourcePath = input.replace
-    ? groupSourcePath(input.accountId, input.mediaId, format.ext, stagingRevision)
-    : (existing?.storage_path || groupSourcePath(input.accountId, input.mediaId, format.ext));
-
+  const sourcePath = existing?.storage_path || groupSourcePath(input.accountId, input.mediaId, format.ext);
   const bytes = await readStoredObject(sourcePath);
   if (!bytes) return fail("Upload didn't arrive. Try again.", 400);
 
+  let token: string;
+  let revision: number;
   if (!existing) {
+    token = crypto.randomUUID();
+    revision = 0;
     const inserted = await db().from("media").insert({
       id: input.mediaId,
       account_id: input.accountId,
@@ -109,6 +98,7 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
       size_bytes: bytes.length,
       kind: "presentation",
       processing_status: "processing",
+      processing_token: token,
       processing_done: 0,
       slide_count: 0,
       group_revision: 0,
@@ -116,87 +106,48 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
       updated_at: new Date().toISOString(),
     });
     if (inserted.error) {
-      if (String(inserted.error.code) === "23505") {
-        const won = await loadOwn(input.accountId, input.mediaId);
-        if (won instanceof Response) return won;
-        if (won?.processing_status === "processing" && groupProcessingFresh(won.updated_at)) {
-          return json({
-            id: input.mediaId,
-            processingStatus: "processing",
-            processingDone: Number(won.processing_done ?? 0),
-            slideCount: Number(won.slide_count ?? 0),
-          }, 202);
-        }
-        if (won && settled(won)) {
-          const slides = await listCommitted(input.accountId, input.mediaId, Number(won.group_revision ?? 0));
-          return json(readyBody(input.mediaId, slides, won, null));
-        }
-      }
-      return fail("Couldn't save that presentation. Try again.", 500);
+      if (String(inserted.error.code) !== "23505") return fail("Couldn't save that presentation. Try again.", 500);
+      const claimed = await claim(input.accountId, input.mediaId, 0);
+      if (claimed instanceof Response) return claimed;
+      token = claimed.token;
+      revision = claimed.revision;
     }
   } else {
-    const claimed = await db().from("media").update({
-      processing_status: "processing",
-      processing_error: null,
-      processing_done: 0,
-      updated_at: new Date().toISOString(),
-    }).eq("id", input.mediaId).eq("account_id", input.accountId);
-    if (claimed.error) return fail("Couldn't save that presentation. Try again.", 500);
+    const claimed = await claim(input.accountId, input.mediaId, Number(existing.group_revision ?? 0));
+    if (claimed instanceof Response) return claimed;
+    token = claimed.token;
+    revision = claimed.revision;
   }
 
-  await deleteStaging(input.accountId, input.mediaId, stagingRevision);
+  const stagingRevision = revision + 1;
+  await discardOwned(input.accountId, input.mediaId, token, stagingRevision);
 
   const converted = format.ext === "pdf"
     ? await convertPdf(bytes, async (done, total) => {
-      await db().from("media").update({
-        processing_status: "processing",
-        processing_done: done,
-        slide_count: total,
-        updated_at: new Date().toISOString(),
-      }).eq("id", input.mediaId).eq("account_id", input.accountId);
+      await touch(input.accountId, input.mediaId, token, { processing_done: done, slide_count: total });
     })
     : await convertPptx(bytes);
 
   if (!converted.ok) {
-    await deleteStaging(input.accountId, input.mediaId, stagingRevision);
-    const message = deckErrorMessage(converted.reason, converted.detail, format).slice(0, 200);
-    const keepCurrent = revision > 0;
-    await db().from("media").update({
-      processing_status: keepCurrent ? "ready" : "failed",
-      processing_error: message,
-      updated_at: new Date().toISOString(),
-    }).eq("id", input.mediaId).eq("account_id", input.accountId);
-    if (!keepCurrent) await removeStored([sourcePath]);
+    await failOwned(input.accountId, input.mediaId, token, revision, stagingRevision, deckErrorMessage(converted.reason, converted.detail, format), sourcePath);
     const status = converted.reason === "size" ? 413 : converted.reason === "macros" || converted.reason === "type" ? 415 : 400;
-    return fail(message, status);
+    return fail(deckErrorMessage(converted.reason, converted.detail, format), status);
   }
 
-  await db().from("media").update({
-    slide_count: converted.slides.length,
-    processing_done: 0,
-    updated_at: new Date().toISOString(),
-  }).eq("id", input.mediaId).eq("account_id", input.accountId);
+  await touch(input.accountId, input.mediaId, token, { slide_count: converted.slides.length, processing_done: 0 });
 
   const storedPaths: string[] = [];
   try {
     for (const slide of converted.slides) {
       const saved = await storeSlide(input.accountId, input.mediaId, input.fileName, slide, stagingRevision);
       storedPaths.push(saved.path);
-      await db().from("media").update({
+      await touch(input.accountId, input.mediaId, token, {
         processing_done: slide.index + 1,
         slide_count: converted.slides.length,
-        updated_at: new Date().toISOString(),
-      }).eq("id", input.mediaId).eq("account_id", input.accountId);
+      });
     }
   } catch {
-    await deleteStaging(input.accountId, input.mediaId, stagingRevision);
-    await removeStored(storedPaths);
-    const keepCurrent = revision > 0;
-    await db().from("media").update({
-      processing_status: keepCurrent ? "ready" : "failed",
-      processing_error: "Couldn't save that presentation. Try again.",
-      updated_at: new Date().toISOString(),
-    }).eq("id", input.mediaId).eq("account_id", input.accountId);
+    await failOwned(input.accountId, input.mediaId, token, revision, stagingRevision, "Couldn't save that presentation. Try again.", sourcePath);
     return fail("Couldn't save that presentation. Try again.", 500);
   }
 
@@ -212,34 +163,29 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
     p_file_name: input.fileName,
     p_mime_type: format.mime,
     p_storage_path: sourcePath,
+    p_token: token,
   });
   if (committed.error || committed.data == null) {
-    await deleteStaging(input.accountId, input.mediaId, stagingRevision);
-    await removeStored(storedPaths);
+    // Lost the claim or the row changed. Discard only if we still own it.
+    await discardOwned(input.accountId, input.mediaId, token, stagingRevision);
     return fail("Couldn't save that presentation. Try again.", 500);
   }
 
-  if (input.replace && existing?.storage_path && existing.storage_path !== sourcePath) {
-    await removeStored([String(existing.storage_path)]);
-  }
-  await deleteOtherRevisions(input.accountId, input.mediaId, Number(committed.data));
-
   const slides = await listCommitted(input.accountId, input.mediaId, Number(committed.data));
   let playlistId: string | null = null;
-  if (!input.replace && input.createPlaylist) {
+  if (input.createPlaylist) {
     const stem = input.fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "").slice(0, 80);
     const name = input.playlistName ?? (stem || "Presentation");
-    playlistId = input.expandSlides
-      ? await expandLegacyPlaylist(input.accountId, input.mediaId, name, input.playbackMode)
-      : await createGroupPlaylist(input.accountId, input.mediaId, name, input.playbackMode, GROUP_DEFAULT_DURATION_MS);
+    playlistId = input.asGroup
+      ? await createGroupPlaylist(input.accountId, input.mediaId, name, input.playbackMode, GROUP_DEFAULT_DURATION_MS)
+      : await expandLegacyPlaylist(input.accountId, input.mediaId, name, input.playbackMode);
   }
 
   const row = await loadOwn(input.accountId, input.mediaId);
   const parent = row instanceof Response || !row ? null : row;
   return json({
-    ...readyBody(input.mediaId, slides, parent, playlistId),
+    ...readyBody(input.mediaId, slides, parent, playlistId, input.asGroup),
     warnings: converted.warnings,
-    asGroup: playlistId ? !input.expandSlides : undefined,
   }, 201);
 }
 
@@ -256,6 +202,7 @@ function readyBody(
   slides: { id: string; index: number }[],
   row: MediaRow | null,
   playlistId: string | null,
+  asGroup: boolean,
 ) {
   return {
     id: mediaId,
@@ -265,13 +212,84 @@ function readyBody(
     warnings: [] as string[],
     processingStatus: "ready" as const,
     defaultDurationMs: Number(row?.group_duration_ms ?? GROUP_DEFAULT_DURATION_MS),
+    asGroup,
   };
+}
+
+async function claim(accountId: string, mediaId: string, expectedRevision: number): Promise<{ token: string; revision: number } | Response> {
+  const claimed = await db().rpc("presentation_claim_group", {
+    p_account_id: accountId,
+    p_media_id: mediaId,
+    p_expected_revision: expectedRevision,
+  });
+  if (claimed.error) return fail("Couldn't save that presentation. Try again.", 500);
+  const result = (claimed.data ?? {}) as ClaimResult;
+  if (result.outcome === "busy") {
+    const row = await loadOwn(accountId, mediaId);
+    const current = row instanceof Response || !row ? null : row;
+    return json({
+      id: mediaId,
+      processingStatus: "processing",
+      processingDone: Number(current?.processing_done ?? 0),
+      slideCount: Number(current?.slide_count ?? 0),
+    }, 202);
+  }
+  if (result.outcome !== "claimed" || !result.token) {
+    return fail("Couldn't save that presentation. Try again.", result.outcome === "conflict" ? 409 : 500);
+  }
+  return { token: String(result.token), revision: Number(result.revision ?? expectedRevision) };
+}
+
+async function discardOwned(accountId: string, mediaId: string, token: string, stagingRevision: number) {
+  const removed = await db().rpc("presentation_discard_staging", {
+    p_account_id: accountId,
+    p_media_id: mediaId,
+    p_token: token,
+    p_staging_revision: stagingRevision,
+  });
+  const paths = Array.isArray(removed.data) ? removed.data.map(String) : [];
+  const owned = paths.filter((path) => path.startsWith(`${accountId}/`));
+  if (owned.length) await removeStored(owned);
+}
+
+async function touch(accountId: string, mediaId: string, token: string, patch: Record<string, unknown>) {
+  await db().from("media").update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", mediaId)
+    .eq("account_id", accountId)
+    .eq("processing_token", token);
+}
+
+async function failOwned(
+  accountId: string,
+  mediaId: string,
+  token: string,
+  revision: number,
+  stagingRevision: number,
+  message: string,
+  sourcePath: string,
+) {
+  await discardOwned(accountId, mediaId, token, stagingRevision);
+  const still = await db()
+    .from("media")
+    .select("processing_token, group_revision")
+    .eq("id", mediaId)
+    .eq("account_id", accountId)
+    .maybeSingle();
+  if (still.data?.processing_token !== token) return;
+  const keepSlides = Number(still.data.group_revision ?? revision) > 0;
+  await db().from("media").update({
+    processing_status: keepSlides ? "ready" : "failed",
+    processing_error: message.slice(0, 200),
+    processing_token: null,
+    updated_at: new Date().toISOString(),
+  }).eq("id", mediaId).eq("account_id", accountId).eq("processing_token", token);
+  if (!keepSlides) await removeStored([sourcePath]);
 }
 
 async function loadOwn(accountId: string, mediaId: string): Promise<MediaRow | null | Response> {
   const existing = await db()
     .from("media")
-    .select("id, kind, file_name, storage_path, processing_status, processing_error, processing_done, slide_count, group_revision, group_duration_ms, updated_at, width, height")
+    .select("id, kind, file_name, storage_path, processing_status, processing_error, processing_done, processing_token, slide_count, group_revision, group_duration_ms, updated_at, width, height")
     .eq("id", mediaId)
     .eq("account_id", accountId)
     .maybeSingle();
@@ -330,42 +348,6 @@ async function storeSlide(
   return { id: slideId, path: slidePath };
 }
 
-async function deleteStaging(accountId: string, sourceId: string, revision: number) {
-  const { data } = await db()
-    .from("media")
-    .select("id, storage_path")
-    .eq("account_id", accountId)
-    .eq("source_media_id", sourceId)
-    .eq("slide_revision", revision);
-  const rows = data ?? [];
-  if (!rows.length) return;
-  const ids = rows.map((row) => String(row.id));
-  const used = await db().from("playlist_items").select("media_id").eq("account_id", accountId).in("media_id", ids);
-  const blocked = new Set((used.data ?? []).map((row) => String(row.media_id)));
-  const drop = rows.filter((row) => !blocked.has(String(row.id)));
-  if (!drop.length) return;
-  await db().from("media").delete().eq("account_id", accountId).in("id", drop.map((row) => String(row.id)));
-  await removeStored(drop.map((row) => String(row.storage_path)));
-}
-
-/** Drop unreferenced slides from older revisions after a successful replace. */
-async function deleteOtherRevisions(accountId: string, sourceId: string, current: number) {
-  const { data } = await db()
-    .from("media")
-    .select("id, storage_path, slide_revision")
-    .eq("account_id", accountId)
-    .eq("source_media_id", sourceId);
-  const stale = (data ?? []).filter((row) => row.slide_revision != null && Number(row.slide_revision) !== current);
-  if (!stale.length) return;
-  const ids = stale.map((row) => String(row.id));
-  const used = await db().from("playlist_items").select("media_id").eq("account_id", accountId).in("media_id", ids);
-  const blocked = new Set((used.data ?? []).map((row) => String(row.media_id)));
-  const drop = stale.filter((row) => !blocked.has(String(row.id)));
-  if (!drop.length) return;
-  await db().from("media").delete().eq("account_id", accountId).in("id", drop.map((row) => String(row.id)));
-  await removeStored(drop.map((row) => String(row.storage_path)));
-}
-
 async function expandLegacyPlaylist(accountId: string, mediaId: string, name: string, mode: "auto" | "manual") {
   const created = await db().rpc("presentation_create_playlist", {
     p_account_id: accountId,
@@ -415,12 +397,13 @@ export async function createGroupPlaylist(
 export function readCompleteOptions(body: Record<string, unknown>, fileName: string) {
   const format = deckFormat(fileName);
   const stem = fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "");
+  const asGroup = body.asGroup === true;
   return {
     format,
-    createPlaylist: body.createPlaylist !== false && body.replace !== true,
-    expandSlides: body.expandSlides === true,
-    playbackMode: normalizePlaybackMode(body.playbackMode) ?? "auto",
+    asGroup,
+    // No flag: same playlist as before this feature (published, one item per slide).
+    createPlaylist: asGroup ? body.createPlaylist === true : body.createPlaylist !== false,
+    playbackMode: normalizePlaybackMode(body.playbackMode) ?? (asGroup ? "auto" : "manual"),
     playlistName: normalizePlaylistName(body.playlistName) ?? (stem.slice(0, 80) || "Presentation"),
-    replace: body.replace === true,
   };
 }

@@ -342,7 +342,7 @@ function AddToPlaylist({ item, onClose, onAdded }: { item: MediaItem; onClose: (
     try {
       await api(`/api/media/presentation/${item.id}/playlist`, {
         method: "POST",
-        body: JSON.stringify({ playlistId: playlistId || undefined, name: playlistId ? undefined : item.fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "") }),
+        body: JSON.stringify({ asGroup: true, playlistId: playlistId || undefined, name: playlistId ? undefined : item.fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "") }),
       });
       onAdded();
     } catch (err) {

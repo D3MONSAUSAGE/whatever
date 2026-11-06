@@ -111,45 +111,81 @@ function accountFromPath(storagePath: string) {
   return isUuid(id) ? id : null;
 }
 
+type SnapshotRow = {
+  parent_id: string;
+  file_name?: string | null;
+  group_revision?: number | null;
+  group_duration_ms?: number | null;
+  processing_status?: string | null;
+  account_id?: string | null;
+  slide_id?: string | null;
+  storage_path?: string | null;
+  slide_index?: number | null;
+  slide_revision?: number | null;
+  slide_duration_ms?: number | null;
+  width?: number | null;
+  height?: number | null;
+};
+
 /**
  * Replace each presentation playlist row with its committed slides, in order.
+ * Parent and children are read in one statement (`presentation_group_snapshot`)
+ * so a commit cannot land between the two reads.
  * A row that is not a presentation is returned unchanged.
- * Slides that are still processing on a brand-new group are omitted.
- * A replace in progress keeps the previously committed revision.
  */
 export async function expandPresentationRows(rows: ExpandableRow[]): Promise<ExpandedRow[] | "error"> {
   const parents = rows.filter((row) => row.kind === "presentation");
   if (!parents.length) return rows;
 
-  const ids = [...new Set(parents.map((row) => row.mediaId))];
-  const parentQuery = await db()
-    .from("media")
-    .select("id, file_name, group_revision, group_duration_ms, processing_status, account_id")
-    .in("id", ids);
-  if (parentQuery.error) {
-    if (isMissingSchema(parentQuery.error)) {
-      return rows.filter((row) => row.kind !== "presentation");
-    }
-    return "error";
-  }
-  const parentById = new Map<string, ParentRow>((parentQuery.data ?? []).map((row) => [String(row.id), row as ParentRow]));
-
-  const slideQuery = await db()
-    .from("media")
-    .select("id, source_media_id, storage_path, slide_index, slide_revision, slide_duration_ms, width, height, account_id")
-    .in("source_media_id", ids);
-  if (slideQuery.error) {
-    if (isMissingSchema(slideQuery.error)) {
-      return rows.filter((row) => row.kind !== "presentation");
-    }
-    return "error";
+  const idsByAccount = new Map<string, string[]>();
+  for (const row of parents) {
+    const accountId = accountFromPath(row.storagePath);
+    if (!accountId) continue;
+    const list = idsByAccount.get(accountId) ?? [];
+    if (!list.includes(row.mediaId)) list.push(row.mediaId);
+    idsByAccount.set(accountId, list);
   }
 
+  const snapshot: SnapshotRow[] = [];
+  for (const [accountId, ids] of idsByAccount) {
+    const query = await db().rpc("presentation_group_snapshot", {
+      p_account_id: accountId,
+      p_media_ids: ids,
+    });
+    if (query.error) {
+      if (isMissingSchema(query.error)) return rows.filter((row) => row.kind !== "presentation");
+      return "error";
+    }
+    snapshot.push(...((query.data ?? []) as SnapshotRow[]));
+  }
+
+  const parentById = new Map<string, ParentRow>();
   const slidesByParent = new Map<string, SlideRow[]>();
-  for (const slide of (slideQuery.data ?? []) as SlideRow[]) {
-    const parentId = String(slide.source_media_id ?? "");
+  for (const row of snapshot) {
+    const parentId = String(row.parent_id);
+    if (!parentById.has(parentId)) {
+      parentById.set(parentId, {
+        id: parentId,
+        file_name: row.file_name,
+        group_revision: row.group_revision,
+        group_duration_ms: row.group_duration_ms,
+        processing_status: row.processing_status,
+        account_id: row.account_id,
+      });
+    }
+    if (!row.slide_id) continue;
     const list = slidesByParent.get(parentId) ?? [];
-    list.push(slide);
+    list.push({
+      id: String(row.slide_id),
+      source_media_id: parentId,
+      storage_path: row.storage_path,
+      slide_index: row.slide_index,
+      slide_revision: row.slide_revision,
+      slide_duration_ms: row.slide_duration_ms,
+      width: row.width,
+      height: row.height,
+      account_id: row.account_id,
+    });
     slidesByParent.set(parentId, list);
   }
 

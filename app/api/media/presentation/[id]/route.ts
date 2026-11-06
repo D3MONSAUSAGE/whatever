@@ -134,7 +134,7 @@ async function loadDetail(accountId: string, id: string) {
     mimeType: String(row.mime_type ?? ""),
     sizeBytes: Number(row.size_bytes ?? 0),
     createdAt: row.created_at ?? null,
-    updatedAt: row.updated_at ?? row.created_at ?? null,
+    updatedAt: row.updated_at ?? null,
     width: row.width ?? null,
     height: row.height ?? null,
     processingStatus: row.processing_status ?? (slides.length ? "ready" : "pending"),

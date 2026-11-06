@@ -12,8 +12,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Add a presentation to a playlist as one item, or create a new playlist for it.
- * `expandSlides: true` keeps the pre-group behavior (one playlist item per slide).
+ * Add a presentation to a playlist.
+ * Without `asGroup: true` this matches the original upload: a published playlist
+ * with one item per slide. The website sends `asGroup: true` for one draft item.
  */
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req);
@@ -37,18 +38,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const body = await readJson(req);
-  const playbackMode = normalizePlaybackMode(body.playbackMode) ?? (body.expandSlides === true ? "manual" : "auto");
+  const asGroup = body.asGroup === true;
+  const playbackMode = normalizePlaybackMode(body.playbackMode) ?? (asGroup ? "auto" : "manual");
   const name = normalizePlaylistName(body.name)
     ?? (String(source.data.file_name || "Presentation").replace(/\.pptx$/i, "").replace(/\.pdf$/i, "").slice(0, 80) || "Presentation");
   const duration = Number(source.data.group_duration_ms ?? GROUP_DEFAULT_DURATION_MS);
 
-  if (isUuid(body.playlistId)) {
+  if (asGroup && isUuid(body.playlistId)) {
     const appended = await appendGroup(admin.accountId, String(body.playlistId), id, duration);
     if (appended instanceof Response) return appended;
     return json({ id: body.playlistId, playbackMode, asGroup: true }, 201);
   }
 
-  if (body.expandSlides === true || !groups) {
+  if (!asGroup || !groups) {
     const created = await db().rpc("presentation_create_playlist", {
       p_account_id: admin.accountId,
       p_source_media_id: id,
