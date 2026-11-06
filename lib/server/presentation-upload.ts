@@ -55,7 +55,7 @@ class LostClaim extends Error {
   }
 }
 
-const HEARTBEAT_MS = 20_000;
+export const HEARTBEAT_MS = 20_000;
 
 export function deckErrorMessage(reason: PptxFailure, detail?: string, format?: DeckFormat | null) {
   if (format?.ext === "pdf" || (!format && detail)) {
@@ -132,18 +132,21 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
     generation = claimed.generation;
   }
 
-  const stopHeartbeat = startHeartbeat(input.accountId, input.mediaId, token);
+  const beat = startClaimHeartbeat(input.accountId, input.mediaId, token);
   let committedRevision = revision;
   let warnings: string[] = [];
   try {
     await discardOwned(input.accountId, input.mediaId, token);
+    if (beat.lost()) throw new LostClaim();
 
     const converted = format.ext === "pdf"
       ? await convertPdf(bytes, async (done, total) => {
         await touch(input.accountId, input.mediaId, token, { processing_done: done, slide_count: total });
+        if (beat.lost()) throw new LostClaim();
       })
       : await convertPptx(bytes);
 
+    if (beat.lost()) throw new LostClaim();
     if (!converted.ok) {
       await failOwned(input.accountId, input.mediaId, token, revision, deckErrorMessage(converted.reason, converted.detail, format));
       const status = converted.reason === "size" ? 413 : converted.reason === "macros" || converted.reason === "type" ? 415 : 400;
@@ -154,6 +157,7 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
 
     try {
       for (const slide of converted.slides) {
+        if (beat.lost()) throw new LostClaim();
         await storeSlide(input.accountId, input.mediaId, input.fileName, slide, generation, token);
         await touch(input.accountId, input.mediaId, token, {
           processing_done: slide.index + 1,
@@ -165,6 +169,8 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
       return fail("Couldn't save that presentation. Try again.", err instanceof LostClaim ? 409 : 500);
     }
 
+    if (beat.lost()) throw new LostClaim();
+    beat.stop();
     const first = converted.slides[0];
     const committed = await db().rpc("presentation_commit_group", {
       p_account_id: input.accountId,
@@ -187,8 +193,12 @@ export async function completeGroupedUpload(input: GroupCompleteInput): Promise<
 
     committedRevision = Number(committed.data);
     warnings = converted.warnings;
+  } catch (err) {
+    if (!(err instanceof LostClaim)) throw err;
+    await failOwned(input.accountId, input.mediaId, token, revision, "Couldn't save that presentation. Try again.");
+    return fail("Couldn't save that presentation. Try again.", 409);
   } finally {
-    stopHeartbeat();
+    beat.stop();
   }
 
   const slides = await listCommitted(input.accountId, input.mediaId, committedRevision);
@@ -264,15 +274,48 @@ async function claim(accountId: string, mediaId: string, expectedRevision: numbe
   };
 }
 
-function startHeartbeat(accountId: string, mediaId: string, token: string) {
+/**
+ * Renews the claim on a timer. The PostgREST builder does nothing until
+ * something calls `.then()`, so each tick must consume the request.
+ * `lost()` becomes true when the database says this token no longer owns the row.
+ */
+export function startClaimHeartbeat(accountId: string, mediaId: string, token: string) {
+  let stopped = false;
+  let claimLost = false;
   const timer = setInterval(() => {
-    void db().rpc("presentation_claim_heartbeat", {
+    if (stopped || claimLost) return;
+    const request = db().rpc("presentation_claim_heartbeat", {
       p_account_id: accountId,
       p_media_id: mediaId,
       p_token: token,
     });
+    void request.then((result) => {
+      if (stopped) return;
+      const row = result as { data?: boolean | null; error?: { message?: string } | null };
+      if (row.error) {
+        console.error("presentation claim heartbeat failed", { mediaId, error: row.error.message ?? "request failed" });
+        return;
+      }
+      if (row.data === false) {
+        claimLost = true;
+        clearInterval(timer);
+        console.error("presentation claim was lost", { mediaId });
+      }
+    }, (err: unknown) => {
+      if (stopped) return;
+      console.error("presentation claim heartbeat failed", {
+        mediaId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }, HEARTBEAT_MS);
-  return () => clearInterval(timer);
+  return {
+    lost: () => claimLost,
+    stop: () => {
+      stopped = true;
+      clearInterval(timer);
+    },
+  };
 }
 
 async function discardOwned(accountId: string, mediaId: string, token: string) {
