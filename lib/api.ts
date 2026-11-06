@@ -11,6 +11,27 @@ export type MediaItem = {
   sourceMediaId?: string | null;
   slideIndex?: number | null;
   usedIn?: MediaUse[];
+  slideCount?: number | null;
+  processingStatus?: "pending" | "processing" | "ready" | "failed" | null;
+  processingError?: string | null;
+  processingDone?: number | null;
+  defaultDurationMs?: number | null;
+  updatedAt?: string | null;
+  coverUrl?: string | null;
+};
+
+export type PresentationSlide = {
+  id: string; fileName: string; index: number; url: string | null;
+  width: number | null; height: number | null; durationMs: number | null;
+};
+
+export type PresentationDetail = {
+  id: string; fileName: string; mimeType: string; sizeBytes: number;
+  createdAt: string | null; updatedAt: string | null;
+  width: number | null; height: number | null;
+  processingStatus: string; processingError: string | null;
+  processingDone: number; slideCount: number; defaultDurationMs: number;
+  coverUrl: string | null; usedIn: MediaUse[]; slides: PresentationSlide[];
 };
 export type DisplayItem = {
   id: string; name: string; connected: boolean; online: boolean; lastSeenAt: string | null;
@@ -57,7 +78,12 @@ export type PlaylistSummary = {
 export type PlaylistDetail = {
   id: string; name: string; defaultDurationMs: number; transition: "none" | "fade"; playbackMode: "auto" | "manual";
   publishedAt: string | null; publishedTransition: "none" | "fade" | null; publishedPlaybackMode?: "auto" | "manual" | null; revision: number; updatedAt: string;
-  items: { id: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl?: string | null; kind?: "image" | "video"; mediaDurationMs?: number | null; durationMs: number | null; position: number }[];
+  items: {
+    id: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl?: string | null;
+    kind?: "image" | "video" | "presentation"; mediaDurationMs?: number | null; durationMs: number | null; position: number;
+    slideCount?: number; groupDurationMs?: number | null;
+    slides?: { id: string; fileName: string; index: number; url: string | null; width: number | null; height: number | null; durationMs: number | null }[];
+  }[];
   displays: { id: string; name: string; assigned: boolean }[];
 };
 

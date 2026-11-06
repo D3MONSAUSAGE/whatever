@@ -41,7 +41,7 @@ export async function signAll(paths: string[], seconds = 3600) {
   return urls;
 }
 
-export type ListQuery = { limit: number; offset: number; q: string; kind: string; unused: boolean; sort: string };
+export type ListQuery = { limit: number; offset: number; q: string; kind: string; unused: boolean; sort: string; grouped: boolean };
 const OPT_IN = ["limit", "offset", "q", "kind", "unused", "sort"];
 export const MAX_PAGE = 200;
 export const DEFAULT_PAGE = 50;
@@ -61,6 +61,7 @@ export function parseListQuery(req: Request): ListQuery | null {
     kind: (p.get("kind") ?? "").trim().toLowerCase(),
     unused: p.get("unused") === "1" || p.get("unused") === "true",
     sort: (p.get("sort") ?? "").trim().toLowerCase(),
+    grouped: p.get("grouped") === "1",
   };
 }
 

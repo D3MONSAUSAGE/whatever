@@ -151,6 +151,8 @@ Same `403` / `404` rules as command.
 | Phone → server | Endpoints above |
 | Server → TV | `commands: [{ "seq": 13, "command": "next" }]` on every `GET /api/player/state` (including `unchanged`) |
 | TV → server | `POST /api/player/state` with `{ "playback": { "playlistId", "playbackMode", "index", "count", "version", "lastAppliedSeq" } }` |
+
+`index` and `count` are positions in the list the TV is showing. A presentation group is expanded into its slides before that list is built, so Next/Previous moves one slide. Optional item fields `groupId`, `groupIndex`, and `groupCount` describe where that slide sits inside the group. See [PRESENTATION_GROUPS.md](./PRESENTATION_GROUPS.md).
 | Poll interval | `pollMs` ≈ 1500 in Manual (or while commands pending); otherwise existing auto poll |
 
 Local TV Previous/Next and keyboard still work; they also report `playback` so phones stay in sync.

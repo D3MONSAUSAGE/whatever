@@ -58,6 +58,17 @@ export function parseDurationMs(input: unknown): number | null | "invalid" {
   return input;
 }
 
+/**
+ * Item durations. Images and videos stay within 1–600s (enforced again in
+ * save_playlist). Presentations may be up to 3600s; the route checks the kind.
+ */
+export function parseItemDurationMs(input: unknown): number | null | "invalid" {
+  if (input === null) return null;
+  if (typeof input !== "number" || !Number.isInteger(input)) return "invalid";
+  if (input < PLAYLIST_MIN_DURATION_MS || input > 3_600_000) return "invalid";
+  return input;
+}
+
 export type DraftSlide = { mediaId: string; durationMs: number | null };
 
 export function parseDraftItems(input: unknown): DraftSlide[] | null {
@@ -67,7 +78,7 @@ export function parseDraftItems(input: unknown): DraftSlide[] | null {
     if (!entry || typeof entry !== "object") return null;
     const mediaId = (entry as { mediaId?: unknown }).mediaId;
     if (!isUuid(mediaId)) return null;
-    const durationMs = parseDurationMs((entry as { durationMs?: unknown }).durationMs);
+    const durationMs = parseItemDurationMs((entry as { durationMs?: unknown }).durationMs);
     if (durationMs === "invalid") return null;
     items.push({ mediaId, durationMs });
   }

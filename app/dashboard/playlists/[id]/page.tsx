@@ -13,13 +13,17 @@ import { IconList } from "@/components/icons";
 
 type Slide = {
   key: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl: string | null;
-  kind: "image" | "video"; mediaDurationMs: number | null; seconds: string;
+  kind: "image" | "video" | "presentation"; mediaDurationMs: number | null; seconds: string;
+  slideCount?: number;
+  groupDurationMs?: number | null;
+  parts?: { url: string | null; fileName: string; durationMs: number | null; width: number | null; height: number | null }[];
 };
 
-export default function PlaylistEditor() {
+export default function PlaylistEditor({ seed }: { seed?: PlaylistDetail } = {}) {
   const params = useParams<{ id: string }>();
-  const id = params.id;
-  const playlist = useApi<PlaylistDetail>(`/api/playlists/${id}`);
+  const id = seed?.id ?? params.id;
+  const live = useApi<PlaylistDetail>(seed ? null : `/api/playlists/${id}`);
+  const playlist = seed ? { data: seed, error: null, reload: async () => {} } : live;
   const toast = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -49,9 +53,18 @@ export default function PlaylistEditor() {
       fileName: item.fileName,
       url: item.url,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      kind: item.kind === "video" ? "video" : "image",
+      kind: item.kind === "video" ? "video" : item.kind === "presentation" ? "presentation" : "image",
       mediaDurationMs: item.mediaDurationMs ?? null,
       seconds: item.durationMs == null ? "" : String(Math.round(item.durationMs / 1000)),
+      slideCount: item.slideCount,
+      groupDurationMs: item.groupDurationMs ?? null,
+      parts: item.slides?.map((slide) => ({
+        url: slide.url,
+        fileName: slide.fileName,
+        durationMs: slide.durationMs,
+        width: slide.width,
+        height: slide.height,
+      })),
     })));
     const next: Record<string, boolean> = {};
     for (const display of data.displays) next[display.id] = display.assigned;
@@ -61,19 +74,37 @@ export default function PlaylistEditor() {
 
   const defaultMs = Math.round(Number(defaultSeconds) * 1000);
   const previewSlides = useMemo(
-    () => slides.filter((slide) => slide.url).map((slide) => ({
-      url: slide.url as string,
-      fileName: slide.fileName,
-      kind: slide.kind,
-      thumbnailUrl: slide.thumbnailUrl,
-      durationMs: slide.kind === "video"
-        ? (slide.mediaDurationMs && slide.mediaDurationMs >= 500 ? slide.mediaDurationMs : 5000)
-        : slide.seconds.trim() === "" || !Number.isFinite(Number(slide.seconds))
-          ? (Number.isFinite(defaultMs) && defaultMs >= 1000 ? defaultMs : 10000)
-          : Math.round(Number(slide.seconds) * 1000),
-    })),
+    () => slides.flatMap((slide) => {
+      const base = slide.seconds.trim() === "" || !Number.isFinite(Number(slide.seconds))
+        ? (Number.isFinite(defaultMs) && defaultMs >= 1000 ? defaultMs : 10000)
+        : Math.round(Number(slide.seconds) * 1000);
+      if (slide.kind === "presentation") {
+        const parts = (slide.parts ?? []).filter((part) => part.url);
+        if (!parts.length && slide.url) {
+          return [{ url: slide.url, fileName: slide.fileName, kind: "image" as const, thumbnailUrl: slide.thumbnailUrl, durationMs: Math.max(3000, base) }];
+        }
+        return parts.map((part) => ({
+          url: part.url as string,
+          fileName: part.fileName,
+          kind: "image" as const,
+          thumbnailUrl: null,
+          durationMs: part.durationMs ?? Math.max(3000, base),
+        }));
+      }
+      if (!slide.url) return [];
+      return [{
+        url: slide.url,
+        fileName: slide.fileName,
+        kind: slide.kind,
+        thumbnailUrl: slide.thumbnailUrl,
+        durationMs: slide.kind === "video"
+          ? (slide.mediaDurationMs && slide.mediaDurationMs >= 500 ? slide.mediaDurationMs : 5000)
+          : base,
+      }];
+    }),
     [slides, defaultMs],
   );
+  const estimatedMs = previewSlides.reduce((sum, slide) => sum + (slide.kind === "video" ? slide.durationMs : slide.durationMs), 0);
 
   function payload() {
     const items = slides.map((slide) => ({
@@ -94,8 +125,15 @@ export default function PlaylistEditor() {
     if (!Number.isInteger(body.defaultDurationMs) || body.defaultDurationMs < 1000 || body.defaultDurationMs > 600000) {
       return "Default duration must be between 1 and 600 seconds.";
     }
-    for (const item of body.items) {
-      if (item.durationMs !== null && (!Number.isInteger(item.durationMs) || item.durationMs < 1000 || item.durationMs > 600000)) {
+    for (let index = 0; index < body.items.length; index++) {
+      const item = body.items[index];
+      const slide = slides[index];
+      if (item.durationMs === null) continue;
+      if (slide?.kind === "presentation") {
+        if (!Number.isInteger(item.durationMs) || item.durationMs < 3000 || item.durationMs > 3_600_000) {
+          return "Each presentation stays between 3 and 3600 seconds per slide.";
+        }
+      } else if (!Number.isInteger(item.durationMs) || item.durationMs < 1000 || item.durationMs > 600000) {
         return "Each slide must be between 1 and 600 seconds, or left blank to use the default.";
       }
     }
@@ -251,7 +289,7 @@ export default function PlaylistEditor() {
               </div>
             </div>
             <div className="mb-3"><LimitNote count={slides.length} max={MAX_SLIDES} noun="slides in a playlist" /></div>
-            <p className="text-sm text-muted mb-3">Drag a slide to reorder. On a phone, use Up and Down.</p>
+            <p className="text-sm text-muted mb-3">Drag a slide to reorder. On a phone, use Up and Down. Estimated length {formatClock(estimatedMs)}.</p>
             {slides.length === 0 ? (
               <p className="text-sm text-muted">Nothing in this playlist yet. Add images or videos from your library.</p>
             ) : (
@@ -276,13 +314,13 @@ export default function PlaylistEditor() {
                       )}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{index + 1}. {slide.fileName}</p>
+                      <p className="font-medium truncate">{index + 1}. {slide.fileName}{slide.kind === "presentation" ? ` · ${slide.slideCount ?? slide.parts?.length ?? 0} slides` : ""}</p>
                       {slide.kind === "video" ? (
                         <p className="mt-2 text-sm text-muted">Plays until the end{slide.mediaDurationMs ? ` (${Math.round(slide.mediaDurationMs / 1000)}s)` : ""}.</p>
                       ) : (
                         <label className="mt-2 grid gap-1">
-                          <span className="text-xs text-muted">Seconds (blank uses the default)</span>
-                          <input className="field" type="number" min={1} max={600} inputMode="numeric"
+                          <span className="text-xs text-muted">{slide.kind === "presentation" ? "Seconds for each slide (blank uses the playlist default). Slides with their own time keep it." : "Seconds (blank uses the default)"}</span>
+                          <input className="field" type="number" min={slide.kind === "presentation" ? 3 : 1} max={slide.kind === "presentation" ? 3600 : 600} inputMode="numeric"
                             aria-label={`Seconds for ${slide.fileName}`} placeholder={defaultSeconds || "10"}
                             value={slide.seconds}
                             onChange={(event) => setSlides(slides.map((row, i) => i === index ? { ...row, seconds: event.target.value } : row))} />
@@ -374,6 +412,13 @@ export default function PlaylistEditor() {
   );
 }
 
+function formatClock(ms: number) {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes ? `${minutes}m ${rest}s` : `${rest}s`;
+}
+
 function Preview({ slides, transition, playbackMode, label, large = false }: {
   slides: { url: string; fileName: string; durationMs: number; kind: "image" | "video"; thumbnailUrl: string | null }[];
   transition: "none" | "fade";
@@ -447,6 +492,15 @@ function AddImages({ existing, onClose, onAdd }: {
 }) {
   const media = useApi<MediaItem[]>("/api/media");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [openDeck, setOpenDeck] = useState<string | null>(null);
+  const [deckSlides, setDeckSlides] = useState<Record<string, { id: string; fileName: string; url: string | null }[]>>({});
+  const rows = (media.data ?? []).filter((item) => !item.sourceMediaId);
+  async function showSlides(id: string) {
+    setOpenDeck(openDeck === id ? null : id);
+    if (deckSlides[id]) return;
+    const detail = await api<{ slides: { id: string; fileName: string; url: string | null }[] }>(`/api/media/presentation/${id}`);
+    setDeckSlides((current) => ({ ...current, [id]: detail.slides }));
+  }
   return (
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
       <div role="dialog" aria-label="Add images" className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
@@ -455,16 +509,18 @@ function AddImages({ existing, onClose, onAdd }: {
           <h2 className="text-lg font-semibold">Add images</h2>
           <button type="button" className="btn btn-quiet px-3" onClick={onClose}>Close</button>
         </div>
-        {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : media.data.length === 0 ? (
+        {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : rows.length === 0 ? (
           <p className="text-muted">Upload an image in Media first.</p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {media.data.map((item) => (
+            {rows.map((item) => (
               <li key={item.id}>
                 <label className="block">
                   <span className="block aspect-video bg-black rounded-md overflow-hidden">
                     {item.kind === "video" ? (
                       item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">Video</span>
+                    ) : item.kind === "presentation" ? (
+                      item.coverUrl ? <img src={item.coverUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">Presentation</span>
                     ) : (
                       item.url && <img src={item.url} alt="" className="size-full object-contain" />
                     )}
@@ -472,25 +528,56 @@ function AddImages({ existing, onClose, onAdd }: {
                   <span className="mt-1 flex items-center gap-2 text-sm min-h-11">
                     <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]}
                       onChange={(event) => setPicked({ ...picked, [item.id]: event.target.checked })} />
-                    <span className="truncate">{item.fileName}</span>
+                    <span className="truncate">{item.fileName}{item.kind === "presentation" ? ` (${item.slideCount ?? 0})` : ""}</span>
                   </span>
                 </label>
+                {item.kind === "presentation" ? (
+                  <button type="button" className="text-sm text-primary underline mt-1" onClick={() => void showSlides(item.id)}>Choose individual slides</button>
+                ) : null}
+                {openDeck === item.id ? (
+                  <ul className="mt-2 grid gap-1">
+                    {(deckSlides[item.id] ?? []).map((slide) => (
+                      <li key={slide.id}>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" className="size-4" aria-label={slide.fileName} checked={!!picked[slide.id]}
+                            onChange={(event) => setPicked({ ...picked, [slide.id]: event.target.checked })} />
+                          <span className="truncate">{slide.fileName}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
         <button type="button" className="btn btn-primary w-full mt-5" onClick={() => {
-          const chosen = (media.data ?? []).filter((item) => picked[item.id]);
-          onAdd(chosen.map((item) => ({
-            key: `${item.id}-${existing.length}-${Math.random().toString(36).slice(2, 8)}`,
-            mediaId: item.id,
-            fileName: item.fileName,
-            url: item.url,
-            thumbnailUrl: item.thumbnailUrl ?? null,
-            kind: item.kind === "video" ? "video" : "image",
-            mediaDurationMs: item.durationMs ?? null,
-            seconds: "",
-          })));
+          const chosen = rows.filter((item) => picked[item.id]);
+          const singles = Object.entries(deckSlides).flatMap(([, slides]) => slides.filter((slide) => picked[slide.id]));
+          onAdd([
+            ...chosen.map((item) => ({
+              key: `${item.id}-${existing.length}-${Math.random().toString(36).slice(2, 8)}`,
+              mediaId: item.id,
+              fileName: item.fileName,
+              url: item.kind === "presentation" ? item.coverUrl ?? null : item.url,
+              thumbnailUrl: item.thumbnailUrl ?? null,
+              kind: item.kind === "video" ? "video" as const : item.kind === "presentation" ? "presentation" as const : "image" as const,
+              mediaDurationMs: item.durationMs ?? null,
+              seconds: item.kind === "presentation" && item.defaultDurationMs ? String(Math.round(item.defaultDurationMs / 1000)) : "",
+              slideCount: item.slideCount ?? undefined,
+              groupDurationMs: item.defaultDurationMs ?? null,
+            })),
+            ...singles.map((slide) => ({
+              key: `${slide.id}-${existing.length}-${Math.random().toString(36).slice(2, 8)}`,
+              mediaId: slide.id,
+              fileName: slide.fileName,
+              url: slide.url,
+              thumbnailUrl: null,
+              kind: "image" as const,
+              mediaDurationMs: null,
+              seconds: "",
+            })),
+          ]);
         }}>Add selected</button>
       </div>
     </div>

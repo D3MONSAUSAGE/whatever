@@ -494,8 +494,10 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     if (!rawName) return null;
     const source = store.media.find((item) => item.id === sourceId && item.account_id === accountId && item.kind === "presentation");
     if (!source) return null;
+    const revision = Number(source.group_revision ?? 0);
     const slides = store.media
       .filter((item) => item.account_id === accountId && item.source_media_id === sourceId && (item.kind == null || item.kind === "image"))
+      .filter((item) => revision <= 0 ? item.slide_revision == null : Number(item.slide_revision) === revision)
       .sort((a, b) => Number(a.slide_index) - Number(b.slide_index));
     if (!slides.length || slides.length > 40) return null;
     const id = crypto.randomUUID();
@@ -531,6 +533,75 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     return id;
   }
 
+  if (name === "presentation_commit_group") {
+    const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+    if (!media || media.kind !== "presentation") return null;
+    const expected = Number(args.p_expected_revision);
+    if (Number(media.group_revision ?? 0) !== expected) return null;
+    const next = expected + 1;
+    const slides = store.media.filter((item) => item.account_id === args.p_account_id && item.source_media_id === media.id && Number(item.slide_revision) === next);
+    if (slides.length !== Number(args.p_slide_count)) return null;
+    media.group_revision = next;
+    media.processing_status = "ready";
+    media.processing_error = null;
+    media.processing_done = Number(args.p_slide_count);
+    media.slide_count = Number(args.p_slide_count);
+    media.width = args.p_width;
+    media.height = args.p_height;
+    media.size_bytes = args.p_size_bytes;
+    media.file_name = args.p_file_name;
+    media.mime_type = args.p_mime_type;
+    if (args.p_storage_path) media.storage_path = args.p_storage_path;
+    if (media.group_duration_ms == null) media.group_duration_ms = 10000;
+    media.updated_at = new Date().toISOString();
+    const playlistIds = new Set(
+      store.playlist_items.filter((item) => item.media_id === media.id && item.kind === "published").map((item) => item.playlist_id),
+    );
+    for (const playlist of store.playlists) {
+      if (playlistIds.has(playlist.id)) {
+        playlist.revision = Number(playlist.revision ?? 0) + 1;
+        playlist.updated_at = media.updated_at;
+      }
+    }
+    for (const display of store.displays) {
+      if (display.account_id === args.p_account_id && display.status === "active" && playlistIds.has(display.assigned_playlist_id)) {
+        display.content_version = Number(display.content_version) + 1;
+      }
+    }
+    return next;
+  }
+
+  if (name === "delete_presentation_group") {
+    const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+    if (!media || media.kind !== "presentation") return null;
+    const drop = store.media.filter((item) => item.account_id === args.p_account_id && (item.id === media.id || item.source_media_id === media.id));
+    const ids = new Set(drop.map((item) => item.id));
+    const lists = [...new Set(store.playlist_items.filter((item) => ids.has(item.media_id)).map((item) => String(item.playlist_id)))];
+    const published = [...new Set(store.playlist_items.filter((item) => ids.has(item.media_id) && item.kind === "published").map((item) => String(item.playlist_id)))];
+    store.playlist_items = store.playlist_items.filter((item) => !ids.has(item.media_id));
+    for (const playlistId of lists) {
+      for (const kind of ["draft", "published"]) {
+        const rows = store.playlist_items
+          .filter((item) => item.playlist_id === playlistId && item.kind === kind)
+          .sort((a, b) => Number(a.position) - Number(b.position));
+        rows.forEach((item, index) => { item.position = index; });
+      }
+    }
+    for (const playlist of store.playlists) {
+      if (published.includes(String(playlist.id))) playlist.revision = Number(playlist.revision ?? 0) + 1;
+    }
+    for (const display of store.displays) {
+      if (display.account_id !== args.p_account_id) continue;
+      const showing = ids.has(display.assigned_media_id);
+      const playing = display.status === "active" && published.includes(String(display.assigned_playlist_id));
+      if (showing) display.assigned_media_id = null;
+      if (showing || playing) display.content_version = Number(display.content_version) + 1;
+    }
+    const paths = drop.flatMap((item) => [item.storage_path, item.thumbnail_path].filter(Boolean).map(String));
+    store.media = store.media.filter((item) => !ids.has(item.id));
+    return paths;
+  }
+
   throw new Error(`Unknown rpc ${name}`);
 }
 
@@ -545,8 +616,14 @@ function savePlaylist(store: Store, args: Record<string, unknown>) {
   if (transition !== "none" && transition !== "fade") return false;
   if (!items || items.length > 40) return false;
   for (const item of items) {
-    if (!store.media.some((media) => media.id === item.mediaId && media.account_id === args.p_account_id)) return false;
-    if (item.durationMs != null && (!Number.isInteger(item.durationMs) || item.durationMs < 1000 || item.durationMs > 600000)) return false;
+    const media = store.media.find((row) => row.id === item.mediaId && row.account_id === args.p_account_id);
+    if (!media) return false;
+    if (item.durationMs != null) {
+      const presentation = media.kind === "presentation";
+      const min = presentation ? 3000 : 1000;
+      const max = presentation ? 3600000 : 600000;
+      if (!Number.isInteger(item.durationMs) || item.durationMs < min || item.durationMs > max) return false;
+    }
   }
   playlist.name = name;
   playlist.default_duration_ms = duration;
@@ -680,7 +757,7 @@ function playerPlaylist(store: Store, args: Record<string, unknown>) {
         media_id: item.media_id,
         storage_path: media?.storage_path ?? null,
         duration_ms: item.duration_ms,
-        kind: media?.kind === "video" ? "video" : "image",
+        kind: media?.kind === "video" ? "video" : media?.kind === "presentation" ? "presentation" : "image",
         width: media?.width ?? null,
         height: media?.height ?? null,
         media_duration_ms: media?.duration_ms ?? null,

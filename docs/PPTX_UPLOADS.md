@@ -1,8 +1,11 @@
 # PowerPoint (.pptx) uploads
 
-Customers upload a `.pptx` in the Media library. Pekko converts it into ordered
-slide images, keeps the original file linked, and can create a **Manual
-slideshow** playlist in one step (PR #38 / #39).
+Customers upload a `.pptx` or PDF in the Media library. After migration
+`0019_presentation_groups.sql`, that file is **one presentation group**.
+Slides, durations, playlists, and the player are described in
+[PRESENTATION_GROUPS.md](./PRESENTATION_GROUPS.md). The notes below describe
+the original per-slide conversion that still runs when `0019` is not applied,
+and when a caller passes `expandSlides: true`.
 
 ## Conversion method (cost: $0)
 
