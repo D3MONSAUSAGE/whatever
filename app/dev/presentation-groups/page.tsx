@@ -3,7 +3,7 @@ import { notFound, useSearchParams } from "next/navigation";
 import { DashboardShell } from "@/components/shell";
 import { MediaLibrary } from "@/components/media-library";
 import { PresentationDetailView } from "@/components/presentation-detail";
-import PlaylistEditor from "@/app/dashboard/playlists/[id]/page";
+import { PlaylistEditor } from "@/components/playlist-editor";
 import type { MediaItem, PlaylistDetail, PresentationDetail } from "@/lib/api";
 
 const cover = "/marketing/tv-menu.webp";
