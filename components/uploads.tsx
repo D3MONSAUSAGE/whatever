@@ -57,21 +57,19 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
     setBusy(true);
     let failed = 0;
     let firstError = "";
-    let lastPlaylistId: string | null = null;
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
       const key = queue[index].key;
       const detail =
         kind === "image" ? "Preparing image…"
         : kind === "video" ? "Checking video…"
-        : "Checking PowerPoint…";
+        : "Checking presentation…";
       patch(key, { state: "active", detail });
       try {
         if (kind === "image") await uploadImage(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
         else if (kind === "video") await uploadVideo(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
         else {
           const result = await uploadPresentation(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
-          lastPlaylistId = result.playlistId;
           patch(key, { playlistId: result.playlistId });
         }
         patch(key, { state: "done", progress: 100, detail: "Uploaded" });
@@ -83,9 +81,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       }
     }
     if (failed === 0) {
-      if (kind === "presentation" && files.length === 1 && lastPlaylistId) {
-        toast.show("Presentation ready. Open the new Manual playlist to publish it.");
-      } else if (kind === "presentation") {
+      if (kind === "presentation") {
         toast.show(files.length === 1 ? "Presentation uploaded" : `Uploaded ${files.length} presentations`);
       } else {
         toast.show(files.length === 1 ? "Uploaded" : `Uploaded ${files.length} files`);
@@ -125,7 +121,7 @@ export function UploadProgress() {
   const active = jobs.some((job) => job.state === "queued" || job.state === "active");
   return (
     <ul className="card mb-6 divide-y divide-line" aria-label="Upload progress">
-      {active ? <li className="px-4 py-2 text-xs text-muted">Uploads keep going if you open another page. Leaving the site stops them. PowerPoint conversion can take a minute.</li> : null}
+      {active ? <li className="px-4 py-2 text-xs text-muted">Uploads keep going if you open another page. Leaving the site stops them. Presentation conversion can take a minute.</li> : null}
       {jobs.map((job) => (
         <li key={job.key} className="px-4 py-3">
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -189,36 +185,80 @@ async function uploadVideo(file: File, onProgress: (progress: number, detail: st
 
 async function uploadPresentation(file: File, onProgress: (progress: number, detail: string) => void) {
   const name = file.name || "presentation.pptx";
-  if (!/\.pptx$/i.test(name)) throw new Error("Upload a .pptx PowerPoint file. Older .ppt files aren't supported yet.");
+  const pdf = /\.pdf$/i.test(name);
+  if (!pdf && !/\.pptx$/i.test(name)) throw new Error("Upload a .pptx PowerPoint file or a PDF. Older .ppt files aren't supported yet.");
   if (/\.pptm$/i.test(name)) throw new Error("Macro-enabled PowerPoint files (.pptm) aren't supported. Save as .pptx without macros.");
-  if (file.size > PPTX_MAX) throw new Error("PowerPoint files must be 50 MB or smaller.");
-  if (file.size <= 0) throw new Error("That PowerPoint file is empty.");
+  if (file.size > PPTX_MAX) throw new Error("Presentation files must be 50 MB or smaller.");
+  if (file.size <= 0) throw new Error("That file is empty.");
 
   onProgress(5, "Starting upload…");
   const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/presentation", {
     method: "POST",
     body: JSON.stringify({ fileName: name, sizeBytes: file.size }),
   });
-  onProgress(10, "Uploading PowerPoint…");
+  onProgress(10, pdf ? "Uploading PDF…" : "Uploading PowerPoint…");
   await uploadToSignedUrl(
     signed.signedUrl,
     file,
-    (progress) => onProgress(Math.max(10, Math.min(55, 10 + progress * 0.45)), "Uploading PowerPoint…"),
+    (progress) => onProgress(Math.max(10, Math.min(55, 10 + progress * 0.45)), pdf ? "Uploading PDF…" : "Uploading PowerPoint…"),
     name,
   );
   onProgress(60, "Converting slides…");
-  const done = await api<{ id: string; slideCount: number; playlistId: string | null; warnings?: string[] }>(
-    "/api/media/presentation/complete",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        mediaId: signed.mediaId,
-        fileName: name,
-        createPlaylist: true,
-        playbackMode: "manual",
-      }),
-    },
-  );
+  const done = await finishPresentation(signed.mediaId, name, onProgress);
   onProgress(100, done.slideCount === 1 ? "1 slide ready" : `${done.slideCount} slides ready`);
   return { playlistId: done.playlistId };
+}
+
+async function finishPresentation(
+  mediaId: string,
+  fileName: string,
+  onProgress: (progress: number, detail: string) => void,
+) {
+  const token = await authToken();
+  let stop = false;
+  const watch = (async () => {
+    while (!stop) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (stop) return;
+      try {
+        const status = await api<{ processingStatus?: string; processingDone?: number; slideCount?: number; processingError?: string | null }>(
+          `/api/media/presentation/${mediaId}`,
+        );
+        const total = Number(status.slideCount ?? 0);
+        const done = Number(status.processingDone ?? 0);
+        if (status.processingStatus === "ready") {
+          onProgress(96, total === 1 ? "1 slide ready" : `${total} slides ready`);
+          return;
+        }
+        const percent = total > 0 ? 60 + Math.round(35 * Math.min(1, done / total)) : 64;
+        onProgress(percent, total > 0 ? `Saving slide ${Math.min(done + 1, total)} of ${total}` : "Converting slides…");
+      } catch {
+        onProgress(64, "Converting slides…");
+      }
+    }
+  })();
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await fetch("/api/media/presentation/complete", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mediaId, fileName, asGroup: true, createPlaylist: false }),
+      });
+      const payload = await res.json().catch(() => ({})) as { error?: string; slideCount?: number; playlistId?: string | null; processingStatus?: string };
+      if (res.status === 202) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        continue;
+      }
+      if (res.ok) return { slideCount: Number(payload.slideCount ?? 0), playlistId: payload.playlistId ?? null };
+      if (res.status >= 500 && attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        continue;
+      }
+      throw new Error(payload.error || "Couldn't convert that presentation.");
+    }
+  } finally {
+    stop = true;
+    await watch.catch(() => undefined);
+  }
+  throw new Error("Couldn't convert that presentation.");
 }

@@ -601,8 +601,17 @@
   }
   function updateManualPos() {
     var pos = el('manual-pos');
+    var item, within, overall;
     if (!pos || !playlist) return;
-    pos.innerHTML = (slideIndex + 1) + ' / ' + playlist.items.length;
+    item = playlist.items[slideIndex];
+    overall = (slideIndex + 1) + ' / ' + playlist.items.length;
+    // Expanded presentation slides count as their own steps for manual and remote.
+    if (item && item.groupCount > 1) {
+      within = (item.groupIndex + 1) + '/' + item.groupCount;
+      pos.innerHTML = playlist.items.length === item.groupCount ? within : within + ' · ' + overall;
+      return;
+    }
+    pos.innerHTML = overall;
   }
   function hideManualUi(force) {
     if (manualHideTimer) { clearTimeout(manualHideTimer); manualHideTimer = null; }
@@ -840,14 +849,26 @@
     img.onload = function () { pinUrl(item, src); commit(); };
     img.onerror = function () {
       if (token !== slideToken) return;
-      if (src.indexOf('blob:') === 0) dropBlob(item.mediaId);
-      dropPin(item);
-      needRefresh = true;
-      clearSlideTimer();
-      slideTimer = setTimeout(function () {
-        if (token !== slideToken) return;
+      // A stale cached blob is tried once. A slide that still fails is skipped
+      // so a missing image cannot freeze the loop.
+      if (src.indexOf('blob:') === 0 && !item.blobRetried) {
+        item.blobRetried = 1;
+        dropBlob(item.mediaId);
+        dropPin(item);
+        needRefresh = true;
+        clearSlideTimer();
         present(index, versionOrNull);
-      }, 3000);
+        return;
+      }
+      dropPin(item);
+      markBad(item);
+      reportError('A slide did not load and was skipped.');
+      clearSlideTimer();
+      if (!playlist) return;
+      slideTimer = setTimeout(function () {
+        if (token !== slideToken || !playlist) return;
+        present((index + 1) % playlist.items.length, null);
+      }, 0);
     };
     img.src = src;
   }
@@ -864,24 +885,32 @@
     needRefresh = false;
     urlRefreshAt = new Date().getTime() + 1800000;
   }
+  function copyGroup(row, it) {
+    if (!it || !it.groupId) return row;
+    row.groupId = it.groupId;
+    row.groupIndex = typeof it.groupIndex === 'number' ? it.groupIndex : 0;
+    row.groupCount = typeof it.groupCount === 'number' ? it.groupCount : 0;
+    return row;
+  }
   function beginPlaylist(version, incoming) {
-    var items = [], list = incoming.items || [], i, it, ms, startAt = 0, keepId = '', mode;
+    var items = [], list = incoming.items || [], i, it, ms, startAt = 0, keepId = '', mode, row;
     mode = incoming && incoming.playbackMode === 'manual' ? 'manual' : 'auto';
     for (i = 0; i < list.length; i++) {
       it = list[i];
       ms = it && it.durationMs;
       if (!it || !it.url) continue;
       if (it.kind === 'video') {
-        items.push({ url: it.url, durationMs: typeof ms === 'number' ? ms : 0, mediaId: it.mediaId || '', kind: 'video' });
+        items.push(copyGroup({ url: it.url, durationMs: typeof ms === 'number' ? ms : 0, mediaId: it.mediaId || '', kind: 'video' }, it));
         continue;
       }
       // Manual images may omit a usable duration; still show them.
       if (mode === 'manual') {
-        items.push({ url: it.url, durationMs: typeof ms === 'number' && ms >= 1000 ? ms : 10000, mediaId: it.mediaId || '', kind: 'image' });
+        row = { url: it.url, durationMs: typeof ms === 'number' && ms >= 1000 ? ms : 10000, mediaId: it.mediaId || '', kind: 'image' };
+        items.push(copyGroup(row, it));
         continue;
       }
       if (typeof ms !== 'number' || ms < 1000) continue;
-      items.push({ url: it.url, durationMs: ms, mediaId: it.mediaId || '', kind: 'image' });
+      items.push(copyGroup({ url: it.url, durationMs: ms, mediaId: it.mediaId || '', kind: 'image' }, it));
     }
     if (!items.length) return;
     if (playlist && shownVersion === version && playlist.id === (incoming.id || '')) {

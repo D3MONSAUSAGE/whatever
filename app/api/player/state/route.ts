@@ -5,6 +5,7 @@ import { fail, json, readJson } from "@/lib/server/http";
 import { readPlaybackSchedule } from "@/lib/server/playback";
 import { isMissingSchema } from "@/lib/server/schema";
 import { playerPollMs } from "@/lib/server/limits";
+import { expandPresentationRows } from "@/lib/server/presentation-groups";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,6 +44,11 @@ type PlaylistItem = {
   kind: "image" | "video";
   width: number | null;
   height: number | null;
+  /** Set only on slides expanded from a presentation group. Older players ignore these. */
+  groupId?: string;
+  groupName?: string;
+  groupIndex?: number;
+  groupCount?: number;
 };
 type PlaylistPayload = { id: string; transition: "none" | "fade"; playbackMode: "auto" | "manual"; items: PlaylistItem[] };
 type PlaylistRow = {
@@ -254,30 +260,69 @@ async function publishedPlaylist(tokenHash: string): Promise<PlaylistPayload | n
 }
 
 async function signPlaylist(rows: PlaylistRow[]): Promise<PlaylistPayload | null | "error"> {
+  const expanded = await expandPresentationRows(rows.map((item) => ({
+    playlistId: item.playlist_id,
+    transition: item.transition,
+    playbackMode: item.playback_mode ?? null,
+    position: item.position,
+    mediaId: item.media_id,
+    storagePath: item.storage_path,
+    durationMs: item.duration_ms,
+    kind: item.kind ?? null,
+    width: typeof item.width === "number" ? item.width : null,
+    height: typeof item.height === "number" ? item.height : null,
+  })));
+  if (expanded === "error") return "error";
+  if (!expanded.length) return null;
 
-  const paths = [...new Set(rows.map((item) => item.storage_path).filter(Boolean))];
+  const paths = [...new Set(expanded.map((item) => item.storagePath).filter(Boolean))];
   const { data: signed, error: signErr } = await db().storage.from(BUCKET).createSignedUrls(paths, URL_TTL_SECONDS);
   if (signErr || !signed) return "error";
   const urls = new Map<string, string>();
   signed.forEach((item) => item.path && item.signedUrl && urls.set(item.path, item.signedUrl));
 
   const items: PlaylistItem[] = [];
-  for (const item of rows) {
-    const url = urls.get(item.storage_path);
-    if (!url || typeof item.duration_ms !== "number") return "error";
-    items.push({
-      mediaId: item.media_id,
+  for (const item of expanded) {
+    const url = urls.get(item.storagePath);
+    if (!url || typeof item.durationMs !== "number") {
+      if (item.groupId) continue;
+      return "error";
+    }
+    const entry: PlaylistItem = {
+      mediaId: item.mediaId,
       url,
-      durationMs: item.duration_ms,
+      durationMs: item.durationMs,
       kind: item.kind === "video" ? "video" : "image",
       width: typeof item.width === "number" ? item.width : null,
       height: typeof item.height === "number" ? item.height : null,
+    };
+    if (item.groupId) {
+      entry.groupId = item.groupId;
+      entry.groupName = item.groupName;
+      entry.groupIndex = item.groupIndex;
+      entry.groupCount = item.groupCount;
+    }
+    items.push(entry);
+  }
+  if (!items.length) return null;
+  // Recount a group after a missing slide was dropped so manual/remote indexes stay aligned.
+  const byGroup = new Map<string, PlaylistItem[]>();
+  for (const item of items) {
+    if (!item.groupId) continue;
+    const list = byGroup.get(item.groupId) ?? [];
+    list.push(item);
+    byGroup.set(item.groupId, list);
+  }
+  for (const list of byGroup.values()) {
+    list.forEach((item, index) => {
+      item.groupIndex = index;
+      item.groupCount = list.length;
     });
   }
   return {
-    id: rows[0].playlist_id,
-    transition: rows[0].transition === "fade" ? "fade" : "none",
-    playbackMode: rows[0].playback_mode === "manual" ? "manual" : "auto",
+    id: expanded[0].playlistId,
+    transition: expanded[0].transition === "fade" ? "fade" : "none",
+    playbackMode: expanded[0].playbackMode === "manual" ? "manual" : "auto",
     items,
   };
 }

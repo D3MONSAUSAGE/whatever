@@ -32,6 +32,7 @@ async function call(handler: (req: Request, ctx?: { params: Promise<{ id: string
     ? await handler(new Request(url, init), { params: Promise.resolve({ id }) })
     : await handler(new Request(url, init));
   const body = await res.json().catch(() => null);
+  await new Promise((resolve) => setImmediate(resolve));
   return { status: res.status, body: body as Record<string, unknown> };
 }
 
@@ -48,7 +49,7 @@ describe("PowerPoint upload API", () => {
     expect(res.status).toBe(413);
   });
 
-  it("converts a staged .pptx into ordered slides and a Manual playlist", async () => {
+  it("without asGroup, finish still publishes a per-slide manual playlist", async () => {
     const bytes = fixture("pekko-demo-16x9.pptx");
     const started = await call(startPresentation, "http://localhost/api/media/presentation", auth({
       fileName: "demo.pptx",
@@ -67,12 +68,13 @@ describe("PowerPoint upload API", () => {
     }));
     expect(done.status).toBe(201);
     expect(done.body.slideCount).toBe(4);
+    expect(done.body.asGroup).toBe(false);
     expect(Array.isArray(done.body.slideIds)).toBe(true);
     expect((done.body.slideIds as string[]).length).toBe(4);
     expect(done.body.playlistId).toBeTruthy();
 
     const source = store.media.find((row) => row.id === mediaId);
-    expect(source).toMatchObject({ kind: "presentation", account_id: expect.any(String) });
+    expect(source).toMatchObject({ kind: "presentation", processing_status: "ready", slide_count: 4 });
     const slides = store.media
       .filter((row) => row.source_media_id === mediaId)
       .sort((a, b) => Number(a.slide_index) - Number(b.slide_index));
@@ -84,7 +86,8 @@ describe("PowerPoint upload API", () => {
     const items = store.playlist_items
       .filter((row) => row.playlist_id === playlist?.id && row.kind === "published")
       .sort((a, b) => Number(a.position) - Number(b.position));
-    expect(items.map((item) => item.media_id)).toEqual(slides.map((s) => s.id));
+    expect(items.map((item) => item.media_id)).toEqual(slides.map((slide) => slide.id));
+    expect(store.playlist_items.some((row) => row.media_id === mediaId)).toBe(false);
   }, 120_000);
 
   it("creates a playlist later from an existing presentation", async () => {

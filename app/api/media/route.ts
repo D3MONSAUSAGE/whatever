@@ -58,6 +58,7 @@ export async function GET(req: Request) {
     else if (k === "promo") list = list.filter((r) => isPromoFile(r.file_name));
     else if (k === "upload") list = list.filter((r) => !isMenuFile(r.file_name) && !isPromoFile(r.file_name));
     if (query.unused) list = list.filter((r) => !(usage?.get(r.id)?.length));
+    if (query.grouped) list = list.filter((r) => !r.source_media_id);
     if (query.sort === "oldest") list.reverse();
     else if (query.sort === "name") list.sort((x, y) => x.file_name.localeCompare(y.file_name, undefined, { sensitivity: "base" }));
     else if (query.sort === "size") list.sort((x, y) => y.size_bytes - x.size_bytes);
@@ -69,25 +70,95 @@ export async function GET(req: Request) {
     rows = page.items.map((r) => byId.get(r.id)).filter((r): r is MediaRow => Boolean(r));
   }
 
+  const presentationIds = rows.filter((row) => row.kind === "presentation").map((row) => row.id);
+  const groupMeta = new Map<string, GroupMeta>();
+  const childIds = new Map<string, string[]>();
+  if (presentationIds.length) {
+    const meta = await db()
+      .from("media")
+      .select("id, processing_status, processing_error, processing_done, slide_count, group_duration_ms, group_revision, updated_at")
+      .eq("account_id", admin.accountId)
+      .in("id", presentationIds);
+    if (!meta.error) {
+      for (const row of meta.data ?? []) groupMeta.set(String(row.id), row as GroupMeta);
+    }
+    const children = await db()
+      .from("media")
+      .select("id, source_media_id, storage_path, slide_index, slide_revision")
+      .eq("account_id", admin.accountId)
+      .in("source_media_id", presentationIds);
+    if (!children.error) {
+      for (const child of children.data ?? []) {
+        const parentId = String(child.source_media_id);
+        const list = childIds.get(parentId) ?? [];
+        list.push(String(child.id));
+        childIds.set(parentId, list);
+        const metaRow = groupMeta.get(parentId);
+        const revision = Number(metaRow?.group_revision ?? 0);
+        const current = revision <= 0 ? child.slide_revision == null : Number(child.slide_revision) === revision;
+        if (current && Number(child.slide_index) === 0 && child.storage_path) {
+          const existing = groupMeta.get(parentId) ?? {};
+          groupMeta.set(parentId, { ...existing, cover_path: String(child.storage_path) });
+        }
+      }
+    }
+  }
+
   const urls = await signAll(rows.flatMap((row) => [row.storage_path, row.thumbnail_path].filter(Boolean)) as string[]);
-  const items = rows.map((r) => ({
-    id: r.id,
-    fileName: r.file_name,
-    sizeBytes: r.size_bytes,
-    createdAt: r.created_at,
-    url: r.kind === "presentation" ? null : urls.get(r.storage_path) ?? null,
-    kind: r.kind === "video" ? "video" : r.kind === "presentation" ? "presentation" : "image",
-    durationMs: r.duration_ms ?? null,
-    width: r.width ?? null,
-    height: r.height ?? null,
-    thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
-    sourceMediaId: r.source_media_id ?? null,
-    slideIndex: r.slide_index ?? null,
-    usedIn: usage?.get(r.id) ?? [],
-  }));
+  const coverPaths = [...groupMeta.values()].map((row) => row.cover_path).filter((path): path is string => Boolean(path));
+  if (coverPaths.length) {
+    const covers = await signAll(coverPaths);
+    covers.forEach((url, path) => urls.set(path, url));
+  }
+  const items = rows.map((r) => {
+    const group = r.kind === "presentation" ? groupMeta.get(r.id) : undefined;
+    const used = new Map((usage?.get(r.id) ?? []).map((playlist) => [playlist.id, playlist]));
+    if (group) {
+      for (const childId of childIds.get(r.id) ?? []) {
+        for (const playlist of usage?.get(childId) ?? []) used.set(playlist.id, playlist);
+      }
+    }
+    const base = {
+      id: r.id,
+      fileName: r.file_name,
+      sizeBytes: r.size_bytes,
+      createdAt: r.created_at,
+      url: r.kind === "presentation" ? null : urls.get(r.storage_path) ?? null,
+      kind: r.kind === "video" ? "video" : r.kind === "presentation" ? "presentation" : "image",
+      durationMs: r.duration_ms ?? null,
+      width: r.width ?? null,
+      height: r.height ?? null,
+      thumbnailUrl: r.thumbnail_path ? urls.get(r.thumbnail_path) ?? null : null,
+      sourceMediaId: r.source_media_id ?? null,
+      slideIndex: r.slide_index ?? null,
+      usedIn: [...used.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    };
+    if (!group && r.kind !== "presentation") return base;
+    return {
+      ...base,
+      slideCount: group?.slide_count ?? null,
+      processingStatus: group?.processing_status ?? null,
+      processingError: group?.processing_error ?? null,
+      processingDone: group?.processing_done ?? null,
+      defaultDurationMs: group?.group_duration_ms ?? null,
+      updatedAt: group?.updated_at ?? null,
+      coverUrl: group?.cover_path ? urls.get(group.cover_path) ?? null : null,
+    };
+  });
   if (!page) return json(items);
   return json({ items, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
 }
+
+type GroupMeta = {
+  processing_status?: string | null;
+  processing_error?: string | null;
+  processing_done?: number | null;
+  slide_count?: number | null;
+  group_duration_ms?: number | null;
+  group_revision?: number | null;
+  updated_at?: string | null;
+  cover_path?: string;
+};
 
 type MediaRow = {
   id: string;

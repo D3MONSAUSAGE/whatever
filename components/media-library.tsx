@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, formatDuration, formatSize, type MediaItem } from "@/lib/api";
+import { api, formatDuration, formatSize, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
@@ -26,7 +26,7 @@ function usePagedMedia(enabled: boolean, query: string, sort: SortKey, kind: Kin
     return () => clearTimeout(t);
   }, [query]);
   const url = useCallback((offset: number) => {
-    const p = new URLSearchParams({ limit: String(MEDIA_PAGE_SIZE), offset: String(offset), sort });
+    const p = new URLSearchParams({ limit: String(MEDIA_PAGE_SIZE), offset: String(offset), sort, grouped: "1" });
     if (debounced) p.set("q", debounced);
     if (kind) p.set("kind", kind);
     if (unused) p.set("unused", "1");
@@ -73,6 +73,8 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
   const toast = useToast();
   const confirm = useConfirm();
   const wasBusy = useRef(false);
+  const [renaming, setRenaming] = useState<MediaItem | null>(null);
+  const [adding, setAdding] = useState<MediaItem | null>(null);
 
   useEffect(() => {
     if (fixture) return;
@@ -80,11 +82,34 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
     wasBusy.current = uploads.busy;
   }, [uploads.busy, fixture, reload]);
 
-  const visible = useMemo(() => (fixture ? sortMedia(fixture, query, sort) : data ?? []), [fixture, data, query, sort]);
+  const visible = useMemo(() => {
+    const rows = fixture ? sortMedia(fixture, query, sort) : data ?? [];
+    return rows.filter((item) => !item.sourceMediaId);
+  }, [fixture, data, query, sort]);
   const libraryEmpty = fixture ? fixture.length === 0 : live.page !== null && live.page.total === 0 && !live.filtering;
 
   async function remove(item: MediaItem) {
     const used = item.usedIn ?? [];
+    if (item.kind === "presentation") {
+      const names = formatNameList(used.map((playlist) => playlist.name));
+      const ok = await confirm.ask({
+        title: "Delete this presentation?",
+        body: used.length
+          ? `Delete “${item.fileName}” and its ${item.slideCount ?? ""} slides? It will be removed from ${names}. Screens drop it the next time they check in.`
+          : `Delete “${item.fileName}” and its slides? This cannot be undone.`,
+        confirmLabel: "Delete presentation",
+        danger: true,
+      });
+      if (ok !== true) return;
+      try {
+        await api(`/api/media/${item.id}?detach=1`, { method: "DELETE" });
+        toast.show("Deleted");
+        reload();
+      } catch (err) {
+        toast.show((err as Error).message, true);
+      }
+      return;
+    }
     if (used.length) {
       const names = formatNameList(used.map((playlist) => playlist.name));
       await confirm.ask({
@@ -115,15 +140,15 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Media library" icon={<IconImage />} lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller. PowerPoint (.pptx) up to 50 MB becomes ordered slide images and a Manual playlist.">
+      <PageHeader title="Media library" icon={<IconImage />} lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.">
         <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
           Upload image
           <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}
             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "image"); }} />
         </label>
         <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
-          Upload PowerPoint
-          <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="sr-only" disabled={uploads.busy}
+          Upload presentation
+          <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="sr-only" disabled={uploads.busy}
             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "presentation"); }} />
         </label>
         <Link href="/dashboard/media/menus" className="btn btn-quiet">Make a menu board</Link>
@@ -139,7 +164,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
         <LoadState error={error} label="Loading…" />
       ) : libraryEmpty ? (
         <EmptyState title="No images yet">
-          Upload a JPG, PNG, WebP, H.264 MP4, or a .pptx PowerPoint. Menus exported from Canva at 1920 × 1080 work well.
+          Upload a JPG, PNG, WebP, H.264 MP4, PowerPoint (.pptx), or PDF. Menus exported from Canva at 1920 × 1080 work well.
         </EmptyState>
       ) : (
         <>
@@ -150,7 +175,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
                 <option value="">All files</option>
                 <option value="image">Images</option>
                 <option value="video">Videos</option>
-                <option value="presentation">PowerPoint</option>
+                <option value="presentation">Presentations</option>
                 <option value="upload">My uploads</option>
                 <option value="menu">Menu boards</option>
                 <option value="promo">Promos</option>
@@ -183,7 +208,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
                   <div className="p-3 flex flex-col gap-2 flex-1">
                     <p className="text-sm font-medium break-words">{item.fileName}</p>
                     <Meta item={item} />
-                    <button type="button" className="btn btn-quiet text-danger mt-auto" onClick={() => remove(item)}>Delete</button>
+                    <ItemActions item={item} onDelete={() => remove(item)} onRename={() => setRenaming(item)} onAdd={() => setAdding(item)} />
                   </div>
                 </li>
               ))}
@@ -197,7 +222,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
                     <p className="font-medium break-words">{item.fileName}</p>
                     <div className="mt-1"><Meta item={item} /></div>
                   </div>
-                  <button type="button" className="btn btn-quiet text-danger" onClick={() => remove(item)}>Delete</button>
+                  <ItemActions item={item} onDelete={() => remove(item)} onRename={() => setRenaming(item)} onAdd={() => setAdding(item)} />
                 </li>
               ))}
             </ul>
@@ -214,6 +239,8 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
           ) : null}
         </>
       )}
+      {renaming ? <RenameDialog item={renaming} onClose={() => setRenaming(null)} onSaved={() => { setRenaming(null); toast.show("Renamed"); reload(); }} /> : null}
+      {adding ? <AddToPlaylist item={adding} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); toast.show("Added to playlist"); reload(); }} /> : null}
       {toast.node}
       {confirm.node}
     </section>
@@ -230,11 +257,12 @@ function Thumb({ item }: { item: MediaItem }) {
     return <video poster={poster} src={item.url || undefined} muted playsInline preload="none" controls className="block aspect-video w-full bg-black object-contain" />;
   }
   if (item.kind === "presentation") {
+    const cover = item.coverUrl || item.thumbnailUrl;
     return (
-      <div className="flex aspect-video w-full flex-col items-center justify-center bg-black text-center text-sm text-white px-3">
-        PowerPoint
-        {item.width && item.height ? <span className="block text-xs text-muted mt-1">{item.width}×{item.height} slides</span> : null}
-      </div>
+      <Link href={`/dashboard/media/presentations/${item.id}`} className="relative block aspect-video w-full overflow-hidden bg-black" data-presentation-card="">
+        {cover ? <img src={cover} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-sm text-white">Presentation</span>}
+        <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">Presentation</span>
+      </Link>
     );
   }
   return (
@@ -245,15 +273,98 @@ function Thumb({ item }: { item: MediaItem }) {
 }
 
 function Meta({ item }: { item: MediaItem }) {
+  const when = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "";
+  const status = item.processingStatus === "processing" ? "Processing" : item.processingStatus === "failed" ? "Failed" : item.kind === "presentation" ? "Ready" : "";
   return (
     <p className="text-xs text-muted flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="badge">{item.kind === "video" ? "Video" : item.kind === "presentation" ? "PowerPoint" : item.slideIndex != null ? `Slide ${(item.slideIndex ?? 0) + 1}` : "Image"}</span>
-      <span>
-        {item.kind === "video" && item.durationMs ? `${formatDuration(item.durationMs)} · ` : ""}
-        {formatSize(item.sizeBytes)}
-      </span>
+      <span className="badge">{item.kind === "video" ? "Video" : item.kind === "presentation" ? "Presentation" : item.slideIndex != null ? `Slide ${(item.slideIndex ?? 0) + 1}` : "Image"}</span>
+      {item.kind === "presentation" ? (
+        <span>{item.slideCount ?? 0} slides · {Math.round((item.defaultDurationMs ?? 10000) / 1000)}s each{status ? ` · ${status}` : ""}{when ? ` · ${when}` : ""}</span>
+      ) : (
+        <span>
+          {item.kind === "video" && item.durationMs ? `${formatDuration(item.durationMs)} · ` : ""}
+          {formatSize(item.sizeBytes)}
+        </span>
+      )}
       {item.usedIn && item.usedIn.length > 0 ? <span>In {formatNameList(item.usedIn.map((playlist) => playlist.name))}</span> : null}
     </p>
+  );
+}
+
+function ItemActions({ item, onDelete, onRename, onAdd }: { item: MediaItem; onDelete: () => void; onRename: () => void; onAdd: () => void }) {
+  if (item.kind !== "presentation") {
+    return <button type="button" className="btn btn-quiet text-danger mt-auto" onClick={onDelete}>Delete</button>;
+  }
+  return (
+    <div className="mt-auto flex flex-wrap gap-2">
+      <Link href={`/dashboard/media/presentations/${item.id}`} className="btn btn-quiet">Preview</Link>
+      <button type="button" className="btn btn-quiet" onClick={onRename}>Rename</button>
+      <button type="button" className="btn btn-quiet" onClick={onAdd} disabled={item.processingStatus === "processing" || item.processingStatus === "failed"}>Add to playlist</button>
+      <button type="button" className="btn btn-quiet text-danger" onClick={onDelete}>Delete</button>
+    </div>
+  );
+}
+
+function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(item.fileName);
+  const [error, setError] = useState<string | null>(null);
+  async function save() {
+    try {
+      await api(`/api/media/presentation/${item.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
+      <div role="dialog" aria-label="Rename presentation" className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-3">Rename presentation</h2>
+        <input className="field" aria-label="Presentation name" value={name} onChange={(event) => setName(event.target.value)} />
+        {error ? <p className="text-sm text-danger mt-2">{error}</p> : null}
+        <div className="mt-4 flex gap-2">
+          <button type="button" className="btn btn-primary" onClick={() => void save()}>Save</button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddToPlaylist({ item, onClose, onAdded }: { item: MediaItem; onClose: () => void; onAdded: () => void }) {
+  const [lists, setLists] = useState<PlaylistSummary[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [playlistId, setPlaylistId] = useState("");
+  useEffect(() => {
+    void api<PlaylistSummary[]>("/api/playlists").then(setLists).catch((err) => setError((err as Error).message));
+  }, []);
+  async function add() {
+    try {
+      await api(`/api/media/presentation/${item.id}/playlist`, {
+        method: "POST",
+        body: JSON.stringify({ asGroup: true, playlistId: playlistId || undefined, name: playlistId ? undefined : item.fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "") }),
+      });
+      onAdded();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  return (
+    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
+      <div role="dialog" aria-label="Add presentation to playlist" className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-3">Add to playlist</h2>
+        <p className="text-sm text-muted mb-3">The presentation is one item. Screens play its slides in order, then continue.</p>
+        <select className="field" aria-label="Playlist" value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
+          <option value="">New playlist</option>
+          {(lists ?? []).map((playlist) => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
+        </select>
+        {error ? <p className="text-sm text-danger mt-2">{error}</p> : null}
+        <div className="mt-4 flex gap-2">
+          <button type="button" className="btn btn-primary" onClick={() => void add()}>Add</button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
