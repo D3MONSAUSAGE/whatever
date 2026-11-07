@@ -20,12 +20,13 @@ describe.skipIf(!local)("stripe webhook events (local database)", () => {
     const { data: u } = await db.auth.admin.createUser({ email: `pantalla-rls-${randomUUID()}@mailinator.com`, password: `${randomUUID()}Aa1!`, email_confirm: true });
     users.push(u.user!.id);
     const { data: acct } = await db.rpc("ensure_account", { p_user_id: u.user!.id, p_name: "Shop" });
-    const ev = { id: `evt_${randomUUID()}`, type: "customer.subscription.created", livemode: false,
+    const ev = { id: `evt_${randomUUID()}`, type: "customer.subscription.created", created: Math.floor(Date.now() / 1000), livemode: false,
       data: { object: { id: `sub_${randomUUID()}`, customer: `cus_${randomUUID()}`, status: "active", cancel_at_period_end: false,
         current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { account_id: acct },
         items: { data: [{ price: { id: "price_biz_test" } }] } } } } as unknown as Stripe.Event;
-    expect(await applyEvent(ev)).toBe(true);
-    expect(await applyEvent(ev)).toBe(false);
+    const fetchSubscription = async () => ev.data.object as Stripe.Subscription;
+    expect(await applyEvent(ev, { fetchSubscription })).toBe(true);
+    expect(await applyEvent(ev, { fetchSubscription })).toBe(false);
     const { data: e } = await db.rpc("account_entitlement", { p_account: acct });
     expect(e[0]).toMatchObject({ state: "active", plan: "business", screen_limit: 3 });
   });
