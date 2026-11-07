@@ -3,7 +3,6 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { GROUPS_UNAVAILABLE, parseGroupDurationMs, presentationGroupsReady } from "@/lib/server/presentation-groups";
-import { playlistsUsingMedia } from "@/lib/server/media-usage";
 import { normalizeFileName } from "@/lib/server/validate";
 
 export const runtime = "nodejs";
@@ -17,9 +16,7 @@ export async function GET(req: Request, ctx: Ctx) {
   if (!(await presentationGroupsReady())) return fail(GROUPS_UNAVAILABLE, 503);
   const { id } = await ctx.params;
   if (!isUuid(id)) return fail("Presentation not found.", 404);
-  const detail = await loadDetail(admin.accountId, id);
-  if (detail instanceof Response) return detail;
-  return json(detail);
+  return loadDetail(admin.accountId, id);
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
@@ -84,12 +81,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
   }
 
-  const detail = await loadDetail(admin.accountId, id);
-  if (detail instanceof Response) return detail;
-  return json(detail);
+  return loadDetail(admin.accountId, id);
 }
 
 async function loadDetail(accountId: string, id: string) {
+  const dbStarted = performance.now();
   const parent = await db()
     .from("media")
     .select("id, kind, file_name, storage_path, mime_type, size_bytes, created_at, updated_at, width, height, processing_status, processing_error, processing_done, slide_count, group_duration_ms, group_revision")
@@ -103,7 +99,7 @@ async function loadDetail(accountId: string, id: string) {
   const revision = Number(row.group_revision ?? 0);
   const slidesQuery = await db()
     .from("media")
-    .select("id, file_name, storage_path, slide_index, slide_revision, slide_duration_ms, width, height")
+    .select("id, file_name, storage_path, thumbnail_path, slide_index, slide_revision, slide_duration_ms, width, height")
     .eq("account_id", accountId)
     .eq("source_media_id", id)
     .order("slide_index", { ascending: true });
@@ -112,23 +108,35 @@ async function loadDetail(accountId: string, id: string) {
     if (revision <= 0) return slide.slide_revision == null;
     return Number(slide.slide_revision) === revision;
   });
-  const paths = slides.map((slide) => String(slide.storage_path)).filter(Boolean);
+  const usedIds = [id, ...slides.map((slide) => String(slide.id))];
+  const usedRows = await db()
+    .from("playlist_items")
+    .select("playlist_id")
+    .eq("account_id", accountId)
+    .in("media_id", usedIds);
+  if (usedRows.error) return fail("Couldn't load that presentation.", 500);
+  const playlistIds = [...new Set((usedRows.data ?? []).map((item) => String(item.playlist_id)))];
+  const used = new Map<string, { id: string; name: string }>();
+  if (playlistIds.length) {
+    const names = await db().from("playlists").select("id, name").eq("account_id", accountId).in("id", playlistIds);
+    if (names.error) return fail("Couldn't load that presentation.", 500);
+    for (const playlist of names.data ?? []) used.set(String(playlist.id), { id: String(playlist.id), name: String(playlist.name) });
+  }
+  const dbMs = performance.now() - dbStarted;
+
+  const paths = slides.flatMap((slide) => [slide.storage_path, slide.thumbnail_path].filter(Boolean).map(String));
+  const signStarted = performance.now();
   const urls = new Map<string, string>();
   if (paths.length) {
-    const signed = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
+    const signed = await db().storage.from(BUCKET).createSignedUrls(paths, 86_400);
     signed.data?.forEach((item) => item.path && item.signedUrl && urls.set(item.path, item.signedUrl));
   }
+  const signMs = performance.now() - signStarted;
   const cover = slides[0];
-  const usedIds = [id, ...slides.map((slide) => String(slide.id))];
-  const used = new Map<string, { id: string; name: string }>();
-  for (const mediaId of usedIds) {
-    const lists = await playlistsUsingMedia(accountId, mediaId);
-    if (lists === null) return fail("Couldn't load that presentation.", 500);
-    for (const list of lists) used.set(list.id, list);
-  }
 
-  return {
+  return json({
     id,
+    accountId,
     fileName: String(row.file_name ?? "Presentation"),
     originalFileName: String(row.file_name ?? "Presentation"),
     mimeType: String(row.mime_type ?? ""),
@@ -149,9 +157,12 @@ async function loadDetail(accountId: string, id: string) {
       fileName: String(slide.file_name ?? "Slide"),
       index: Number(slide.slide_index ?? 0),
       url: urls.get(String(slide.storage_path)) ?? null,
+      thumbnailUrl: slide.thumbnail_path ? urls.get(String(slide.thumbnail_path)) ?? null : null,
       width: slide.width ?? null,
       height: slide.height ?? null,
       durationMs: slide.slide_duration_ms ?? null,
     })),
-  };
+  }, 200, {
+    "Server-Timing": `db;dur=${dbMs.toFixed(1)}, sign;dur=${signMs.toFixed(1)}`,
+  });
 }
