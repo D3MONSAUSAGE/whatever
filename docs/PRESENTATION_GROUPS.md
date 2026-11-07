@@ -159,7 +159,7 @@ A playlist that already lists slide images (the pre-group PowerPoint flow) is no
 | `.pptx` | `pptx-glimpse` | MIT |
 | `.pdf` | `pdfjs-dist` + `@napi-rs/canvas` | Apache-2.0 + MIT |
 
-No LibreOffice and no paid conversion API. Animations, transitions, and embedded video become still images. Password-protected PDFs are rejected. Text uses the Liberation fonts shipped with pdf.js.
+No LibreOffice and no paid conversion API. Animations, transitions, and embedded video become still images. Password-protected PDFs are rejected. Text uses the Liberation fonts shipped with pdf.js. Node runs pdf.js in-process, but it still loads `pdf.worker.mjs`. That file and the `@napi-rs/canvas` linux-x64-gnu binary are included in the finish route's serverless trace.
 
 ## Where `kind: "presentation"` can appear
 

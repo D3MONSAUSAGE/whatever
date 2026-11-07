@@ -20,7 +20,11 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfjs-dist/standard_fonts/**",
       "./node_modules/pdfjs-dist/cmaps/**",
       "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+      // Node disables the worker thread but still imports this file for the fake worker.
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/@napi-rs/canvas/**",
+      // Optional native package. The loader require() is inside try/catch, so the tracer skips it.
+      "./node_modules/@napi-rs/canvas-linux-x64-gnu/**",
     ],
   },
   // Lint runs as `npm run lint`. Skipping it here avoids a warning about the Next.js ESLint plugin.

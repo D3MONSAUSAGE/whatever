@@ -41,6 +41,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      - run: node scripts/check-pdf-trace.mjs
       - name: Playwright e2e
         env:
           BASE_URL: ${{ secrets.BASE_URL }}
