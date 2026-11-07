@@ -136,6 +136,7 @@ async function loadDetail(accountId: string, id: string) {
 
   return json({
     id,
+    accountId,
     fileName: String(row.file_name ?? "Presentation"),
     originalFileName: String(row.file_name ?? "Presentation"),
     mimeType: String(row.mime_type ?? ""),

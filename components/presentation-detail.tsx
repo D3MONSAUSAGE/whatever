@@ -7,6 +7,8 @@ import { useConfirm } from "@/components/confirm";
 import { LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { IconImage } from "@/components/icons";
 import { useRouter } from "next/navigation";
+import { getSupabase } from "@/lib/supabase-browser";
+import { assetPathFromUrl, rememberSlideSrc, type SlideSrcScope } from "@/lib/slide-src-cache";
 
 export function PresentationDetailView({ id, fixture }: { id?: string; fixture?: PresentationDetail }) {
   const [data, setData] = useState<PresentationDetail | null>(fixture ?? null);
@@ -18,6 +20,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
   const [stageReady, setStageReady] = useState(false);
   const [lists, setLists] = useState<PlaylistSummary[] | null>(null);
   const [playlistId, setPlaylistId] = useState("");
+  const [viewer, setViewer] = useState<SlideSrcScope | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -42,12 +45,26 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
   useEffect(() => { setStageReady(false); }, [preview, data?.id]);
 
   useEffect(() => {
+    const orgId = data?.accountId;
+    if (!orgId || fixture) {
+      setViewer(null);
+      return;
+    }
+    let stop = false;
+    getSupabase().auth.getSession().then(({ data: session }) => {
+      const userId = session.session?.user.id;
+      if (!stop && userId) setViewer({ userId, orgId });
+    }).catch(() => undefined);
+    return () => { stop = true; };
+  }, [data?.accountId, fixture]);
+
+  useEffect(() => {
     const next = data?.slides[(preview + 1) % Math.max(data.slides.length, 1)];
-    const src = next ? stableSrc(`${next.id}:full`, next.url) : null;
+    const src = next ? slideSrc(viewer, next.url, "full") : null;
     if (!src) return;
     const img = new Image();
     img.src = src;
-  }, [data, preview]);
+  }, [data, preview, viewer]);
 
   async function save() {
     if (!data) return;
@@ -125,7 +142,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
   if (!data) return <PresentationSkeleton error={error} />;
   const count = data.slides.length;
   const current = data.slides[preview];
-  const stageSrc = current ? stableSrc(`${current.id}:full`, current.url) : null;
+  const stageSrc = current ? slideSrc(viewer, current.url, "full") : null;
   return (
     <section className="min-w-0 overflow-x-hidden" data-presentation-detail="">
       <PageHeader title={data.fileName} icon={<IconImage />} lede={`${data.slideCount} slides · uploaded ${data.createdAt ? new Date(data.createdAt).toLocaleDateString() : ""} · ${statusLabel(data.processingStatus)}`}>
@@ -158,7 +175,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
           </div>
           <div className="mt-4 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Slides">
             {data.slides.map((slide, index) => {
-              const thumb = stableSrc(`${slide.id}:thumb`, slide.thumbnailUrl ?? null);
+              const thumb = slideSrc(viewer, slide.thumbnailUrl ?? null, "thumb");
               return (
                 <button key={slide.id} type="button" aria-label={`Show slide ${index + 1}`} aria-current={index === preview} className={`h-16 w-16 shrink-0 overflow-hidden rounded border bg-black ${index === preview ? "border-primary" : "border-ink"}`} onClick={() => setPreview(index)}>
                   {thumb ? <img src={thumb} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white">{index + 1}</span>}
@@ -214,21 +231,9 @@ function PresentationSkeleton({ error }: { error: string | null }) {
   );
 }
 
-const SRC_KEY = "pekko-slide-src";
-
-/** Reuse a signed URL until it is close to expiry so the browser can keep the bytes. */
-function stableSrc(id: string, fresh: string | null) {
-  if (!fresh || typeof sessionStorage === "undefined") return fresh;
-  try {
-    const all = JSON.parse(sessionStorage.getItem(SRC_KEY) || "{}") as Record<string, { url: string; exp: number }>;
-    const hit = all[id];
-    if (hit && hit.exp > Date.now() + 30_000) return hit.url;
-    all[id] = { url: fresh, exp: Date.now() + 23 * 60 * 60 * 1000 };
-    sessionStorage.setItem(SRC_KEY, JSON.stringify(all));
-  } catch {
-    return fresh;
-  }
-  return fresh;
+function slideSrc(viewer: SlideSrcScope | null, fresh: string | null, kind: "full" | "thumb") {
+  if (!fresh || !viewer) return fresh;
+  return rememberSlideSrc(viewer, assetPathFromUrl(fresh), kind, fresh);
 }
 
 function statusLabel(status: string) {

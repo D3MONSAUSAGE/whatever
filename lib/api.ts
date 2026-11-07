@@ -27,7 +27,7 @@ export type PresentationSlide = {
 };
 
 export type PresentationDetail = {
-  id: string; fileName: string; mimeType: string; sizeBytes: number;
+  id: string; accountId: string; fileName: string; mimeType: string; sizeBytes: number;
   createdAt: string | null; updatedAt: string | null;
   width: number | null; height: number | null;
   processingStatus: string; processingError: string | null;

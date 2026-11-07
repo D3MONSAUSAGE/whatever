@@ -8,6 +8,7 @@ import { UploadProgress, UploadsProvider } from "@/components/uploads";
 import { BrandLockup } from "@/components/brand";
 import { AlertsBanner } from "@/components/alerts";
 import { isRecoveryUrl } from "@/components/auth-frame";
+import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
 import { IconCalendar, IconChart, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
 
 const NAV = [
@@ -35,6 +36,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
       const back = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
       getSupabase().auth.getSession().then(({ data }) => (data.session ? setReady(true) : router.replace(back)));
       sub = getSupabase().auth.onAuthStateChange((event, session) => {
+        onDashboardAuthChange();
         if (event === "PASSWORD_RECOVERY") { router.replace("/reset-password"); return; }
         if (!session) router.replace("/login");
       }).data.subscription;
@@ -46,6 +48,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
 
   async function signOut() {
     // This device only; "Sign out everywhere" stays in Settings.
+    clearSlideSrcCache();
     try { await getSupabase().auth.signOut({ scope: "local" }); } catch { /* still leave the dashboard */ }
     location.assign("/login");
   }

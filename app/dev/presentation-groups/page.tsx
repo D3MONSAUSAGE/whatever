@@ -52,6 +52,7 @@ const library: MediaItem[] = [
 
 const detail: PresentationDetail = {
   id: library[0].id,
+  accountId: "org-preview",
   fileName: "Quarterly review",
   mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   sizeBytes: 2_400_000,
