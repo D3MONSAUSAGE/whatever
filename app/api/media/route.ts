@@ -84,7 +84,7 @@ export async function GET(req: Request) {
     }
     const children = await db()
       .from("media")
-      .select("id, source_media_id, storage_path, slide_index, slide_revision")
+      .select("id, source_media_id, storage_path, thumbnail_path, slide_index, slide_revision")
       .eq("account_id", admin.accountId)
       .in("source_media_id", presentationIds);
     if (!children.error) {
@@ -98,14 +98,18 @@ export async function GET(req: Request) {
         const current = revision <= 0 ? child.slide_revision == null : Number(child.slide_revision) === revision;
         if (current && Number(child.slide_index) === 0 && child.storage_path) {
           const existing = groupMeta.get(parentId) ?? {};
-          groupMeta.set(parentId, { ...existing, cover_path: String(child.storage_path) });
+          groupMeta.set(parentId, {
+            ...existing,
+            cover_path: String(child.storage_path),
+            cover_thumb: child.thumbnail_path ? String(child.thumbnail_path) : undefined,
+          });
         }
       }
     }
   }
 
   const urls = await signAll(rows.flatMap((row) => [row.storage_path, row.thumbnail_path].filter(Boolean)) as string[]);
-  const coverPaths = [...groupMeta.values()].map((row) => row.cover_path).filter((path): path is string => Boolean(path));
+  const coverPaths = [...groupMeta.values()].flatMap((row) => [row.cover_path, row.cover_thumb].filter((path): path is string => Boolean(path)));
   if (coverPaths.length) {
     const covers = await signAll(coverPaths);
     covers.forEach((url, path) => urls.set(path, url));
@@ -143,6 +147,7 @@ export async function GET(req: Request) {
       defaultDurationMs: group?.group_duration_ms ?? null,
       updatedAt: group?.updated_at ?? null,
       coverUrl: group?.cover_path ? urls.get(group.cover_path) ?? null : null,
+      thumbnailUrl: group?.cover_thumb ? urls.get(group.cover_thumb) ?? base.thumbnailUrl : base.thumbnailUrl,
     };
   });
   if (!page) return json(items);
@@ -158,6 +163,7 @@ type GroupMeta = {
   group_revision?: number | null;
   updated_at?: string | null;
   cover_path?: string;
+  cover_thumb?: string;
 };
 
 type MediaRow = {

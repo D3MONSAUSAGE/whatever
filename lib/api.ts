@@ -22,6 +22,7 @@ export type MediaItem = {
 
 export type PresentationSlide = {
   id: string; fileName: string; index: number; url: string | null;
+  thumbnailUrl?: string | null;
   width: number | null; height: number | null; durationMs: number | null;
 };
 

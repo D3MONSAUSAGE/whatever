@@ -257,7 +257,7 @@ function Thumb({ item }: { item: MediaItem }) {
     return <video poster={poster} src={item.url || undefined} muted playsInline preload="none" controls className="block aspect-video w-full bg-black object-contain" />;
   }
   if (item.kind === "presentation") {
-    const cover = item.coverUrl || item.thumbnailUrl;
+    const cover = item.thumbnailUrl || item.coverUrl;
     return (
       <Link href={`/dashboard/media/presentations/${item.id}`} className="relative block aspect-video w-full overflow-hidden bg-black" data-presentation-card="">
         {cover ? <img src={cover} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-sm text-white">Presentation</span>}

@@ -1,3 +1,4 @@
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { BUCKET, db } from "./supabase";
 import { readStoredObject, removeStored } from "./video";
 import { convertPdf } from "./pdf";
@@ -391,12 +392,25 @@ async function storeSlide(
 ) {
   const slideId = crypto.randomUUID();
   const slidePath = slideStoragePath(accountId, slideId);
+  const thumbPath = slidePath.replace(/\.png$/i, ".thumb.jpg");
   const up = await db().storage.from(BUCKET).upload(slidePath, slide.png, {
     contentType: "image/png",
-    cacheControl: "3600",
+    cacheControl: "31536000",
     upsert: false,
   });
   if (up.error) throw new Error("slide-upload");
+  let savedThumb: string | null = null;
+  try {
+    const thumb = await slideThumbnail(slide.png);
+    const thumbUp = await db().storage.from(BUCKET).upload(thumbPath, thumb, {
+      contentType: "image/jpeg",
+      cacheControl: "31536000",
+      upsert: false,
+    });
+    if (!thumbUp.error) savedThumb = thumbPath;
+  } catch {
+    savedThumb = null;
+  }
   const stem = fileName.replace(/\.pptx$/i, "").replace(/\.pdf$/i, "");
   const inserted = await db().rpc("presentation_insert_slide", {
     p_account_id: accountId,
@@ -412,10 +426,25 @@ async function storeSlide(
     p_token: token,
   });
   if (inserted.error || !inserted.data) {
-    await removeStored([slidePath]);
+    await removeStored(savedThumb ? [slidePath, savedThumb] : [slidePath]);
     throw new LostClaim();
   }
+  if (savedThumb) {
+    await db().from("media").update({ thumbnail_path: savedThumb }).eq("id", slideId).eq("account_id", accountId);
+  }
   return { id: slideId, path: slidePath };
+}
+
+/** Small JPEG for the library and the strip. The TV still receives the full PNG. */
+async function slideThumbnail(png: Uint8Array) {
+  const image = await loadImage(Buffer.from(png));
+  const scale = Math.min(1, 320 / Math.max(image.width, image.height, 1));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = createCanvas(width, height);
+  const context = canvas.getContext("2d");
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toBuffer("image/jpeg", 70);
 }
 
 async function expandLegacyPlaylist(accountId: string, mediaId: string, name: string, mode: "auto" | "manual") {
