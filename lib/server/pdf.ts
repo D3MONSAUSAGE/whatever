@@ -1,4 +1,5 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { createCanvas } from "@napi-rs/canvas";
 import { PPTX_MAX_SLIDES, PPTX_RENDER_WIDTH, type PptxConvertResult, type PptxFailure, type PptxSlide } from "./pptx";
 
@@ -42,6 +43,12 @@ export async function convertPdf(
   if (!inspected.ok) return inspected;
 
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // On Node, pdfjs still import()s the worker module for its in-process fake worker.
+  // A relative "./pdf.worker.mjs" is what failed on Vercel when the file was not traced.
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(path.join(
+    process.cwd(),
+    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+  )).href;
   // pdfjs' public types disagree with the Node canvas context we pass through.
   let doc: PdfDoc | null = null;
   try {
