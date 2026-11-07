@@ -73,6 +73,8 @@ function auth(token: string, body?: unknown, method = "POST"): RequestInit {
 async function call(handler: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>, url: string, init?: RequestInit, id?: string) {
   const res = await handler(new Request(url, init), { params: Promise.resolve({ id: id ?? "00000000-0000-4000-8000-000000000000" }) });
   const body = await res.json().catch(() => null);
+  // Conversion is synchronous CPU. Yield so the worker can answer Vitest before the next deck.
+  await new Promise((resolve) => setImmediate(resolve));
   return { status: res.status, body: body as Record<string, unknown> };
 }
 

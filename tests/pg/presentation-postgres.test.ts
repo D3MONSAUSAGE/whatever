@@ -30,13 +30,16 @@ describe.skipIf(!databaseUrl)("presentation groups on PostgreSQL", () => {
     }
     const admin = new Client({ connectionString: urlFor(root.pathname.replace(/^\//, "") || "pantalla") });
     await admin.connect();
-    await admin.query(`
-      select pg_terminate_backend(pid) from pg_stat_activity
-      where datname = $1 and pid <> pg_backend_pid()
-    `, [dbName]);
-    await admin.query(`drop database if exists ${dbName}`);
-    await admin.query(`create database ${dbName}`);
-    await admin.end();
+    try {
+      await admin.query(`
+        select pg_terminate_backend(pid) from pg_stat_activity
+        where datname = $1 and pid <> pg_backend_pid()
+      `, [dbName]);
+      await admin.query(`drop database if exists ${dbName}`);
+      await admin.query(`create database ${dbName}`);
+    } finally {
+      await admin.end();
+    }
 
     client = new Client({ connectionString: urlFor(dbName) });
     await client.connect();

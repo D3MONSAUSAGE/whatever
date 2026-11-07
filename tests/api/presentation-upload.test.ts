@@ -32,6 +32,7 @@ async function call(handler: (req: Request, ctx?: { params: Promise<{ id: string
     ? await handler(new Request(url, init), { params: Promise.resolve({ id }) })
     : await handler(new Request(url, init));
   const body = await res.json().catch(() => null);
+  await new Promise((resolve) => setImmediate(resolve));
   return { status: res.status, body: body as Record<string, unknown> };
 }
 

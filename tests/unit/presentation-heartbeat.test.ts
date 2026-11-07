@@ -32,55 +32,71 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Only the timers the heartbeat uses. Leaving setImmediate real keeps Vitest's worker RPC on the real clock. */
+function useHeartbeatTimers() {
+  vi.useFakeTimers({ toFake: ["setTimeout", "setInterval"] });
+}
+
 describe("presentation claim heartbeat", () => {
   it("executes the lazy request on every tick and stops when cleared", async () => {
-    vi.useFakeTimers();
+    useHeartbeatTimers();
     const beat = startClaimHeartbeat("account", "media", "token");
-    expect(state.executed).toBe(0);
+    try {
+      expect(state.executed).toBe(0);
 
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
-    expect(state.executed).toBe(1);
-    expect(beat.lost()).toBe(false);
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(state.executed).toBe(1);
+      expect(beat.lost()).toBe(false);
 
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
-    expect(state.executed).toBe(2);
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(state.executed).toBe(2);
 
-    beat.stop();
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS * 3);
-    expect(state.executed).toBe(2);
+      beat.stop();
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(state.executed).toBe(2);
+    } finally {
+      beat.stop();
+      vi.useRealTimers();
+    }
   });
 
   it("stops the worker when the claim is lost and does not tick again", async () => {
-    vi.useFakeTimers();
+    useHeartbeatTimers();
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     state.results.push({ data: false, error: null });
     const beat = startClaimHeartbeat("account", "media", "token");
+    try {
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(state.executed).toBe(1);
+      expect(beat.lost()).toBe(true);
+      expect(errors).toHaveBeenCalledWith("presentation claim was lost", { mediaId: "media" });
 
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
-    expect(state.executed).toBe(1);
-    expect(beat.lost()).toBe(true);
-    expect(errors).toHaveBeenCalledWith("presentation claim was lost", { mediaId: "media" });
-
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS * 3);
-    expect(state.executed).toBe(1);
-    beat.stop();
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(state.executed).toBe(1);
+    } finally {
+      beat.stop();
+      vi.useRealTimers();
+    }
   });
 
   it("logs a failed heartbeat and keeps the claim", async () => {
-    vi.useFakeTimers();
+    useHeartbeatTimers();
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     state.results.push({ data: null, error: { message: "timeout" } });
     state.results.push({ reject: new Error("network") });
     const beat = startClaimHeartbeat("account", "media", "token");
+    try {
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(beat.lost()).toBe(false);
+      expect(errors).toHaveBeenCalledWith("presentation claim heartbeat failed", { mediaId: "media", error: "timeout" });
 
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
-    expect(beat.lost()).toBe(false);
-    expect(errors).toHaveBeenCalledWith("presentation claim heartbeat failed", { mediaId: "media", error: "timeout" });
-
-    await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
-    expect(state.executed).toBe(2);
-    expect(beat.lost()).toBe(false);
-    expect(errors).toHaveBeenCalledWith("presentation claim heartbeat failed", { mediaId: "media", error: "network" });
-    beat.stop();
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_MS);
+      expect(state.executed).toBe(2);
+      expect(beat.lost()).toBe(false);
+      expect(errors).toHaveBeenCalledWith("presentation claim heartbeat failed", { mediaId: "media", error: "network" });
+    } finally {
+      beat.stop();
+      vi.useRealTimers();
+    }
   });
 });
