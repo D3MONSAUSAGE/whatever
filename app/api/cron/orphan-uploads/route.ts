@@ -5,6 +5,7 @@ import { db } from "@/lib/server/supabase";
 import { isMissingSchema } from "@/lib/server/schema";
 import { deliverAlertEmails } from "@/lib/server/alerts";
 import { deletionEnabled, runDueDeletions } from "@/lib/server/account-deletion";
+import { executeBillingReminders } from "@/lib/server/billing-dispatch";
 
 const ANALYTICS_RETENTION_DAYS = 90;
 
@@ -43,7 +44,9 @@ export async function GET(req: Request) {
   }
   // M17.5: due account deletions, only when ACCOUNT_DELETION=1.
   const deletions = deletionEnabled() ? await runDueDeletions({ dryRun }).catch(() => ({ error: true })) : { enabled: false };
-  return json({ ...result, analytics, alerts, commercial, deletions });
+  // Same daily Hobby cron. The dispatcher no-ops unless BILLING_REMINDERS=1, so this sends nothing by default.
+  const reminders = await executeBillingReminders(dryRun).catch(() => ({ error: true }));
+  return json({ ...result, analytics, alerts, commercial, deletions, reminders });
 }
 
 function cronGate(req: Request) {

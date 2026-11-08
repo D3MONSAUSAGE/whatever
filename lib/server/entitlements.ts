@@ -35,9 +35,17 @@ export const PLAN_LIMITS: Record<PlanId, number> = { trial: 5, starter: 1, busin
 
 /** New organizations. Matches accounts.trial_ends_at default (created_at + 14 days). */
 export const TRIAL_DAYS = 14;
+/**
+ * After the 14-day trial, screens keep playing for this many days (state trial_grace).
+ * This is playback grace, not extra trial days.
+ */
+export const PLAYBACK_GRACE_DAYS = 3;
 /** First recorded payment failure. A repeat past_due does not move this. */
 export const PAYMENT_GRACE_DAYS = 7;
-/** Existing customers. Starts only after BILLING_ENFORCE is turned on, and only once. */
+/**
+ * Existing customers keep full access for this many days after the advance notice
+ * is successfully sent. The clock is not started by a dashboard visit.
+ */
 export const TRANSITION_DAYS = 14;
 
 const DAY = 86_400_000;
@@ -173,21 +181,13 @@ export async function loadEntitlement(accountId: string): Promise<EntitlementRow
 }
 
 /**
- * Starts the existing-customer window once, from the database clock's stand-in
- * (this server's time), only while enforcement is on. A second read returns the
- * stored instant and does not write. Enforcement off performs no read and no write.
+ * Reads a transition start that the reminder dispatcher already stored after a
+ * successful notice. A dashboard request never writes this column.
  */
-export async function readOrStartTransition(accountId: string): Promise<string | null> {
-  if (!billingEnforced()) return null;
-  const row = await db().from("accounts").select("plan, billing_transition_started_at").eq("id", accountId).maybeSingle();
-  if (row.error || !row.data || row.data.plan !== "grandfathered") return null;
-  const existing = row.data.billing_transition_started_at ? String(row.data.billing_transition_started_at) : null;
-  if (existing) return existing;
-  const started = new Date().toISOString();
-  const upd = await db().from("accounts").update({ billing_transition_started_at: started }).eq("id", accountId).is("billing_transition_started_at", null);
-  if (upd.error) return null;
-  const again = await db().from("accounts").select("billing_transition_started_at").eq("id", accountId).maybeSingle();
-  return again.data?.billing_transition_started_at ? String(again.data.billing_transition_started_at) : null;
+export async function readTransitionStart(accountId: string): Promise<string | null> {
+  const row = await db().from("accounts").select("billing_transition_started_at").eq("id", accountId).maybeSingle();
+  if (row.error || !row.data?.billing_transition_started_at) return null;
+  return String(row.data.billing_transition_started_at);
 }
 
 /** Player gate. Fails open on a database error so a DB blip never blanks paying customers' screens. */
