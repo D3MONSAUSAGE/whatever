@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BillingEmailSelfTest, SelfTestResults, selfTestRunId } from "@/components/billing-email-selftest";
 import {
-  billingNoticeKey, deliverSelfTest, evaluateSelfTestGate, selfTestAllowed, selfTestClaimKey, selfTestNotices, selfTestStatus, SELF_TEST_KINDS,
+  billingNoticeKey, deliverSelfTest, evaluateSelfTestGate, selfTestAllowed, selfTestAttemptSucceeded, selfTestClaimKey, selfTestNotices, selfTestStatus, SELF_TEST_KINDS,
 } from "@/lib/server/billing-notices";
 import type { EntitlementRow } from "@/lib/server/entitlements";
 import { BILLING_EMAIL_FROM, memoryNoticeLedger } from "@/lib/server/transactional-email";
@@ -40,6 +40,11 @@ describe("billing email self-test", () => {
     expect(table).toContain("sent");
     expect(table).toContain("re_123");
     expect(table).toContain(">Error<");
+  });
+  it("does not treat a failed claim as a completed send", () => {
+    expect(selfTestAttemptSucceeded([{ sent: false, reason: "failed" }, { sent: false, reason: "noop" }])).toBe(false);
+    expect(selfTestAttemptSucceeded([{ sent: true, reason: "sent" }])).toBe(true);
+    expect(selfTestAttemptSucceeded([{ sent: false, reason: "duplicate" }])).toBe(true);
   });
   it("allowlists exact org ids and hides everyone else", () => {
     expect(selfTestAllowed(org, undefined)).toBe(false);

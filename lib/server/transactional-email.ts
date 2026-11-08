@@ -4,9 +4,26 @@ import { db } from "./supabase";
 /** Intended Production sender. The module sends only when ALERT_EMAIL_FROM is actually set. */
 export const BILLING_EMAIL_FROM = "Pekko <billing@pekkotv.com>";
 
+/** Explicit columns. `id` is an opaque dedupe key and is never parsed for the account or kind. */
+export type NoticeClaim = { id: string; accountId: string; kind: string };
+
+export class NoticeLedgerError extends Error {
+  readonly code: string;
+  constructor(code: string) {
+    super(code);
+    this.name = "NoticeLedgerError";
+    this.code = code;
+  }
+}
+
+/** Postgres SQLSTATE only. Messages, details, and hints can echo values and are never logged. */
+export function dbErrorCode(code: string | undefined): string {
+  return code && /^[0-9A-Z]{5}$/.test(code) ? code : "unknown";
+}
+
 export type NoticeLedger = {
   /** Returns true the first time this id is claimed, false if it was already claimed. */
-  claim(id: string): Promise<boolean>;
+  claim(notice: NoticeClaim): Promise<boolean>;
   /** True when this id was already claimed. Does not claim it. */
   has(id: string): Promise<boolean>;
 };
@@ -15,9 +32,9 @@ export type NoticeLedger = {
 export function memoryNoticeLedger(): NoticeLedger {
   const seen = new Set<string>();
   return {
-    async claim(id: string) {
-      if (seen.has(id)) return false;
-      seen.add(id);
+    async claim(notice: NoticeClaim) {
+      if (seen.has(notice.id)) return false;
+      seen.add(notice.id);
       return true;
     },
     async has(id: string) {
@@ -29,11 +46,14 @@ export function memoryNoticeLedger(): NoticeLedger {
 /** Inserts the notice id once. A unique violation means this event was already claimed. */
 export function supabaseNoticeLedger(): NoticeLedger {
   return {
-    async claim(id: string) {
-      const [accountId, kind] = id.split("|");
-      const ins = await db().from("billing_notices").insert({ id, account_id: accountId, kind: kind || "notice" });
+    async claim(notice: NoticeClaim) {
+      const ins = await db().from("billing_notices").insert({
+        id: notice.id,
+        account_id: notice.accountId,
+        kind: notice.kind,
+      });
       if (ins.error?.code === "23505") return false;
-      if (ins.error) throw new Error("notice ledger unavailable");
+      if (ins.error) throw new NoticeLedgerError(dbErrorCode(ins.error.code));
       return true;
     },
     async has(id: string) {
@@ -59,6 +79,8 @@ export type SendResult = { sent: boolean; reason: "noop" | "sent" | "duplicate" 
  */
 export async function sendTransactionalEmail(input: {
   idempotencyKey: string;
+  accountId: string;
+  kind: string;
   message: EmailMessage;
   env?: Record<string, string | undefined>;
   ledger?: NoticeLedger;
@@ -73,10 +95,11 @@ export async function sendTransactionalEmail(input: {
   const ledger = input.ledger ?? supabaseNoticeLedger();
   let claimed = false;
   try {
-    claimed = await ledger.claim(input.idempotencyKey);
-  } catch {
-    log("billing-email noop: notice ledger unavailable");
-    return { sent: false, reason: "failed", id: null, error: "notice ledger unavailable" };
+    claimed = await ledger.claim({ id: input.idempotencyKey, accountId: input.accountId, kind: input.kind });
+  } catch (err) {
+    const code = err instanceof NoticeLedgerError ? err.code : "unknown";
+    log(`billing-email ledger error code=${code}`);
+    return { sent: false, reason: "failed", id: null, error: `Couldn't record this send (${code}). No email was sent.` };
   }
   if (!claimed) return { sent: false, reason: "duplicate", id: null, error: null };
   const provider = emailProvider(env);
