@@ -7,6 +7,8 @@ export const BILLING_EMAIL_FROM = "Pekko <billing@pekkotv.com>";
 export type NoticeLedger = {
   /** Returns true the first time this id is claimed, false if it was already claimed. */
   claim(id: string): Promise<boolean>;
+  /** True when this id was already claimed. Does not claim it. */
+  has(id: string): Promise<boolean>;
 };
 
 /** In-memory ledger for tests. Production uses the billing_notices table. */
@@ -17,6 +19,9 @@ export function memoryNoticeLedger(): NoticeLedger {
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
+    },
+    async has(id: string) {
+      return seen.has(id);
     },
   };
 }
@@ -31,6 +36,11 @@ export function supabaseNoticeLedger(): NoticeLedger {
       if (ins.error) throw new Error("notice ledger unavailable");
       return true;
     },
+    async has(id: string) {
+      const row = await db().from("billing_notices").select("id").eq("id", id).maybeSingle();
+      if (row.error) return false;
+      return Boolean(row.data?.id);
+    },
   };
 }
 
@@ -40,7 +50,7 @@ export function transactionalEmailReady(env: Record<string, string | undefined> 
     && Boolean(env.ALERT_EMAIL_FROM);
 }
 
-export type SendResult = { sent: boolean; reason: "noop" | "sent" | "duplicate" | "failed" };
+export type SendResult = { sent: boolean; reason: "noop" | "sent" | "duplicate" | "failed"; id: string | null; error: string | null };
 
 /**
  * One transactional send. With the provider unset, this logs a no-op and does not
@@ -58,7 +68,7 @@ export async function sendTransactionalEmail(input: {
   const log = input.log ?? ((line: string) => console.info(line));
   if (!transactionalEmailReady(env)) {
     log("billing-email noop: EMAIL_PROVIDER, RESEND_API_KEY, and ALERT_EMAIL_FROM are not all set");
-    return { sent: false, reason: "noop" };
+    return { sent: false, reason: "noop", id: null, error: null };
   }
   const ledger = input.ledger ?? supabaseNoticeLedger();
   let claimed = false;
@@ -66,14 +76,16 @@ export async function sendTransactionalEmail(input: {
     claimed = await ledger.claim(input.idempotencyKey);
   } catch {
     log("billing-email noop: notice ledger unavailable");
-    return { sent: false, reason: "failed" };
+    return { sent: false, reason: "failed", id: null, error: "notice ledger unavailable" };
   }
-  if (!claimed) return { sent: false, reason: "duplicate" };
+  if (!claimed) return { sent: false, reason: "duplicate", id: null, error: null };
   const provider = emailProvider(env);
   if (!provider) {
     log("billing-email noop: EMAIL_PROVIDER, RESEND_API_KEY, and ALERT_EMAIL_FROM are not all set");
-    return { sent: false, reason: "noop" };
+    return { sent: false, reason: "noop", id: null, error: null };
   }
   const result = await provider.send(input.message);
-  return result.ok ? { sent: true, reason: "sent" } : { sent: false, reason: "failed" };
+  return result.ok
+    ? { sent: true, reason: "sent", id: result.id ?? null, error: null }
+    : { sent: false, reason: "failed", id: null, error: result.error ?? "send failed" };
 }

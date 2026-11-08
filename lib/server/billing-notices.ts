@@ -1,4 +1,4 @@
-import { daysLeft, type EntitlementRow } from "./entitlements";
+import { daysLeft, paymentGraceEndsAt, transitionEndsAt, trialEndsAt, type EntitlementRow } from "./entitlements";
 import { sendTransactionalEmail, supabaseNoticeLedger, type NoticeLedger, type SendResult } from "./transactional-email";
 
 export type BillingNoticeKind =
@@ -27,6 +27,25 @@ function notice(kind: BillingNoticeKind, deadline: string, subject: string, text
   return { kind, deadline, subject, text };
 }
 
+/** Shared copy for the six reminders. Self-test and live reminders both use this. */
+export function billingTemplate(kind: "trial_ending_3" | "trial_ending_1" | "payment_failed" | "grace_ending_2" | "grace_ending_1" | "transition_14", deadline: string): BillingNotice {
+  const when = utcDate(deadline);
+  switch (kind) {
+    case "trial_ending_3":
+      return notice(kind, deadline, "Your Pekko trial ends in 3 days", `Your free trial ends on ${when}. Choose a plan to keep your screens on. Your content stays either way.`);
+    case "trial_ending_1":
+      return notice(kind, deadline, "Your Pekko trial ends in 1 day", `Your free trial ends on ${when}. Choose a plan to keep your screens on. Your content stays either way.`);
+    case "payment_failed":
+      return notice(kind, deadline, "Pekko couldn't take your payment", `We couldn't take your last payment. Update your payment method before ${when} to keep your screens playing. Your content is not deleted.`);
+    case "grace_ending_2":
+      return notice(kind, deadline, "Your Pekko payment grace ends in 2 days", `Your payment grace ends on ${when}. Update your payment method before then. Your content is not deleted.`);
+    case "grace_ending_1":
+      return notice(kind, deadline, "Your Pekko payment grace ends in 1 day", `Your payment grace ends on ${when}. Update your payment method before then. Your content is not deleted.`);
+    case "transition_14":
+      return notice(kind, deadline, "Your Pekko access continues for 14 days", `You're an early Pekko customer. You keep full access through ${when}. Your content stays; nothing is deleted.`);
+  }
+}
+
 /**
  * Reminders derived only from server timestamps on the entitlement row.
  * Receipts are not included: Stripe sends those from its own email setting.
@@ -34,22 +53,8 @@ function notice(kind: BillingNoticeKind, deadline: string, subject: string, text
 export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: string | null; enforced?: boolean }): BillingNotice[] {
   const notices: BillingNotice[] = [];
   const trialLeft = daysLeft(e.trial_ends_at, e.server_time);
-  if (e.state === "trial" && e.trial_ends_at && trialLeft === 3) {
-    notices.push(notice(
-      "trial_ending_3",
-      e.trial_ends_at,
-      "Your Pekko trial ends in 3 days",
-      `Your free trial ends on ${utcDate(e.trial_ends_at)}. Choose a plan to keep your screens on. Your content stays either way.`,
-    ));
-  }
-  if (e.state === "trial" && e.trial_ends_at && trialLeft === 1) {
-    notices.push(notice(
-      "trial_ending_1",
-      e.trial_ends_at,
-      "Your Pekko trial ends in 1 day",
-      `Your free trial ends on ${utcDate(e.trial_ends_at)}. Choose a plan to keep your screens on. Your content stays either way.`,
-    ));
-  }
+  if (e.state === "trial" && e.trial_ends_at && trialLeft === 3) notices.push(billingTemplate("trial_ending_3", e.trial_ends_at));
+  if (e.state === "trial" && e.trial_ends_at && trialLeft === 1) notices.push(billingTemplate("trial_ending_1", e.trial_ends_at));
   if (e.state === "trial_grace" || e.state === "expired") {
     const deadline = e.playback_ends_at || e.trial_ends_at || e.server_time;
     notices.push(notice(
@@ -62,29 +67,10 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
     ));
   }
   if (e.state === "past_due" && e.grace_ends_at) {
-    notices.push(notice(
-      "payment_failed",
-      e.grace_ends_at,
-      "Pekko couldn't take your payment",
-      `We couldn't take your last payment. Update your payment method before ${utcDate(e.grace_ends_at)} to keep your screens playing. Your content is not deleted.`,
-    ));
+    notices.push(billingTemplate("payment_failed", e.grace_ends_at));
     const graceLeft = daysLeft(e.grace_ends_at, e.server_time);
-    if (graceLeft === 2) {
-      notices.push(notice(
-        "grace_ending_2",
-        e.grace_ends_at,
-        "Your Pekko payment grace ends in 2 days",
-        `Your payment grace ends on ${utcDate(e.grace_ends_at)}. Update your payment method before then. Your content is not deleted.`,
-      ));
-    }
-    if (graceLeft === 1) {
-      notices.push(notice(
-        "grace_ending_1",
-        e.grace_ends_at,
-        "Your Pekko payment grace ends in 1 day",
-        `Your payment grace ends on ${utcDate(e.grace_ends_at)}. Update your payment method before then. Your content is not deleted.`,
-      ));
-    }
+    if (graceLeft === 2) notices.push(billingTemplate("grace_ending_2", e.grace_ends_at));
+    if (graceLeft === 1) notices.push(billingTemplate("grace_ending_1", e.grace_ends_at));
   }
   if (e.state === "canceled") {
     notices.push(notice(
@@ -96,12 +82,7 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
   }
   const transitionEnd = opts?.transitionEndsAt ?? null;
   if (opts?.enforced && e.state === "grandfathered" && transitionEnd && (daysLeft(transitionEnd, e.server_time) ?? 0) > 0) {
-    notices.push(notice(
-      "transition_14",
-      transitionEnd,
-      "Your Pekko access continues for 14 days",
-      `You're an early Pekko customer. You keep full access through ${utcDate(transitionEnd)}. Your content stays; nothing is deleted.`,
-    ));
+    notices.push(billingTemplate("transition_14", transitionEnd));
   }
   return notices;
 }
@@ -111,10 +92,102 @@ export function billingNoticeKey(accountId: string, notice: Pick<BillingNotice, 
   return `${accountId}|${notice.kind}|${notice.deadline}`;
 }
 
+export const SELF_TEST_KINDS = ["trial_ending_3", "trial_ending_1", "payment_failed", "grace_ending_2", "grace_ending_1", "transition_14"] as const;
+
+/** Separate from live reminder keys so a self-test cannot claim or suppress a real notice. */
+export function selfTestClaimKey(accountId: string, run: string, kind: string): string {
+  return `selftest:${accountId}:${run}:${kind}`;
+}
+
+export function selfTestAllowed(accountId: string, allowlist: string | undefined): boolean {
+  return (allowlist || "").split(",").map((part) => part.trim()).filter(Boolean).includes(accountId);
+}
+
+/**
+ * All six templates, using this org's stored dates when it has them.
+ * Missing dates are computed from the server timestamp only. Nothing is written.
+ */
+export function selfTestNotices(e: EntitlementRow, transitionStartedAt: string | null): BillingNotice[] {
+  const trialEnd = e.trial_ends_at ?? (e.trial_started_at ? trialEndsAt(e.trial_started_at) : trialEndsAt(e.server_time));
+  const graceEnd = e.grace_ends_at ?? paymentGraceEndsAt(e.server_time);
+  const transitionEnd = transitionEndsAt(transitionStartedAt) ?? transitionEndsAt(e.server_time) ?? e.server_time;
+  const deadline = {
+    trial_ending_3: trialEnd,
+    trial_ending_1: trialEnd,
+    payment_failed: graceEnd,
+    grace_ending_2: graceEnd,
+    grace_ending_1: graceEnd,
+    transition_14: transitionEnd,
+  };
+  return SELF_TEST_KINDS.map((kind) => {
+    const item = billingTemplate(kind, deadline[kind]);
+    return { ...item, subject: `[TEST] ${item.subject}` };
+  });
+}
+
+export function evaluateSelfTestGate(input: {
+  accountId: string;
+  allowlist: string | undefined;
+  email: string;
+  run: string;
+  replay: boolean;
+  limited: boolean;
+}): { ok: true } | { ok: false; status: number; error: string } {
+  if (!selfTestAllowed(input.accountId, input.allowlist)) return { ok: false, status: 404, error: "Not found." };
+  if (!input.email.includes("@")) return { ok: false, status: 400, error: "This account has no email." };
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(input.run)) return { ok: false, status: 400, error: "Send a run id made of letters, numbers, _ or -." };
+  if (!input.replay && input.limited) return { ok: false, status: 429, error: "A test email was just sent. Wait 10 minutes before sending another." };
+  return { ok: true };
+}
+
 /** Receipts stay on Stripe's own customer email. This app does not send them. */
 export const RECEIPT_CHANNEL = "stripe" as const;
 
 export type NoticeDelivery = { key: string; sent: boolean; reason: SendResult["reason"] };
+
+export type SelfTestResult = {
+  kind: BillingNotice["kind"];
+  subject: string;
+  deadline: string;
+  sent: boolean;
+  reason: SendResult["reason"];
+  id: string | null;
+  error: string | null;
+};
+
+/** Sends the six test templates. Claim keys stay in the selftest namespace. */
+export async function deliverSelfTest(input: {
+  accountId: string;
+  to: string;
+  run: string;
+  notices: BillingNotice[];
+  env?: Record<string, string | undefined>;
+  ledger?: NoticeLedger;
+  log?: (line: string) => void;
+}): Promise<SelfTestResult[]> {
+  const env = input.env ?? process.env;
+  const ledger = input.ledger ?? supabaseNoticeLedger();
+  const out: SelfTestResult[] = [];
+  for (const notice of input.notices) {
+    const result = await sendTransactionalEmail({
+      idempotencyKey: selfTestClaimKey(input.accountId, input.run, notice.kind),
+      message: { to: input.to, subject: notice.subject, text: notice.text },
+      env,
+      ledger,
+      log: input.log,
+    });
+    out.push({
+      kind: notice.kind,
+      subject: notice.subject,
+      deadline: notice.deadline,
+      sent: result.sent,
+      reason: result.reason,
+      id: result.id,
+      error: result.error,
+    });
+  }
+  return out;
+}
 
 /**
  * Sends each notice at most once. With email unset, logs a no-op and does not

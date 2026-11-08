@@ -4,7 +4,7 @@
  * Nothing here signs up for or pays for anything.
  */
 export type EmailMessage = { to: string; subject: string; text: string };
-export type EmailProvider = { name: string; send(msg: EmailMessage): Promise<{ ok: boolean; error?: string }> };
+export type EmailProvider = { name: string; send(msg: EmailMessage): Promise<{ ok: boolean; id?: string | null; error?: string }> };
 
 export function emailProvider(env: Record<string, string | undefined> = process.env): EmailProvider | null {
   const kind = (env.EMAIL_PROVIDER || "").toLowerCase();
@@ -20,7 +20,9 @@ export function emailProvider(env: Record<string, string | undefined> = process.
             headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
             body: JSON.stringify({ from, to: [msg.to], subject: msg.subject, text: msg.text }),
           });
-          return r.ok ? { ok: true } : { ok: false, error: `resend ${r.status}` };
+          const body = await r.json().catch(() => null) as { id?: unknown } | null;
+          const id = body && typeof body.id === "string" ? body.id : null;
+          return r.ok ? { ok: true, id } : { ok: false, error: `resend ${r.status}` };
         } catch {
           return { ok: false, error: "resend unreachable" };
         }
