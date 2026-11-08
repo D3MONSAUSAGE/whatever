@@ -123,10 +123,12 @@ export const WEBHOOK_API_VERSION = "2025-02-24.acacia";
  */
 export const CHECKOUT_API_VERSION = "2025-03-31.basil";
 
-/** On only when the env is exactly "1". Pekko remains the seller otherwise. */
+/** Test mode turns Managed Payments on only when the env is exactly "1". */
 export function managedPaymentsEnabled(value: string | undefined): boolean {
   return clean(value) === "1";
 }
+
+const LIVE_MANAGED_PAYMENTS_ERROR = "Set STRIPE_MANAGED_PAYMENTS to 0 before live Checkout. Standard Stripe Billing sends managed_payments[enabled]=false so Pekko stays the seller. An unset value is refused and the account default is not used.";
 
 export function checkoutSessionRequest(input: {
   price: string;
@@ -136,10 +138,9 @@ export function checkoutSessionRequest(input: {
   origin: string;
   managedPayments: string | undefined;
   secretKey: string | undefined;
-}): {
-  params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } };
-  options: Stripe.RequestOptions;
-} {
+}):
+  | { ok: true; params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } }; options: Stripe.RequestOptions }
+  | { ok: false; code: "managed_payments_config"; error: string } {
   const params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } } = {
     mode: "subscription",
     line_items: [{ price: input.price, quantity: 1 }],
@@ -149,11 +150,22 @@ export function checkoutSessionRequest(input: {
     success_url: `${input.origin}/dashboard/billing?checkout=success`,
     cancel_url: `${input.origin}/dashboard/billing?checkout=canceled`,
   };
-  // The opt-out is test-mode only. A live key leaves the field unset so the account default applies.
-  if (clean(input.secretKey).startsWith("sk_test_")) {
-    params.managed_payments = { enabled: managedPaymentsEnabled(input.managedPayments) };
+  const options: Stripe.RequestOptions = { apiVersion: CHECKOUT_API_VERSION };
+  const key = clean(input.secretKey);
+  const flag = clean(input.managedPayments);
+  if (key.startsWith("sk_test_")) {
+    params.managed_payments = { enabled: flag === "1" };
+    return { ok: true, params, options };
   }
-  return { params, options: { apiVersion: CHECKOUT_API_VERSION } };
+  if (key.startsWith("sk_live_")) {
+    // Live opt-out only when the flag is exactly "0". Anything else, including unset, is a config error.
+    if (flag === "0") {
+      params.managed_payments = { enabled: false };
+      return { ok: true, params, options };
+    }
+    return { ok: false, code: "managed_payments_config", error: LIVE_MANAGED_PAYMENTS_ERROR };
+  }
+  return { ok: true, params, options };
 }
 
 let cached: { key: string; client: Stripe } | null = null;

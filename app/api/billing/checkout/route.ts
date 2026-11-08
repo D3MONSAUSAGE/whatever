@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (a.error || !a.data) return fail("Couldn't load your account.", 500);
   if (a.data.owner_user_id !== admin.userId) return json({ error: "Only the account owner can change the plan.", code: "not_owner" }, 403);
   const origin = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || new URL(req.url).origin).replace(/\/+$/, "");
-  const { params, options } = checkoutSessionRequest({
+  const built = checkoutSessionRequest({
     price,
     accountId: admin.accountId,
     email: admin.email,
@@ -32,7 +32,8 @@ export async function POST(req: Request) {
     managedPayments: process.env.STRIPE_MANAGED_PAYMENTS,
     secretKey: stripeKey() ?? "",
   });
-  const session = await s.checkout.sessions.create(params, options);
+  if (!built.ok) return json({ error: built.error, code: built.code }, 503);
+  const session = await s.checkout.sessions.create(built.params, built.options);
   return json({ url: session.url });
 }
 

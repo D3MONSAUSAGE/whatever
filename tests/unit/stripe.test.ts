@@ -63,21 +63,38 @@ describe("checkout session", () => {
     expect((client as unknown as { getApiField(key: string): string }).getApiField("version")).toBe(WEBHOOK_API_VERSION);
     expect(WEBHOOK_API_VERSION).toBe("2025-02-24.acacia");
     const off = checkoutSessionRequest(input);
+    expect(off.ok).toBe(true);
+    if (!off.ok) return;
     expect(off.options.apiVersion).toBe(CHECKOUT_API_VERSION);
     expect(CHECKOUT_API_VERSION).toBe("2025-03-31.basil");
     expect(off.params.managed_payments).toEqual({ enabled: false });
     expect(off.params.mode).toBe("subscription");
     const on = checkoutSessionRequest({ ...input, managedPayments: "1", customerId: "cus_1" });
+    expect(on.ok).toBe(true);
+    if (!on.ok) return;
     expect(on.params.managed_payments).toEqual({ enabled: true });
     expect(on.params).toMatchObject({ customer: "cus_1" });
-    expect(checkoutSessionRequest({ ...input, managedPayments: "true" }).params.managed_payments?.enabled).toBe(false);
+    const spelled = checkoutSessionRequest({ ...input, managedPayments: "true" });
+    expect(spelled.ok && spelled.params.managed_payments?.enabled).toBe(false);
   });
-  it("leaves managed_payments unset for a live key", () => {
-    const live = checkoutSessionRequest({ ...input, secretKey: "sk_live_abc", managedPayments: "1" });
-    expect(live.params).not.toHaveProperty("managed_payments");
-    expect(JSON.stringify(live.params)).not.toContain("managed_payments");
-    expect(checkoutSessionRequest({ ...input, secretKey: "sk_test_abc" }).params.managed_payments).toEqual({ enabled: false });
-    expect(checkoutSessionRequest({ ...input, secretKey: "\"sk_test_abc\"" }).params.managed_payments).toEqual({ enabled: false });
+  it("opts live Checkout out of Managed Payments only when STRIPE_MANAGED_PAYMENTS is 0", () => {
+    const unset = checkoutSessionRequest({ ...input, secretKey: "sk_live_abc", managedPayments: undefined });
+    expect(unset.ok).toBe(false);
+    if (!unset.ok) {
+      expect(unset.code).toBe("managed_payments_config");
+      expect(unset.error).toMatch(/STRIPE_MANAGED_PAYMENTS/);
+      expect(unset.error).toMatch(/unset/);
+    }
+    const blank = checkoutSessionRequest({ ...input, secretKey: "sk_live_abc", managedPayments: "  " });
+    expect(blank.ok).toBe(false);
+    const other = checkoutSessionRequest({ ...input, secretKey: "sk_live_abc", managedPayments: "1" });
+    expect(other.ok).toBe(false);
+    const optedOut = checkoutSessionRequest({ ...input, secretKey: "sk_live_abc", managedPayments: "0" });
+    expect(optedOut.ok).toBe(true);
+    if (optedOut.ok) expect(optedOut.params.managed_payments).toEqual({ enabled: false });
+    const quoted = checkoutSessionRequest({ ...input, secretKey: "\"sk_test_abc\"", managedPayments: undefined });
+    expect(quoted.ok).toBe(true);
+    if (quoted.ok) expect(quoted.params.managed_payments).toEqual({ enabled: false });
   });
   it("reads the period end from the subscription or, on basil, from the items", () => {
     const asSub = (value: unknown) => periodEndSeconds(value as Stripe.Subscription);

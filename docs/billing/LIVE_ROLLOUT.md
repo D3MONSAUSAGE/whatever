@@ -8,6 +8,7 @@ The operator is Francisco Lopez, a sole proprietor doing business as Pekko. Unpu
 
 - Test Checkout and webhooks keep using only `STRIPE_TEST_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_BUSINESS` / `STRIPE_PRICE_MULTI`.
 - Live mode is a separate set of variables. It is selected only when `STRIPE_LIVE_ENABLED` is exactly `1`, and then only an `sk_live_` key is accepted. Test values are not used as a fallback, and live values are not used while the flag is off.
+- Live Checkout uses standard Stripe Billing. It sends `managed_payments[enabled]=false` only when `STRIPE_MANAGED_PAYMENTS` is exactly `0`. If that variable is unset, or any other value, Checkout returns `managed_payments_config` and does not call Stripe. Test Checkout is unchanged: unset still opts out, and only `1` enables Managed Payments.
 - `scripts/stripe-live-setup.mjs` prints the three live monthly prices and the webhook at `https://pekkotv.com/api/billing/webhook`. It does not call Stripe unless `--confirm-live` is passed, and it still refuses unless the live flag is `1` and the key is `sk_live_`.
 - New organizations already get a **14-day trial from creation** (`accounts.trial_ends_at` defaults to `now() + 14 days`, and the entitlement function falls back to `created_at + 14 days`). Then a 3-day playback grace (`trial_grace`). Then screens pause (`expired`). Content stays.
 - Organizations that existed before billing were set to `grandfathered` in migration `0013`. They are the early customers. `rollout_notice` on `GET /api/entitlements` tells them billing changes come with advance notice and a grace period, and that content is not deleted. Grandfathered screens are not paused when enforcement is later turned on (see `account_entitlement` in `0013_billing_entitlements.sql`).
@@ -36,7 +37,7 @@ Do not set these on the test preview. Set them on production only when live mode
 | `STRIPE_LIVE_PRICE_STARTER` | Live price id for Starter, $19/month. |
 | `STRIPE_LIVE_PRICE_BUSINESS` | Live price id for Business, $39/month. |
 | `STRIPE_LIVE_PRICE_MULTI` | Live price id for Multi-screen, $59/month. |
-| `STRIPE_MANAGED_PAYMENTS` | Leave unset. Live Checkout does not send `managed_payments`; the account default applies. The test opt-out stays test-only. |
+| `STRIPE_MANAGED_PAYMENTS` | Production must be exactly `0`. Live Checkout then sends `managed_payments[enabled]=false` (standard Stripe Billing, Pekko is the seller). If it is unset, or any other value, live Checkout is refused and the account default is not used. Test mode is unchanged: unset still opts out, and only `1` turns Managed Payments on. |
 
 Test variables stay as they are for the sandbox. They are not read in live mode:
 
