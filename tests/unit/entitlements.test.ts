@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { PRODUCT_NAME } from "@/components/brand";
 import {
-  billingEnforced, daysLeft, ENTITLEMENT_STATES, toResponse, warningFor, type EntitlementRow,
+  billingEnforced, daysLeft, downgradeNeedsScreenSelection, ENTITLEMENT_STATES, rolloutNotice, SUSPENDED_PAYLOAD, toResponse, warningFor, type EntitlementRow,
 } from "@/lib/server/entitlements";
 
 const base: EntitlementRow = {
@@ -62,9 +63,28 @@ describe("toResponse", () => {
     });
     expect(toResponse("acc", { ...base, state: "expired" }, "x").suspend_at).toBeNull();
     expect(toResponse("acc", { ...base, plan: "grandfathered", state: "grandfathered" }, "x").trial).toBeNull();
+    expect(toResponse("acc", base, "https://example.test/").rollout_notice).toBeNull();
+    expect(toResponse("acc", { ...base, plan: "grandfathered", state: "grandfathered" }, "x").rollout_notice).toMatch(/grace period/);
   });
   it("has a closed state list", () => {
     expect(ENTITLEMENT_STATES).toEqual(["trial", "trial_grace", "active", "past_due", "grandfathered", "canceled", "expired"]);
+  });
+});
+
+describe("enforcement readiness", () => {
+  it("keeps enforcement off and never describes deletion", () => {
+    expect(billingEnforced({})).toBe(false);
+    expect(SUSPENDED_PAYLOAD.message).toMatch(/content is saved/i);
+    expect(SUSPENDED_PAYLOAD.message).not.toMatch(/delet/i);
+    expect(rolloutNotice({ state: "grandfathered" })).toMatch(/advance notice|before billing changes/i);
+    expect(rolloutNotice({ state: "trial" })).toBeNull();
+    expect(PRODUCT_NAME).toBe("Pekko");
+    expect(PRODUCT_NAME).not.toMatch(/TECHNOLOGIES|™/);
+  });
+  it("asks for a screen choice only when the next plan is smaller than the screens on", () => {
+    expect(downgradeNeedsScreenSelection(4, 3)).toBe(true);
+    expect(downgradeNeedsScreenSelection(3, 3)).toBe(false);
+    expect(downgradeNeedsScreenSelection(1, 5)).toBe(false);
   });
 });
 

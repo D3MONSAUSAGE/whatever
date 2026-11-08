@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
-import { checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, stripeKey, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
+import { checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, priceFor, stripeKey, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
 
 describe("stripe test mode guard", () => {
   it("refuses live and missing keys", () => {
@@ -85,6 +85,29 @@ describe("checkout session", () => {
     expect(asSub({ status: "active", items: { data: [{ current_period_end: 200 }, { current_period_end: 150 }] } })).toBe(150);
     expect(asSub({ status: "trialing", trial_end: 80, current_period_end: 100 })).toBe(80);
     expect(asSub({ status: "active" })).toBeNull();
+  });
+});
+
+describe("live mode stays off and does not share secrets with test", () => {
+  const testPrices = { STRIPE_PRICE_STARTER: "price_test_s", STRIPE_PRICE_BUSINESS: "price_test_b", STRIPE_PRICE_MULTI: "price_test_m" };
+  const livePrices = { STRIPE_LIVE_PRICE_STARTER: "price_live_s", STRIPE_LIVE_PRICE_BUSINESS: "price_live_b", STRIPE_LIVE_PRICE_MULTI: "price_live_m" };
+  it("refuses an sk_live_ key until STRIPE_LIVE_ENABLED is exactly 1", () => {
+    expect(stripeKey({ STRIPE_LIVE_SECRET_KEY: "sk_live_abc", STRIPE_TEST_SECRET_KEY: "sk_test_abc" })).toBe("sk_test_abc");
+    expect(stripeKey({ STRIPE_LIVE_ENABLED: "true", STRIPE_LIVE_SECRET_KEY: "sk_live_abc" })).toBeNull();
+    expect(stripeKey({ STRIPE_LIVE_ENABLED: "1", STRIPE_LIVE_SECRET_KEY: "sk_live_abc", STRIPE_TEST_SECRET_KEY: "sk_test_abc" })).toBe("sk_live_abc");
+    expect(stripeKey({ STRIPE_LIVE_ENABLED: "1", STRIPE_LIVE_SECRET_KEY: "sk_test_nope", STRIPE_TEST_SECRET_KEY: "sk_test_abc" })).toBeNull();
+  });
+  it("never falls back across price or webhook secrets", () => {
+    expect(priceFor("business", { ...testPrices, ...livePrices })).toBe("price_test_b");
+    expect(priceFor("business", { STRIPE_LIVE_ENABLED: "1", ...testPrices, ...livePrices })).toBe("price_live_b");
+    expect(priceFor("business", { STRIPE_LIVE_ENABLED: "1", ...testPrices })).toBeNull();
+    expect(planForPrice("price_test_b", { STRIPE_LIVE_ENABLED: "1", ...testPrices, ...livePrices })).toBeNull();
+    expect(planForPrice("price_live_b", { STRIPE_LIVE_ENABLED: "1", ...livePrices })).toBe("business");
+    expect(webhookSecret({ STRIPE_WEBHOOK_SECRET: "whsec_test", STRIPE_LIVE_WEBHOOK_SECRET: "whsec_live" })).toBe("whsec_test");
+    expect(webhookSecret({ STRIPE_LIVE_ENABLED: "1", STRIPE_WEBHOOK_SECRET: "whsec_test", STRIPE_LIVE_WEBHOOK_SECRET: "whsec_live" })).toBe("whsec_live");
+    expect(webhookEventAllowed(true, {})).toBe(false);
+    expect(webhookEventAllowed(false, { STRIPE_LIVE_ENABLED: "1" })).toBe(false);
+    expect(webhookEventAllowed(true, { STRIPE_LIVE_ENABLED: "1" })).toBe(true);
   });
 });
 

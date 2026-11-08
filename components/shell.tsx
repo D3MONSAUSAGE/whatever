@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
 import { ToastProvider } from "@/components/toast";
 import { UploadProgress, UploadsProvider } from "@/components/uploads";
-import { BrandLockup } from "@/components/brand";
+import { BrandLockup, PRODUCT_NAME } from "@/components/brand";
 import { AlertsBanner } from "@/components/alerts";
+import { BillingBanner } from "@/components/billing-banner";
 import { isRecoveryUrl } from "@/components/auth-frame";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
 import { IconCalendar, IconChart, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
@@ -63,7 +64,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     <UploadsProvider>
     <div className="min-h-dvh md:flex">
       <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
-        <Link href="/dashboard" className="px-1 mb-6">
+        <Link href="/dashboard" className="px-1 mb-6" aria-label={PRODUCT_NAME}>
           <BrandLockup size="sm" />
         </Link>
         {NAV.map((item) => (
@@ -91,6 +92,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
         </header>
         <main className="px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 max-w-6xl">
           <UploadProgress />
+          {preview ? null : <BillingBanner />}
           {preview ? null : <AlertsBanner />}
           {children}
         </main>

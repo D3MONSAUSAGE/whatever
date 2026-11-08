@@ -107,7 +107,7 @@ export default function Billing() {
       </section>
 
       {list.length > 0 && (
-        <section className="card p-5 space-y-3" aria-labelledby="screens-heading">
+        <section id="screens" className="card p-5 space-y-3" aria-labelledby="screens-heading">
           <h2 id="screens-heading" className="text-lg font-semibold">Screens that stay on</h2>
           <p className="text-muted text-sm">
             Your plan includes {allowed} screen{allowed === 1 ? "" : "s"}. Screens you don't choose are paused and show a notice; their content and settings are kept, and you can switch them back on anytime.

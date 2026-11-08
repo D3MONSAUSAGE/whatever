@@ -1,7 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
-import { billingDiagnostics, checkoutAvailable, checkoutSessionRequest, PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
+import { billingDiagnostics, checkoutAvailable, checkoutSessionRequest, PAID_PLANS, priceFor, stripe, stripeKey, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     customerId: a.data.stripe_customer_id,
     origin,
     managedPayments: process.env.STRIPE_MANAGED_PAYMENTS,
-    secretKey: process.env.STRIPE_TEST_SECRET_KEY,
+    secretKey: stripeKey() ?? "",
   });
   const session = await s.checkout.sessions.create(params, options);
   return json({ url: session.url });

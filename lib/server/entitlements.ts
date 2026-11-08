@@ -50,6 +50,21 @@ function utcDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) + " (UTC)";
 }
 
+/**
+ * Early customers (plan grandfathered in migration 0013) are not cut off when
+ * enforcement later turns on. The notice is the advance warning; the grace is
+ * that their existing screens keep playing.
+ */
+export function rolloutNotice(e: Pick<EntitlementRow, "state">): string | null {
+  if (e.state !== "grandfathered") return null;
+  return "You're an early Pekko customer. We'll tell you before billing changes, and your screens keep a grace period. Your content stays; nothing is deleted.";
+}
+
+/** A downgrade whose screen count is below the screens currently on needs the owner to choose which stay on. */
+export function downgradeNeedsScreenSelection(activeScreens: number, nextLimit: number): boolean {
+  return activeScreens > nextLimit;
+}
+
 export function warningFor(e: EntitlementRow): Warning {
   if (e.state === "expired") {
     return { kind: "expired", action: "open_plan", message: "Your free trial has ended, so your screens are paused. Your content and settings are saved. Choose a plan to turn them back on." };
@@ -97,6 +112,7 @@ export function toResponse(accountId: string, e: EntitlementRow, appUrl: string)
     /** Gated premium features. None in M17: every plan and the trial get every feature. */
     features_locked: [] as string[],
     warning: warningFor(e),
+    rollout_notice: rolloutNotice(e),
     enforced: billingEnforced(),
     billing_url: `${appUrl.replace(/\/$/, "")}/dashboard/billing`,
     server_time: e.server_time,

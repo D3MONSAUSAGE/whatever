@@ -1,10 +1,11 @@
 import Stripe from "stripe";
 import { db } from "./supabase";
 
-/** M17.3 Stripe, TEST MODE ONLY. Any key that is not sk_test_ is refused. */
+/** Stripe billing. Live charges stay off unless STRIPE_LIVE_ENABLED is exactly "1". */
 export type PaidPlan = "starter" | "business" | "multi";
 export const PAID_PLANS: readonly PaidPlan[] = ["starter", "business", "multi"];
 const PRICE_ENV = { starter: "STRIPE_PRICE_STARTER", business: "STRIPE_PRICE_BUSINESS", multi: "STRIPE_PRICE_MULTI" } as const;
+const LIVE_PRICE_ENV = { starter: "STRIPE_LIVE_PRICE_STARTER", business: "STRIPE_LIVE_PRICE_BUSINESS", multi: "STRIPE_LIVE_PRICE_MULTI" } as const;
 
 /** Names the checkout and webhook gates read. Listed literally so the runtime receives them. */
 export const BILLING_ENV_NAMES = [
@@ -13,6 +14,13 @@ export const BILLING_ENV_NAMES = [
   "STRIPE_PRICE_STARTER",
   "STRIPE_PRICE_BUSINESS",
   "STRIPE_PRICE_MULTI",
+] as const;
+export const LIVE_BILLING_ENV_NAMES = [
+  "STRIPE_LIVE_SECRET_KEY",
+  "STRIPE_LIVE_WEBHOOK_SECRET",
+  "STRIPE_LIVE_PRICE_STARTER",
+  "STRIPE_LIVE_PRICE_BUSINESS",
+  "STRIPE_LIVE_PRICE_MULTI",
 ] as const;
 
 function clean(value: string | undefined): string {
@@ -25,11 +33,17 @@ function clean(value: string | undefined): string {
  * allowlist, so the vars can be set on the project and still be empty in the function.
  */
 const DYNAMIC_NAME = {
+  STRIPE_LIVE_ENABLED: ["STRIPE", "LIVE", "ENABLED"].join("_"),
   STRIPE_TEST_SECRET_KEY: ["STRIPE", "TEST", "SECRET", "KEY"].join("_"),
   STRIPE_WEBHOOK_SECRET: ["STRIPE", "WEBHOOK", "SECRET"].join("_"),
   STRIPE_PRICE_STARTER: ["STRIPE", "PRICE", "STARTER"].join("_"),
   STRIPE_PRICE_BUSINESS: ["STRIPE", "PRICE", "BUSINESS"].join("_"),
   STRIPE_PRICE_MULTI: ["STRIPE", "PRICE", "MULTI"].join("_"),
+  STRIPE_LIVE_SECRET_KEY: ["STRIPE", "LIVE", "SECRET", "KEY"].join("_"),
+  STRIPE_LIVE_WEBHOOK_SECRET: ["STRIPE", "LIVE", "WEBHOOK", "SECRET"].join("_"),
+  STRIPE_LIVE_PRICE_STARTER: ["STRIPE", "LIVE", "PRICE", "STARTER"].join("_"),
+  STRIPE_LIVE_PRICE_BUSINESS: ["STRIPE", "LIVE", "PRICE", "BUSINESS"].join("_"),
+  STRIPE_LIVE_PRICE_MULTI: ["STRIPE", "LIVE", "PRICE", "MULTI"].join("_"),
 } as const;
 
 function readRuntime(name: keyof typeof DYNAMIC_NAME, literal: string | undefined): string {
@@ -43,26 +57,62 @@ function readRuntime(name: keyof typeof DYNAMIC_NAME, literal: string | undefine
 export function billingEnv(override?: Record<string, string | undefined>) {
   if (override) {
     return {
+      STRIPE_LIVE_ENABLED: clean(override.STRIPE_LIVE_ENABLED),
       STRIPE_TEST_SECRET_KEY: clean(override.STRIPE_TEST_SECRET_KEY),
       STRIPE_WEBHOOK_SECRET: clean(override.STRIPE_WEBHOOK_SECRET),
       STRIPE_PRICE_STARTER: clean(override.STRIPE_PRICE_STARTER),
       STRIPE_PRICE_BUSINESS: clean(override.STRIPE_PRICE_BUSINESS),
       STRIPE_PRICE_MULTI: clean(override.STRIPE_PRICE_MULTI),
+      STRIPE_LIVE_SECRET_KEY: clean(override.STRIPE_LIVE_SECRET_KEY),
+      STRIPE_LIVE_WEBHOOK_SECRET: clean(override.STRIPE_LIVE_WEBHOOK_SECRET),
+      STRIPE_LIVE_PRICE_STARTER: clean(override.STRIPE_LIVE_PRICE_STARTER),
+      STRIPE_LIVE_PRICE_BUSINESS: clean(override.STRIPE_LIVE_PRICE_BUSINESS),
+      STRIPE_LIVE_PRICE_MULTI: clean(override.STRIPE_LIVE_PRICE_MULTI),
     };
   }
   return {
+    STRIPE_LIVE_ENABLED: readRuntime("STRIPE_LIVE_ENABLED", process.env.STRIPE_LIVE_ENABLED),
     STRIPE_TEST_SECRET_KEY: readRuntime("STRIPE_TEST_SECRET_KEY", process.env.STRIPE_TEST_SECRET_KEY),
     STRIPE_WEBHOOK_SECRET: readRuntime("STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET),
     STRIPE_PRICE_STARTER: readRuntime("STRIPE_PRICE_STARTER", process.env.STRIPE_PRICE_STARTER),
     STRIPE_PRICE_BUSINESS: readRuntime("STRIPE_PRICE_BUSINESS", process.env.STRIPE_PRICE_BUSINESS),
     STRIPE_PRICE_MULTI: readRuntime("STRIPE_PRICE_MULTI", process.env.STRIPE_PRICE_MULTI),
+    STRIPE_LIVE_SECRET_KEY: readRuntime("STRIPE_LIVE_SECRET_KEY", process.env.STRIPE_LIVE_SECRET_KEY),
+    STRIPE_LIVE_WEBHOOK_SECRET: readRuntime("STRIPE_LIVE_WEBHOOK_SECRET", process.env.STRIPE_LIVE_WEBHOOK_SECRET),
+    STRIPE_LIVE_PRICE_STARTER: readRuntime("STRIPE_LIVE_PRICE_STARTER", process.env.STRIPE_LIVE_PRICE_STARTER),
+    STRIPE_LIVE_PRICE_BUSINESS: readRuntime("STRIPE_LIVE_PRICE_BUSINESS", process.env.STRIPE_LIVE_PRICE_BUSINESS),
+    STRIPE_LIVE_PRICE_MULTI: readRuntime("STRIPE_LIVE_PRICE_MULTI", process.env.STRIPE_LIVE_PRICE_MULTI),
   };
 }
 
+/** Live mode only when the flag is exactly "1". Anything else, including "true", stays in test. */
+export function billingMode(env?: Record<string, string | undefined>): "test" | "live" {
+  const flag = env ? env.STRIPE_LIVE_ENABLED : process.env.STRIPE_LIVE_ENABLED;
+  return clean(flag) === "1" ? "live" : "test";
+}
+
+/**
+ * The secret for the active mode. Test never reads STRIPE_LIVE_*, and live never
+ * reads STRIPE_TEST_*. A live key is refused unless the flag is exactly "1".
+ */
 export function stripeKey(env?: Record<string, string | undefined>): string | null {
-  const k = billingEnv(env).STRIPE_TEST_SECRET_KEY;
-  if (!k.startsWith("sk_test_")) return null; // live, missing, or quoted keys never load
-  return k;
+  const values = billingEnv(env);
+  if (billingMode(env) === "live") {
+    const live = values.STRIPE_LIVE_SECRET_KEY;
+    return live.startsWith("sk_live_") ? live : null;
+  }
+  const test = values.STRIPE_TEST_SECRET_KEY;
+  return test.startsWith("sk_test_") ? test : null;
+}
+
+export function webhookSecret(env?: Record<string, string | undefined>): string {
+  const values = billingEnv(env);
+  return billingMode(env) === "live" ? values.STRIPE_LIVE_WEBHOOK_SECRET : values.STRIPE_WEBHOOK_SECRET;
+}
+
+/** Live mode accepts only livemode events. Test mode refuses them. */
+export function webhookEventAllowed(livemode: boolean, env?: Record<string, string | undefined>): boolean {
+  return billingMode(env) === "live" ? livemode : !livemode;
 }
 
 /** Webhook payloads and subscription re-fetches stay on the SDK default. */
@@ -106,18 +156,24 @@ export function checkoutSessionRequest(input: {
   return { params, options: { apiVersion: CHECKOUT_API_VERSION } };
 }
 
-let cached: Stripe | null = null;
+let cached: { key: string; client: Stripe } | null = null;
 export function stripe(): Stripe | null {
   const k = stripeKey();
   if (!k) return null;
   // No apiVersion here: the client, webhook parser, and subscription re-fetch stay on acacia.
-  return (cached ??= new Stripe(k));
+  if (cached?.key !== k) cached = { key: k, client: new Stripe(k) };
+  return cached.client;
 }
-export const priceFor = (plan: PaidPlan, env?: Record<string, string | undefined>) => billingEnv(env)[PRICE_ENV[plan]] || null;
+export function priceFor(plan: PaidPlan, env?: Record<string, string | undefined>): string | null {
+  const values = billingEnv(env);
+  const name = (billingMode(env) === "live" ? LIVE_PRICE_ENV : PRICE_ENV)[plan];
+  return values[name] || null;
+}
 export function planForPrice(priceId: string | null | undefined, env?: Record<string, string | undefined>): PaidPlan | null {
   if (!priceId) return null;
   const values = billingEnv(env);
-  return PAID_PLANS.find((p) => values[PRICE_ENV[p]] === priceId) ?? null;
+  const names = billingMode(env) === "live" ? LIVE_PRICE_ENV : PRICE_ENV;
+  return PAID_PLANS.find((p) => values[names[p]] === priceId) ?? null;
 }
 
 const ts = (s: number | null | undefined) => (s ? new Date(s * 1000).toISOString() : null);
@@ -296,39 +352,57 @@ function valueShape(value: string) {
   };
 }
 
-/** Names only. Never returns values. `rejected` means the var is set but not a test key, whsec_, or price_. */
+/** Names only. Never returns values. `rejected` means the var is set but has the wrong prefix for the active mode. */
 export function billingDiagnostics(env?: Record<string, string | undefined>) {
   const values = billingEnv(env);
+  const live = billingMode(env) === "live";
   const missing: string[] = [];
   const rejected: string[] = [];
   const shapes: Record<string, ReturnType<typeof valueShape>> = {};
-  const expect = {
-    STRIPE_TEST_SECRET_KEY: "sk_test_",
-    STRIPE_WEBHOOK_SECRET: "whsec_",
-    STRIPE_PRICE_STARTER: "price_",
-    STRIPE_PRICE_BUSINESS: "price_",
-    STRIPE_PRICE_MULTI: "price_",
-  } as const;
-  for (const name of BILLING_ENV_NAMES) {
+  const names = live ? LIVE_BILLING_ENV_NAMES : BILLING_ENV_NAMES;
+  const expectPrefix: Record<string, string> = live
+    ? {
+      STRIPE_LIVE_SECRET_KEY: "sk_live_",
+      STRIPE_LIVE_WEBHOOK_SECRET: "whsec_",
+      STRIPE_LIVE_PRICE_STARTER: "price_",
+      STRIPE_LIVE_PRICE_BUSINESS: "price_",
+      STRIPE_LIVE_PRICE_MULTI: "price_",
+    }
+    : {
+      STRIPE_TEST_SECRET_KEY: "sk_test_",
+      STRIPE_WEBHOOK_SECRET: "whsec_",
+      STRIPE_PRICE_STARTER: "price_",
+      STRIPE_PRICE_BUSINESS: "price_",
+      STRIPE_PRICE_MULTI: "price_",
+    };
+  for (const name of names) {
     const value = values[name];
     if (!value) {
       missing.push(name);
       continue;
     }
-    if (!value.startsWith(expect[name])) {
+    if (!value.startsWith(expectPrefix[name])) {
       rejected.push(name);
       shapes[name] = valueShape(value);
     }
   }
-  const sources = env ? undefined : {
-    STRIPE_TEST_SECRET_KEY: {
-      literal: valueShape(clean(process.env.STRIPE_TEST_SECRET_KEY)),
-      dynamic: valueShape(clean(process.env[DYNAMIC_NAME.STRIPE_TEST_SECRET_KEY])),
-    },
-  };
+  const sources = env ? undefined : live
+    ? {
+      STRIPE_LIVE_SECRET_KEY: {
+        literal: valueShape(clean(process.env.STRIPE_LIVE_SECRET_KEY)),
+        dynamic: valueShape(clean(process.env[DYNAMIC_NAME.STRIPE_LIVE_SECRET_KEY])),
+      },
+    }
+    : {
+      STRIPE_TEST_SECRET_KEY: {
+        literal: valueShape(clean(process.env.STRIPE_TEST_SECRET_KEY)),
+        dynamic: valueShape(clean(process.env[DYNAMIC_NAME.STRIPE_TEST_SECRET_KEY])),
+      },
+    };
   return {
+    mode: live ? "live" as const : "test" as const,
     available: checkoutAvailable(values),
-    webhook: !!stripeKey(values) && values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_"),
+    webhook: !!stripeKey(values) && webhookSecret(values).startsWith("whsec_"),
     missing,
     rejected,
     shapes,
