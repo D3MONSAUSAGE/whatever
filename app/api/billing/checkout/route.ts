@@ -41,5 +41,11 @@ export async function GET(req: Request) {
   const debug = new URL(req.url).searchParams.get("debug") === "1" && process.env.VERCEL_ENV === "preview";
   if (!debug) return json({ available: checkoutAvailable() });
   const report = billingDiagnostics();
-  return json({ available: report.available, webhook: report.webhook, missing: report.missing, rejected: report.rejected });
+  return json({
+    available: report.available,
+    webhook: report.webhook,
+    missing: report.missing,
+    rejected: report.rejected,
+    shapes: report.shapes,
+  });
 }

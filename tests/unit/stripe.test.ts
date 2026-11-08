@@ -35,6 +35,8 @@ describe("billing env diagnostics", () => {
     expect(JSON.stringify(missing)).not.toContain("whsec_ok");
     const live = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "sk_live_secret", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
     expect(live.rejected).toEqual(["STRIPE_TEST_SECRET_KEY"]);
+    expect(live.shapes.STRIPE_TEST_SECRET_KEY.prefix).toBe("sk_live_");
+    expect(live.shapes.STRIPE_TEST_SECRET_KEY.length).toBe("sk_live_secret".length);
     expect(JSON.stringify(live)).not.toContain("sk_live_secret");
     const quoted = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "\"sk_test_abc\"", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
     expect(quoted.available).toBe(true);

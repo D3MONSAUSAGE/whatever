@@ -183,19 +183,65 @@ export function checkoutAvailable(env?: Record<string, string | undefined>) {
   return !!stripeKey(env) && PAID_PLANS.every((p) => !!priceFor(p, env));
 }
 
+const PUBLIC_PREFIXES = ["sk_test_", "sk_live_", "rk_test_", "rk_live_", "pk_test_", "pk_live_", "whsec_", "price_"] as const;
+
+/** Character classes of the start of a value. Never the characters themselves. */
+function classPattern(value: string): string {
+  return [...value.slice(0, 12)].map((ch) => {
+    const code = ch.charCodeAt(0);
+    if (code >= 97 && code <= 122) return "a";
+    if (code >= 65 && code <= 90) return "A";
+    if (code >= 48 && code <= 57) return "9";
+    if (ch === "_") return "_";
+    if (code < 128) return "+";
+    return "?";
+  }).join("");
+}
+
+function valueShape(value: string) {
+  const lowered = value.toLowerCase();
+  const prefix = PUBLIC_PREFIXES.find((item) => value.startsWith(item))
+    ?? PUBLIC_PREFIXES.find((item) => lowered.startsWith(item))
+    ?? null;
+  return {
+    length: value.length,
+    prefix,
+    case: prefix && !value.startsWith(prefix) ? "upper" : "as-is",
+    pattern: classPattern(value),
+    interiorWhitespace: /\s/.test(value),
+    nonAscii: /[^\u0000-\u007f]/.test(value),
+  };
+}
+
 /** Names only. Never returns values. `rejected` means the var is set but not a test key, whsec_, or price_. */
 export function billingDiagnostics(env?: Record<string, string | undefined>) {
   const values = billingEnv(env);
   const missing: string[] = [];
   const rejected: string[] = [];
-  if (!values.STRIPE_TEST_SECRET_KEY) missing.push("STRIPE_TEST_SECRET_KEY");
-  else if (!values.STRIPE_TEST_SECRET_KEY.startsWith("sk_test_")) rejected.push("STRIPE_TEST_SECRET_KEY");
-  if (!values.STRIPE_WEBHOOK_SECRET) missing.push("STRIPE_WEBHOOK_SECRET");
-  else if (!values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_")) rejected.push("STRIPE_WEBHOOK_SECRET");
-  for (const name of ["STRIPE_PRICE_STARTER", "STRIPE_PRICE_BUSINESS", "STRIPE_PRICE_MULTI"] as const) {
+  const shapes: Record<string, ReturnType<typeof valueShape>> = {};
+  const expect = {
+    STRIPE_TEST_SECRET_KEY: "sk_test_",
+    STRIPE_WEBHOOK_SECRET: "whsec_",
+    STRIPE_PRICE_STARTER: "price_",
+    STRIPE_PRICE_BUSINESS: "price_",
+    STRIPE_PRICE_MULTI: "price_",
+  } as const;
+  for (const name of BILLING_ENV_NAMES) {
     const value = values[name];
-    if (!value) missing.push(name);
-    else if (!value.startsWith("price_")) rejected.push(name);
+    if (!value) {
+      missing.push(name);
+      continue;
+    }
+    if (!value.startsWith(expect[name])) {
+      rejected.push(name);
+      shapes[name] = valueShape(value);
+    }
   }
-  return { available: checkoutAvailable(values), webhook: !!stripeKey(values) && values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_"), missing, rejected };
+  return {
+    available: checkoutAvailable(values),
+    webhook: !!stripeKey(values) && values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_"),
+    missing,
+    rejected,
+    shapes,
+  };
 }
