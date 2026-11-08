@@ -177,7 +177,7 @@ export default function Settings() {
         </div>
       </div>
       <p className="mt-6 text-xs text-muted">
-        <a href="/terms" className="hover:underline">Terms of Service</a> · <a href="/privacy" className="hover:underline">Privacy Policy</a>
+        <a href="/terms" className="hover:underline">Terms of Service</a> · <a href="/terms#billing" className="hover:underline">Billing terms</a> · <a href="/privacy" className="hover:underline">Privacy Policy</a>
       </p>
       {confirm.node}
     </section>

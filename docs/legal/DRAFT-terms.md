@@ -1,32 +1,13 @@
-UNPUBLISHED DRAFT. Not linked from the site. Not reviewed by a lawyer. Do not publish until counsel approves.
+Published on the site at `/terms` and `/terms#billing` on November 8, 2026.
 
-# Terms of Service (DRAFT)
+This file is not a second policy and it is not a statement that a lawyer reviewed the text. The pages visitors see are `app/terms/page.tsx`.
 
-Last updated November 8, 2026
+Operator: Francisco Lopez, a sole proprietor doing business as Pekko. Pekko is owned entirely by Francisco Lopez and is wholly separate from Teamtegrate LLC. It is not a Pekko LLC.
 
-These terms cover your use of Pekko, a service from Francisco Lopez, a sole proprietor doing business as Pekko ("we", "Pekko") for showing images, videos, and playlists on screens ("the Service"). Pekko is not a corporation and is not operated by another company. By creating an account you agree to these terms.
+Public address: 20227 Saticoy St, Apt 202, Winnetka, CA 91306, US.
 
-Business address: [Business address: to be confirmed]
+Support and privacy email: vivalopez06-wh5rwz@mail.grokbot.com.
 
-## Your account
+Refunds: monthly subscription payments are not refunded for unused time or a cancellation partway through a billing period, except where a refund is required by applicable law. Confirmed duplicate or incorrect charges will be corrected.
 
-You must give accurate information and keep your password safe. You are responsible for what happens under your account, including the screens you pair to it.
-
-## Your content
-
-You keep ownership of the media you upload. You give Pekko permission to store, process, and deliver it to your screens only to run the Service. Ending a trial or a subscription pauses screens. It does not delete your content.
-
-## Plans, trials, and billing
-
-New organizations get a 14-day trial from the moment the organization is created, with no card. Organizations that already existed before paid billing are early customers: they get advance notice and a grace period before billing changes affect their screens.
-
-Paid plans are monthly: Starter $19, Business $39, and Multi-screen $59. Payments are processed by Stripe. Pekko does not store card numbers. Stripe sends payment receipts from Stripe's own email setting. A failed payment starts a grace period; screens keep playing until that date. Canceling stops renewal at the end of the period already paid. If a plan includes fewer screens than you have on, you choose which screens stay on. The others pause. Nothing is deleted.
-
-[Refund window: to be confirmed by counsel.]
-
-## Contact
-
-[Support email: to be confirmed]
-
-Francisco Lopez, a sole proprietor doing business as Pekko
-[Business address: to be confirmed]
+The published terms do not include a warranty disclaimer, a liability cap, indemnity, or a governing-law clause. Those were not in the authorized text.

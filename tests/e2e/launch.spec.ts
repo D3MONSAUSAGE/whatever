@@ -47,23 +47,24 @@ test("pricing shows the approved plans and Start free trial opens sign-up", asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
-test("support, contact and legal pages carry placeholders, not invented details", async ({ page }) => {
+test("support, contact and legal pages publish the authorized contact", async ({ page }) => {
   for (const path of ["/support", "/contact", "/account-deletion"]) {
     await page.goto(path);
-    await expect(page.getByTestId("support-todo")).toBeVisible();
-    expect(await page.locator("a[href^='mailto:']").count()).toBe(0);
+    await expect(page.getByTestId("support-email")).toHaveAttribute("href", "mailto:vivalopez06-wh5rwz@mail.grokbot.com");
+    await expect(page.getByTestId("support-address")).toContainText("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
+    await expect(page.getByTestId("support-todo")).toHaveCount(0);
   }
   await page.goto("/account-deletion");
   await expect(page.getByTestId("deleted-table")).toContainText("Uploaded images and videos");
   await expect(page.getByTestId("retained-table")).toContainText("Stripe");
   await page.goto("/privacy");
-  await expect(page.getByRole("heading", { name: "Privacy Policy (DRAFT)" })).toBeVisible();
-  for (const p of ["Supabase", "Vercel", "Firebase Cloud Messaging", "Stripe (planned)", "[Legal entity name: to be confirmed]"]) {
+  await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
+  for (const p of ["Supabase", "Vercel", "Firebase Cloud Messaging", "Stripe", "Resend", "us-west-1", "us-east-1"]) {
     await expect(page.getByText(p, { exact: false }).first()).toBeVisible();
   }
   await page.goto("/terms");
-  await expect(page.getByRole("heading", { name: "Terms of Service (DRAFT)" })).toBeVisible();
-  await expect(page.getByText("[Legal entity name: to be confirmed]", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Terms of Service" })).toBeVisible();
+  await expect(page.getByText("not refunded for unused time", { exact: false })).toBeVisible();
 });
 
 test("a signed-out owner deletes their account from the public page, can cancel, and the job deletes it", async ({ page, request }) => {

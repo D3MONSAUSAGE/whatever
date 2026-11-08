@@ -15,17 +15,16 @@ const DELETED = [
   ["Plan and trial status", "Deleted"],
 ];
 const RETAINED = [
-  ["Deletion record (random account and user IDs, request and completion dates; no email or content)", "Kept as proof the request was completed. [Retention period to be confirmed.]"],
-  ["Database and storage backups held by our hosting provider (Supabase)", "Deleted data can remain in backups until they rotate out. [Backup window to be confirmed.]"],
-  ["Payment records held by Stripe (paid plans; not live yet)", "Invoices and payment records are kept as required for tax and accounting. [Period to be confirmed.]"],
-  ["Short-lived server logs at our hosting providers (IP address, request details)", "Expire on the providers' own schedule. [To be confirmed.]"],
+  ["Deletion record (account id, user id, request and completion dates; no email or content)", "Kept as the record that the request finished. This application does not set a destruction date for that row."],
+  ["Database and storage backups held by Supabase", "Deleted data can remain in a backup until Supabase's own backup cycle drops it. This application does not set that cycle."],
+  ["Payment records held by Stripe, if a paid subscription was started", "Pekko does not store card numbers. Stripe keeps its own billing records. This application does not set Stripe's retention period, and this page does not enable charges."],
+  ["Server logs and pairing rate limits", "Error logs written by this app record the method, path, and a short message, not headers, cookies, or bodies. Pairing limits use the IP address as the limit key. Provider log retention is not set here."],
 ];
 
 // Public page (works without the app; this is the URL for the Google Play listing).
 export default function AccountDeletionInfo() {
   return (
     <PublicPage>
-      <p role="note" className="note-error mb-6"><strong>DRAFT:</strong> retention periods marked [to be confirmed] are pending review.</p>
       <h1 className="text-2xl font-semibold tracking-tight">Delete your Pekko account</h1>
       <p className="mt-2 text-sm text-muted">Only the account owner can delete an account. You don&apos;t need the mobile app.</p>
       <ol className="mt-5 list-decimal pl-5 grid gap-2">

@@ -1,54 +1,17 @@
-UNPUBLISHED DRAFT. Not linked from the site. Not reviewed by a lawyer. Do not publish until counsel approves.
+Published on the site at `/terms#billing`, on the pricing page, and on Plan & billing, on November 8, 2026.
 
-# Billing and refunds (DRAFT)
+This file is not a second policy and it is not a statement that a lawyer reviewed the text.
 
-Last updated November 8, 2026
+Seller: Francisco Lopez, a sole proprietor doing business as Pekko.
+Public address: 20227 Saticoy St, Apt 202, Winnetka, CA 91306, US.
+Support email: vivalopez06-wh5rwz@mail.grokbot.com.
 
-Operator: Francisco Lopez, a sole proprietor doing business as Pekko.
+Monthly prices: Starter $19 for 1 screen, Business $39 for 3 screens, Multi-screen $59 for 5 screens.
+New organizations: 14-day trial, up to 5 screens, no card. A separate 3-day playback grace follows the trial. It does not lengthen the trial.
+Existing customers: 14 days of full access after the advance notice email succeeds. Publishing this page is not that notice.
+Failed payment: 7 days of playback grace from the first failure.
+Canceling stops the next renewal. Access continues through the period already paid.
 
-Business address: [Business address: to be confirmed]
+Refunds: monthly subscription payments are not refunded for unused time or a cancellation partway through a billing period, except where a refund is required by applicable law. Confirmed duplicate or incorrect charges will be corrected.
 
-Pekko is a sole proprietorship owned by Francisco Lopez. It is not a limited liability company and is not operated by another company.
-
-## Trial
-
-A new organization has 14 days from creation. No card is required. Three days before the trial ends, the dashboard shows a notice (and an email, only if account email is switched on). After the trial, screens keep playing for a short grace period. Then they pause. Content and settings stay.
-
-## Existing organizations
-
-Organizations created before paid billing are early customers. They receive advance warning and a grace period before any billing change affects their screens. Turning enforcement on does not delete content and does not immediately pause those screens.
-
-## Paid plans
-
-Monthly prices, billed by Stripe, with Pekko as the seller:
-
-| Plan | Price | Screens |
-| --- | --- | --- |
-| Starter | $19 | 1 |
-| Business | $39 | 3 |
-| Multi-screen | $59 | 5 |
-
-If you move to a plan with fewer screens than you currently have on, you choose which screens stay on. The others pause. Playlists, media, and settings are not deleted.
-
-## Failed payment
-
-If a payment fails, screens keep playing until the grace end date shown in the dashboard. The notice includes that date. Update the card in Stripe Checkout. Pekko does not store the card number.
-
-## Cancellation
-
-Canceling stops the next renewal. The plan stays in force until the end of the period already paid. After that, screens pause. Content remains until you delete the account yourself.
-
-## Receipts
-
-Payment receipts are sent by Stripe, using Stripe's own email setting. Pekko does not send a separate receipt.
-
-## Refunds
-
-[Refund window: to be confirmed by counsel.]
-
-## Contact
-
-[Support email: to be confirmed]
-
-Francisco Lopez, a sole proprietor doing business as Pekko
-[Business address: to be confirmed]
+Publishing these terms does not set `STRIPE_LIVE_ENABLED`, `BILLING_ENFORCE`, or `BILLING_REMINDERS`.
