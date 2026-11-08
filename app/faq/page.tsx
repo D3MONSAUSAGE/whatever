@@ -6,7 +6,7 @@ import { ContactBlock } from "@/components/contact-block";
 
 export const metadata: Metadata = {
   title: "FAQ · Pekko",
-  description: "Answers about the Pekko free trial, plans, screens, devices and account deletion.",
+  description: "Answers about PowerPoint and PDF uploads, the Pekko free trial, plans, screens, devices and account deletion.",
   alternates: { canonical: "/faq" },
 };
 

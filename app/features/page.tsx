@@ -5,13 +5,13 @@ import { FeatureGrid, Screenshot, SectionHeading, TrialCta } from "@/components/
 
 export const metadata: Metadata = {
   title: "Features · Pekko",
-  description: "Digital signage for TVs, tablets and computers: media, menu boards, playlists, schedules, multiple screens, status alerts and offline playback.",
+  description: "Digital signage for TVs, tablets and computers: images, videos, PowerPoint and PDF presentations, playlists, schedules, multiple screens, status alerts and offline playback.",
   alternates: { canonical: "/features" },
 };
 
 const ROWS = [
   { title: "Manage everything from one dashboard", body: "See your screens, media, playlists and schedules at a glance, from your computer or phone.", shot: SHOTS.dashboard },
-  { title: "Media library", body: "Upload images and MP4 videos once and use them on any screen.", shot: SHOTS.media },
+  { title: "Turn presentations into screen content", body: "Upload a PowerPoint (.pptx) or PDF to share menus, promotions, or office announcements. Pekko converts each slide or page into a still image you can use in your playlists.", shot: SHOTS.media },
   { title: "Playlists", body: "Arrange slides, set how long each one shows, and publish to one screen or many.", shot: SHOTS.playlists },
   { title: "Schedules", body: "Run different playlists by weekday and time of day, per location and time zone, for single screens or groups.", shot: SHOTS.schedule },
   { title: "Screens and status", body: "Pair a screen with a 6-digit code, see what each one is playing, and get an alert when one goes offline.", shot: SHOTS.displays },
