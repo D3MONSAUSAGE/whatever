@@ -30,6 +30,7 @@ export async function POST(req: Request) {
     customerId: a.data.stripe_customer_id,
     origin,
     managedPayments: process.env.STRIPE_MANAGED_PAYMENTS,
+    secretKey: process.env.STRIPE_TEST_SECRET_KEY,
   });
   const session = await s.checkout.sessions.create(params, options);
   return json({ url: session.url });

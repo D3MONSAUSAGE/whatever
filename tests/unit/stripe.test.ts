@@ -56,6 +56,7 @@ describe("checkout session", () => {
     customerId: null as string | null,
     origin: "https://preview.example",
     managedPayments: undefined as string | undefined,
+    secretKey: "sk_test_abc" as string | undefined,
   };
   it("disables Managed Payments on basil and leaves the client on acacia", () => {
     const client = new Stripe("sk_test_dummy");
@@ -69,7 +70,14 @@ describe("checkout session", () => {
     const on = checkoutSessionRequest({ ...input, managedPayments: "1", customerId: "cus_1" });
     expect(on.params.managed_payments).toEqual({ enabled: true });
     expect(on.params).toMatchObject({ customer: "cus_1" });
-    expect(checkoutSessionRequest({ ...input, managedPayments: "true" }).params.managed_payments.enabled).toBe(false);
+    expect(checkoutSessionRequest({ ...input, managedPayments: "true" }).params.managed_payments?.enabled).toBe(false);
+  });
+  it("leaves managed_payments unset for a live key", () => {
+    const live = checkoutSessionRequest({ ...input, secretKey: "sk_live_abc", managedPayments: "1" });
+    expect(live.params).not.toHaveProperty("managed_payments");
+    expect(JSON.stringify(live.params)).not.toContain("managed_payments");
+    expect(checkoutSessionRequest({ ...input, secretKey: "sk_test_abc" }).params.managed_payments).toEqual({ enabled: false });
+    expect(checkoutSessionRequest({ ...input, secretKey: "\"sk_test_abc\"" }).params.managed_payments).toEqual({ enabled: false });
   });
   it("reads the period end from the subscription or, on basil, from the items", () => {
     const asSub = (value: unknown) => periodEndSeconds(value as Stripe.Subscription);

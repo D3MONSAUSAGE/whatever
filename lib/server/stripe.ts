@@ -85,23 +85,25 @@ export function checkoutSessionRequest(input: {
   customerId: string | null;
   origin: string;
   managedPayments: string | undefined;
+  secretKey: string | undefined;
 }): {
-  params: Stripe.Checkout.SessionCreateParams & { managed_payments: { enabled: boolean } };
+  params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } };
   options: Stripe.RequestOptions;
 } {
-  return {
-    params: {
-      mode: "subscription",
-      line_items: [{ price: input.price, quantity: 1 }],
-      client_reference_id: input.accountId,
-      ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
-      subscription_data: { metadata: { account_id: input.accountId } },
-      success_url: `${input.origin}/dashboard/billing?checkout=success`,
-      cancel_url: `${input.origin}/dashboard/billing?checkout=canceled`,
-      managed_payments: { enabled: managedPaymentsEnabled(input.managedPayments) },
-    },
-    options: { apiVersion: CHECKOUT_API_VERSION },
+  const params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } } = {
+    mode: "subscription",
+    line_items: [{ price: input.price, quantity: 1 }],
+    client_reference_id: input.accountId,
+    ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
+    subscription_data: { metadata: { account_id: input.accountId } },
+    success_url: `${input.origin}/dashboard/billing?checkout=success`,
+    cancel_url: `${input.origin}/dashboard/billing?checkout=canceled`,
   };
+  // The opt-out is test-mode only. A live key leaves the field unset so the account default applies.
+  if (clean(input.secretKey).startsWith("sk_test_")) {
+    params.managed_payments = { enabled: managedPaymentsEnabled(input.managedPayments) };
+  }
+  return { params, options: { apiVersion: CHECKOUT_API_VERSION } };
 }
 
 let cached: Stripe | null = null;
