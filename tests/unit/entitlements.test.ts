@@ -64,7 +64,8 @@ describe("toResponse", () => {
     expect(toResponse("acc", { ...base, state: "expired" }, "x").suspend_at).toBeNull();
     expect(toResponse("acc", { ...base, plan: "grandfathered", state: "grandfathered" }, "x").trial).toBeNull();
     expect(toResponse("acc", base, "https://example.test/").rollout_notice).toBeNull();
-    expect(toResponse("acc", { ...base, plan: "grandfathered", state: "grandfathered" }, "x").rollout_notice).toMatch(/grace period/);
+    expect(toResponse("acc", { ...base, plan: "grandfathered", state: "grandfathered" }, "x").rollout_notice).toMatch(/has not started/);
+    expect(toResponse("acc", { ...base, plan: "grandfathered", state: "grandfathered" }, "x", { transitionEndsAt: "2026-11-22T00:00:00.000Z" }).transition_ends_at).toBeNull();
   });
   it("has a closed state list", () => {
     expect(ENTITLEMENT_STATES).toEqual(["trial", "trial_grace", "active", "past_due", "grandfathered", "canceled", "expired"]);
@@ -76,7 +77,9 @@ describe("enforcement readiness", () => {
     expect(billingEnforced({})).toBe(false);
     expect(SUSPENDED_PAYLOAD.message).toMatch(/content is saved/i);
     expect(SUSPENDED_PAYLOAD.message).not.toMatch(/delet/i);
-    expect(rolloutNotice({ state: "grandfathered" })).toMatch(/advance notice|before billing changes/i);
+    expect(rolloutNotice({ state: "grandfathered" })).toMatch(/has not started/);
+    expect(rolloutNotice({ state: "grandfathered" }, "2026-11-22T00:00:00.000Z", true)).toContain("Nov 22, 2026 (UTC)");
+    expect(rolloutNotice({ state: "grandfathered" }, "2026-11-22T00:00:00.000Z", false)).toMatch(/has not started/);
     expect(rolloutNotice({ state: "trial" })).toBeNull();
     expect(PRODUCT_NAME).toBe("Pekko");
     expect(PRODUCT_NAME).not.toMatch(/TECHNOLOGIES|™/);

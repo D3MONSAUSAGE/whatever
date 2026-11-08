@@ -33,7 +33,42 @@ export type Warning = {
 
 export const PLAN_LIMITS: Record<PlanId, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5, comp: 5 };
 
+/** New organizations. Matches accounts.trial_ends_at default (created_at + 14 days). */
+export const TRIAL_DAYS = 14;
+/** First recorded payment failure. A repeat past_due does not move this. */
+export const PAYMENT_GRACE_DAYS = 7;
+/** Existing customers. Starts only after BILLING_ENFORCE is turned on, and only once. */
+export const TRANSITION_DAYS = 14;
+
 const DAY = 86_400_000;
+
+/** Adds whole days to a server timestamp. The result does not depend on a local zone. */
+export function addServerDays(iso: string, days: number): string {
+  return new Date(Date.parse(iso) + days * DAY).toISOString();
+}
+
+export function trialEndsAt(createdAt: string): string {
+  return addServerDays(createdAt, TRIAL_DAYS);
+}
+
+export function paymentGraceEndsAt(failureRecordedAt: string): string {
+  return addServerDays(failureRecordedAt, PAYMENT_GRACE_DAYS);
+}
+
+/**
+ * Existing-customer window. A stored start is never replaced. Enforcement off does
+ * not start the clock. The caller must pass a server timestamp, never a client clock.
+ */
+export function transitionStamp(existingStart: string | null, serverNow: string, enforced: boolean): string | null {
+  if (existingStart) return existingStart;
+  if (!enforced) return null;
+  return serverNow;
+}
+
+export function transitionEndsAt(startedAt: string | null): string | null {
+  if (!startedAt) return null;
+  return addServerDays(startedAt, TRANSITION_DAYS);
+}
 
 /**
  * Whole days left = ceil(remaining / 24 h); 1 during the final 24 hours, 0 once the instant
@@ -55,9 +90,12 @@ function utcDate(iso: string) {
  * enforcement later turns on. The notice is the advance warning; the grace is
  * that their existing screens keep playing.
  */
-export function rolloutNotice(e: Pick<EntitlementRow, "state">): string | null {
+export function rolloutNotice(e: Pick<EntitlementRow, "state">, endsAt: string | null = null, enforced = false): string | null {
   if (e.state !== "grandfathered") return null;
-  return "You're an early Pekko customer. We'll tell you before billing changes, and your screens keep a grace period. Your content stays; nothing is deleted.";
+  if (enforced && endsAt) {
+    return `You're an early Pekko customer. You keep full access through ${utcDate(endsAt)}. Your content stays; nothing is deleted.`;
+  }
+  return "You're an early Pekko customer. Enforcement is off, so your 14-day transition has not started. You keep full access and get a notice before billing changes. Your content stays.";
 }
 
 /** A downgrade whose screen count is below the screens currently on needs the owner to choose which stay on. */
@@ -76,6 +114,10 @@ export function warningFor(e: EntitlementRow): Warning {
     return { kind: "trial_ended", action: "open_plan", message: `Your free trial has ended. Screens keep playing until ${utcDate(e.playback_ends_at)}. Choose a plan to keep them on.` };
   }
   if (e.state === "past_due") {
+    const graceLeft = daysLeft(e.grace_ends_at, e.server_time);
+    if (e.grace_ends_at && (graceLeft === 1 || graceLeft === 2)) {
+      return { kind: "payment_failed", action: "open_plan", message: `Your payment grace ends in ${graceLeft} day${graceLeft === 1 ? "" : "s"}, on ${utcDate(e.grace_ends_at)}. Update your payment method to keep your screens playing. Your content is not deleted.` };
+    }
     return { kind: "payment_failed", action: "open_plan", message: e.grace_ends_at
       ? `We couldn't take your last payment. Update your payment method before ${utcDate(e.grace_ends_at)} to keep your screens playing.`
       : "We couldn't take your last payment. Update your payment method to keep your screens playing." };
@@ -85,12 +127,15 @@ export function warningFor(e: EntitlementRow): Warning {
   }
   const left = daysLeft(e.trial_ends_at, e.server_time);
   if (e.state === "trial" && left !== null && left <= 7) {
-    return { kind: "trial_ending", action: "open_plan", message: `${left} day${left === 1 ? "" : "s"} left in your free trial.` };
+    const when = e.trial_ends_at ? ` on ${utcDate(e.trial_ends_at)}` : "";
+    return { kind: "trial_ending", action: "open_plan", message: `${left} day${left === 1 ? "" : "s"} left in your free trial${when}.` };
   }
   return null;
 }
 
-export function toResponse(accountId: string, e: EntitlementRow, appUrl: string) {
+export function toResponse(accountId: string, e: EntitlementRow, appUrl: string, extra?: { transitionEndsAt?: string | null }) {
+  const enforced = billingEnforced();
+  const transitionEndsAt = enforced ? (extra?.transitionEndsAt ?? null) : null;
   return {
     account_id: accountId,
     state: e.state,
@@ -112,8 +157,9 @@ export function toResponse(accountId: string, e: EntitlementRow, appUrl: string)
     /** Gated premium features. None in M17: every plan and the trial get every feature. */
     features_locked: [] as string[],
     warning: warningFor(e),
-    rollout_notice: rolloutNotice(e),
-    enforced: billingEnforced(),
+    rollout_notice: rolloutNotice(e, transitionEndsAt, enforced),
+    transition_ends_at: transitionEndsAt,
+    enforced,
     billing_url: `${appUrl.replace(/\/$/, "")}/dashboard/billing`,
     server_time: e.server_time,
   };
@@ -124,6 +170,24 @@ export async function loadEntitlement(accountId: string): Promise<EntitlementRow
   if (error) return "error";
   const row = Array.isArray(data) ? data[0] : data;
   return (row as EntitlementRow) ?? null;
+}
+
+/**
+ * Starts the existing-customer window once, from the database clock's stand-in
+ * (this server's time), only while enforcement is on. A second read returns the
+ * stored instant and does not write. Enforcement off performs no read and no write.
+ */
+export async function readOrStartTransition(accountId: string): Promise<string | null> {
+  if (!billingEnforced()) return null;
+  const row = await db().from("accounts").select("plan, billing_transition_started_at").eq("id", accountId).maybeSingle();
+  if (row.error || !row.data || row.data.plan !== "grandfathered") return null;
+  const existing = row.data.billing_transition_started_at ? String(row.data.billing_transition_started_at) : null;
+  if (existing) return existing;
+  const started = new Date().toISOString();
+  const upd = await db().from("accounts").update({ billing_transition_started_at: started }).eq("id", accountId).is("billing_transition_started_at", null);
+  if (upd.error) return null;
+  const again = await db().from("accounts").select("billing_transition_started_at").eq("id", accountId).maybeSingle();
+  return again.data?.billing_transition_started_at ? String(again.data.billing_transition_started_at) : null;
 }
 
 /** Player gate. Fails open on a database error so a DB blip never blanks paying customers' screens. */
