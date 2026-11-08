@@ -227,7 +227,7 @@ function valueShape(value: string) {
     case: prefix && !value.startsWith(prefix) ? "upper" : "as-is",
     pattern: classPattern(value),
     interiorWhitespace: /\s/.test(value),
-    nonAscii: /[^\u0000-\u007f]/.test(value),
+    nonAscii: [...value].some((ch) => ch.charCodeAt(0) > 127),
     redacted: value === "[REDACTED]",
   };
 }
