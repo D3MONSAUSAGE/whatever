@@ -1,15 +1,15 @@
 /**
- * Legal operator and support contact, set per environment (Vercel env vars).
- * The operating entity has NOT been chosen: until NEXT_PUBLIC_LEGAL_OPERATOR_NAME is set,
- * pages show a clearly marked placeholder and never state an entity as fact.
+ * Published operator and contact. Francisco authorized these public facts on
+ * November 8, 2026. They are not a statement that a lawyer reviewed the policies.
+ * They are not read from the environment, so an unset variable cannot put a
+ * placeholder back on the site.
  */
-const clean = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const LEGAL_UPDATED = "November 8, 2026";
+export const LEGAL_OPERATOR = "Francisco Lopez, a sole proprietor doing business as Pekko";
+export const LEGAL_COPYRIGHT = "Francisco Lopez";
+export const LEGAL_OWNERSHIP = "Pekko is owned entirely by Francisco Lopez. It is not a Pekko LLC and is wholly separate from Teamtegrate LLC.";
+export const LEGAL_ADDRESS = "20227 Saticoy St, Apt 202, Winnetka, CA 91306, US";
+export const SUPPORT_EMAIL = "vivalopez06-wh5rwz@mail.grokbot.com";
+export const REFUND_POLICY = "Monthly subscription payments are not refunded for unused time or a cancellation partway through a billing period, except where a refund is required by applicable law. Confirmed duplicate or incorrect charges will be corrected. Canceling stops the next renewal; access continues to the end of the period already paid.";
 
-export const LEGAL_OPERATOR_NAME: string | null = clean(process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME);
-export const LEGAL_OPERATOR_PLACEHOLDER = "[Legal entity name: to be confirmed]";
-export const legalOperator = () => LEGAL_OPERATOR_NAME ?? LEGAL_OPERATOR_PLACEHOLDER;
-
-const rawSupport = clean(process.env.NEXT_PUBLIC_SUPPORT_EMAIL);
-export const SUPPORT_EMAIL: string | null = rawSupport && EMAIL_RE.test(rawSupport) ? rawSupport : null;
-export const SUPPORT_PLACEHOLDER = "[Support email: to be confirmed]";
+export const legalOperator = () => LEGAL_OPERATOR;

@@ -1,4 +1,5 @@
 "use client";
+import { BillingDisclosure } from "@/components/billing-disclosure";
 import { PLANS } from "@/lib/plans";
 import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem } from "@/lib/api";
@@ -106,6 +107,7 @@ export default function Billing() {
         <p className="text-muted mt-3 text-sm" data-testid="checkout-note">{canBuy
           ? "You'll finish payment on Stripe's secure checkout. Nothing is charged until you confirm there."
           : "Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed."}</p>
+        <BillingDisclosure className="mt-4" />
       </section>
 
       {list.length > 0 && (

@@ -15,13 +15,16 @@ test("offline screens are called out on Overview and Displays", async ({ page })
   }
 });
 
-test("draft legal pages, friendly 404, and health check", async ({ page, request }) => {
+test("published legal pages, friendly 404, and health check", async ({ page, request }) => {
   for (const path of ["/terms", "/privacy"]) {
     await page.setViewportSize({ width: 390, height: 900 });
     await page.goto(path);
-    await expect(page.getByTestId("legal-draft")).toContainText("not yet reviewed by a lawyer");
+    await expect(page.getByTestId("legal-draft")).toHaveCount(0);
+    await expect(page.getByText("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US")).toBeVisible();
+    await expect(page.getByRole("link", { name: "vivalopez06-wh5rwz@mail.grokbot.com" })).toBeVisible();
     if (shots) await page.screenshot({ path: `${shots}${path}-390.png`, fullPage: true });
   }
+  await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
   await page.goto("/login");
   await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
 

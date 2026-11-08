@@ -1,32 +1,73 @@
 import { readFileSync } from "node:fs";
-import { describe, it, expect, vi, afterEach } from "vitest";
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
-describe("legal config", () => {
-  it("shows placeholders when unset", async () => {
-    vi.stubEnv("NEXT_PUBLIC_LEGAL_OPERATOR_NAME", ""); vi.stubEnv("NEXT_PUBLIC_SUPPORT_EMAIL", "");
-    const m = await import("@/lib/legal");
-    expect(m.legalOperator()).toMatch(/to be confirmed/); expect(m.SUPPORT_EMAIL).toBeNull();
+import { describe, expect, it } from "vitest";
+import { PAYMENT_GRACE_DAYS, PLAYBACK_GRACE_DAYS, TRANSITION_DAYS, TRIAL_DAYS } from "@/lib/server/entitlements";
+import { PLANS, TRIAL } from "@/lib/plans";
+import {
+  LEGAL_ADDRESS, LEGAL_OPERATOR, REFUND_POLICY, SUPPORT_EMAIL,
+} from "@/lib/legal";
+
+const PAGES = [
+  "app/terms/page.tsx",
+  "app/privacy/page.tsx",
+  "app/account-deletion/page.tsx",
+  "components/contact-block.tsx",
+  "components/billing-disclosure.tsx",
+  "components/site/site-footer.tsx",
+  "app/login/page.tsx",
+];
+
+describe("published legal pages", () => {
+  it("uses the authorized operator, address, mailbox, and refund policy", () => {
+    expect(LEGAL_OPERATOR).toBe("Francisco Lopez, a sole proprietor doing business as Pekko");
+    expect(LEGAL_ADDRESS).toBe("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
+    expect(SUPPORT_EMAIL).toBe("vivalopez06-wh5rwz@mail.grokbot.com");
+    expect(REFUND_POLICY).toMatch(/not refunded for unused time/);
+    expect(REFUND_POLICY).toMatch(/required by applicable law/);
+    expect(REFUND_POLICY).toMatch(/duplicate or incorrect charges/);
+    expect(TRIAL_DAYS).toBe(14);
+    expect(TRIAL.days).toBe(14);
+    expect(TRIAL.screens).toBe(5);
+    expect(PLAYBACK_GRACE_DAYS).toBe(3);
+    expect(TRANSITION_DAYS).toBe(14);
+    expect(PAYMENT_GRACE_DAYS).toBe(7);
+    expect(PLANS.map((plan) => [plan.price, plan.screens])).toEqual([[19, 1], [39, 3], [59, 5]]);
   });
-  it("uses env values and rejects a bad email", async () => {
-    vi.stubEnv("NEXT_PUBLIC_LEGAL_OPERATOR_NAME", "Example Operator"); vi.stubEnv("NEXT_PUBLIC_SUPPORT_EMAIL", "not-an-email");
-    const m = await import("@/lib/legal");
-    expect(m.legalOperator()).toBe("Example Operator"); expect(m.SUPPORT_EMAIL).toBeNull();
-  });
-  it("keeps the sole-proprietor drafts unpublished and free of other entity names", () => {
-    const files = [
-      "docs/legal/DRAFT-terms.md",
-      "docs/legal/DRAFT-privacy.md",
-      "docs/legal/DRAFT-billing-refunds.md",
-    ];
-    const operator = "Francisco Lopez, a sole proprietor doing business as Pekko";
-    for (const file of files) {
+
+  it("publishes those facts and does not leave placeholders or a lawyer-review claim", () => {
+    const terms = readFileSync("app/terms/page.tsx", "utf8");
+    const privacy = readFileSync("app/privacy/page.tsx", "utf8");
+    const joined = PAGES.map((file) => readFileSync(file, "utf8")).join("\n");
+    expect(terms).toContain("LEGAL_ADDRESS");
+    expect(terms).toContain("REFUND_POLICY");
+    expect(terms).toContain("TRIAL_DAYS");
+    expect(terms).toContain("PLAYBACK_GRACE_DAYS");
+    expect(terms).toContain("TRANSITION_DAYS");
+    expect(terms).toContain("PAYMENT_GRACE_DAYS");
+    expect(terms).toContain('id="billing"');
+    expect(terms).toMatch(/publishing or reading this page is not that notice/i);
+    expect(privacy).toContain("us-west-1");
+    expect(privacy).toContain("us-east-1");
+    expect(privacy).toContain("Supabase");
+    expect(privacy).toContain("Vercel");
+    expect(privacy).toContain("Stripe");
+    expect(privacy).toContain("Resend");
+    expect(privacy).toContain("90 days");
+    expect(privacy).toMatch(/does not include an advertising network or a third-party website-analytics script/);
+    expect(privacy).toMatch(/not a promise that every backup/);
+    expect(privacy).toMatch(/not a guarantee that all processing stays/);
+    expect(privacy).toMatch(/not a claim of compliance/);
+    expect(privacy).not.toMatch(/CCPA|GDPR/);
+    for (const file of PAGES) {
       const text = readFileSync(file, "utf8");
-      expect(text, file).toContain("UNPUBLISHED DRAFT");
-      expect(text, file).toContain(operator);
-      expect(text, file).toContain("[Business address: to be confirmed]");
-      expect(text, file).not.toMatch(/Pekko LLC|Pekko Technologies|Teamtegrate/);
+      expect(text, file).not.toMatch(/to be confirmed|UNPUBLISHED DRAFT|\[Business address|\[Support email|\[Legal entity/);
+      expect(text, file).not.toMatch(/reviewed by a lawyer/i);
+      expect(text, file).not.toMatch(/processing stays only in|exclusively in/i);
     }
-    const footer = readFileSync("components/site/site-footer.tsx", "utf8");
-    expect(footer).not.toContain("docs/legal");
+    expect(joined).not.toContain("docs/legal");
+    expect(readFileSync("components/site/site-footer.tsx", "utf8")).toContain('"/terms#billing"');
+    expect(readFileSync("app/login/page.tsx", "utf8")).toContain('data-testid="signup-legal"');
+    expect(readFileSync("app/dashboard/billing/page.tsx", "utf8")).toContain("<BillingDisclosure");
+    expect(readFileSync("components/site/sections.tsx", "utf8")).toContain("<BillingDisclosure");
+    expect(readFileSync("lib/legal.ts", "utf8")).not.toMatch(/STRIPE_LIVE_ENABLED|BILLING_ENFORCE|BILLING_REMINDERS|process\.env/);
   });
 });

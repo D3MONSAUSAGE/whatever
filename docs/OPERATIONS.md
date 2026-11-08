@@ -63,4 +63,4 @@ Already in place and covered by `npm run test:player` plus the e2e TV tests:
 Media is not yet kept on the TV across restarts, and full offline play isn't there yet. Both are part of Milestone B (persistent cache, incremental downloads).
 
 ## 7. Legal pages
-`/terms` and `/privacy` are **drafts** with a red "not yet reviewed by a lawyer" notice and [bracketed] gaps (pricing, liability, governing law, contact, retention timelines). They're linked from the sign-in pages and Settings. They need legal review before launch.
+`/terms`, `/privacy`, and `/terms#billing` are the published policies, linked from the footer, sign-up, and Settings. They name the operator, public address, and support email. They do not say a lawyer reviewed them, and they do not include a warranty, liability cap, or governing-law clause. Charges stay off until the billing flags are set on purpose.

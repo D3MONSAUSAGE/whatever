@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BillingDisclosure } from "@/components/billing-disclosure";
 import { PLANS, TRIAL } from "@/lib/plans";
 import { FAQ, FEATURES, SHOTS } from "@/lib/marketing";
 
@@ -76,7 +77,8 @@ export function TrialDetails() {
       <h3 className="font-semibold text-base">How the trial works</h3>
       <p>Your {TRIAL.days}-day trial starts when you create your account and includes every feature on up to {TRIAL.screens} screens, the full Multi-screen experience. We don&apos;t ask for a card.</p>
       <p>When the trial ends, your screens keep playing for 3 more days. If you don&apos;t choose a plan, they pause. Your content and settings are kept, and choosing a plan turns them back on.</p>
-      <p>Prices are in US dollars, billed monthly. Taxes may apply.</p>
+      <p>Prices are in US dollars, billed monthly. Taxes may apply. These pages do not set a tax rate.</p>
+      <BillingDisclosure />
     </div>
   );
 }

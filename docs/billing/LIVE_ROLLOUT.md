@@ -2,7 +2,7 @@
 
 Live charges stay **off**. `STRIPE_LIVE_ENABLED` and `BILLING_ENFORCE` both default off. Nothing in this document turns them on. Do not merge live keys into the test sandbox, and do not run `scripts/stripe-live-setup.mjs` until Francisco confirms.
 
-The operator is Francisco Lopez, a sole proprietor doing business as Pekko. Unpublished legal drafts are in `docs/legal/`. They are not linked from the site.
+The operator is Francisco Lopez, a sole proprietor doing business as Pekko. Public terms, privacy, and billing terms are at `/terms`, `/privacy`, and `/terms#billing`. Publishing them is not a lawyer's review and does not turn on charges.
 
 ## What is ready
 
@@ -52,7 +52,7 @@ Optional, only if billing email should actually send:
 
 ## Order of operations (do not start this from CI)
 
-1. Counsel reviews `docs/legal/DRAFT-terms.md`, `docs/legal/DRAFT-privacy.md`, and `docs/legal/DRAFT-billing-refunds.md`. Fill `[Business address: to be confirmed]`. Publish only after that review. The drafts are not linked today.
+1. The public legal pages are already published. Do not treat that publication as a customer billing notice or as permission to set `STRIPE_LIVE_ENABLED`, `BILLING_ENFORCE`, or `BILLING_REMINDERS`. Those three stay unset.
 2. In the live Stripe account, run `node scripts/stripe-live-setup.mjs` and read the plan. Then, only with an `sk_live_` key and `STRIPE_LIVE_ENABLED=1`, run it again with `--confirm-live`. Put the printed price ids and webhook secret into the live env names above.
 3. Confirm Checkout on a live $1 or the real price only after Francisco says to. This branch does not do that.
 4. Leave `BILLING_ENFORCE` off. Early customers see `rollout_notice`. Give them the advance warning and the grace period before setting the flag to `1`.

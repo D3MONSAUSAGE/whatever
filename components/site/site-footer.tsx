@@ -1,16 +1,15 @@
 import Link from "next/link";
 import { LogoMark, Wordmark } from "@/components/brand";
-import { LEGAL_OPERATOR_NAME } from "@/lib/legal";
+import { LEGAL_COPYRIGHT } from "@/lib/legal";
 
 const COLS = [
   { title: "Product", links: [["Features", "/features"], ["Pricing", "/pricing"], ["FAQ", "/faq"], ["Start free trial", "/signup"], ["Login", "/login"]] },
   { title: "Help", links: [["Support", "/support"], ["Contact", "/contact"]] },
-  { title: "Legal", links: [["Terms", "/terms"], ["Privacy", "/privacy"], ["Delete your account", "/account-deletion"]] },
+  { title: "Legal", links: [["Terms", "/terms"], ["Privacy", "/privacy"], ["Billing terms", "/terms#billing"], ["Delete your account", "/account-deletion"]] },
 ] as const;
 
 export function SiteFooter() {
-  // Copyright uses the configured operator name only; until it's set, plain "Pekko" (no entity claimed).
-  const owner = LEGAL_OPERATOR_NAME ?? "Pekko";
+  const owner = LEGAL_COPYRIGHT;
   return (
     <footer className="border-t border-line bg-white/60" data-testid="site-footer">
       <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:grid-cols-2 md:grid-cols-4">

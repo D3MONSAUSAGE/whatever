@@ -5,4 +5,4 @@ export const PLANS = [
   { id: "multi", name: "Multi-screen", price: 59, screens: 5 },
 ] as const;
 export const TRIAL = { days: 14, screens: 5 } as const;
-export { SUPPORT_EMAIL, SUPPORT_PLACEHOLDER } from "./legal";
+export { SUPPORT_EMAIL } from "./legal";

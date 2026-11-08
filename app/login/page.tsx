@@ -1,25 +1,34 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { AuthFrame, friendlyAuthError, isRecoveryUrl, MIN_PASSWORD } from "@/components/auth-frame";
 
-export default function Login() {
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<AuthFrame title="Sign in"><p className="text-sm text-muted">Loading…</p></AuthFrame>}>
+      <Login />
+    </Suspense>
+  );
+}
+
+function Login() {
   const router = useRouter();
-  const [mode, setMode] = useState<"in" | "up">("in");
+  const params = useSearchParams();
+  const [mode, setMode] = useState<"in" | "up">(params.get("mode") === "up" ? "up" : "in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
 
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("mode") === "up") setMode("up");
+    if (params.get("mode") === "up") setMode("up");
     // A recovery link that fell back to the Site URL still ends on the reset page.
     if (isRecoveryUrl()) { location.replace(`/reset-password${location.search}${location.hash}`); return; }
     if (!supabaseConfigured()) return;
     getSupabase().auth.getSession().then(({ data }) => data.session && router.replace(nextPath())).catch(() => {});
-  }, [router]);
+  }, [params, router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +75,11 @@ export default function Login() {
           <div className="text-right">
             <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">Forgot password?</Link>
           </div>
+        ) : null}
+        {mode === "up" ? (
+          <p className="text-sm text-muted" data-testid="signup-legal">
+            By creating an account you agree to the <Link className="underline" href="/terms">Terms of Service</Link> and <Link className="underline" href="/privacy">Privacy Policy</Link>.
+          </p>
         ) : null}
         <button className="btn btn-primary w-full" disabled={busy}>{busy ? "One moment…" : mode === "in" ? "Sign in" : "Create account"}</button>
       </form>
