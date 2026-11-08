@@ -27,5 +27,13 @@ end $$;
 revoke all on function public.dispatch_billing_reminders() from public, anon, authenticated;
 grant execute on function public.dispatch_billing_reminders() to service_role;
 
-do $$ begin perform cron.unschedule('pekko-billing-reminders'); exception when others then null; end $$;
-select cron.schedule('pekko-billing-reminders', '0 15 * * *', 'select public.dispatch_billing_reminders()');
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    begin
+      perform cron.unschedule('pekko-billing-reminders');
+    exception when others then null;
+    end;
+    perform cron.schedule('pekko-billing-reminders', '0 15 * * *', 'select public.dispatch_billing_reminders()');
+  end if;
+end $$;
