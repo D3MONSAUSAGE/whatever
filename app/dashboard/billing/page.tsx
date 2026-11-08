@@ -2,6 +2,7 @@
 import { PLANS } from "@/lib/plans";
 import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem } from "@/lib/api";
+import { BillingEmailSelfTest } from "@/components/billing-email-selftest";
 import { PageHeader } from "@/components/ui";
 import { useToast } from "@/components/toast";
 
@@ -29,6 +30,7 @@ export default function Billing() {
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
   const checkout = useApi<{ available: boolean }>("/api/billing/checkout");
+  const selfTest = useApi<{ enabled: boolean }>("/api/billing/notifications/test");
   const canBuy = !!checkout.data?.available;
   const [buying, setBuying] = useState<string | null>(null);
 
@@ -135,6 +137,7 @@ export default function Billing() {
           </button>
         </section>
       )}
+      <BillingEmailSelfTest enabled={selfTest.data?.enabled === true} />
       {toast.node}
     </div>
   );

@@ -1,6 +1,9 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { BillingEmailSelfTest, SelfTestResults, selfTestRunId } from "@/components/billing-email-selftest";
 import {
-  billingNoticeKey, deliverSelfTest, evaluateSelfTestGate, selfTestAllowed, selfTestClaimKey, selfTestNotices, SELF_TEST_KINDS,
+  billingNoticeKey, deliverSelfTest, evaluateSelfTestGate, selfTestAllowed, selfTestClaimKey, selfTestNotices, selfTestStatus, SELF_TEST_KINDS,
 } from "@/lib/server/billing-notices";
 import type { EntitlementRow } from "@/lib/server/entitlements";
 import { BILLING_EMAIL_FROM, memoryNoticeLedger } from "@/lib/server/transactional-email";
@@ -15,6 +18,29 @@ const row: EntitlementRow = {
 };
 
 describe("billing email self-test", () => {
+  it("tells the dashboard the flag without listing other orgs", () => {
+    expect(selfTestStatus(org, undefined)).toEqual({ enabled: false });
+    expect(selfTestStatus(org, `other, ${org}`)).toEqual({ enabled: true });
+    expect(selfTestRunId(1_700_000_000_000)).toBe("test-1700000000000");
+    expect(evaluateSelfTestGate({
+      accountId: org, allowlist: org, email: "owner@example.com", run: selfTestRunId(1_700_000_000_000), replay: false, limited: false,
+    })).toEqual({ ok: true });
+  });
+  it("renders the button and results only for an allowlisted org", () => {
+    expect(renderToStaticMarkup(createElement(BillingEmailSelfTest, { enabled: false }))).toBe("");
+    const shown = renderToStaticMarkup(createElement(BillingEmailSelfTest, { enabled: true }));
+    expect(shown).toContain("Send test billing emails");
+    expect(shown).not.toContain("selftest-results");
+    const table = renderToStaticMarkup(createElement(SelfTestResults, { rows: [{
+      kind: "trial_ending_3", sent: true, reason: "sent", id: "re_123", error: null,
+    }] }));
+    expect(table).toContain("Kind");
+    expect(table).toContain("trial_ending_3");
+    expect(table).toContain("yes");
+    expect(table).toContain("sent");
+    expect(table).toContain("re_123");
+    expect(table).toContain(">Error<");
+  });
   it("allowlists exact org ids and hides everyone else", () => {
     expect(selfTestAllowed(org, undefined)).toBe(false);
     expect(selfTestAllowed(org, "")).toBe(false);

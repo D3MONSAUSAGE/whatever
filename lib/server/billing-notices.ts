@@ -103,6 +103,11 @@ export function selfTestAllowed(accountId: string, allowlist: string | undefined
   return (allowlist || "").split(",").map((part) => part.trim()).filter(Boolean).includes(accountId);
 }
 
+/** Whether this signed-in org may see the dashboard self-test. Does not reveal the rest of the list. */
+export function selfTestStatus(accountId: string, allowlist: string | undefined): { enabled: boolean } {
+  return { enabled: selfTestAllowed(accountId, allowlist) };
+}
+
 /**
  * All six templates, using this org's stored dates when it has them.
  * Missing dates are computed from the server timestamp only. Nothing is written.

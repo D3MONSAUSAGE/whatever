@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
-import { deliverSelfTest, evaluateSelfTestGate, selfTestAllowed, selfTestClaimKey, selfTestNotices } from "@/lib/server/billing-notices";
+import { deliverSelfTest, evaluateSelfTestGate, selfTestAllowed, selfTestClaimKey, selfTestNotices, selfTestStatus } from "@/lib/server/billing-notices";
 import { loadEntitlement } from "@/lib/server/entitlements";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { db } from "@/lib/server/supabase";
@@ -15,6 +15,13 @@ async function readTransitionStart(accountId: string): Promise<string | null> {
   const row = await db().from("accounts").select("billing_transition_started_at").eq("id", accountId).maybeSingle();
   if (row.error || !row.data?.billing_transition_started_at) return null;
   return String(row.data.billing_transition_started_at);
+}
+
+/** Tells the dashboard whether to show the self-test control. No emails and no entitlement writes. */
+export async function GET(req: Request) {
+  const admin = await requireAdmin(req);
+  if (admin instanceof Response) return admin;
+  return json(selfTestStatus(admin.accountId, process.env.BILLING_EMAIL_SELFTEST_ORGS));
 }
 
 /**
