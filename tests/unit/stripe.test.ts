@@ -25,6 +25,23 @@ describe("stripe test mode guard", () => {
   });
 });
 
+describe("billing env diagnostics", () => {
+  it("names missing vars and rejects a live key without returning values", async () => {
+    const { billingDiagnostics } = await import("@/lib/server/stripe");
+    const prices = { STRIPE_PRICE_STARTER: "price_a", STRIPE_PRICE_BUSINESS: "price_b", STRIPE_PRICE_MULTI: "price_c" };
+    const missing = billingDiagnostics({ STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
+    expect(missing.missing).toEqual(["STRIPE_TEST_SECRET_KEY"]);
+    expect(missing.available).toBe(false);
+    expect(JSON.stringify(missing)).not.toContain("whsec_ok");
+    const live = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "sk_live_secret", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
+    expect(live.rejected).toEqual(["STRIPE_TEST_SECRET_KEY"]);
+    expect(JSON.stringify(live)).not.toContain("sk_live_secret");
+    const quoted = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "\"sk_test_abc\"", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
+    expect(quoted.available).toBe(true);
+    expect(quoted.missing).toEqual([]);
+  });
+});
+
 describe("checkout availability", () => {
   it("needs a test key and all prices", async () => {
     const { checkoutAvailable } = await import("@/lib/server/stripe");

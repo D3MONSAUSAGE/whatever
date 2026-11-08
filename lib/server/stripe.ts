@@ -4,11 +4,46 @@ import { db } from "./supabase";
 /** M17.3 Stripe, TEST MODE ONLY. Any key that is not sk_test_ is refused. */
 export type PaidPlan = "starter" | "business" | "multi";
 export const PAID_PLANS: readonly PaidPlan[] = ["starter", "business", "multi"];
-const PRICE_ENV: Record<PaidPlan, string> = { starter: "STRIPE_PRICE_STARTER", business: "STRIPE_PRICE_BUSINESS", multi: "STRIPE_PRICE_MULTI" };
+const PRICE_ENV = { starter: "STRIPE_PRICE_STARTER", business: "STRIPE_PRICE_BUSINESS", multi: "STRIPE_PRICE_MULTI" } as const;
 
-export function stripeKey(env: Record<string, string | undefined> = process.env): string | null {
-  const k = env.STRIPE_TEST_SECRET_KEY;
-  if (!k || !k.startsWith("sk_test_")) return null; // live or missing keys never load
+/** Names the checkout and webhook gates read. Listed literally so the runtime receives them. */
+export const BILLING_ENV_NAMES = [
+  "STRIPE_TEST_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRICE_STARTER",
+  "STRIPE_PRICE_BUSINESS",
+  "STRIPE_PRICE_MULTI",
+] as const;
+
+function clean(value: string | undefined): string {
+  if (!value) return "";
+  return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
+/**
+ * Direct `process.env.NAME` reads. `env[name]` is invisible to the host's env
+ * allowlist, so the vars can be set on the project and still be empty in the function.
+ */
+export function billingEnv(override?: Record<string, string | undefined>) {
+  const raw = override ?? {
+    STRIPE_TEST_SECRET_KEY: process.env.STRIPE_TEST_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
+    STRIPE_PRICE_BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
+    STRIPE_PRICE_MULTI: process.env.STRIPE_PRICE_MULTI,
+  };
+  return {
+    STRIPE_TEST_SECRET_KEY: clean(raw.STRIPE_TEST_SECRET_KEY),
+    STRIPE_WEBHOOK_SECRET: clean(raw.STRIPE_WEBHOOK_SECRET),
+    STRIPE_PRICE_STARTER: clean(raw.STRIPE_PRICE_STARTER),
+    STRIPE_PRICE_BUSINESS: clean(raw.STRIPE_PRICE_BUSINESS),
+    STRIPE_PRICE_MULTI: clean(raw.STRIPE_PRICE_MULTI),
+  };
+}
+
+export function stripeKey(env?: Record<string, string | undefined>): string | null {
+  const k = billingEnv(env).STRIPE_TEST_SECRET_KEY;
+  if (!k.startsWith("sk_test_")) return null; // live, missing, or quoted keys never load
   return k;
 }
 let cached: Stripe | null = null;
@@ -17,10 +52,11 @@ export function stripe(): Stripe | null {
   if (!k) return null;
   return (cached ??= new Stripe(k));
 }
-export const priceFor = (plan: PaidPlan, env: Record<string, string | undefined> = process.env) => env[PRICE_ENV[plan]] || null;
-export function planForPrice(priceId: string | null | undefined, env: Record<string, string | undefined> = process.env): PaidPlan | null {
+export const priceFor = (plan: PaidPlan, env?: Record<string, string | undefined>) => billingEnv(env)[PRICE_ENV[plan]] || null;
+export function planForPrice(priceId: string | null | undefined, env?: Record<string, string | undefined>): PaidPlan | null {
   if (!priceId) return null;
-  return PAID_PLANS.find((p) => env[PRICE_ENV[p]] === priceId) ?? null;
+  const values = billingEnv(env);
+  return PAID_PLANS.find((p) => values[PRICE_ENV[p]] === priceId) ?? null;
 }
 
 const ts = (s: number | null | undefined) => (s ? new Date(s * 1000).toISOString() : null);
@@ -142,7 +178,24 @@ async function must(p: PromiseLike<{ error: { message: string } | null }>) {
   if (r.error) throw new Error(r.error.message);
 }
 
-/** True only when a test key and all three price ids are configured. */
-export function checkoutAvailable(env: Record<string, string | undefined> = process.env) {
+/** True only when a test key and all three price ids are configured. Webhook secret is separate. */
+export function checkoutAvailable(env?: Record<string, string | undefined>) {
   return !!stripeKey(env) && PAID_PLANS.every((p) => !!priceFor(p, env));
+}
+
+/** Names only. Never returns values. `rejected` means the var is set but not a test key, whsec_, or price_. */
+export function billingDiagnostics(env?: Record<string, string | undefined>) {
+  const values = billingEnv(env);
+  const missing: string[] = [];
+  const rejected: string[] = [];
+  if (!values.STRIPE_TEST_SECRET_KEY) missing.push("STRIPE_TEST_SECRET_KEY");
+  else if (!values.STRIPE_TEST_SECRET_KEY.startsWith("sk_test_")) rejected.push("STRIPE_TEST_SECRET_KEY");
+  if (!values.STRIPE_WEBHOOK_SECRET) missing.push("STRIPE_WEBHOOK_SECRET");
+  else if (!values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_")) rejected.push("STRIPE_WEBHOOK_SECRET");
+  for (const name of ["STRIPE_PRICE_STARTER", "STRIPE_PRICE_BUSINESS", "STRIPE_PRICE_MULTI"] as const) {
+    const value = values[name];
+    if (!value) missing.push(name);
+    else if (!value.startsWith("price_")) rejected.push(name);
+  }
+  return { available: checkoutAvailable(values), webhook: !!stripeKey(values) && values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_"), missing, rejected };
 }

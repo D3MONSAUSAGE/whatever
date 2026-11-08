@@ -1,4 +1,4 @@
-import { applyEvent, stripe } from "@/lib/server/stripe";
+import { applyEvent, billingEnv, stripe } from "@/lib/server/stripe";
 import { json } from "@/lib/server/http";
 
 export const runtime = "nodejs";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // timestamps older than 5 minutes), then de-duplicated through stripe_events.
 export async function POST(req: Request) {
   const s = stripe();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = billingEnv().STRIPE_WEBHOOK_SECRET;
   if (!s || !secret) return json({ error: "disabled" }, 503);
   const sig = req.headers.get("stripe-signature");
   if (!sig) return json({ error: "signature" }, 400);

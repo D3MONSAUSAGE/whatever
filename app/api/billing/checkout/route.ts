@@ -1,7 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
-import { checkoutAvailable, PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
+import { billingDiagnostics, checkoutAvailable, PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +36,10 @@ export async function POST(req: Request) {
 }
 
 // Public: whether online checkout is switched on (no secrets returned).
-export async function GET() {
-  return json({ available: checkoutAvailable() });
+// Preview-only ?debug=1 lists missing variable names. Values are never included.
+export async function GET(req: Request) {
+  const debug = new URL(req.url).searchParams.get("debug") === "1" && process.env.VERCEL_ENV === "preview";
+  if (!debug) return json({ available: checkoutAvailable() });
+  const report = billingDiagnostics();
+  return json({ available: report.available, webhook: report.webhook, missing: report.missing, rejected: report.rejected });
 }
