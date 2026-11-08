@@ -6,8 +6,15 @@ export const metadata: Metadata = { title: "Privacy Policy · Pekko" };
 
 export default function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" updated={LEGAL_UPDATED}>
+    <LegalPage title="Privacy Policy" updated={LEGAL_UPDATED} dateLine={`Effective ${LEGAL_UPDATED}. Last updated ${LEGAL_UPDATED}.`}>
       <p>This policy explains what {LEGAL_OPERATOR} processes when you use Pekko, why, and the choices the product actually offers. {LEGAL_OWNERSHIP}</p>
+
+      <h2 className="font-semibold text-lg" id="changes">Changes to this policy</h2>
+      <p>
+        Before a material change takes effect, the updated policy is posted on this page with its new effective date. The page stays linked from the site footer.
+        When notice is required, or when notice is appropriate for an account whose email address Pekko has, that notice is sent to the account email.
+        Pekko does not automatically email every edit of this page. Publishing this section does not send an email.
+      </p>
 
       <h2 className="font-semibold text-lg">Information used to operate Pekko</h2>
       <ul className="list-disc pl-5 grid gap-1">

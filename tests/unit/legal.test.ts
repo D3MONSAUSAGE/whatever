@@ -56,6 +56,13 @@ describe("published legal pages", () => {
     expect(privacy).toMatch(/not a promise that every backup/);
     expect(privacy).toMatch(/not a guarantee that all processing stays/);
     expect(privacy).toMatch(/not a claim of compliance/);
+    expect(privacy).toContain('id="changes"');
+    expect(privacy).toContain("dateLine={`Effective ${LEGAL_UPDATED}. Last updated ${LEGAL_UPDATED}.`}");
+    expect(privacy).toMatch(/Before a material change takes effect, the updated policy is posted on this page/);
+    expect(privacy).toMatch(/linked from the site footer/);
+    expect(privacy).toMatch(/sent to the account email/);
+    expect(privacy).toMatch(/does not automatically email every edit/);
+    expect(privacy).not.toMatch(/sendTransactionalEmail|emailProvider\(/);
     expect(privacy).not.toMatch(/CCPA|GDPR/);
     for (const file of PAGES) {
       const text = readFileSync(file, "utf8");

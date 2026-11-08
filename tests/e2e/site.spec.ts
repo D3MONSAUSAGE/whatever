@@ -57,6 +57,10 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
       }
       await page.waitForURL(/\/login\?mode=up/);
       await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+      const legal = page.getByTestId("signup-legal");
+      await expect(legal).toBeVisible();
+      await expect(legal.getByRole("link", { name: "Terms of Service" })).toHaveAttribute("href", "/terms");
+      await expect(legal.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
       await page.goto("/");
       await page.getByTestId("start-trial").click();
       await page.waitForURL(/\/login\?mode=up/);
