@@ -136,12 +136,43 @@ describe("billing reminder dispatcher", () => {
     expect(JSON.stringify(preview)).not.toContain("@");
   });
 
-  it("does not email or update accounts from the scheduler migration", () => {
+  it("keeps the vault function unexposed and its return free of the secret", () => {
     const sql = readFileSync("supabase/migrations/0022_billing_reminders_cron.sql", "utf8");
+    const rollback = readFileSync("supabase/rollback/0022_billing_reminders_cron.sql", "utf8");
+    expect(sql).toMatch(/create schema if not exists private/);
+    expect(sql).toMatch(/create or replace function private\.dispatch_billing_reminders\(p_dry_run boolean default false\)/);
+    expect(sql).toMatch(/security definer\s+set search_path = ''/);
+    expect(sql).toMatch(/revoke all on schema private from public/);
+    expect(sql).toMatch(/revoke all on schema private from anon, authenticated, service_role/);
+    expect(sql).toMatch(/revoke all on function private\.dispatch_billing_reminders\(boolean\) from public/);
+    expect(sql).toMatch(/revoke all on function private\.dispatch_billing_reminders\(boolean\) from anon, authenticated, service_role/);
+    expect(sql).toMatch(/revoke all on function private\.billing_reminders_auth_check\(bigint\) from anon, authenticated, service_role/);
+    expect(sql).toMatch(/grant execute on function private\.dispatch_billing_reminders\(boolean\) to postgres/);
+    expect(sql).toMatch(/grant execute on function private\.billing_reminders_auth_check\(bigint\) to postgres/);
+    expect(sql).not.toMatch(/grant execute on function[\s\S]*to (anon|authenticated|service_role)/);
+    expect(sql).not.toMatch(/create or replace function public\.dispatch_billing_reminders/);
+    expect(sql).toMatch(/select private\.dispatch_billing_reminders\(false\)/);
     expect(sql).toMatch(/pekko-billing-reminders/);
     expect(sql).toMatch(/0 15 \* \* \*/);
     expect(sql).toMatch(/BILLING_REMINDERS/);
+    expect(sql).toMatch(
+      /return pg_catalog\.jsonb_build_object\(\s*'status', 'dispatched',\s*'request_id', request_id,\s*'dry_run', coalesce\(p_dry_run, false::boolean\)\s*\)/,
+    );
+    expect(sql).toMatch(/return pg_catalog\.jsonb_build_object\('status', 'dispatch_failed'\)/);
+    expect(sql).toMatch(/return pg_catalog\.jsonb_build_object\('status', 'check_failed'\)/);
+    expect(sql).toMatch(/when code = 200 and cron_auth = 'accepted' and enabled_val = 'false'::jsonb then 'aligned'/);
+    const checked = sql.slice(sql.indexOf("'status', 'checked'"), sql.indexOf("'status', 'check_failed'"));
+    expect(checked).not.toMatch(/content|headers|error_msg|secret|authorization/i);
     expect(sql).not.toMatch(/\bupdate\s+public\.accounts\b/i);
     expect(sql).not.toMatch(/billing_transition_started_at/);
+    expect(sql).not.toMatch(/raise\s+(log|notice|warning|exception)/i);
+    expect(sql).not.toMatch(/select private\.dispatch_billing_reminders\([^)]*secret/);
+    expect(rollback).toMatch(/cron\.unschedule\('pekko-billing-reminders'\)/);
+    expect(rollback).toMatch(/drop function if exists private\.dispatch_billing_reminders\(boolean\)/);
+    expect(rollback).toMatch(/drop function if exists public\.dispatch_billing_reminders\(\)/);
+    expect(rollback).not.toMatch(/pekko-alert-delivery|vault\.update_secret|vault\.create_secret/);
+    const route = readFileSync("app/api/cron/billing-reminders/route.ts", "utf8");
+    expect(route).toMatch(/cronAuth: "accepted"/);
+    expect(route).not.toMatch(/console\.(log|info|warn|error)\([^)]*authorization/i);
   });
 });

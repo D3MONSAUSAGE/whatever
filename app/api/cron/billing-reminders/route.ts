@@ -16,7 +16,9 @@ export async function GET(req: Request) {
   const dryRun = dryRunRequested(req);
   try {
     const result = await executeBillingReminders(dryRun);
-    return json({ ok: true, ...result });
+    // cronAuth is metadata for the private scheduler check. It is not a secret.
+    // The bearer token is never copied into the body or the log.
+    return json({ ok: true, ...result, cronAuth: "accepted" });
   } catch {
     console.info("billing-reminders failed code=unknown");
     return fail("Couldn't run billing reminders.", 500);
