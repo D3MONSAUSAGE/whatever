@@ -39,7 +39,7 @@ export function FeatureGrid() {
   );
 }
 
-export function PricingCards({ testPrefix = "plan" }: { testPrefix?: string }) {
+export function PricingCards({ testPrefix = "plan", canBuy }: { testPrefix?: string; canBuy?: boolean }) {
   return (
     <div className="mt-10 grid gap-4 md:grid-cols-3">
       {PLANS.map((p) => {
@@ -58,6 +58,11 @@ export function PricingCards({ testPrefix = "plan" }: { testPrefix?: string }) {
               <li>✓ Offline playback and screen alerts</li>
             </ul>
             <Link href={SIGNUP_HREF} className={`btn mt-5 ${featured ? "btn-primary" : "btn-quiet"}`}>Start free trial</Link>
+            {canBuy === undefined ? null : canBuy ? (
+              <Link href="/dashboard/billing" className="btn btn-quiet mt-2" data-testid={`buy-${p.id}`}>Choose {p.name}</Link>
+            ) : (
+              <p className="mt-2 text-center text-sm text-muted" data-testid={`buy-${p.id}`}>Online checkout coming soon</p>
+            )}
           </article>
         );
       })}

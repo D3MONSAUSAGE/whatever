@@ -21,7 +21,7 @@ Assumptions: ~20 ms active CPU and ~150 ms wall time per call at 2 GB memory (Fl
 
 | | 10 | 50 | 100 | 500 screens |
 |---|---|---|---|---|
-| Supabase Pro plan (shared with Teamtegrate) | $25 | $25 | $25 | $25 |
+| Supabase Pro plan (shared project, already paid) | $25 | $25 | $25 | $25 |
 
 ### Pekko-specific costs, per month
 

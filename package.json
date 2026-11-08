@@ -25,7 +25,8 @@
     "pdfjs-dist": "^4.10.38",
     "pptx-glimpse": "^5.3.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

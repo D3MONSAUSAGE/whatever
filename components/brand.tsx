@@ -1,6 +1,9 @@
 "use client";
 
 
+/** Visible product name. The dashboard sidebar uses this text, not the TECHNOLOGIES wordmark image. */
+export const PRODUCT_NAME = "Pekko";
+
 /** The official Pekko "P" (from /workspace/pekko-logo). The white variant is a white silhouette for dark/brand fills. */
 export function LogoMark({
   className = "size-12",
@@ -26,7 +29,7 @@ export function Wordmark({
   return (
     <span className={`inline-flex flex-col leading-none text-ink ${align === "center" ? "items-center" : "items-start"}`}>
       <span className={`font-extrabold tracking-tight ${title}`}>
-        Pekko
+        {PRODUCT_NAME}
       </span>
     </span>
   );
