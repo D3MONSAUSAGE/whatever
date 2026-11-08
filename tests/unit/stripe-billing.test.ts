@@ -207,4 +207,41 @@ describe("stripe billing events", () => {
     });
     expect(db.accounts.get("acct_1")?.subscription_status).toBe("canceled");
   });
+
+  it("uses the item period end when basil omits it on the subscription", async () => {
+    setTestDb(db as never);
+    db.seed({ id: "acct_1", billing_event_created: null });
+    const itemEnd = Math.floor(NOW / 1000) + 40 * 86400;
+    const live = sub({
+      current_period_end: undefined,
+      items: { data: [{ price: { id: "price_biz" }, current_period_end: itemEnd }] },
+    });
+    await applyEvent(event("customer.subscription.updated", 60, { id: "sub_1" }, "evt_basil_period"), {
+      now: NOW,
+      fetchSubscription: async () => live,
+    });
+    expect(db.accounts.get("acct_1")?.current_period_end).toBe(new Date(itemEnd * 1000).toISOString());
+  });
+
+  it("re-fetches a basil invoice that names the subscription on parent", async () => {
+    setTestDb(db as never);
+    db.seed({ id: "acct_1", billing_event_created: null, subscription_status: "active", grace_ends_at: "2026-11-01T00:00:00.000Z" });
+    const itemEnd = Math.floor(NOW / 1000) + 45 * 86400;
+    const live = sub({
+      status: "active",
+      current_period_end: undefined,
+      items: { data: [{ price: { id: "price_biz" }, current_period_end: itemEnd }] },
+    });
+    const invoice = { id: "in_basil", parent: { subscription_details: { subscription: "sub_1" } } };
+    expect(await applyEvent(event("invoice.paid", 70, invoice, "evt_basil_paid"), {
+      now: NOW,
+      fetchSubscription: async () => live,
+    })).toBe(true);
+    expect(db.accounts.get("acct_1")).toMatchObject({
+      plan: "business",
+      subscription_status: "active",
+      grace_ends_at: null,
+      current_period_end: new Date(itemEnd * 1000).toISOString(),
+    });
+  });
 });

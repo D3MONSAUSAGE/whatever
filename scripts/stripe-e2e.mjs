@@ -46,6 +46,13 @@ function assert(cond, message) {
   if (!cond) throw new Error(message);
 }
 
+function periodEnd(sub) {
+  if (typeof sub.current_period_end === "number") return sub.current_period_end;
+  const ends = (sub.items?.data ?? []).map((item) => item.current_period_end).filter((value) => typeof value === "number");
+  assert(ends.length, "subscription has no current_period_end");
+  return Math.min(...ends);
+}
+
 async function app(path, init = {}) {
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
@@ -139,8 +146,8 @@ try {
   if (afterCheckout.screen_limit === quantity) throw new Error("quantity alone must not satisfy the screen-limit check");
   console.log(`Business entitlement screen_limit=${afterCheckout.screen_limit}; checkout quantity=${quantity}`);
 
-  const periodEnd = subscription.current_period_end;
-  await stripe.testHelpers.testClocks.advance(clock.id, { frozen_time: periodEnd + 120 });
+  const firstPeriodEnd = periodEnd(subscription);
+  await stripe.testHelpers.testClocks.advance(clock.id, { frozen_time: firstPeriodEnd + 120 });
   await waitClock(clock.id);
   const renewed = await stripe.subscriptions.retrieve(subscription.id);
   const renewal = (await stripe.invoices.list({ subscription: subscription.id, limit: 5 })).data
@@ -152,7 +159,7 @@ try {
   console.log(`renewal ${renewal.id} paid`);
 
   await stripe.subscriptions.update(subscription.id, { default_payment_method: "pm_card_chargeCustomerFail" });
-  await stripe.testHelpers.testClocks.advance(clock.id, { frozen_time: renewed.current_period_end + 120 });
+  await stripe.testHelpers.testClocks.advance(clock.id, { frozen_time: periodEnd(renewed) + 120 });
   await waitClock(clock.id);
   const pastDue = await stripe.subscriptions.retrieve(subscription.id);
   assert(pastDue.status === "past_due", `failed card should be past_due, was ${pastDue.status}`);

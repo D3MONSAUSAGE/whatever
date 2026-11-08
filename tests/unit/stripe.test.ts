@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
-import { planForPrice, stripeKey } from "@/lib/server/stripe";
+import { checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, stripeKey, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
 
 describe("stripe test mode guard", () => {
   it("refuses live and missing keys", () => {
@@ -45,6 +45,38 @@ describe("billing env diagnostics", () => {
     const quoted = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "\"sk_test_abc\"", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
     expect(quoted.available).toBe(true);
     expect(quoted.missing).toEqual([]);
+  });
+});
+
+describe("checkout session", () => {
+  const input = {
+    price: "price_biz",
+    accountId: "acct_1",
+    email: "owner@example.com",
+    customerId: null as string | null,
+    origin: "https://preview.example",
+    managedPayments: undefined as string | undefined,
+  };
+  it("disables Managed Payments on basil and leaves the client on acacia", () => {
+    const client = new Stripe("sk_test_dummy");
+    expect((client as unknown as { getApiField(key: string): string }).getApiField("version")).toBe(WEBHOOK_API_VERSION);
+    expect(WEBHOOK_API_VERSION).toBe("2025-02-24.acacia");
+    const off = checkoutSessionRequest(input);
+    expect(off.options.apiVersion).toBe(CHECKOUT_API_VERSION);
+    expect(CHECKOUT_API_VERSION).toBe("2025-03-31.basil");
+    expect(off.params.managed_payments).toEqual({ enabled: false });
+    expect(off.params.mode).toBe("subscription");
+    const on = checkoutSessionRequest({ ...input, managedPayments: "1", customerId: "cus_1" });
+    expect(on.params.managed_payments).toEqual({ enabled: true });
+    expect(on.params).toMatchObject({ customer: "cus_1" });
+    expect(checkoutSessionRequest({ ...input, managedPayments: "true" }).params.managed_payments.enabled).toBe(false);
+  });
+  it("reads the period end from the subscription or, on basil, from the items", () => {
+    const asSub = (value: unknown) => periodEndSeconds(value as Stripe.Subscription);
+    expect(asSub({ status: "active", current_period_end: 100, items: { data: [{ current_period_end: 200 }] } })).toBe(100);
+    expect(asSub({ status: "active", items: { data: [{ current_period_end: 200 }, { current_period_end: 150 }] } })).toBe(150);
+    expect(asSub({ status: "trialing", trial_end: 80, current_period_end: 100 })).toBe(80);
+    expect(asSub({ status: "active" })).toBeNull();
   });
 });
 

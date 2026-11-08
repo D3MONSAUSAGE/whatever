@@ -64,10 +64,51 @@ export function stripeKey(env?: Record<string, string | undefined>): string | nu
   if (!k.startsWith("sk_test_")) return null; // live, missing, or quoted keys never load
   return k;
 }
+
+/** Webhook payloads and subscription re-fetches stay on the SDK default. */
+export const WEBHOOK_API_VERSION = "2025-02-24.acacia";
+/**
+ * Checkout only. Acacia rejects `managed_payments` outright, and a sandbox with
+ * Managed Payments on will not create a session until this request names the flag.
+ */
+export const CHECKOUT_API_VERSION = "2025-03-31.basil";
+
+/** On only when the env is exactly "1". Pekko remains the seller otherwise. */
+export function managedPaymentsEnabled(value: string | undefined): boolean {
+  return clean(value) === "1";
+}
+
+export function checkoutSessionRequest(input: {
+  price: string;
+  accountId: string;
+  email: string;
+  customerId: string | null;
+  origin: string;
+  managedPayments: string | undefined;
+}): {
+  params: Stripe.Checkout.SessionCreateParams & { managed_payments: { enabled: boolean } };
+  options: Stripe.RequestOptions;
+} {
+  return {
+    params: {
+      mode: "subscription",
+      line_items: [{ price: input.price, quantity: 1 }],
+      client_reference_id: input.accountId,
+      ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
+      subscription_data: { metadata: { account_id: input.accountId } },
+      success_url: `${input.origin}/dashboard/billing?checkout=success`,
+      cancel_url: `${input.origin}/dashboard/billing?checkout=canceled`,
+      managed_payments: { enabled: managedPaymentsEnabled(input.managedPayments) },
+    },
+    options: { apiVersion: CHECKOUT_API_VERSION },
+  };
+}
+
 let cached: Stripe | null = null;
 export function stripe(): Stripe | null {
   const k = stripeKey();
   if (!k) return null;
+  // No apiVersion here: the client, webhook parser, and subscription re-fetch stay on acacia.
   return (cached ??= new Stripe(k));
 }
 export const priceFor = (plan: PaidPlan, env?: Record<string, string | undefined>) => billingEnv(env)[PRICE_ENV[plan]] || null;
@@ -89,22 +130,39 @@ async function defaultFetchSubscription(id: string): Promise<Stripe.Subscription
   return client.subscriptions.retrieve(id);
 }
 
+function idOf(value: string | { id: string } | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
 function subscriptionIdOf(ev: Stripe.Event): string | null {
   if (ev.type.startsWith("customer.subscription.")) return (ev.data.object as Stripe.Subscription).id;
   if (ev.type === "invoice.paid" || ev.type === "invoice.payment_failed") {
-    const invoice = ev.data.object as Stripe.Invoice;
-    return typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id ?? null;
+    const invoice = ev.data.object as Stripe.Invoice & {
+      parent?: { subscription_details?: { subscription?: string | { id: string } | null } | null } | null;
+    };
+    // Acacia puts the id on invoice.subscription. Basil moved it under parent.subscription_details.
+    return idOf(invoice.subscription) ?? idOf(invoice.parent?.subscription_details?.subscription);
   }
   if (ev.type === "checkout.session.completed") {
     const session = ev.data.object as Stripe.Checkout.Session;
-    return typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
+    return idOf(session.subscription);
   }
   return null;
 }
 
-function periodEndSeconds(sub: Stripe.Subscription): number | null {
+/**
+ * Acacia stores the period on the subscription. Basil stores it on each item.
+ * The subscription value wins when both are present. Several items use the earliest end.
+ */
+export function periodEndSeconds(sub: Stripe.Subscription): number | null {
   if (sub.status === "trialing" && sub.trial_end) return sub.trial_end;
-  return sub.current_period_end ?? sub.trial_end ?? null;
+  if (typeof sub.current_period_end === "number") return sub.current_period_end;
+  const ends = (sub.items?.data ?? [])
+    .map((item) => (item as { current_period_end?: number | null }).current_period_end)
+    .filter((value): value is number => typeof value === "number");
+  if (ends.length) return Math.min(...ends);
+  return typeof sub.trial_end === "number" ? sub.trial_end : null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
-import { billingDiagnostics, checkoutAvailable, PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
+import { billingDiagnostics, checkoutAvailable, checkoutSessionRequest, PAID_PLANS, priceFor, stripe, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,15 +23,15 @@ export async function POST(req: Request) {
   if (a.error || !a.data) return fail("Couldn't load your account.", 500);
   if (a.data.owner_user_id !== admin.userId) return json({ error: "Only the account owner can change the plan.", code: "not_owner" }, 403);
   const origin = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || new URL(req.url).origin).replace(/\/+$/, "");
-  const session = await s.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price, quantity: 1 }],
-    client_reference_id: admin.accountId,
-    ...(a.data.stripe_customer_id ? { customer: a.data.stripe_customer_id } : { customer_email: admin.email }),
-    subscription_data: { metadata: { account_id: admin.accountId } },
-    success_url: `${origin}/dashboard/billing?checkout=success`,
-    cancel_url: `${origin}/dashboard/billing?checkout=canceled`,
+  const { params, options } = checkoutSessionRequest({
+    price,
+    accountId: admin.accountId,
+    email: admin.email,
+    customerId: a.data.stripe_customer_id,
+    origin,
+    managedPayments: process.env.STRIPE_MANAGED_PAYMENTS,
   });
+  const session = await s.checkout.sessions.create(params, options);
   return json({ url: session.url });
 }
 
