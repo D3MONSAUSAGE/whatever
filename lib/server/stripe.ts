@@ -230,8 +230,12 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
       if (plan) patch.plan = plan;
       let q = db().from("accounts").update(patch);
       q = accountId ? q.eq("id", accountId) : q.eq("stripe_subscription_id", sub.id);
-      // Only a newer event may overwrite. An older replay matches zero rows and leaves the row alone.
-      await must(q.or(`billing_event_created.is.null,billing_event_created.lt.${ev.created ?? 0}`));
+      // A newer event overwrites. The same second also overwrites, because the handler
+      // re-fetches the subscription. A canceled row stays canceled at that second:
+      // trial_will_end and subscription.deleted often share event.created.
+      const created = ev.created ?? 0;
+      const sameSecond = `and(billing_event_created.eq.${created},subscription_status.not.in.(canceled,incomplete_expired))`;
+      await must(q.or(`billing_event_created.is.null,billing_event_created.lt.${created},${sameSecond}`));
     }
   }
 

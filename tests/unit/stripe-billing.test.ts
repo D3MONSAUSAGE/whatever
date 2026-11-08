@@ -19,12 +19,7 @@ function memoryDb() {
       select() { return builder; },
       eq(col: string, val: unknown) { filters.push((row) => row[col] === val); return builder; },
       or(expr: string) {
-        filters.push((row) => expr.split(",").some((part) => {
-          const [col, cmp, value] = part.split(".");
-          if (cmp === "is") return row[col] == null;
-          if (cmp === "lt") return Number(row[col]) < Number(value);
-          return false;
-        }));
+        filters.push((row) => matchFilter(row, expr));
         return builder;
       },
       maybeSingle() { return builder; },
@@ -57,6 +52,42 @@ function memoryDb() {
     accounts,
     seed(row: Row) { accounts.set(String(row.id), { ...row }); },
   };
+}
+
+function splitTop(expr: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (ch === "," && depth === 0) {
+      parts.push(expr.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(expr.slice(start));
+  return parts;
+}
+
+/** Same predicates the billing update sends to PostgREST. */
+function matchFilter(row: Row, expr: string): boolean {
+  const trimmed = expr.trim();
+  if (trimmed.startsWith("and(") && trimmed.endsWith(")")) return splitTop(trimmed.slice(4, -1)).every((part) => matchFilter(row, part));
+  if (trimmed.startsWith("or(") && trimmed.endsWith(")")) return splitTop(trimmed.slice(3, -1)).some((part) => matchFilter(row, part));
+  const notIn = trimmed.match(/^([a-z_]+)\.not\.in\.\(([^)]*)\)$/);
+  if (notIn) {
+    const value = row[notIn[1]];
+    return value != null && !notIn[2].split(",").includes(String(value));
+  }
+  const parts = splitTop(trimmed);
+  if (parts.length > 1) return parts.some((part) => matchFilter(row, part));
+  const [col, cmp, value] = trimmed.split(".");
+  if (cmp === "is") return row[col] == null;
+  if (cmp === "lt") return Number(row[col]) < Number(value);
+  if (cmp === "eq") return row[col] == value;
+  return false;
 }
 
 const db = memoryDb();
@@ -206,6 +237,41 @@ describe("stripe billing events", () => {
       fetchSubscription: async () => sub({ status: "canceled", trial_end: trialEnd, current_period_end: trialEnd }),
     });
     expect(db.accounts.get("acct_1")?.subscription_status).toBe("canceled");
+  });
+
+  it("lets subscription.deleted win when it shares a second with trial_will_end", async () => {
+    setTestDb(db as never);
+    const created = 1_700_000_000;
+    const trialEnd = created + 3 * 86400;
+    const trialing = async () => sub({ status: "trialing", trial_end: trialEnd, current_period_end: trialEnd });
+    const canceled = sub({ status: "canceled", trial_end: trialEnd, current_period_end: trialEnd });
+
+    db.seed({ id: "acct_1", plan: "trial", subscription_status: "trialing", billing_event_created: null });
+    expect(await applyEvent(event("customer.subscription.trial_will_end", created, { id: "sub_1" }, "evt_will_end_first"), {
+      now: NOW,
+      fetchSubscription: trialing,
+    })).toBe(true);
+    expect(db.accounts.get("acct_1")?.subscription_status).toBe("trialing");
+    expect(await applyEvent(event("customer.subscription.deleted", created, canceled, "evt_deleted_same_second"), {
+      now: NOW,
+      fetchSubscription: async () => { throw new Error("no such subscription"); },
+    })).toBe(true);
+    expect(db.accounts.get("acct_1")?.subscription_status).toBe("canceled");
+    expect(await applyEvent(event("customer.subscription.deleted", created, canceled, "evt_deleted_same_second"), {
+      now: NOW,
+      fetchSubscription: async () => { throw new Error("no such subscription"); },
+    })).toBe(false);
+
+    db.seed({ id: "acct_1", plan: "trial", subscription_status: "trialing", billing_event_created: null });
+    expect(await applyEvent(event("customer.subscription.deleted", created, canceled, "evt_deleted_first"), {
+      now: NOW,
+      fetchSubscription: async () => { throw new Error("no such subscription"); },
+    })).toBe(true);
+    expect(await applyEvent(event("customer.subscription.trial_will_end", created, { id: "sub_1" }, "evt_will_end_after"), {
+      now: NOW,
+      fetchSubscription: trialing,
+    })).toBe(true);
+    expect(db.accounts.get("acct_1")).toMatchObject({ subscription_status: "canceled", billing_event_created: created });
   });
 
   it("uses the item period end when basil omits it on the subscription", async () => {
