@@ -47,5 +47,6 @@ export async function GET(req: Request) {
     missing: report.missing,
     rejected: report.rejected,
     shapes: report.shapes,
+    sources: report.sources,
   });
 }

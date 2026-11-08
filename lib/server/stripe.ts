@@ -24,20 +24,38 @@ function clean(value: string | undefined): string {
  * Direct `process.env.NAME` reads. `env[name]` is invisible to the host's env
  * allowlist, so the vars can be set on the project and still be empty in the function.
  */
+const DYNAMIC_NAME = {
+  STRIPE_TEST_SECRET_KEY: ["STRIPE", "TEST", "SECRET", "KEY"].join("_"),
+  STRIPE_WEBHOOK_SECRET: ["STRIPE", "WEBHOOK", "SECRET"].join("_"),
+  STRIPE_PRICE_STARTER: ["STRIPE", "PRICE", "STARTER"].join("_"),
+  STRIPE_PRICE_BUSINESS: ["STRIPE", "PRICE", "BUSINESS"].join("_"),
+  STRIPE_PRICE_MULTI: ["STRIPE", "PRICE", "MULTI"].join("_"),
+} as const;
+
+function readRuntime(name: keyof typeof DYNAMIC_NAME, literal: string | undefined): string {
+  const cleaned = clean(literal);
+  if (cleaned && cleaned !== "[REDACTED]") return cleaned;
+  const dynamic = clean(process.env[DYNAMIC_NAME[name]]);
+  if (dynamic && dynamic !== "[REDACTED]") return dynamic;
+  return cleaned;
+}
+
 export function billingEnv(override?: Record<string, string | undefined>) {
-  const raw = override ?? {
-    STRIPE_TEST_SECRET_KEY: process.env.STRIPE_TEST_SECRET_KEY,
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
-    STRIPE_PRICE_BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
-    STRIPE_PRICE_MULTI: process.env.STRIPE_PRICE_MULTI,
-  };
+  if (override) {
+    return {
+      STRIPE_TEST_SECRET_KEY: clean(override.STRIPE_TEST_SECRET_KEY),
+      STRIPE_WEBHOOK_SECRET: clean(override.STRIPE_WEBHOOK_SECRET),
+      STRIPE_PRICE_STARTER: clean(override.STRIPE_PRICE_STARTER),
+      STRIPE_PRICE_BUSINESS: clean(override.STRIPE_PRICE_BUSINESS),
+      STRIPE_PRICE_MULTI: clean(override.STRIPE_PRICE_MULTI),
+    };
+  }
   return {
-    STRIPE_TEST_SECRET_KEY: clean(raw.STRIPE_TEST_SECRET_KEY),
-    STRIPE_WEBHOOK_SECRET: clean(raw.STRIPE_WEBHOOK_SECRET),
-    STRIPE_PRICE_STARTER: clean(raw.STRIPE_PRICE_STARTER),
-    STRIPE_PRICE_BUSINESS: clean(raw.STRIPE_PRICE_BUSINESS),
-    STRIPE_PRICE_MULTI: clean(raw.STRIPE_PRICE_MULTI),
+    STRIPE_TEST_SECRET_KEY: readRuntime("STRIPE_TEST_SECRET_KEY", process.env.STRIPE_TEST_SECRET_KEY),
+    STRIPE_WEBHOOK_SECRET: readRuntime("STRIPE_WEBHOOK_SECRET", process.env.STRIPE_WEBHOOK_SECRET),
+    STRIPE_PRICE_STARTER: readRuntime("STRIPE_PRICE_STARTER", process.env.STRIPE_PRICE_STARTER),
+    STRIPE_PRICE_BUSINESS: readRuntime("STRIPE_PRICE_BUSINESS", process.env.STRIPE_PRICE_BUSINESS),
+    STRIPE_PRICE_MULTI: readRuntime("STRIPE_PRICE_MULTI", process.env.STRIPE_PRICE_MULTI),
   };
 }
 
@@ -210,6 +228,7 @@ function valueShape(value: string) {
     pattern: classPattern(value),
     interiorWhitespace: /\s/.test(value),
     nonAscii: /[^\u0000-\u007f]/.test(value),
+    redacted: value === "[REDACTED]",
   };
 }
 
@@ -237,11 +256,18 @@ export function billingDiagnostics(env?: Record<string, string | undefined>) {
       shapes[name] = valueShape(value);
     }
   }
+  const sources = env ? undefined : {
+    STRIPE_TEST_SECRET_KEY: {
+      literal: valueShape(clean(process.env.STRIPE_TEST_SECRET_KEY)),
+      dynamic: valueShape(clean(process.env[DYNAMIC_NAME.STRIPE_TEST_SECRET_KEY])),
+    },
+  };
   return {
     available: checkoutAvailable(values),
     webhook: !!stripeKey(values) && values.STRIPE_WEBHOOK_SECRET.startsWith("whsec_"),
     missing,
     rejected,
     shapes,
+    sources,
   };
 }
