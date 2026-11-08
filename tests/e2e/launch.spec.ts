@@ -44,6 +44,10 @@ test("pricing shows the approved plans and Start free trial opens sign-up", asyn
   await page.getByTestId("start-trial").click();
   await page.waitForURL(/\/login\?mode=up/);
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  const legal = page.getByTestId("signup-legal");
+  await expect(legal).toBeVisible();
+  await expect(legal.getByRole("link", { name: "Terms of Service" })).toHaveAttribute("href", "/terms");
+  await expect(legal.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
