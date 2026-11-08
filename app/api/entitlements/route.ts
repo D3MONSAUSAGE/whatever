@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
-import { billingEnforced, loadEntitlement, readOrStartTransition, toResponse, transitionEndsAt } from "@/lib/server/entitlements";
+import { loadEntitlement, readTransitionStart, toResponse, transitionEndsAt } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +11,8 @@ export async function GET(req: Request) {
   if (admin instanceof Response) return admin;
   const e = await loadEntitlement(admin.accountId);
   if (e === "error" || !e) return fail("Couldn't load your plan. Try again.", 503);
-  // Enforcement off returns before any transition read, so the clock cannot start.
-  const started = billingEnforced() && e.plan === "grandfathered" ? await readOrStartTransition(admin.accountId) : null;
+  // Read only. The reminder dispatcher stamps this after the notice email succeeds.
+  const started = e.plan === "grandfathered" ? await readTransitionStart(admin.accountId) : null;
   return json(toResponse(admin.accountId, e, process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin, {
     transitionEndsAt: transitionEndsAt(started),
   }));
