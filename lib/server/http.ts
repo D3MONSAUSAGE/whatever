@@ -25,6 +25,12 @@ export async function allow(key: string, windowSeconds: number, max: number) {
   return data === true;
 }
 
+/** Removes one self-test window so a failed attempt can be retried. Other keys stay. */
+export async function releaseLimit(key: string) {
+  const { error } = await db().from("rate_limits").delete().eq("key", key);
+  if (error) console.info(`billing-email rate-limit release error code=${/^[0-9A-Z]{5}$/.test(error.code || "") ? error.code : "unknown"}`);
+}
+
 /** 429 with Retry-After when the fixed window is full. Null when the call is allowed. */
 export async function enforceLimit(key: string, windowSeconds: number, max: number, message: string) {
   if (await allow(key, windowSeconds, max)) return null;

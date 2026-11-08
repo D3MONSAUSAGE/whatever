@@ -130,6 +130,11 @@ export function selfTestNotices(e: EntitlementRow, transitionStartedAt: string |
   });
 }
 
+/** True when this attempt sent mail or found an existing claim. A total failure did not. */
+export function selfTestAttemptSucceeded(results: { sent: boolean; reason: string }[]): boolean {
+  return results.some((row) => row.sent || row.reason === "duplicate");
+}
+
 export function evaluateSelfTestGate(input: {
   accountId: string;
   allowlist: string | undefined;
@@ -176,6 +181,8 @@ export async function deliverSelfTest(input: {
   for (const notice of input.notices) {
     const result = await sendTransactionalEmail({
       idempotencyKey: selfTestClaimKey(input.accountId, input.run, notice.kind),
+      accountId: input.accountId,
+      kind: notice.kind,
       message: { to: input.to, subject: notice.subject, text: notice.text },
       env,
       ledger,
@@ -213,6 +220,8 @@ export async function deliverBillingNotices(input: {
     const key = billingNoticeKey(input.accountId, notice);
     const result = await sendTransactionalEmail({
       idempotencyKey: key,
+      accountId: input.accountId,
+      kind: notice.kind,
       message: { to: input.to, subject: notice.subject, text: notice.text },
       env,
       ledger,
