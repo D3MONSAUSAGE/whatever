@@ -23,6 +23,7 @@ The operator is Francisco Lopez, a sole proprietor doing business as Pekko. Unpu
 | --- | --- | --- |
 | `STRIPE_LIVE_ENABLED` | exactly `1` | off |
 | `BILLING_ENFORCE` | exactly `1` | off |
+| `BILLING_REMINDERS` | exactly `1` | off, so the scheduler sends nothing and starts no transition |
 | `EMAIL_PROVIDER` | `resend` (and the Resend key and from-address) | unset, so no email is sent |
 
 ## Environment variables to set before any live charge
