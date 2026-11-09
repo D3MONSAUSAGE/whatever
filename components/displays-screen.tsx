@@ -318,6 +318,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
     if (!playlistId) return onError("Choose a playlist.");
     if (!displayIds.length) return onError("Choose at least one screen.");
     setBusy("checking");
+    let committing = false;
     try {
       const preview = await api<{
         affected: { name: string; change: "assign" }[];
@@ -345,6 +346,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         confirmLabel: replace ? "Replace and publish" : "Publish",
       });
       if (ok !== true) return;
+      committing = true;
       setBusy("publishing");
       await api("/api/displays/publish", {
         method: "POST",
@@ -354,7 +356,8 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
       onDone("Published. Assigned · TV updates within ~30 s, then it shows as playing.");
     } catch (err) {
       const timedOut = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
-      onError(timedOut ? "That took too long. Check the screens before trying again." : (err as Error).message);
+      if (timedOut && committing) onDone("Still publishing; check the screens in a moment.");
+      else onError(timedOut ? "The preview took too long. Try again." : (err as Error).message);
     } finally {
       setBusy(null);
     }

@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
  * which is what clears the others. POST /api/playlists/:id/publish is unchanged.
  */
 export async function POST(req: Request) {
+  const started = Date.now();
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -27,26 +28,24 @@ export async function POST(req: Request) {
   const groupId = isUuid(body.groupId) ? body.groupId : null;
   if (body.groupId != null && body.groupId !== "" && !groupId) return fail("Screen group not found.", 404);
 
-  const playlist = await db().from("playlists").select("id").eq("id", playlistId).eq("account_id", admin.accountId).maybeSingle();
-  if (playlist.error) return fail("Couldn't preview that publish.", 500);
-  if (!playlist.data) return fail("Playlist not found.", 404);
-
-  let memberIds: string[] | null = null;
-  if (groupId) {
-    const group = await db().from("screen_groups").select("id").eq("id", groupId).eq("account_id", admin.accountId).maybeSingle();
-    if (group.error) return fail("Couldn't preview that publish.", 500);
-    if (!group.data) return fail("Screen group not found.", 404);
-    const members = await db().from("screen_group_members").select("display_id").eq("group_id", groupId).eq("account_id", admin.accountId);
-    if (members.error) return fail("Couldn't preview that publish.", 500);
-    memberIds = (members.data ?? []).map((row) => String(row.display_id));
-  }
-
-  const displays = await db()
+  const playlistQuery = db().from("playlists").select("id").eq("id", playlistId).eq("account_id", admin.accountId).maybeSingle();
+  const displayQuery = db()
     .from("displays")
     .select("id, name, assigned_playlist_id, last_seen_at, token_hash, location_id")
     .eq("account_id", admin.accountId)
     .eq("status", "active");
-  if (displays.error) return fail("Couldn't preview that publish.", 500);
+  const groupQuery = groupId
+    ? db().from("screen_groups").select("id").eq("id", groupId).eq("account_id", admin.accountId).maybeSingle()
+    : Promise.resolve({ data: { id: "" }, error: null });
+  const memberQuery = groupId
+    ? db().from("screen_group_members").select("display_id").eq("group_id", groupId).eq("account_id", admin.accountId)
+    : Promise.resolve({ data: [] as { display_id: string }[], error: null });
+  const [playlist, displays, group, members] = await Promise.all([playlistQuery, displayQuery, groupQuery, memberQuery]);
+  if (playlist.error || displays.error || group.error || members.error) return fail("Couldn't preview that publish.", 500);
+  if (!playlist.data) return fail("Playlist not found.", 404);
+  if (groupId && !group.data) return fail("Screen group not found.", 404);
+
+  const memberIds = groupId ? (members.data ?? []).map((row) => String(row.display_id)) : null;
   const rows = displays.data ?? [];
   const known = new Set(rows.map((row) => String(row.id)));
 
@@ -62,7 +61,8 @@ export async function POST(req: Request) {
   }
   if (!selectedIds.length || selectedIds.length > 50) return fail("Choose at least one screen.", 400);
 
-  const schedules = await loadDisplaySchedules(
+  // Commit assigns in one playlist publish. It does not walk each screen's schedule again.
+  const schedules = commit ? new Map<string, { currentSchedule?: { name: string; target: "display" | "group" } | null }>() : await loadDisplaySchedules(
     admin.accountId,
     rows.map((row) => ({ id: String(row.id), timeZone: null })),
   );
@@ -109,5 +109,8 @@ export async function POST(req: Request) {
     console.error("display publish returned no row", playlistId);
     return fail("Add at least one image, then choose screens from this account.", 400);
   }
+  const ms = Date.now() - started;
+  console.info(JSON.stringify({ event: "display-publish", commit: true, ms, screens: publishIds.length }));
+  if (ms > 8000) console.error(JSON.stringify({ event: "display-publish-slow", ms, screens: publishIds.length }));
   return json({ commit: true, replace, playlistId, ...impact });
 }

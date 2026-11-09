@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatClock12, shiftClock, shiftWeekdays } from "@/lib/clock";
-import { groupPublishIds, nowPlaying } from "@/lib/now-playing";
+import { groupPreviewCopy, groupPublishIds, nowPlaying } from "@/lib/now-playing";
 import { syncLine } from "@/lib/sync-line";
 import { playbackVersion, resolveRule, type ScheduleRule } from "@/lib/server/schedule";
 
@@ -65,6 +65,29 @@ describe("acceptance fixes", () => {
     expect(formatClock12("00:00")).toMatch(/12:00\s*AM/);
     expect(formatClock12("12:00")).toMatch(/12:00\s*PM/);
     expect(formatClock12("24:00")).toMatch(/12:00\s*AM/);
+  });
+
+  it("does not call an unchanged group screen cleared", () => {
+    const copy = groupPreviewCopy({
+      affected: [{ id: "window", name: "Window" }],
+      kept: [{ id: "counter", name: "Counter" }, { id: "patio", name: "Patio" }],
+      willBeCleared: [{ id: "window-2", name: "Window 2" }, { id: "patio", name: "Patio" }],
+      overriddenBySchedule: [],
+      offline: [],
+    }, ["window", "window-2"], false);
+    expect(copy.willBeCleared).toEqual([]);
+    expect(copy.unchanged.map((item) => item.name)).toEqual(["Window 2"]);
+    expect(copy.kept).toEqual([]);
+    expect(copy.othersLeftAlone).toBe(2);
+    const replacing = groupPreviewCopy({
+      affected: [],
+      kept: [],
+      willBeCleared: [{ id: "window-2", name: "Window 2" }],
+      overriddenBySchedule: [],
+      offline: [],
+    }, ["window-2"], true);
+    expect(replacing.willBeCleared.map((item) => item.name)).toEqual(["Window 2"]);
+    expect(replacing.unchanged).toEqual([]);
   });
 
   it("publishes only the screens that belong to the group", () => {

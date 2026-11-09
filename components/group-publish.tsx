@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { api, useApi, type DisplayItem, type PlaylistSummary } from "@/lib/api";
-import { groupPublishIds } from "@/lib/now-playing";
+import { groupPreviewCopy, groupPublishIds } from "@/lib/now-playing";
 
 type Impact = {
-  affected: { name: string }[];
-  kept: { name: string }[];
-  willBeCleared: { name: string }[];
-  overriddenBySchedule: { name: string; scheduleName: string }[];
-  offline: { name: string }[];
+  affected: { id: string; name: string }[];
+  kept: { id: string; name: string }[];
+  willBeCleared: { id: string; name: string }[];
+  overriddenBySchedule: { id: string; name: string; scheduleName: string }[];
+  offline: { id: string; name: string }[];
 };
 
 const PUBLISH_MS = 20_000;
@@ -20,6 +20,20 @@ function timedOut(err: unknown) {
 
 function names(items: { name: string }[]) {
   return items.length ? items.map((item) => item.name).join(", ") : "None";
+}
+
+function GroupPreview({ impact, memberIds }: { impact: Impact; memberIds: string[] }) {
+  const copy = groupPreviewCopy(impact, memberIds, false);
+  return (
+    <div className="grid gap-2 text-sm">
+      <p><span className="font-semibold">Affected.</span> {names(copy.affected)}</p>
+      {copy.unchanged.length ? <p><span className="font-semibold">Also showing this (unchanged).</span> {names(copy.unchanged)}</p> : null}
+      {copy.kept.length ? <p><span className="font-semibold">Kept.</span> {names(copy.kept)}</p> : null}
+      <p><span className="font-semibold">Overridden by schedule.</span> {copy.overriddenBySchedule.length ? copy.overriddenBySchedule.map((item) => `${item.name} (${item.scheduleName})`).join(", ") : "None"}</p>
+      <p><span className="font-semibold">Offline.</span> {names(copy.offline)}</p>
+      {copy.othersLeftAlone ? <p>{copy.othersLeftAlone === 1 ? "1 other screen is left alone." : `${copy.othersLeftAlone} other screens are left alone.`}</p> : null}
+    </div>
+  );
 }
 
 export function GroupPublish({ groupId, members, onChanged }: { groupId: string; members: DisplayItem[]; onChanged: () => void }) {
@@ -53,16 +67,21 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
         signal: AbortSignal.timeout(PUBLISH_MS),
         body: JSON.stringify({ playlistId, displayIds: selected, groupId, commit, replace: false }),
       });
-      setPreview(body);
       if (commit) {
         setMessage("Published to the screens you checked. TVs update within about 30 seconds.");
         onChanged();
+      } else {
+        setPreview(body);
       }
     } catch (err) {
-      setFailed(true);
-      setMessage(timedOut(err)
-        ? "That took too long. Check the screens before trying again."
-        : (err as Error).message);
+      if (timedOut(err) && commit) {
+        setFailed(false);
+        setMessage("Still publishing; check the screens in a moment.");
+        onChanged();
+      } else {
+        setFailed(true);
+        setMessage(timedOut(err) ? "The preview took too long. Try again." : (err as Error).message);
+      }
     } finally {
       setPhase("idle");
     }
@@ -89,15 +108,7 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
           </li>
         ))}
       </ul>
-      {preview ? (
-        <div className="grid gap-2 text-sm">
-          <p><span className="font-semibold">Affected.</span> {names(preview.affected)}</p>
-          <p><span className="font-semibold">Will be cleared.</span> {preview.willBeCleared.length ? `${names(preview.willBeCleared)}. They keep it, because this publish does not replace.` : "None"}</p>
-          <p><span className="font-semibold">Kept.</span> {names(preview.kept)}</p>
-          <p><span className="font-semibold">Overridden by schedule.</span> {preview.overriddenBySchedule.length ? preview.overriddenBySchedule.map((item) => `${item.name} (${item.scheduleName})`).join(", ") : "None"}</p>
-          <p><span className="font-semibold">Offline.</span> {names(preview.offline)}</p>
-        </div>
-      ) : null}
+      {preview ? <GroupPreview impact={preview} memberIds={members.map((item) => item.id)} /> : null}
       {message ? <p role="status" className={`text-sm ${failed ? "text-danger" : ""}`}>{message}</p> : null}
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn min-h-11" disabled={phase !== "idle"} onClick={() => void run(false)}>{phase === "preview" ? "Checking…" : "Preview"}</button>
