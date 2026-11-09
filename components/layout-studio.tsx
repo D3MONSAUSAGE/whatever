@@ -6,7 +6,7 @@ import {
   type AccountLibraryFile, type AccountStudio,
 } from "@/lib/layout-account";
 import {
-  containedBoard, frameFor, layoutSvg, MENU_LIMITS, parseLayout, sampleLayout, templateSpec,
+  containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, templateSpec,
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import { api, authToken, uploadForm } from "@/lib/api";
@@ -50,7 +50,7 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
   const [progress, setProgress] = useState<string | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
-  const videoBox = frame.video;
+  const videoBox = mediaVideoBox(draft);
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
   const zoneSrc = clipUrl || librarySrc || "/layout-studio/media/promo";
   const showZone = Boolean(videoBox) && (accountMode ? Boolean(clipUrl || (draft.videoMediaId && librarySrc)) : Boolean(clipUrl) || videoOn || Boolean(draft.videoMediaId));
@@ -155,7 +155,7 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
   function publish() {
     const doc = checkedDraft();
     if (!doc) return;
-    const box = frameFor(doc.template, doc.split).video;
+    const box = mediaVideoBox(doc);
     const snapshot: Snapshot = {
       doc, imageHref, videoOn: videoOn && !!box,
       svg: layoutSvg(doc, { imageHref }),
@@ -355,7 +355,7 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
                 <button type="button" style={{ ...chip(false), marginTop: 8 }} onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
                 {template === "triple-column" && si === draft.sections.length - 1 ? (
                   <>
-                    <p style={{ fontSize: 13, color: "#5c534c" }}>This column can hold the photo. A video is not added, because it would cover a column.</p>
+                    <p style={{ fontSize: 13, color: "#5c534c" }}>A photo sits behind all three columns. A video is not added, because it would cover a column.</p>
                     <label style={fieldLabel}>Upload new
                       <input aria-label="Column photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onPhoto(event.target.files?.[0])} />
                     </label>
@@ -622,7 +622,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
               loop
               playsInline
               {...{ "webkit-playsinline": "webkit-playsinline" }}
-              style={{ position: "absolute", left: video.x, top: video.y, width: video.w, height: video.h, objectFit: "contain", background: "transparent", pointerEvents: "none" }}
+              style={{ position: "absolute", left: video.x, top: video.y, width: video.w, height: video.h, objectFit: "cover", background: "transparent", pointerEvents: "none" }}
             />
           ) : null}
           {hits.map((hit) => (

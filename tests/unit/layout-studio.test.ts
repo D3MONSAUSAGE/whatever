@@ -3,7 +3,7 @@ import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { Resvg } from "@resvg/resvg-js";
 import {
-  BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, containedBoard, fontFamily, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, MENU_LIMITS, paintAfterStill, zoneOnBoard,
+  BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, containedBoard, fontFamily, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, mediaVideoBox, MENU_LIMITS, paintAfterStill, PROMO_BAND, promoBandHeight, zoneOnBoard,
   paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, zoneVideoStyle, type LayoutTemplate, type ZoneBox,
 } from "@/lib/layout-studio";
 import { renderLayoutPng } from "@/lib/server/layout-render";
@@ -201,7 +201,8 @@ describe("layout studio frames", () => {
     const doc = { ...sampleLayout("menu-promo-67"), videoMediaId: "00000000-0000-4000-8000-000000000001" };
     expect(playerComposition(doc, "https://png", null)).toBeNull();
     const composition = playerComposition(doc, "https://png", "https://mp4");
-    expect(composition?.video?.box).toEqual({ x: 1286, y: 0, w: 634, h: 1080 });
+    expect(composition?.video?.box).toEqual(mediaVideoBox(doc));
+    expect(composition?.video?.box.h).toBe(1080 - PROMO_BAND);
     expect(composition).not.toHaveProperty("groupIndex");
     const dashboard = readFileSync("app/dashboard/media/layout-studio/page.tsx", "utf8");
     const dashboardPage = dashboard.slice(dashboard.indexOf("export default"));
@@ -222,6 +223,45 @@ describe("layout studio frames", () => {
     expect(layoutStudioEnabled({})).toBe(false);
     expect(layoutStudioEnabled({ LAYOUT_STUDIO: "true" })).toBe(false);
     expect(layoutStudioEnabled({ LAYOUT_STUDIO: "1" })).toBe(true);
+  });
+
+  it("keeps the video, the photo, and the promo band on one rectangle", () => {
+    const photo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    for (const template of ["menu-promo-67", "split-50"] as const) {
+      const doc = { ...sampleLayout(template), videoMediaId: "00000000-0000-4000-8000-000000000001" };
+      const frame = frameFor(template, doc.split);
+      const media = mediaVideoBox(doc);
+      expect(promoBandHeight(doc)).toBe(PROMO_BAND);
+      expect(media).toEqual({ x: frame.video!.x, y: frame.video!.y, w: frame.video!.w, h: frame.video!.h - PROMO_BAND });
+      expect(playerComposition(doc, "https://png", "https://mp4")?.video?.box).toEqual(media);
+      const drawn = layoutSvg(doc, { imageHref: photo });
+      expect(drawn).toContain(`<image href="${photo}" x="${media!.x}" y="${media!.y}" width="${media!.w}" height="${media!.h}"`);
+      expect(drawn).not.toContain(`height="${frame.video!.h}" preserveAspectRatio`);
+      const empty = { ...doc, featureTitle: "   ", featureDetail: "" };
+      expect(promoBandHeight(empty)).toBe(0);
+      expect(mediaVideoBox(empty)).toEqual(frame.video);
+      const blank = layoutSvg(empty);
+      expect(blank).not.toContain("Featured");
+      expect(blank).not.toContain(`height="${PROMO_BAND}"`);
+    }
+  });
+
+  it("gives every column the same type and puts the photo behind the board", () => {
+    const photo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const doc = sampleLayout("triple-column");
+    const drawn = layoutSvg(doc, { imageHref: photo });
+    expect(drawn).toContain(`<image href="${photo}" x="0" y="0" width="${BOARD_W}" height="${BOARD_H}"`);
+    expect(drawn.match(/<image /g)).toHaveLength(1);
+    const sizeNear = (label: string) => {
+      const index = drawn.indexOf(label);
+      return Number(drawn.slice(Math.max(0, index - 180), index).match(/font-size="(\d+)"/)?.[1]);
+    };
+    const drip = sizeNear("Drip");
+    const jasmine = sizeNear("Jasmine");
+    const bun = sizeNear("Morning bun");
+    expect(drip).toBeGreaterThan(10);
+    expect(jasmine).toBe(drip);
+    expect(bun).toBe(drip);
   });
 
   it("draws a complete board, including the video slot", () => {
@@ -277,7 +317,10 @@ describe("player composition contract", () => {
       expect(Buffer.compare(inter, serif)).not.toBe(0);
       const feature = frameFor("menu-promo-67", colored.value.split).feature;
       const image = layoutSvg(colored.value, { imageHref: bannerPhoto });
-      expect(image).toContain(`x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="xMidYMid slice"`);
+      const media = mediaVideoBox(colored.value)!;
+      expect(image).toContain(`x="${media.x}" y="${media.y}" width="${media.w}" height="${media.h}" preserveAspectRatio="xMidYMid slice"`);
+      expect(media.h).toBe(feature.h - PROMO_BAND);
+      expect(media.y + media.h).toBe(feature.y + feature.h - PROMO_BAND);
       const red = new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="20"><rect width="80" height="20" fill="#ff0000"/></svg>`).render().asPng();
       const signaturePng = renderLayoutPng(sampleLayout("signature"), { bytes: red, mime: "image/png" });
       expect(pngPixel(signaturePng, 140, 420)[0]).toBeLessThan(40);
@@ -340,7 +383,7 @@ describe("player composition contract", () => {
       expect(splitSvg.slice(right - 40, right + 20)).not.toContain("Left only");
     }
     const safe = zoneVideoStyle(frameFor("menu-promo-67", 0.67).video!);
-      expect(safe.objectFit).toBe("contain");
+      expect(safe.objectFit).toBe("cover");
       expect(safe.left.startsWith("66.")).toBe(true);
       expect(Number(safe.width.replace("%", ""))).toBeLessThan(40);
       const full = Array.from({ length: 4 }, (_, section) => ({
@@ -394,7 +437,7 @@ describe("player composition contract", () => {
     if (parsedBox.ok) {
       expect(parsedBox.value).not.toHaveProperty("box");
       const owned = playerComposition(parsedBox.value, "https://png", "https://mp4");
-      expect(owned?.video?.box).toEqual(frameFor(parsedBox.value.template, parsedBox.value.split, parsedBox.value.columnWidths).video);
+      expect(owned?.video?.box).toEqual(mediaVideoBox(parsedBox.value));
       expect(owned?.video?.box.w).toBeLessThan(1000);
     }
     const columns = parseLayout({ ...sampleLayout("triple-column"), columnWidths: [0.5, 0.25, 0.25] });

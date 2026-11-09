@@ -137,6 +137,24 @@ export function frameFor(template: LayoutTemplate, split: number, columnWidths?:
   return { template, split: ratio, menu, feature, video: feature, columns: [menu] };
 }
 
+/** Bottom promo band on Menu and promotion and Split showcase. Empty copy gets no band. */
+export const PROMO_BAND = 170;
+
+export function promoBandHeight(doc: { template: LayoutTemplate; featureTitle?: string; featureDetail?: string }): number {
+  if (doc.template !== "menu-promo-67" && doc.template !== "split-50") return 0;
+  if (!(doc.featureTitle || "").trim() && !(doc.featureDetail || "").trim()) return 0;
+  return PROMO_BAND;
+}
+
+/** The rectangle the video and its fallback photo share. The promo band stays below it. */
+export function mediaVideoBox(doc: LayoutDocument): ZoneBox | null {
+  const frame = frameFor(doc.template, doc.split, doc.columnWidths);
+  if (!frame.video) return null;
+  const band = promoBandHeight(doc);
+  if (band <= 0 || band >= frame.video.h - 80) return frame.video;
+  return { x: frame.video.x, y: frame.video.y, w: frame.video.w, h: frame.video.h - band };
+}
+
 export function boxesOverlap(a: ZoneBox, b: ZoneBox) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -398,12 +416,12 @@ export type PlayerComposition = { layoutVersion: 1; fallbackUrl: string; video?:
 export function playerComposition(doc: LayoutDocument, fallbackUrl: string, videoUrl: string | null): PlayerComposition | null {
   if (!doc.videoMediaId || !videoUrl) return null;
   // The box always comes from the template and its proportions. A box on the document is ignored.
-  const frame = frameFor(doc.template, doc.split, doc.columnWidths);
-  if (!frame.video) return null;
+  const box = mediaVideoBox(doc);
+  if (!box) return null;
   return {
     layoutVersion: 1,
     fallbackUrl,
-    video: { mediaId: doc.videoMediaId, url: videoUrl, box: frame.video },
+    video: { mediaId: doc.videoMediaId, url: videoUrl, box },
   };
 }
 
@@ -508,7 +526,7 @@ export function zoneVideoStyle(box: ZoneBox) {
     top: `${(box.y / BOARD_H) * 100}%`,
     width: `${(box.w / BOARD_W) * 100}%`,
     height: `${(box.h / BOARD_H) * 100}%`,
-    objectFit: "contain" as const,
+    objectFit: "cover" as const,
     background: "transparent",
   };
 }
@@ -517,7 +535,7 @@ export function fontFamily(font: BoardFont | undefined) {
   return font === "noto-serif" ? "Noto Serif" : "Inter";
 }
 
-function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false) {
+function itemUnit(sections: LayoutSection[], top: number, bottom: number, scale: TypeScale, spread = false) {
   let units = 0;
   let travel = 0;
   for (const section of sections) {
@@ -538,6 +556,11 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
     const used = travel * unit;
     if (used < room * 0.72) unit = Math.min(72, unit * Math.min(1.8, (room * 0.88) / used));
   }
+  return unit;
+}
+
+function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false, unitOverride?: number) {
+  const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
   const nameSize = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
   const descSize = Math.max(10, Math.round(nameSize * 0.55));
   let y = top;
@@ -579,20 +602,18 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     `<rect width="${BOARD_W}" height="${BOARD_H}" fill="${colors.feature}"/>`,
   ];
   const feature = frame.video ?? frame.feature;
+  const media = mediaVideoBox(doc) ?? feature;
   if (doc.template === "triple-column") {
-    frame.columns.forEach((column, index) => {
-      if (href && index === frame.columns.length - 1) return;
-      parts.push(`<rect x="${column.x}" y="${column.y}" width="${column.w}" height="${column.h}" fill="${colors.paper}"/>`);
-    });
-    const photo = frame.columns[frame.columns.length - 1];
     if (href) {
-      const photoTop = photo.y + Math.round(photo.h * 0.5);
-      parts.push(`<image href="${esc(href)}" x="${photo.x}" y="${photoTop}" width="${photo.w}" height="${photo.h - (photoTop - photo.y)}" preserveAspectRatio="${imageAspect(doc)}"/>`);
+      parts.push(`<image href="${esc(href)}" x="0" y="0" width="${BOARD_W}" height="${BOARD_H}" preserveAspectRatio="${imageAspect(doc)}"/>`);
+      parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${BOARD_H}" fill="${colors.paper}" fill-opacity="0.9"/>`);
     } else {
-      parts.push(`<rect x="${photo.x}" y="${photo.y}" width="${photo.w}" height="${photo.h}" fill="${colors.paper}"/>`);
+      frame.columns.forEach((column) => {
+        parts.push(`<rect x="${column.x}" y="${column.y}" width="${column.w}" height="${column.h}" fill="${colors.paper}"/>`);
+      });
     }
   } else if (href && doc.template !== "menu-banner") {
-    const box = doc.template === "signature" ? frame.feature : feature;
+    const box = doc.template === "signature" ? frame.feature : media;
     parts.push(`<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${imageAspect(doc)}"/>`);
   }
   if (doc.template === "signature") {
@@ -626,12 +647,13 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   }
   const textTop = colors.band && doc.template !== "signature" ? 180 : menu.y + (doc.subtitle ? 72 : 36);
   if (doc.template === "triple-column") {
+    const textTop = 176;
+    const textBottom = BOARD_H - 64;
+    const shared = Math.min(...frame.columns.map((_, index) => itemUnit(doc.sections[index] ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
     frame.columns.forEach((column, index) => {
       const section = doc.sections[index];
       if (!section) return;
-      const photo = href && index === frame.columns.length - 1;
-      const bottom = photo ? column.y + Math.round(column.h * 0.48) : BOARD_H - 64;
-      paintItems(parts, [section], column.x + 36, 176, column.w - 72, bottom, colors, doc.typeScale, family);
+      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
     });
   } else {
     paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
@@ -659,8 +681,17 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       parts.push(`<text x="${hx}" y="${bandY + Math.round(bandH * 0.42)}" font-family="${family}" font-size="${Math.min(32, headSize)}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120))}</text>`);
       if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${family}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120))}</text>`);
     }
-  } else if (feature.h >= 280 && doc.template !== "triple-column") {
-    const head = doc.featureTitle || "Featured";
+  } else if ((doc.template === "menu-promo-67" || doc.template === "split-50") && promoBandHeight(doc) > 0) {
+    const band = promoBandHeight(doc);
+    const bandY = feature.y + feature.h - band;
+    const hx = feature.x + 48;
+    const title = (doc.featureTitle || "").trim();
+    const detail = (doc.featureDetail || "").trim();
+    parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${band}" fill="${colors.feature}"/>`);
+    if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(title, 40, feature.w - 80))}</text>`);
+    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80))}</text>`);
+  } else if (feature.h >= 280 && doc.template !== "triple-column" && ((doc.featureTitle || "").trim() || (doc.featureDetail || "").trim())) {
+    const head = (doc.featureTitle || "").trim();
     const hx = feature.x + 48;
     if (!href) {
       const cap = Math.min(240, Math.round(feature.h * 0.26));

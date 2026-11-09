@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as me } from "@/app/api/me/route";
 import { GET, POST } from "@/app/api/layout-studio/route";
 import { accountSaveBody, applyLibraryFile, boardAfterReload, readAccountStudio } from "@/lib/layout-account";
-import { boxesOverlap, frameFor, sampleLayout } from "@/lib/layout-studio";
+import { boxesOverlap, frameFor, mediaVideoBox, sampleLayout } from "@/lib/layout-studio";
 import { attachLayoutCompositions } from "@/lib/server/layout-player";
 import { setTestDb } from "@/lib/server/supabase";
 import { createFakeDb, type Store } from "./fake-db";
@@ -159,7 +159,9 @@ describe("layout studio account route", () => {
     await attachLayoutCompositions(items);
     const box = items[0].composition?.video?.box;
     const frame = frameFor("menu-promo-67", 0.61);
-    expect(box).toEqual(frame.video);
+    const publishedMenu = store.menus.find((item) => item.id === menu);
+    expect(box).toEqual(mediaVideoBox(publishedMenu!.content as ReturnType<typeof sampleLayout>));
+    expect(box?.h).toBeLessThan(frame.video!.h);
     expect(box && frame.video && boxesOverlap(frame.menu, frame.video)).toBe(false);
     expect(items[0].composition).not.toHaveProperty("groupIndex");
 
