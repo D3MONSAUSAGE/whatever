@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
 import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components/tv";
 import { syncLine } from "@/lib/sync-line";
+import { clockLabel, nowPlaying } from "@/lib/now-playing";
+import { GroupPublish } from "@/components/group-publish";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { IconTv } from "@/components/icons";
 import { ScreenActions } from "@/components/screen-actions";
@@ -76,10 +78,10 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
           <h2 className="font-semibold">What's playing</h2>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Status display={display} />
-            <span className="text-sm">{contentLabel(display)}</span>
+            <span className="text-sm">{nowPlaying(contentLabel(display), display.currentSchedule ? { name: display.currentSchedule.name, playlistName: display.currentSchedule.playlistName, untilLabel: clockLabel(display.currentSchedule.until) } : null)}</span>
           </div>
           <p className="text-sm text-muted mt-2"><time dateTime={display.lastSeenAt ?? undefined}>{heartbeatLabel(display.lastSeenAt)}</time></p>
-          {next ? <p className="text-sm mt-3">Next change: {next.label}{next.at ? ` · ${new Date(next.at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}</p> : <p className="text-sm mt-3 text-muted">No scheduled change in the next few days.</p>}
+          {next ? <p className="text-sm mt-3">Next change: {next.label}{next.at ? ` · ${new Date(next.at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true })}` : ""}</p> : <p className="text-sm mt-3 text-muted">No scheduled change in the next few days.</p>}
           <p className="text-sm mt-3" data-testid="sync-state">
             {syncLine(display)}
           </p>
@@ -146,8 +148,8 @@ export function GroupWorkspace({ id }: { id: string }) {
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader title={group.name} eyebrow="Screen group" lede={`${online} online · ${offline} offline · ${members.length} screens`} icon={<IconTv />}>
         <Link href="/dashboard/screens/groups" className="btn min-h-11">All groups</Link>
-        <Link href="/dashboard/displays" className="btn btn-primary min-h-11">Publish to screens</Link>
       </PageHeader>
+      <GroupPublish groupId={group.id} members={members} onChanged={() => displays.reload()} />
       <article className="card p-4 mb-4 text-sm">
         <h2 className="font-semibold">What wins</h2>
         <ol className="mt-2 list-decimal pl-5 grid gap-1">
@@ -164,7 +166,7 @@ export function GroupWorkspace({ id }: { id: string }) {
                 <span className="font-semibold truncate">{display.name}</span>
                 <Status display={display} />
               </div>
-              <p className="text-sm mt-1 truncate">{contentLabel(display)}</p>
+              <p className="text-sm mt-1">{nowPlaying(contentLabel(display), display.currentSchedule ? { name: display.currentSchedule.name, playlistName: display.currentSchedule.playlistName, untilLabel: clockLabel(display.currentSchedule.until) } : null)}</p>
               {display.currentSchedule ? <p className="text-xs text-muted mt-1">Schedule on now: {display.currentSchedule.name}</p> : null}
             </Link>
           </li>

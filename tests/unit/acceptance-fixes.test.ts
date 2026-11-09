@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { shiftClock, shiftWeekdays } from "@/lib/clock";
+import { formatClock12, shiftClock, shiftWeekdays } from "@/lib/clock";
+import { groupPublishIds, nowPlaying } from "@/lib/now-playing";
 import { syncLine } from "@/lib/sync-line";
 import { playbackVersion, resolveRule, type ScheduleRule } from "@/lib/server/schedule";
 
@@ -54,6 +55,21 @@ describe("acceptance fixes", () => {
     const gate = readFileSync("lib/server/schedule-target.ts", "utf8");
     expect(gate).toContain('.eq("kind", "published")');
     expect(gate).toContain("Screens play its published slides");
+  });
+
+  it("names the scheduled playlist and the assignment it returns to", () => {
+    expect(nowPlaying("Acceptance New Board", { name: "Round 2", playlistName: "Morning Favorites", untilLabel: "10:10 PM" }))
+      .toBe("Now: Morning Favorites (schedule Round 2 until 10:10 PM) · then Acceptance New Board");
+    expect(nowPlaying("Acceptance New Board", null)).toBe("Acceptance New Board");
+    expect(formatClock12("21:24")).toMatch(/9:24\s*PM/);
+    expect(formatClock12("00:00")).toMatch(/12:00\s*AM/);
+    expect(formatClock12("12:00")).toMatch(/12:00\s*PM/);
+    expect(formatClock12("24:00")).toMatch(/12:00\s*AM/);
+  });
+
+  it("publishes only the screens that belong to the group", () => {
+    expect(groupPublishIds(["window", "patio-2"], { window: true, "patio-2": true, patio: true })).toEqual(["window", "patio-2"]);
+    expect(groupPublishIds(["window"], { patio: true })).toEqual([]);
   });
 
   it("does not say a screen is playing while it is offline", () => {

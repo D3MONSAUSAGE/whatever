@@ -101,9 +101,13 @@ export async function POST(req: Request) {
     p_display_ids: publishIds,
   });
   if (published.error) {
+    console.error("display publish failed", published.error.message);
     if (isMissingSchema(published.error)) return fail(PLAYLISTS_UNAVAILABLE, 503);
     return fail("Couldn't publish the playlist.", 500);
   }
-  if (!published.data) return fail("Add at least one image, then choose screens from this account.", 400);
+  if (!published.data) {
+    console.error("display publish returned no row", playlistId);
+    return fail("Add at least one image, then choose screens from this account.", 400);
+  }
   return json({ commit: true, replace, playlistId, ...impact });
 }

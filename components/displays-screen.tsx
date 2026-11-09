@@ -100,7 +100,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
                     <p className="w-full text-xs text-muted" data-testid="current-schedule">
                       <span className="badge badge-live mr-1">Scheduled</span>
                       {display.currentSchedule.name} plays {display.currentSchedule.playlistName || "a playlist"}
-                      {display.currentSchedule.until ? ` until ${new Date(display.currentSchedule.until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}
+                      {display.currentSchedule.until ? ` until ${new Date(display.currentSchedule.until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true })}` : ""}
                     </p>
                   ) : null}
                   {locations.data && locations.data.length > 0 ? (
@@ -299,12 +299,12 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
   const confirm = useConfirm();
   const [playlistId, setPlaylistId] = useState("");
   const [replace, setReplace] = useState(false);
+  const [busy, setBusy] = useState<null | "checking" | "publishing">(null);
   const [chosen, setChosen] = useState<Record<string, boolean>>(() => {
     const next: Record<string, boolean> = {};
     for (const id of initialIds) next[id] = true;
     return next;
   });
-  const [busy, setBusy] = useState(false);
 
   function pickPlaylist(id: string) {
     setPlaylistId(id);
@@ -317,7 +317,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
     const displayIds = Object.entries(chosen).filter(([, on]) => on).map(([id]) => id);
     if (!playlistId) return onError("Choose a playlist.");
     if (!displayIds.length) return onError("Choose at least one screen.");
-    setBusy(true);
+    setBusy("checking");
     try {
       const preview = await api<{
         affected: { name: string; change: "assign" }[];
@@ -325,7 +325,11 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         willBeCleared: { name: string }[];
         overriddenBySchedule: { name: string; scheduleName: string }[];
         offline: { name: string }[];
-      }>("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: false }) });
+      }>("/api/displays/publish", {
+        method: "POST",
+        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({ playlistId, displayIds, commit: false }),
+      });
       const assign = preview.affected.map((item) => item.name);
       const cleared = preview.willBeCleared.map((item) => item.name);
       const ok = await confirm.ask({
@@ -340,17 +344,25 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         ].filter(Boolean).join(" "),
         confirmLabel: replace ? "Replace and publish" : "Publish",
       });
-      if (ok !== true) { setBusy(false); return; }
-      await api("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: true, replace }) });
+      if (ok !== true) return;
+      setBusy("publishing");
+      await api("/api/displays/publish", {
+        method: "POST",
+        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({ playlistId, displayIds, commit: true, replace }),
+      });
       onDone("Published. Assigned · TV updates within ~30 s, then it shows as playing.");
     } catch (err) {
-      onError((err as Error).message);
-      setBusy(false);
+      const timedOut = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
+      onError(timedOut ? "That took too long. Check the screens before trying again." : (err as Error).message);
+    } finally {
+      setBusy(null);
     }
   }
 
   const selected = playlists.data?.find((playlist) => playlist.id === playlistId);
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
       <div role="dialog" aria-label="Assign playlist" className="bg-paper w-full md:max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}>
@@ -390,13 +402,15 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
               <input type="checkbox" className="size-5" checked={replace} onChange={(event) => setReplace(event.target.checked)} aria-label="Replace on unchecked screens" />
               <span>Replace: take this playlist off screens you didn&apos;t check</span>
             </label>
-            <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={publish}>
-              {busy ? "Publishing…" : "Publish to selected screens"}
+            <button type="button" className="btn btn-primary w-full" disabled={busy !== null} onClick={publish}>
+              {busy === "checking" ? "Checking…" : busy === "publishing" ? "Publishing…" : "Publish to selected screens"}
             </button>
           </>
         )}
       </div>
     </div>
+    {confirm.node}
+    </>
   );
 }
 

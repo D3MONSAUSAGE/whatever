@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type MediaItem, type PlaylistDetail, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
-import { browserTimeZone, shiftClock, shiftWeekdays, zoneLabel } from "@/lib/clock";
+import { browserTimeZone, formatClock12, shiftClock, shiftWeekdays, zoneLabel } from "@/lib/clock";
 import { useUploads } from "@/components/uploads";
 import { useConfirm } from "@/components/confirm";
 
@@ -411,7 +411,7 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
       }
       throw err;
     }
-    onDone(`Saved ${start} to ${end} in ${zoneLabel(zone)}. A screen schedule wins over a group schedule while it is on. The TV plays the playlist's published slides, not an unpublished draft.`);
+    onDone(`Saved ${formatClock12(start)} to ${formatClock12(end)} in ${zoneLabel(zone)}. A screen schedule wins over a group schedule while it is on. The TV plays the playlist's published slides, not an unpublished draft.`);
   }
 
   return (

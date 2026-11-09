@@ -79,6 +79,18 @@ export function shiftClock(time: string, fromZone: string, toZone: string, now =
   };
 }
 
+/** 21:24 stays 9:24 PM. The clock is already in the location zone, so this does not shift it. */
+export function formatClock12(time: string) {
+  const match = /^(\d{2}):(\d{2})/.exec(time);
+  if (!match) return time;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour === 24 && minute === 0) return "12:00 AM";
+  if (hour > 23 || minute > 59) return time;
+  const instant = new Date(Date.UTC(2000, 0, 1, hour, minute));
+  return instant.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
+}
+
 /** ISO weekdays 1–7. A negative delta moves Monday back onto Sunday. */
 export function shiftWeekdays(days: number[], delta: number) {
   if (!delta) return [...days];

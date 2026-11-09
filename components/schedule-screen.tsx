@@ -15,6 +15,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconCalendar } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
+import { formatClock12 } from "@/lib/clock";
 
 const DAYS: { value: number; label: string }[] = [
   { value: 1, label: "Mon" },
@@ -518,7 +519,7 @@ function Rules({
                 <span className={`badge ${schedule.enabled ? "badge-live" : ""}`}>{schedule.enabled ? "Enabled" : "Paused"}</span>
               </div>
               <p className="text-sm">
-                {schedule.playlistName} · {schedule.displayName || schedule.groupName} · {dayList(schedule.weekdays)} {schedule.startTime}–{schedule.endTime}
+                {schedule.playlistName} · {schedule.displayName || schedule.groupName} · {dayList(schedule.weekdays)} {formatClock12(schedule.startTime)}–{formatClock12(schedule.endTime)}
                 {schedule.priority ? ` · priority ${schedule.priority}` : ""}
               </p>
               <p className="text-xs text-muted">{schedule.displayId ? "This screen" : "Group"}{schedule.startsOn ? ` · from ${schedule.startsOn}` : ""}{schedule.endsOn ? ` · through ${schedule.endsOn}` : ""}</p>
