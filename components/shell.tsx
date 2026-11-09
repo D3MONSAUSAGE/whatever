@@ -14,10 +14,10 @@ import { IconCalendar, IconGear, IconImage, IconList, IconTv } from "@/component
 
 const NAV = [
   { href: "/dashboard/screens", label: "My Screens", icon: IconTv },
-  { href: "/dashboard/media", label: "Content", icon: IconImage },
+  { href: "/dashboard/content", label: "Content", icon: IconImage },
   { href: "/dashboard/playlists", label: "Playlists", icon: IconList },
   { href: "/dashboard/schedule", label: "Schedules", icon: IconCalendar },
-  { href: "/dashboard/settings", label: "Account", icon: IconGear },
+  { href: "/dashboard/account", label: "Account", icon: IconGear },
 ];
 
 export function DashboardShell({ children, preview = false, pathOverride }: { children: React.ReactNode; preview?: boolean; pathOverride?: string }) {
@@ -54,7 +54,11 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
 
   if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">Loading…</div>;
 
-  const isActive = (href: string) => (href === "/dashboard" ? path === href : path.startsWith(href));
+  const isActive = (href: string) => {
+    if (href === "/dashboard/content") return path.startsWith("/dashboard/content") || path.startsWith("/dashboard/media");
+    if (href === "/dashboard/account") return path.startsWith("/dashboard/account") || path.startsWith("/dashboard/settings") || path.startsWith("/dashboard/billing");
+    return href === "/dashboard" ? path === href : path.startsWith(href);
+  };
   const current = NAV.find((item) => isActive(item.href))?.label ?? "Pekko";
 
   return (

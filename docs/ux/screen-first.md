@@ -5,9 +5,9 @@ The screen is the workspace. Open Pekko, pick a screen or a group, see what is a
 ## Information architecture
 
 - My Screens: all screens, screen groups, add a screen. Accounts that already have a screen start here.
-- Content: media, menus and layouts, playlists, presentations.
-- Schedules: upcoming, recurring, calendar. The existing schedule rules are the only clock.
-- Account: settings, billing, support. Billing is unchanged.
+- Content: a landing page for the media library, menus and layouts, playlists, and presentations. Those pages are unchanged.
+- Schedules: upcoming for the next 7 to 14 days, recurring windows, and a week/month overview. The existing schedule rules are the only clock. Editing a rule stays on Rules.
+- Account: settings, the existing billing page, and support. Billing is unchanged.
 
 The website labels are My Screens, Content, Playlists, Schedules, and Account. Playlists stays beside Content because a playlist is still its own page.
 
