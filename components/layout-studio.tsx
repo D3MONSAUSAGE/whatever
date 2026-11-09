@@ -405,6 +405,11 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: "100vh", background: "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <div className="studio-grid">
         <div className="studio-heading">
+          <div className="studio-page-title">
+            <p className="studio-kicker">{accountMode ? "Media" : "Isolated preview"}</p>
+            <h1 className="studio-title">Layout Studio</h1>
+            <p className="studio-lead">{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+          </div>
           {account ? (
             <div className="board-bar">
               <label className="board-field">
@@ -417,11 +422,6 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
               <button type="button" className="btn btn-quiet" onClick={newBoard}>New board</button>
             </div>
           ) : null}
-          <div className="studio-page-title">
-            <p className="studio-kicker">{accountMode ? "Media" : "Isolated preview"}</p>
-            <h1 className="studio-title">Layout Studio</h1>
-            <p className="studio-lead">{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
-          </div>
         </div>
         <section className="studio-preview" aria-label="TV preview">
           <p className="studio-kicker">Preview</p>
@@ -700,10 +700,13 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         .board-bar { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
         .board-field { display: grid; gap: 4px; flex: 1; min-width: 0; }
         .preview-frame { margin: 0; background: #111; border-radius: 16px; overflow: hidden; }
-        .remove-btn { align-self: start; min-height: 44px; }
+        .remove-btn { border: 0; background: transparent; color: #b8342a; font: inherit; font-size: 14px; font-weight: 650; min-height: 44px; padding: 0 4px; cursor: pointer; }
+        .action-stack { display: grid; gap: 4px; flex: 1 1 140px; align-content: start; min-width: 0; }
+        .action-stack .btn { width: 100%; flex: none; }
         .zone-group h3 { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #5c534c; }
         .zone-help { margin: 0; font-size: 13px; line-height: 1.4; color: #5c534c; }
         .media-card { display: flex; gap: 12px; align-items: center; min-width: 0; }
+        .media-meta { min-width: 0; flex: 1; }
         .media-thumb { width: 112px; height: 63px; border-radius: 8px; object-fit: cover; background: #111; flex: 0 0 auto; }
         .media-name { margin: 0; font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .media-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -716,7 +719,8 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           .zone-open .studio-page-title { display: none; }
           .studio-title { font-size: 22px; line-height: 1.2; margin: 0; }
           .studio-lead { display: none; }
-          .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: clip; max-width: 100%; padding: 0 0 112px !important; gap: 0 !important; }
+          .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: clip; max-width: 100%; padding: 0 !important; gap: 0 !important; }
+          .studio-controls { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
           .studio-heading, .studio-controls, .studio-preview { width: 100%; max-width: 100%; min-width: 0; }
           .studio-controls { overflow-x: hidden; }
           .studio-preview { position: static; z-index: 1; background: #efe8dc; padding: 0 16px 12px; }
@@ -816,7 +820,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
               cursor: "pointer", padding: 0, color: "#fff",
             }}
           >
-            <span style={{ position: "absolute", left: 6, bottom: 6, maxWidth: "calc(100% - 12px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "rgba(0,0,0,0.72)", borderRadius: 8, padding: "4px 8px", fontSize: 12, fontWeight: 700, lineHeight: "16px" }}>{hit.label.replace(/^Edit /, "")}</span>
+            <span style={{ position: "absolute", left: 6, bottom: 6, maxWidth: "calc(100% - 12px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: active === hit.id ? "#0066ff" : "rgba(0,0,0,0.72)", borderRadius: 8, padding: "4px 8px", fontSize: 12, fontWeight: 700, lineHeight: "16px" }}>{hit.label.replace(/^Edit /, "")}</span>
           </button>
         ))}
       </div>
@@ -923,33 +927,39 @@ function ZoneMedia({
         {hasVideo && allowVideo ? (
           <div className="media-card">
             {thumbVideo ? <video className="media-thumb" muted autoPlay loop playsInline src={thumbVideo} /> : <div className="media-thumb" />}
-            <div>
+            <div className="media-meta">
               <p className="media-name">{videoFile?.name || "Video"}</p>
               <p className="zone-help">Video</p>
             </div>
+            <button type="button" className="remove-btn" onClick={removeVideo}>Remove video</button>
           </div>
         ) : hasImage ? (
           <div className="media-card">
             {thumbImage ? <img className="media-thumb" alt="" src={thumbImage} /> : <div className="media-thumb" />}
-            <div>
+            <div className="media-meta">
               <p className="media-name">{imageFile?.name || "Image"}</p>
               <p className="zone-help">Image</p>
             </div>
+            <button type="button" className="remove-btn" onClick={removePhoto}>Remove image</button>
           </div>
         ) : <p className="zone-help">Nothing in this zone yet.</p>}
         {progress ? <p role="status">{progress}</p> : null}
-        {allowImage && hasVideo ? <p className="zone-help">Replaces the current video.</p> : null}
-        {allowVideo && hasImage && !hasVideo ? <p className="zone-help">Replaces the current image.</p> : null}
         <div className="media-actions">
           {allowImage ? (
-            <label className={`btn file-btn ${imagePrimary ? "btn-primary" : "btn-quiet"}`}>{imageLabel}
-              <input aria-label={imageLabel} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onPhoto(file); }} />
-            </label>
+            <div className="action-stack">
+              <label className={`btn file-btn ${imagePrimary ? "btn-primary" : "btn-quiet"}`}>{imageLabel}
+                <input aria-label={imageLabel} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onPhoto(file); }} />
+              </label>
+              {hasVideo ? <p className="zone-help">Replaces the current video.</p> : null}
+            </div>
           ) : null}
           {allowVideo ? (
-            <label className={`btn file-btn ${videoPrimary ? "btn-primary" : "btn-quiet"}`}>{videoLabel}
-              <input aria-label={videoLabel} type="file" accept="video/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onVideo(file); }} />
-            </label>
+            <div className="action-stack">
+              <label className={`btn file-btn ${videoPrimary ? "btn-primary" : "btn-quiet"}`}>{videoLabel}
+                <input aria-label={videoLabel} type="file" accept="video/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onVideo(file); }} />
+              </label>
+              {hasImage && !hasVideo ? <p className="zone-help">Replaces the current image.</p> : null}
+            </div>
           ) : null}
           {account ? <button type="button" className="btn btn-quiet" aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>Choose from library</button> : null}
         </div>
@@ -971,8 +981,6 @@ function ZoneMedia({
             ) : null}
           </div>
         ) : null}
-        {allowImage && hasImage ? <button type="button" className="btn btn-quiet remove-btn" onClick={removePhoto}>Remove image</button> : null}
-        {allowVideo && hasVideo ? <button type="button" className="btn btn-quiet remove-btn" onClick={removeVideo}>Remove video</button> : null}
         {allowVideo ? <p className="zone-help">{hasVideo ? "This board already has its one video. Another video replaces it." : "A board plays one video, muted and looping, in this zone."}</p> : null}
       </section>
       <section className="zone-group">
