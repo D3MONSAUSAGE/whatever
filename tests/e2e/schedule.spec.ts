@@ -110,7 +110,7 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard/schedule");
     await expect(page.getByRole("heading", { name: "Schedule", exact: true })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Mobile" }).getByRole("link", { name: "Schedule", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Mobile" }).getByRole("link", { name: "Schedules", exact: true })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Main" })).toBeHidden();
     await expect(page.getByLabel("Name for Kitchen line")).toBeVisible();
     await expect(page.getByText("Weekday lunch").first()).toBeVisible();
@@ -118,7 +118,7 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await page.getByLabel("Preview screen").selectOption({ label: "Front counter" });
     await expect(page.getByText("Saved assignment").first()).toBeVisible();
 
-    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Account" }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await signUp(page, other);
     const foreign = await authed(page, "/api/locations");

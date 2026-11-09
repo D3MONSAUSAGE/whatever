@@ -16,8 +16,8 @@ const NAV = [
   { href: "/dashboard/screens", label: "My Screens", icon: IconTv },
   { href: "/dashboard/media", label: "Content", icon: IconImage },
   { href: "/dashboard/playlists", label: "Playlists", icon: IconList },
-  { href: "/dashboard/schedule", label: "Schedule", icon: IconCalendar },
-  { href: "/dashboard/settings", label: "Settings", icon: IconGear },
+  { href: "/dashboard/schedule", label: "Schedules", icon: IconCalendar },
+  { href: "/dashboard/settings", label: "Account", icon: IconGear },
 ];
 
 export function DashboardShell({ children, preview = false, pathOverride }: { children: React.ReactNode; preview?: boolean; pathOverride?: string }) {

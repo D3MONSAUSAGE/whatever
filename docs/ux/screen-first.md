@@ -9,6 +9,8 @@ The screen is the workspace. Open Pekko, pick a screen or a group, see what is a
 - Schedules: upcoming, recurring, calendar. The existing schedule rules are the only clock.
 - Account: settings, billing, support. Billing is unchanged.
 
+The website labels are My Screens, Content, Playlists, Schedules, and Account. Playlists stays beside Content because a playlist is still its own page.
+
 `/dashboard/displays` and the other current routes stay. New work is added beside them.
 
 ## Screen workspace
