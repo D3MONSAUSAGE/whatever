@@ -6,6 +6,7 @@ import { MediaLibrary } from "@/components/media-library";
 import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
 import { ScreenWorkspace } from "@/components/my-screens";
+import { LayoutStudio } from "@/components/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 
@@ -85,7 +86,7 @@ export function PreviewApp() {
   const params = useSearchParams();
   const screen = params.get("screen") || "overview";
   const empty = params.get("empty") === "1";
-  const path = screen === "overview" ? "/dashboard" : `/dashboard/${screen}`;
+  const path = screen === "studio" ? "/dashboard/media/layout-studio" : screen === "overview" ? "/dashboard" : `/dashboard/${screen}`;
   const overview = empty
     ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
     : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
@@ -97,6 +98,7 @@ export function PreviewApp() {
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
       {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} /> : null}
+      {screen === "studio" ? <LayoutStudio /> : null}
     </DashboardShell>
   );
 }

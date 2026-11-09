@@ -436,7 +436,8 @@ describe("player composition contract", () => {
     expect(editor).toContain("Each column is 20% to 60%");
     expect(editor).toContain("TV preview");
     expect(editor).toContain("Upload new");
-    expect(editor).toContain("Edit feature zone");
+    expect(editor).toContain("Edit promotion");
+    expect(editor).toContain("Replaces the current video.");
     expect(editor).toContain("position: sticky");
     expect(editor).toContain("min-height: 44px");
     const banner = layoutSvg(sampleLayout("menu-banner"));

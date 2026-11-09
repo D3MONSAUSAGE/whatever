@@ -93,7 +93,7 @@ export function readAccountStudio(body: unknown): AccountStudio | null {
   return { boards, legacy, library };
 }
 
-/** Attach a library id. A photo must be JPEG or PNG. A video must be a video row. */
+/** Attach a library id. A photo must be JPEG, PNG, or WebP. A video must be a video row. */
 export function applyLibraryFile(doc: LayoutDocument, entry: AccountLibraryFile | null, role: "photo" | "video"): LayoutDocument {
   if (role === "photo") {
     if (!entry || entry.kind !== "image") return { ...doc, imageMediaId: null };
@@ -102,4 +102,13 @@ export function applyLibraryFile(doc: LayoutDocument, entry: AccountLibraryFile 
   }
   if (!entry || entry.kind !== "video") return { ...doc, videoMediaId: null };
   return { ...doc, videoMediaId: entry.id };
+}
+
+/**
+ * A promotion, banner, or split side shows one file. The newest choice clears the other,
+ * including the board's single video when an image takes that zone.
+ */
+export function placeZoneMedia(doc: LayoutDocument, role: "photo" | "video", id: string | null, exclusive: boolean): LayoutDocument {
+  if (role === "photo") return { ...doc, imageMediaId: id, videoMediaId: exclusive ? null : doc.videoMediaId };
+  return { ...doc, videoMediaId: id, imageMediaId: exclusive ? null : doc.imageMediaId };
 }
