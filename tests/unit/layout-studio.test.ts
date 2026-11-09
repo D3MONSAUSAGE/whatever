@@ -266,6 +266,9 @@ describe("player composition contract", () => {
       const image = layoutSvg(colored.value, { imageHref: bannerPhoto });
       expect(image).toContain(`x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="xMidYMid slice"`);
       const red = new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="20"><rect width="80" height="20" fill="#ff0000"/></svg>`).render().asPng();
+      const signaturePng = renderLayoutPng(sampleLayout("signature"), { bytes: red, mime: "image/png" });
+      expect(pngPixel(signaturePng, 140, 420)[0]).toBeLessThan(40);
+      expect(pngPixel(signaturePng, 12, 12)[0]).toBeGreaterThan(200);
       const painted = renderLayoutPng(colored.value, { bytes: red, mime: "image/png" });
       expect(painted.readUInt32BE(16)).toBe(1920);
       expect(painted.readUInt32BE(20)).toBe(1080);
@@ -274,7 +277,56 @@ describe("player composition contract", () => {
       expect(menuPixel[1]).toBeGreaterThan(180);
       expect(featurePixel[0]).toBeGreaterThan(200);
       expect(featurePixel[1]).toBeLessThan(40);
-      const safe = zoneVideoStyle(frameFor("menu-promo-67", 0.67).video!);
+      const signatureFrame = frameFor("signature", sampleLayout("signature").split);
+    const signatureSvg = layoutSvg(sampleLayout("signature"), { imageHref: bannerPhoto });
+    expect(signatureSvg).toContain(`<image href="${bannerPhoto}" x="0" y="0" width="1920" height="1080" preserveAspectRatio="xMidYMid slice"/>`);
+    expect(signatureSvg.indexOf("<image ")).toBeLessThan(signatureSvg.indexOf(`width="${signatureFrame.menu.w - 96}"`));
+    expect(boxesOverlap(signatureFrame.menu, signatureFrame.video!)).toBe(false);
+    const columns = frameFor("triple-column", 1 / 3).columns;
+    const tripleDoc = parseLayout({
+      ...sampleLayout("triple-column"),
+      sections: [
+        { name: "Coffee only", items: [{ name: "Drip only", price: "$3", description: "Left column" }] },
+        { name: "Tea only", items: [{ name: "Mint only", price: "$3", description: "Middle column" }] },
+        { name: "Bakery only", items: [{ name: "Bun only", price: "$4", description: "Right column" }] },
+      ],
+    });
+    expect(tripleDoc.ok).toBe(true);
+    if (tripleDoc.ok) {
+      const tripleSvg = layoutSvg(tripleDoc.value);
+      const at = (label: string) => {
+        const index = tripleSvg.indexOf(label);
+        const found = [...tripleSvg.slice(Math.max(0, index - 220), index).matchAll(/x="([\d.]+)"/g)];
+        return Number(found[found.length - 1]?.[1]);
+      };
+      expect(at("COFFEE ONLY")).toBeGreaterThanOrEqual(columns[0].x);
+      expect(at("COFFEE ONLY")).toBeLessThan(columns[1].x);
+      expect(at("TEA ONLY")).toBeGreaterThanOrEqual(columns[1].x);
+      expect(at("TEA ONLY")).toBeLessThan(columns[2].x);
+      expect(at("BAKERY ONLY")).toBeGreaterThanOrEqual(columns[2].x);
+    }
+    const splitFrame = frameFor("split-50", 0.5);
+    const splitDoc = parseLayout({
+      ...sampleLayout("split-50"),
+      featureTitle: "Right only ride",
+      sections: [{ name: "Floor", items: [{ name: "Left only class", price: "6:30", description: "Studio A" }] }],
+    });
+    expect(splitDoc.ok).toBe(true);
+    if (splitDoc.ok) {
+      const splitSvg = layoutSvg(splitDoc.value);
+      const left = splitSvg.indexOf("Left only class");
+      const right = splitSvg.indexOf("Right only ride");
+      const xBefore = (svg: string, index: number) => {
+        const found = [...svg.slice(Math.max(0, index - 220), index).matchAll(/x="([\d.]+)"/g)];
+        return Number(found[found.length - 1]?.[1]);
+      };
+      const leftX = xBefore(splitSvg, left);
+      const rightX = xBefore(splitSvg, right);
+      expect(leftX).toBeLessThan(splitFrame.menu.w);
+      expect(rightX).toBeGreaterThanOrEqual(splitFrame.feature.x);
+      expect(splitSvg.slice(right - 40, right + 20)).not.toContain("Left only");
+    }
+    const safe = zoneVideoStyle(frameFor("menu-promo-67", 0.67).video!);
       expect(safe.objectFit).toBe("contain");
       expect(safe.left.startsWith("66.")).toBe(true);
       expect(Number(safe.width.replace("%", ""))).toBeLessThan(40);

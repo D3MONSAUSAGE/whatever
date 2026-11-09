@@ -250,9 +250,21 @@ export function LayoutStudio() {
             <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split}
               onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
           </label>
+          {template === "split-50" || template === "signature" || template === "menu-promo-67" ? (
+            <>
+              <label style={fieldLabel}>{template === "split-50" ? "Right side title" : template === "signature" ? "Side title" : "Feature title"}
+                <input aria-label={template === "split-50" ? "Right side title" : "Feature title"} style={field} value={draft.featureTitle} maxLength={40}
+                  onChange={(event) => update({ ...draft, featureTitle: event.target.value })} />
+              </label>
+              <label style={fieldLabel}>{template === "split-50" ? "Right side detail" : template === "signature" ? "Side detail" : "Feature detail"}
+                <input aria-label={template === "split-50" ? "Right side detail" : "Feature detail"} style={field} value={draft.featureDetail} maxLength={80}
+                  onChange={(event) => update({ ...draft, featureDetail: event.target.value })} />
+              </label>
+            </>
+          ) : null}
           {draft.sections.map((section, si) => (
             <fieldset key={si} style={{ border: "1px solid #ddd4c6", borderRadius: 12, margin: "12px 0", padding: 12 }}>
-              <legend>Section {si + 1}</legend>
+              <legend>{template === "triple-column" ? `Column ${si + 1}` : `Section ${si + 1}`}</legend>
               <input aria-label={`Section ${si + 1} name`} style={field} value={section.name} maxLength={MENU_LIMITS.sectionName}
                 onChange={(event) => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, name: event.target.value } : s) })} />
               {section.items.map((item, ii) => (
@@ -270,7 +282,9 @@ export function LayoutStudio() {
               <button type="button" style={{ ...chip(false), marginTop: 8 }} onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
             </fieldset>
           ))}
-          <button type="button" style={chip(false)} onClick={() => update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] })}>Add section</button>
+          {template === "triple-column" ? <p style={{ fontSize: 13, color: "#5c534c" }}>Each column keeps its own section. A video is not added, because it would cover a column.</p> : (
+            <button type="button" style={chip(false)} onClick={() => update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] })}>Add section</button>
+          )}
           {account ? (
             <>
               <label style={fieldLabel}>Saved board
@@ -311,13 +325,14 @@ export function LayoutStudio() {
               {account.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>Classic menus stay in the menu editor: {account.legacy.map((item) => item.name).join(", ")}.</p> : null}
             </>
           ) : null}
-          <label style={{ ...fieldLabel, marginTop: 16 }}>Photo for the feature area
-            <input type="file" accept="image/jpeg,image/png" onChange={(event) => onPhoto(event.target.files?.[0])} />
+          <label style={{ ...fieldLabel, marginTop: 16 }}>{template === "signature" ? "Background image" : "Photo for the feature area"}
+            <input aria-label={template === "signature" ? "Background image" : "Feature photo"} type="file" accept="image/jpeg,image/png" onChange={(event) => onPhoto(event.target.files?.[0])} />
           </label>
           <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
-            <input type="checkbox" checked={videoOn && !!videoBox} disabled={!videoBox} onChange={(event) => setVideoOn(event.target.checked)} />
-            Play the demo video in the safe area
+            <input type="checkbox" checked={videoOn && !!videoBox && !draft.videoMediaId} disabled={!videoBox || Boolean(draft.videoMediaId)} onChange={(event) => setVideoOn(event.target.checked)} />
+            Play the bundled demo in the safe area
           </label>
+          {draft.videoMediaId ? <p style={{ fontSize: 13, color: "#5c534c" }}>Publish uses the selected library video. The bundled demo is not that file.</p> : null}
           {!videoBox ? <p style={{ fontSize: 14 }}>This layout is three menu columns. A video would cover one of them, so it stays a still.</p> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" style={chip(false)} onClick={saveDraft}>Save draft</button>
@@ -329,8 +344,8 @@ export function LayoutStudio() {
           <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
         </section>
         <section>
-          <Stage svg={svg} video={videoOn && videoBox ? videoBox : null} label="Draft" />
-          {published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split).video : null} label="Published preview" /> : <p>No published preview yet.</p>}
+          <Stage svg={svg} video={(videoOn || Boolean(draft.videoMediaId)) && videoBox ? videoBox : null} videoSrc={libraryVideoUrl(account, draft.videoMediaId)} label="Draft" />
+          {published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId)} label="Published preview" /> : <p>No published preview yet.</p>}
         </section>
       </div>
       <style>{`
@@ -346,7 +361,12 @@ export function LayoutStudio() {
   );
 }
 
-function Stage({ svg, video, label }: { svg: string; video: { x: number; y: number; w: number; h: number } | null; label: string }) {
+function libraryVideoUrl(account: AccountStudio | null, mediaId: string | null) {
+  const file = account?.library.find((item) => item.id === mediaId && item.kind === "video");
+  return file?.url || "/layout-studio/media/promo";
+}
+
+function Stage({ svg, video, videoSrc, label }: { svg: string; video: { x: number; y: number; w: number; h: number } | null; videoSrc: string; label: string }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState({ scale: 1, left: 0, top: 0 });
   useEffect(() => {
@@ -369,7 +389,7 @@ function Stage({ svg, video, label }: { svg: string; video: { x: number; y: numb
           <div dangerouslySetInnerHTML={{ __html: svg }} />
           {video ? (
             <video
-              src="/layout-studio/media/promo"
+              src={videoSrc}
               muted
               autoPlay
               loop

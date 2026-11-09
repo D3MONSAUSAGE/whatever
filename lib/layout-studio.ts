@@ -548,6 +548,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="xMidYMid slice"/>`);
   }
   if (doc.template === "signature") {
+    // Opaque card over the full-bleed background. Text stays on this card, not on the photo.
     parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${BOARD_H - 96}" fill="${colors.paper}"/>`);
   } else if (doc.template === "menu-banner") {
     parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
