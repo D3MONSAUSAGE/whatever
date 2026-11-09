@@ -34,10 +34,13 @@ describe("studio phone frame", () => {
         client: document.documentElement.clientWidth,
         sticky: preview ? getComputedStyle(preview).position : "",
         tab: tab ? tab.getBoundingClientRect().height : 0,
+        previewBottom: preview ? preview.getBoundingClientRect().bottom : 0,
+        controlsTop: document.querySelector(".studio-controls")?.getBoundingClientRect().top ?? 0,
       };
     });
     expect(metrics.scroll).toBeLessThanOrEqual(metrics.client + 1);
-    expect(metrics.sticky).toBe("sticky");
+    expect(metrics.sticky).toBe("static");
+    expect(metrics.controlsTop).toBeGreaterThanOrEqual(metrics.previewBottom - 1);
     expect(metrics.tab).toBeGreaterThanOrEqual(44);
     await browser.close();
   });

@@ -31,7 +31,7 @@ function blankItem(): LayoutItem {
   return { name: "", price: "", description: "" };
 }
 
-export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "preview" | "account"; screenId?: string | null } = {}) {
+export function LayoutStudio({ mode = "preview", screenId = null, fixture = null }: { mode?: "preview" | "account"; screenId?: string | null; fixture?: AccountStudio | null } = {}) {
   const accountMode = mode === "account";
   const [template, setTemplate] = useState<LayoutTemplate>("menu-promo-67");
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout("menu-promo-67"));
@@ -41,7 +41,7 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
   const [account, setAccount] = useState<AccountStudio | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [note, setNote] = useState(accountMode ? "Loading this account." : "This browser copy does not write an account.");
+  const [note, setNote] = useState(accountMode || fixture ? "" : "This browser copy does not write an account.");
   const spec = templateSpec(template);
   const frame = frameFor(draft.template, draft.split, draft.columnWidths);
   const [step, setStep] = useState<StudioStep>("template");
@@ -80,6 +80,19 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
   }, [accountMode]);
 
   useEffect(() => {
+    if (fixture) {
+      const board = fixture.boards[0] ?? null;
+      setAccount(fixture);
+      setMenuId(board?.id ?? null);
+      if (board) {
+        setTemplate(board.document.template);
+        setDraft(board.document);
+        setImageHref(fixture.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+        setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+      }
+      setNote("");
+      return;
+    }
     if (accountMode) {
       let cancel = false;
       api<unknown>("/api/layout-studio").then((body) => {
@@ -95,7 +108,7 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
           setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
           setVideoOn(false);
         }
-        setNote(loaded.boards.length ? "Loaded the board saved on this account." : "No layout board yet. Save a draft when this one is ready.");
+        setNote("");
       }).catch((err: Error) => { if (!cancel) setNote(err.message); });
       return () => { cancel = true; };
     }
@@ -118,10 +131,44 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
         setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
         setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
       }
-      setNote(loaded.boards.length ? "Loaded the board saved on this account." : "Signed in. A draft will be stored on this account.");
+      setNote("");
     }).catch(() => { /* no session: the browser preview stays local */ });
     return () => { cancel = true; };
-  }, [accountMode]);
+  }, [accountMode, fixture]);
+
+  function selectBoard(id: string) {
+    if (!account) return;
+    if (!id) { newBoard(); return; }
+    const board = account.boards.find((item) => item.id === id);
+    if (!board) return;
+    setMenuId(board.id);
+    setTemplate(board.document.template);
+    setDraft(board.document);
+    setImageHref(account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+    setClipUrl(null);
+    setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+    setZone("");
+    setStep("template");
+    setNote("");
+  }
+
+  function newBoard() {
+    const sample = sampleLayout("menu-promo-67");
+    setMenuId(null);
+    setTemplate(sample.template);
+    setDraft(sample);
+    setImageHref(null);
+    setClipUrl(null);
+    setVideoOn(false);
+    setZone("");
+    setStep("template");
+    setNote("");
+  }
+
+  function closeZone() {
+    setZone("");
+    setStep("template");
+  }
 
   function choose(next: LayoutTemplate) {
     const sample = sampleLayout(next);
@@ -355,40 +402,66 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
   const photoLabel = zone === "photo" || zone === "background" || template === "signature" ? "Background image" : "Feature photo";
 
   return (
-    <main className="studio-app" style={{ minHeight: "100vh", background: "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
+    <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: "100vh", background: "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <div className="studio-grid">
         <div className="studio-heading">
-          <p className="studio-kicker">{accountMode ? "Media" : "Isolated preview"}</p>
-          <h1 className="studio-title">Layout Studio</h1>
-          <p className="studio-lead">{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+          {account ? (
+            <div className="board-bar">
+              <label className="board-field">
+                <span className="studio-kicker">Board</span>
+                <select aria-label="Board" className="field" value={menuId ?? ""} onChange={(event) => selectBoard(event.target.value)}>
+                  <option value="">New board</option>
+                  {account.boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+                </select>
+              </label>
+              <button type="button" className="btn btn-quiet" onClick={newBoard}>New board</button>
+            </div>
+          ) : null}
+          <div className="studio-page-title">
+            <p className="studio-kicker">{accountMode ? "Media" : "Isolated preview"}</p>
+            <h1 className="studio-title">Layout Studio</h1>
+            <p className="studio-lead">{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+          </div>
         </div>
+        <section className="studio-preview" aria-label="TV preview">
+          <p className="studio-kicker">Preview</p>
+          <Stage
+            svg={svg}
+            video={showZone ? videoBox : null}
+            videoSrc={zoneSrc}
+            label=""
+            hits={previewHits(template, frame)}
+            active={zone}
+            onHit={openZone}
+          />
+          {!accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
+          {!accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
+        </section>
         <section className="studio-controls">
           {screenId ? <p style={{ fontSize: 14 }}>This edit is for one screen. Publish assigns the board to that screen and leaves the others as they are.</p> : null}
 
           <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>
-              {TEMPLATES.map((id) => (
-                <button key={id} type="button" onClick={() => choose(id)} style={chip(id === template)}>{templateSpec(id).name}</button>
-              ))}
+            <div className="zone-groups">
+              <section className="zone-group">
+                <h3>Template</h3>
+                <div className="chip-row">
+                  {TEMPLATES.map((id) => (
+                    <button key={id} type="button" onClick={() => choose(id)} style={chip(id === template)}>{templateSpec(id).name}</button>
+                  ))}
+                </div>
+              </section>
+              <BoardText draft={draft} update={update} />
             </div>
-            <label style={fieldLabel}>Title
-              <input style={field} value={draft.title} maxLength={MENU_LIMITS.title} onChange={(event) => update({ ...draft, title: event.target.value })} />
-            </label>
-            <label style={fieldLabel}>Subtitle
-              <input style={field} value={draft.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(event) => update({ ...draft, subtitle: event.target.value })} />
-            </label>
-            <label style={fieldLabel}>Footer
-              <input style={field} value={draft.footer} maxLength={MENU_LIMITS.footer} onChange={(event) => update({ ...draft, footer: event.target.value })} />
-            </label>
           </div>
 
           <div className={step === "section" ? "studio-pane on" : "studio-pane"} data-step="section">
-            <p className="studio-sheet-note" role="status">{note}</p>
-            <section className="zone-group">
-              <h3>Section content</h3>
-              <p className="zone-help">Menu. Text only. Use the promotion, banner, or board photo for an image or video.</p>
-            </section>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "8px 0" }}>
+            {note ? <p className="studio-sheet-note" role="status">{note}</p> : null}
+            <div className="zone-groups">
+              <ZoneHead zone={zone || "menu"} template={template} onClose={closeZone} />
+              <BoardText draft={draft} update={update} />
+              <section className="zone-group">
+                <h3>Menu sections</h3>
+            <div className="chip-row">
               {draft.sections.map((section, index) => (
                 <button key={index} type="button" style={chip(index === activeSection)} onClick={() => { setSectionIndex(index); setZone(template === "triple-column" ? `column-${index}` : "menu"); }}>
                   {template === "triple-column" ? `Column ${index + 1}` : section.name || `Section ${index + 1}`}
@@ -426,32 +499,21 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
             {template === "triple-column" ? null : (
               <button type="button" style={chip(false)} onClick={() => update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] })}>Add section</button>
             )}
+              </section>
+            </div>
           </div>
 
           <div className={step === "content" ? "studio-pane on" : "studio-pane"} data-step="content">
-            <p className="studio-sheet-note" role="status">{note}</p>
-            <p style={{ fontSize: 14 }}>Editing {zoneLabel(zone, template)}</p>
+            {note ? <p className="studio-sheet-note" role="status">{note}</p> : null}
             <div className={menuZone ? "zone-panel on" : "zone-panel"} data-zone-panel="menu">
-              <p style={{ fontSize: 14 }}>This area is the menu. Its sections and items are the only text it takes. Select the feature on the TV preview to add a photo or video.</p>
+              <div className="zone-groups">
+                <ZoneHead zone={zone || "menu"} template={template} onClose={closeZone} />
+                <BoardText draft={draft} update={update} />
+              </div>
             </div>
             <div className={featureZone ? "zone-panel on" : "zone-panel"} data-zone-panel="feature">
-              <section className="zone-group">
-                <h3>Section content</h3>
-                <p className="zone-help">{zoneLabel(zone, template)}. {zoneCapabilityLine(zone, template)}</p>
-              </section>
-              {template === "split-50" || template === "signature" || template === "menu-promo-67" || template === "menu-banner" ? (
-                <section className="zone-group">
-                  <h3>Text settings</h3>
-                  <label style={fieldLabel}>{template === "split-50" ? "Right side title" : template === "signature" ? "Side title" : "Feature title"}
-                    <input aria-label={template === "split-50" ? "Right side title" : "Feature title"} style={field} value={draft.featureTitle} maxLength={40}
-                      onChange={(event) => update({ ...draft, featureTitle: event.target.value })} />
-                  </label>
-                  <label style={fieldLabel}>{template === "split-50" ? "Right side detail" : template === "signature" ? "Side detail" : "Feature detail"}
-                    <input aria-label={template === "split-50" ? "Right side detail" : "Feature detail"} style={field} value={draft.featureDetail} maxLength={80}
-                      onChange={(event) => update({ ...draft, featureDetail: event.target.value })} />
-                  </label>
-                </section>
-              ) : null}
+              <div className="zone-stack">
+              <ZoneHead zone={zone} template={template} onClose={closeZone} />
               <ZoneMedia
                 photoLabel={photoLabel}
                 allowImage={zoneAllows(template, zone, "image")}
@@ -474,6 +536,7 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
                   update(next);
                   setImageHref(entry?.url ?? null);
                   if (exclusive) { setClipUrl(null); setVideoOn(false); }
+                  setNote(exclusive && (draft.videoMediaId || clipUrl) ? "Image replaces the video in this zone." : "");
                 }}
                 onLibraryVideo={(entry) => {
                   const applied = applyLibraryFile(draft, entry, "video");
@@ -483,8 +546,23 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
                   setClipUrl(null);
                   setVideoOn(Boolean(next.videoMediaId));
                   if (exclusive) setImageHref(null);
+                  setNote(exclusive && (draft.imageMediaId || imageHref) ? "Video replaces the image in this zone." : "");
                 }}
               />
+              {zoneAllows(template, zone, "text") ? (
+                <section className="zone-group">
+                  <h3>Text settings</h3>
+                  <label style={fieldLabel}>{template === "split-50" ? "Right side title" : template === "signature" ? "Side title" : "Feature title"}
+                    <input aria-label={template === "split-50" ? "Right side title" : "Feature title"} style={field} value={draft.featureTitle} maxLength={40}
+                      onChange={(event) => update({ ...draft, featureTitle: event.target.value })} />
+                  </label>
+                  <label style={fieldLabel}>{template === "split-50" ? "Right side detail" : template === "signature" ? "Side detail" : "Feature detail"}
+                    <input aria-label={template === "split-50" ? "Right side detail" : "Feature detail"} style={field} value={draft.featureDetail} maxLength={80}
+                      onChange={(event) => update({ ...draft, featureDetail: event.target.value })} />
+                  </label>
+                </section>
+              ) : null}
+              </div>
             </div>
             <div className={backgroundZone ? "zone-panel on" : "zone-panel"} data-zone-panel="background">
               <label style={fieldLabel}>Menu background
@@ -569,23 +647,6 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
           </div>
 
           <div className={step === "publish" ? "studio-pane on" : "studio-pane"} data-step="publish">
-            {account ? (
-              <label style={fieldLabel}>Saved board
-                <select aria-label="Saved board" value={menuId ?? ""} onChange={(event) => {
-                  const id = event.target.value;
-                  const board = account.boards.find((item) => item.id === id);
-                  setMenuId(id || null);
-                  if (!board) return;
-                  setTemplate(board.document.template);
-                  setDraft(board.document);
-                  setImageHref(account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
-                  setClipUrl(null);
-                }}>
-                  <option value="">New board</option>
-                  {account.boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
-                </select>
-              </label>
-            ) : null}
             {account?.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>Classic menus stay in the menu editor: {account.legacy.map((item) => item.name).join(", ")}.</p> : null}
             {accountMode ? null : (
               <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
@@ -601,27 +662,8 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
               {accountMode || account ? <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : null}
               {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
             </div>
-            <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
+            {note ? <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p> : null}
           </div>
-        </section>
-        <section className="studio-preview" aria-label="TV preview">
-          <p className="studio-kicker">TV preview</p>
-          {template === "signature" ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              <button type="button" style={chip(backgroundZone)} onClick={() => openZone("background")}>Edit background</button>
-            </div>
-          ) : null}
-          <Stage
-            svg={svg}
-            video={showZone ? videoBox : null}
-            videoSrc={zoneSrc}
-            label="TV output"
-            hits={previewHits(template, frame)}
-            active={zone}
-            onHit={openZone}
-          />
-          {!accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
-          {!accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
         </section>
       </div>
       <div className="studio-savebar">
@@ -649,8 +691,16 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
         .zone-panel.on { display: block; }
         .file-btn { position: relative; overflow: hidden; }
         .file-btn input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
-        .zone-groups { display: grid; gap: 12px; }
+        .zone-groups, .zone-stack { display: grid; gap: 12px; }
         .zone-group { display: grid; gap: 8px; padding: 12px; background: #fff; border: 1px solid #ddd4c6; border-radius: 16px; }
+        .zone-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .zone-head h2 { margin: 0; font-size: 20px; line-height: 1.2; }
+        .zone-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .board-bar { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+        .board-field { display: grid; gap: 4px; flex: 1; min-width: 0; }
+        .preview-frame { margin: 0; background: #111; border-radius: 16px; overflow: hidden; }
+        .remove-btn { align-self: start; min-height: 44px; }
         .zone-group h3 { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #5c534c; }
         .zone-help { margin: 0; font-size: 13px; line-height: 1.4; color: #5c534c; }
         .media-card { display: flex; gap: 12px; align-items: center; min-width: 0; }
@@ -660,17 +710,16 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
         .segment { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: #efe8dc; }
         .segment button { min-height: 44px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 650; color: #1a1614; }
         .segment button[aria-pressed="true"] { background: #fff; color: #0066ff; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+        .media-actions .btn { min-height: 44px; border-radius: 12px; flex: 1 1 140px; }
         @media (max-width: 860px) {
-          .shell-main .studio-app { margin: -20px -16px 0; }
-          .studio-heading { order: -2; position: sticky; top: 0; z-index: 4; background: #efe8dc; padding: 10px 16px 0; }
-          .shell-main .studio-heading { top: 56px; }
+          .studio-heading { position: static; padding: 0 16px 8px; }
+          .zone-open .studio-page-title { display: none; }
           .studio-title { font-size: 22px; line-height: 1.2; margin: 0; }
           .studio-lead { display: none; }
-          .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: hidden; max-width: 100%; padding: 0 0 120px !important; gap: 0 !important; }
-          .studio-heading, .studio-controls, .studio-preview { width: 100%; max-width: 100%; min-width: 0; overflow-x: hidden; }
-          .studio-preview { position: sticky; top: 48px; z-index: 3; order: -1; background: #efe8dc; padding: 8px 0 8px; }
-          .shell-main .studio-preview { top: 104px; }
-          .studio-preview figure { border: 0; border-radius: 0; margin: 0; width: 100%; }
+          .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: clip; max-width: 100%; padding: 0 0 112px !important; gap: 0 !important; }
+          .studio-heading, .studio-controls, .studio-preview { width: 100%; max-width: 100%; min-width: 0; }
+          .studio-controls { overflow-x: hidden; }
+          .studio-preview { position: static; z-index: 1; background: #efe8dc; padding: 0 16px 12px; }
           .studio-unpublished { display: none; }
           .studio-pane.on .studio-sheet-note { display: block; }
           .studio-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 36; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #fffdf8; border-top: 1px solid #ddd4c6; }
@@ -679,8 +728,7 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
           .studio-tabs { display: flex; position: static; overflow-x: auto; background: transparent; border: 0; padding: 8px 16px 0; gap: 4px; }
           .studio-tabs button { flex: 0 0 auto; min-height: 44px; }
           .studio-pane, .section-block, .zone-panel { display: none; }
-          .studio-pane.on { display: block; padding: 0 16px; }
-          .studio-pane[data-step="section"].on, .studio-pane[data-step="content"].on { position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 34; max-height: min(42vh, calc(100dvh - 400px)); overflow: auto; background: #fffdf8; border-top: 1px solid #ddd4c6; border-radius: 16px 16px 0 0; padding: 12px 16px 24px; box-shadow: 0 -8px 24px rgba(0,0,0,.12); }
+          .studio-pane.on { display: block; padding: 0 16px 16px; }
           .section-block.on, .zone-panel.on { display: block; }
           .item-grid { grid-template-columns: minmax(0, 1fr) !important; }
           .studio-controls input, .studio-controls select, .studio-controls button, .studio-controls a { min-height: 44px; max-width: 100%; }
@@ -688,6 +736,7 @@ export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "pr
         @media (min-width: 861px) {
           .studio-tabs { display: none !important; }
           .studio-pane, .section-block { display: block; }
+          .studio-pane[data-step="section"] .board-text { display: none; }
           .studio-preview { position: sticky; top: 16px; align-self: start; }
         }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
@@ -731,8 +780,8 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
     return () => watch.disconnect();
   }, []);
   return (
-    <figure style={{ margin: "0 0 18px", background: "#000", borderRadius: 16, overflow: "hidden" }}>
-      <figcaption style={{ color: "#f3ecdf", padding: "10px 14px", fontSize: 13 }}>{label}</figcaption>
+    <figure className="preview-frame">
+      {label ? <figcaption style={{ color: "#f3ecdf", padding: "10px 14px", fontSize: 13 }}>{label}</figcaption> : null}
       <div ref={frameRef} style={{ position: "relative", aspectRatio: "16 / 9", overflow: "hidden" }}>
         <div style={{ position: "absolute", width: 1920, height: 1080, left: frame.left, top: frame.top, transform: `scale(${frame.scale})`, transformOrigin: "top left" }}>
           <div dangerouslySetInnerHTML={{ __html: svg }} />
@@ -776,21 +825,46 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
 }
 
 
+function BoardText({ draft, update }: { draft: LayoutDocument; update: (next: LayoutDocument) => void }) {
+  return (
+    <section className="zone-group board-text">
+      <h3>Text settings</h3>
+      <label style={fieldLabel}>Title
+        <input style={field} aria-label="Title" value={draft.title} maxLength={MENU_LIMITS.title} onChange={(event) => update({ ...draft, title: event.target.value })} />
+      </label>
+      <label style={fieldLabel}>Subtitle
+        <input style={field} aria-label="Subtitle" value={draft.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(event) => update({ ...draft, subtitle: event.target.value })} />
+      </label>
+      <label style={fieldLabel}>Footer
+        <input style={field} aria-label="Footer" value={draft.footer} maxLength={MENU_LIMITS.footer} onChange={(event) => update({ ...draft, footer: event.target.value })} />
+      </label>
+    </section>
+  );
+}
+
+function ZoneHead({ zone, template, onClose }: { zone: string; template: LayoutTemplate; onClose: () => void }) {
+  const caps = zoneCapabilities(template).find((item) => item.id === zone);
+  return (
+    <header className="zone-head">
+      <div>
+        <h2>{zoneLabel(zone, template)}</h2>
+        <div className="zone-chips">
+          {caps?.text ? <span className="badge">Text</span> : null}
+          {caps?.image ? <span className="badge">Image</span> : null}
+          {caps?.video ? <span className="badge">Video</span> : null}
+        </div>
+      </div>
+      <button type="button" className="btn btn-quiet" onClick={onClose} aria-label="Close section">Close</button>
+    </header>
+  );
+}
+
 function zoneLabel(zone: string, template: LayoutTemplate) {
   return zoneCapabilities(template).find((item) => item.id === zone)?.label ?? "Section";
 }
 
 function zoneAllows(template: LayoutTemplate, zone: string, kind: "image" | "video" | "text") {
   return zoneCapabilities(template).find((item) => item.id === zone)?.[kind] === true;
-}
-
-function zoneCapabilityLine(zone: string, template: LayoutTemplate) {
-  const caps = zoneCapabilities(template).find((item) => item.id === zone);
-  if (!caps) return "Text, image, or video.";
-  if (caps.video && caps.image) return caps.text ? "Image or one video, plus a short title." : "Image or one video.";
-  if (caps.video) return caps.text ? "One video, plus a short title." : "One video.";
-  if (caps.image) return "Image only.";
-  return "Text only.";
 }
 
 function previewHits(template: LayoutTemplate, frame: ReturnType<typeof frameFor>) {
@@ -830,12 +904,17 @@ function ZoneMedia({
   onLibraryPhoto: (entry: AccountLibraryFile | null) => void;
   onLibraryVideo: (entry: AccountLibraryFile | null) => void;
 }) {
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const hasImage = allowImage && Boolean(draft.imageMediaId || previewImage);
   const hasVideo = allowVideo && Boolean(draft.videoMediaId || previewVideo || videoAttached);
-  const imageWord = hasVideo ? "Replace with image" : hasImage ? "Replace image" : "Upload image";
-  const videoWord = hasImage ? "Replace with video" : hasVideo ? "Replace video" : "Upload video";
+  const imageLabel = hasImage && !hasVideo ? "Replace image" : "Upload image";
+  const videoLabel = hasVideo ? "Replace video" : "Upload video";
+  const imagePrimary = allowImage && !hasVideo;
+  const videoPrimary = allowVideo && (hasVideo || !allowImage);
   const imageFile = account?.library.find((item) => item.id === draft.imageMediaId);
   const videoFile = account?.library.find((item) => item.id === draft.videoMediaId);
+  const thumbVideo = previewVideo || videoFile?.url || "";
+  const thumbImage = previewImage || imageFile?.url || "";
   return (
     <div className="zone-groups">
       <section className="zone-group">
@@ -843,7 +922,7 @@ function ZoneMedia({
         <p className="zone-help">{photoLabel}. {allowImage && allowVideo ? "Image or one video." : allowVideo ? "One video." : "Image only."}</p>
         {hasVideo && allowVideo ? (
           <div className="media-card">
-            {previewVideo || videoFile?.url ? <video className="media-thumb" muted autoPlay loop playsInline src={previewVideo || videoFile?.url || undefined} /> : <div className="media-thumb" />}
+            {thumbVideo ? <video className="media-thumb" muted autoPlay loop playsInline src={thumbVideo} /> : <div className="media-thumb" />}
             <div>
               <p className="media-name">{videoFile?.name || "Video"}</p>
               <p className="zone-help">Video</p>
@@ -851,7 +930,7 @@ function ZoneMedia({
           </div>
         ) : hasImage ? (
           <div className="media-card">
-            <div className="media-thumb" style={{ background: previewImage ? `center/cover no-repeat url("${previewImage}")` : "#111" }} />
+            {thumbImage ? <img className="media-thumb" alt="" src={thumbImage} /> : <div className="media-thumb" />}
             <div>
               <p className="media-name">{imageFile?.name || "Image"}</p>
               <p className="zone-help">Image</p>
@@ -863,26 +942,27 @@ function ZoneMedia({
         {allowVideo && hasImage && !hasVideo ? <p className="zone-help">Replaces the current image.</p> : null}
         <div className="media-actions">
           {allowImage ? (
-            <label className="btn btn-primary file-btn">{imageWord}
-              <input aria-label={imageWord} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onPhoto(file); }} />
+            <label className={`btn file-btn ${imagePrimary ? "btn-primary" : "btn-quiet"}`}>{imageLabel}
+              <input aria-label={imageLabel} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onPhoto(file); }} />
             </label>
           ) : null}
           {allowVideo ? (
-            <label className={`btn file-btn ${allowImage ? "" : "btn-primary"}`}>{videoWord}
-              <input aria-label={videoWord} type="file" accept="video/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onVideo(file); }} />
+            <label className={`btn file-btn ${videoPrimary ? "btn-primary" : "btn-quiet"}`}>{videoLabel}
+              <input aria-label={videoLabel} type="file" accept="video/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onVideo(file); }} />
             </label>
           ) : null}
+          {account ? <button type="button" className="btn btn-quiet" aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>Choose from library</button> : null}
         </div>
-        {account ? (
+        {libraryOpen && account ? (
           <div className="media-actions">
-            {allowImage ? <label className="zone-help">Choose image from library
+            {allowImage ? <label className="zone-help">Image
               <select className="field" aria-label="Choose image from library" value={hasVideo && allowVideo ? "" : (draft.imageMediaId ?? "")} onChange={(event) => onLibraryPhoto(account.library.find((item) => item.id === event.target.value) ?? null)}>
                 <option value="">No photo</option>
                 {account.library.filter((item) => item.kind === "image").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
             </label> : null}
             {allowVideo ? (
-              <label className="zone-help">Choose video from library
+              <label className="zone-help">Video
                 <select className="field" aria-label="Choose video from library" value={draft.videoMediaId ?? ""} onChange={(event) => onLibraryVideo(account.library.find((item) => item.id === event.target.value) ?? null)}>
                   <option value="">No video</option>
                   {account.library.filter((item) => item.kind === "video").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -891,8 +971,8 @@ function ZoneMedia({
             ) : null}
           </div>
         ) : null}
-        {allowImage && hasImage ? <button type="button" className="btn btn-quiet" onClick={removePhoto}>Remove image</button> : null}
-        {allowVideo && hasVideo ? <button type="button" className="btn btn-quiet" onClick={removeVideo}>Remove video</button> : null}
+        {allowImage && hasImage ? <button type="button" className="btn btn-quiet remove-btn" onClick={removePhoto}>Remove image</button> : null}
+        {allowVideo && hasVideo ? <button type="button" className="btn btn-quiet remove-btn" onClick={removeVideo}>Remove video</button> : null}
         {allowVideo ? <p className="zone-help">{hasVideo ? "This board already has its one video. Another video replaces it." : "A board plays one video, muted and looping, in this zone."}</p> : null}
       </section>
       <section className="zone-group">

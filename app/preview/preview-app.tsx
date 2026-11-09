@@ -7,6 +7,8 @@ import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
 import { ScreenWorkspace } from "@/components/my-screens";
 import { LayoutStudio } from "@/components/layout-studio";
+import type { AccountStudio } from "@/lib/layout-account";
+import { sampleLayout } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 
@@ -98,7 +100,7 @@ export function PreviewApp() {
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
       {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} /> : null}
-      {screen === "studio" ? <LayoutStudio /> : null}
+      {screen === "studio" ? <LayoutStudio mode="account" fixture={studioFixture} /> : null}
     </DashboardShell>
   );
 }
@@ -152,6 +154,24 @@ const scheduleFixture: ScheduleFixture = {
       { start: "2026-10-29T21:00:00.000Z", end: "2026-10-30T07:00:00.000Z", date: "2026-10-29", source: "default", scheduleId: null, scheduleName: null, playlistId: "pl-lunch", playlistName: "Lunch loop", target: null, priority: null },
     ],
   },
+};
+
+const studioImageId = "00000000-0000-4000-8000-0000000000a1";
+const studioVideoId = "00000000-0000-4000-8000-0000000000b1";
+const studioPhoto = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAkCAIAAAC2bqvFAAAAU0lEQVR4nO3PUQkAIBTAwJfHPjY2mCH8OITBAtzm7PV1wwUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1owWMXc21bpt/FQuQAAAAASUVORK5CYII=";
+const studioFixture: AccountStudio = {
+  boards: [{
+    id: "board-lunch",
+    name: "Lunch board",
+    document: { ...sampleLayout("menu-promo-67"), imageMediaId: studioImageId, videoMediaId: null },
+    mediaId: null,
+    playlistId: null,
+  }],
+  legacy: [],
+  library: [
+    { id: studioImageId, name: "lunch-special.png", kind: "image", mime: "image/png", url: studioPhoto },
+    { id: studioVideoId, name: "promo.mp4", kind: "video", mime: "video/mp4", url: "/layout-studio/media/promo" },
+  ],
 };
 
 function poster(label: string, color: string) {
