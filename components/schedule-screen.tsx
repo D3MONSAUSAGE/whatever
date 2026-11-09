@@ -16,6 +16,7 @@ import { useConfirm } from "@/components/confirm";
 import { IconCalendar } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
 import { formatClock12 } from "@/lib/clock";
+import { ScheduleViews } from "@/components/schedule-views";
 
 const DAYS: { value: number; label: string }[] = [
   { value: 1, label: "Mon" },
@@ -103,6 +104,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
       </p>
       {blocked ? <p className="text-danger mb-4" role="alert">{blocked}</p> : null}
 
+      <ScheduleViews schedules={schedules.data} displays={displays.data}>
       <Locations
         locations={locations.data}
         error={locations.error}
@@ -220,6 +222,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
         displays={displays.data ?? []}
         fixture={fixture?.preview ?? null}
       />
+      </ScheduleViews>
       {toast.node}
       {confirm.node}
     </section>
