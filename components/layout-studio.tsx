@@ -41,6 +41,8 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   const [account, setAccount] = useState<AccountStudio | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [phonePreview, setPhonePreview] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [note, setNote] = useState(accountMode || fixture ? "" : "This browser copy does not write an account.");
   const spec = templateSpec(template);
@@ -53,6 +55,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
   const saveLock = useRef<"draft" | "publish" | null>(null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
+  const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
   const videoBox = mediaVideoBox(draft);
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
   const zoneSrc = clipUrl || librarySrc || "/layout-studio/media/promo";
@@ -79,6 +82,14 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       setNote("Restored the draft stored in this browser.");
     } catch { /* a bad draft is ignored */ }
   }, [accountMode]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 860px)");
+    const apply = () => setPhonePreview(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     if (fixture) {
@@ -425,14 +436,19 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           </div>
           {account ? (
             <div className="board-bar">
-              <label className="board-field">
-                <span className="studio-kicker">Board</span>
-                <input aria-label="Board name" className="field" value={boardName} maxLength={80} onChange={(event) => setBoardName(event.target.value)} />
+              <span className="studio-kicker">Board</span>
+              {renaming ? (
+                <input aria-label="Board name" className="field board-name" value={boardName} maxLength={80} autoFocus
+                  onChange={(event) => setBoardName(event.target.value)}
+                  onBlur={() => setRenaming(false)}
+                  onKeyDown={(event) => { if (event.key === "Enter") setRenaming(false); }} />
+              ) : (
                 <select aria-label="Board" className="field" value={menuId ?? ""} onChange={(event) => selectBoard(event.target.value)}>
-                  <option value="">New board</option>
-                  {account.boards.map((board) => <option key={board.id} value={board.id}>{boardChoice(board)}</option>)}
+                  {menuId ? null : <option value="">{boardName || "Untitled board"}</option>}
+                  {account.boards.map((board) => <option key={board.id} value={board.id}>{board.id === menuId ? boardChoice({ ...board, name: boardName || board.name }) : boardChoice(board)}</option>)}
                 </select>
-              </label>
+              )}
+              <button type="button" className="btn btn-quiet board-rename" aria-label="Rename board" onClick={() => setRenaming(true)}>✎</button>
               <button type="button" className="btn btn-quiet" onClick={newBoard}>New board</button>
             </div>
           ) : null}
@@ -440,7 +456,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         <section className="studio-preview" aria-label="TV preview">
           <p className="studio-kicker">Preview</p>
           <Stage
-            svg={svg}
+            svg={previewMarkup}
             video={showZone ? videoBox : null}
             videoSrc={zoneSrc}
             label=""
@@ -469,7 +485,6 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           </div>
 
           <div className={step === "section" ? "studio-pane on" : "studio-pane"} data-step="section">
-            {note ? <p className="studio-sheet-note" role="status">{note}</p> : null}
             <div className="zone-groups">
               <ZoneHead zone={zone || "menu"} template={template} onClose={closeZone} />
               <BoardText draft={draft} update={update} />
@@ -518,7 +533,6 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           </div>
 
           <div className={step === "content" ? "studio-pane on" : "studio-pane"} data-step="content">
-            {note ? <p className="studio-sheet-note" role="status">{note}</p> : null}
             <div className={menuZone ? "zone-panel on" : "zone-panel"} data-zone-panel="menu">
               <div className="zone-groups">
                 <ZoneHead zone={zone || "menu"} template={template} onClose={closeZone} />
@@ -668,7 +682,6 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
                 Play the bundled demo in the safe area
               </label>
             )}
-            {progress ? <p role="status">{progress}</p> : null}
             <div className="studio-save-inline" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {accountMode ? null : <button type="button" style={chip(false)} onClick={saveDraft}>Save draft</button>}
               {accountMode ? null : <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={publish}>Publish preview</button>}
@@ -676,7 +689,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
               {accountMode || account ? <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : null}
               {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
             </div>
-            {note ? <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p> : null}
+            {note ? <p className="studio-inline-note" role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p> : null}
           </div>
         </section>
       </div>
@@ -714,8 +727,13 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         .zone-head h2 { margin: 0; font-size: 20px; line-height: 1.2; }
         .zone-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
         .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
-        .board-bar { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
-        .board-field { display: grid; gap: 4px; flex: 1; min-width: 0; }
+        .board-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; margin: 0 0 8px; }
+        .board-bar .studio-kicker { grid-column: 1 / -1; margin: 0; }
+        .board-rename { width: 44px; padding: 0; }
+        .media-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .media-row.single { grid-template-columns: 1fr; }
+        .media-row .btn { width: 100%; height: 44px; min-height: 44px; white-space: nowrap; }
+        .library-btn { width: 100%; height: 44px; min-height: 44px; }
         .preview-frame { margin: 0; background: #111; border-radius: 16px; overflow: hidden; }
         .remove-btn { border: 0; background: transparent; color: #b8342a; font: inherit; font-size: 14px; font-weight: 650; min-height: 44px; padding: 0 4px; cursor: pointer; }
         .action-stack { display: grid; gap: 4px; flex: 1 1 140px; align-content: start; min-width: 0; }
@@ -742,7 +760,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           .studio-controls { overflow-x: hidden; }
           .studio-preview { position: static; z-index: 1; background: #efe8dc; padding: 0 16px 12px; }
           .studio-unpublished { display: none; }
-          .studio-pane.on .studio-sheet-note { display: block; }
+          .studio-inline-note { display: none; }
           .studio-savebar { display: flex; flex-direction: column; align-items: stretch; position: fixed; left: 0; right: 0; bottom: 0; z-index: 36; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #fffdf8; border-top: 1px solid #ddd4c6; }
           .studio-save-actions { display: flex; gap: 8px; }
           .studio-save-actions .btn { flex: 1 1 0; min-height: 44px; }
@@ -882,6 +900,10 @@ function ZoneHead({ zone, template, onClose }: { zone: string; template: LayoutT
   );
 }
 
+function enlargePreviewText(svg: string) {
+  return svg.replace(/font-size="([\d.]+)"/g, (_match, size) => `font-size="${Math.round(Number(size) * 1.12)}"`);
+}
+
 function boardChoice(board: AccountBoard) {
   const layout = templateSpec(board.document.template).name;
   const when = board.updatedAt ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(board.updatedAt)) : "";
@@ -914,7 +936,7 @@ function previewHits(template: LayoutTemplate, frame: ReturnType<typeof frameFor
 }
 
 function ZoneMedia({
-  photoLabel, allowImage, allowVideo, draft, account, progress, previewImage, previewVideo, videoAttached, onPhoto, onVideo, removePhoto, removeVideo, update, onLibraryPhoto, onLibraryVideo,
+  photoLabel, allowImage, allowVideo, draft, account, previewImage, previewVideo, videoAttached, onPhoto, onVideo, removePhoto, removeVideo, update, onLibraryPhoto, onLibraryVideo,
 }: {
   photoLabel: string;
   allowImage: boolean;
@@ -968,26 +990,21 @@ function ZoneMedia({
             <button type="button" className="remove-btn" onClick={removePhoto}>Remove image</button>
           </div>
         ) : <p className="zone-help">Nothing in this zone yet.</p>}
-        {progress ? <p role="status">{progress}</p> : null}
-        <div className="media-actions">
+        <div className={allowImage && allowVideo ? "media-row" : "media-row single"}>
           {allowImage ? (
-            <div className="action-stack">
-              <label className={`btn file-btn ${imagePrimary ? "btn-primary" : "btn-quiet"}`}>{imageLabel}
-                <input aria-label={imageLabel} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onPhoto(file); }} />
-              </label>
-              {hasVideo ? <p className="zone-help">Replaces the current video.</p> : null}
-            </div>
+            <label className={`btn file-btn ${imagePrimary ? "btn-primary" : "btn-quiet"}`}>{imageLabel}
+              <input aria-label={imageLabel} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onPhoto(file); }} />
+            </label>
           ) : null}
           {allowVideo ? (
-            <div className="action-stack">
-              <label className={`btn file-btn ${videoPrimary ? "btn-primary" : "btn-quiet"}`}>{videoLabel}
-                <input aria-label={videoLabel} type="file" accept="video/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onVideo(file); }} />
-              </label>
-              {hasImage && !hasVideo ? <p className="zone-help">Replaces the current image.</p> : null}
-            </div>
+            <label className={`btn file-btn ${videoPrimary ? "btn-primary" : "btn-quiet"}`}>{videoLabel}
+              <input aria-label={videoLabel} type="file" accept="video/*" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; onVideo(file); }} />
+            </label>
           ) : null}
-          {account ? <button type="button" className="btn btn-quiet" aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>Choose from library</button> : null}
         </div>
+        {hasVideo && allowImage ? <p className="zone-help">Replaces the current video.</p> : null}
+        {hasImage && !hasVideo && allowVideo ? <p className="zone-help">Replaces the current image.</p> : null}
+        {account ? <button type="button" className="btn btn-quiet library-btn" aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>Choose from library</button> : null}
         {libraryOpen && account ? (
           <div className="media-actions">
             {allowImage ? <label className="zone-help">Image
