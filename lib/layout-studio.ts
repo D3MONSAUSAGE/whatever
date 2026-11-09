@@ -411,7 +411,7 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
   const room = Math.max(80, bottom - top);
   let unit = room / Math.max(units, 1);
   if (scale === "counter") unit *= 0.88;
-  unit = Math.min(72, Math.max(40, unit));
+  unit = Math.min(72, unit);
   const nameSize = Math.round(Math.min(40, Math.max(22, unit * 0.5)));
   const descSize = Math.max(16, Math.round(nameSize * 0.5));
   let y = top;

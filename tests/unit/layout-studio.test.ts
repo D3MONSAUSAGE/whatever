@@ -97,6 +97,19 @@ describe("layout studio frames", () => {
       }
       const sizes = [...board.matchAll(/font-size="(\d+)"/g)].map((match) => Number(match[1]));
       expect(Math.max(...sizes)).toBeGreaterThanOrEqual(22);
+      const ys = [...board.matchAll(/y="([\d.]+)"/g)].map((match) => Number(match[1]));
+      expect(Math.max(...ys)).toBeLessThanOrEqual(1080);
+      const dozen = Array.from({ length: 12 }, (_, index) => ({
+        name: `Row ${index + 1}`, price: "$4", description: `Line ${index + 1} remains`,
+      }));
+      const dozenDoc = parseLayout({ ...sampleLayout("menu-promo-67"), sections: [{ name: "All", items: dozen }] });
+      expect(dozenDoc.ok).toBe(true);
+      if (dozenDoc.ok) {
+        const full = layoutSvg(dozenDoc.value);
+        for (const item of dozen) expect(full).toContain(item.description);
+        const fullYs = [...full.matchAll(/y="([\d.]+)"/g)].map((match) => Number(match[1]));
+        expect(Math.max(...fullYs)).toBeLessThanOrEqual(1080);
+      }
     }
     const banner = layoutSvg(sampleLayout("menu-banner"));
     const footerAt = banner.indexOf("Members save 10% after 4");
