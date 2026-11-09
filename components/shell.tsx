@@ -47,8 +47,11 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
 
   async function signOut() {
     // This device only; "Sign out everywhere" stays in Settings.
+    // Don't wait on a stuck auth call. The first click on Layout Studio was
+    // easy to miss while a fixed panel sat above the header.
     clearSlideSrcCache();
-    try { await getSupabase().auth.signOut({ scope: "local" }); } catch { /* still leave the dashboard */ }
+    const done = getSupabase().auth.signOut({ scope: "local" }).catch(() => undefined);
+    await Promise.race([done, new Promise((resolve) => setTimeout(resolve, 1200))]);
     location.assign("/login");
   }
 
@@ -84,7 +87,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
         </button>
       </nav>
       <div className="flex-1 min-w-0">
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-white/95 px-4 h-14 backdrop-blur">
+        <header className="md:hidden sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-line bg-white/95 px-4 h-14 backdrop-blur">
           <Link href="/dashboard" className="min-w-0">
             <BrandLockup size="sm" markClassName="size-8" />
           </Link>
