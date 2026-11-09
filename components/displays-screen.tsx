@@ -205,9 +205,9 @@ function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: (wa
 }
 
 function PlayerUrl() {
-  const [url, setUrl] = useState("/player");
+  const [url, setUrl] = useState("/pair");
   const [copied, setCopied] = useState(false);
-  useEffect(() => { setUrl(`${window.location.origin}/player`); }, []);
+  useEffect(() => { setUrl(`${window.location.origin}/pair`); }, []);
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
@@ -225,6 +225,7 @@ function PlayerUrl() {
   return (
     <span className="mt-2 flex flex-wrap items-center gap-2">
       <code data-testid="player-url" className="rounded-lg border border-line bg-white px-3 py-2 text-base font-semibold text-ink break-all">{url}</code>
+      <span className="text-sm text-muted">Player: {url.replace(/\/pair$/, "/tv")}</span>
       <button type="button" className="btn" onClick={copy} aria-label="Copy TV address">{copied ? "Copied" : "Copy"}</button>
       <span role="status" className="sr-only">{copied ? "TV address copied" : ""}</span>
     </span>

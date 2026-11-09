@@ -110,7 +110,8 @@ export default function Settings() {
             <dl className="divide-y divide-line">
               <Row label="Email">{email ?? me.data?.email ?? <span className="skeleton inline-block h-5 w-48 align-middle" />}</Row>
               <Row label="Business">{me.data ? (me.data.accountName || <span className="text-muted">Not set</span>) : <span className="skeleton inline-block h-5 w-32 align-middle" />}</Row>
-              <Row label="TV address"><span className="break-all">{origin}/player</span></Row>
+              <Row label="Pair a TV"><span className="break-all">{origin}/pair</span></Row>
+              <Row label="TV player"><span className="break-all">{origin}/tv</span></Row>
             </dl>
           )}
         </div>

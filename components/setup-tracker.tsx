@@ -87,8 +87,9 @@ export function SetupTracker({ fixture, origin }: { fixture?: OnboardingState; o
                 {step.id === "screen" && origin ? (
                   <p className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="tracker-player-url">
                     <span className="text-muted">TV address:</span>
-                    <code className="rounded-lg border border-line bg-paper px-2 py-1 text-base font-semibold text-ink break-all">{origin}/player</code>
-                    <button type="button" className="btn btn-quiet" onClick={() => navigator.clipboard?.writeText(`${origin}/player`).catch(() => {})}>Copy</button>
+                    <code className="rounded-lg border border-line bg-paper px-2 py-1 text-base font-semibold text-ink break-all">{origin}/pair</code>
+                    <span className="text-muted">Player {origin}/tv</span>
+                    <button type="button" className="btn btn-quiet" onClick={() => navigator.clipboard?.writeText(`${origin}/pair`).catch(() => {})}>Copy</button>
                   </p>
                 ) : null}
                 {current && step.id === "business" ? <BusinessStep disabled={!!fixture} onDone={() => live.reload()} /> : null}

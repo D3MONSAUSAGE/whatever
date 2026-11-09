@@ -26,7 +26,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       await page.goto("/dashboard/displays");
       const add = page.getByTestId("add-screen");
       await expect(add).toBeVisible();
-      const playerUrl = `${new URL(baseURL).origin}/player`;
+      const playerUrl = `${new URL(baseURL).origin}/pair`;
       await expect(page.getByTestId("player-url")).toHaveText(playerUrl);
       await expect(page.getByText("The TV shows a 6-digit code.")).toBeVisible();
       await add.click();
