@@ -96,13 +96,19 @@ export async function saveLayoutForAccount(accountId: string, body: {
         const updated = await db().from("menus").update({
           name, template, content: document, updated_at: new Date().toISOString(),
         }).eq("id", menuId).eq("account_id", accountId);
-        if (updated.error) throw new Error("Couldn't save the board.");
+        if (updated.error) {
+          console.error("layout-studio update failed", updated.error.message);
+          throw new Error("Couldn't save the board.");
+        }
         return;
       }
       const inserted = await db().from("menus").insert({
         account_id: accountId, name, template, content: document, updated_at: new Date().toISOString(),
       }).select("id").single();
-      if (inserted.error || !inserted.data) throw new Error("Couldn't save the board.");
+      if (inserted.error || !inserted.data) {
+        console.error("layout-studio insert failed", inserted.error?.message ?? "no row");
+        throw new Error("Couldn't save the board.");
+      }
       menuId = String(inserted.data.id);
     },
     render: async (document) => {

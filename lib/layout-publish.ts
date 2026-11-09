@@ -59,10 +59,12 @@ export async function applyLayoutSave(input: {
     if (error) return { ok: false, error };
   }
   const effect = boardSaveEffect(input.mode);
+  // Write the menu row first. A new board has no id until this returns, and the
+  // swap that publishes it has to update that row.
+  await deps.writeContent(doc, storedMenuTemplate(doc));
   if (effect.renderPng) {
     const mediaId = await deps.render(doc);
     await deps.swap(input.previousMediaId, mediaId);
   }
-  await deps.writeContent(doc, storedMenuTemplate(doc));
   return { ok: true, swapped: effect.swapMedia, document: doc };
 }

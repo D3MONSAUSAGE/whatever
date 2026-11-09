@@ -44,7 +44,7 @@ describe("layout save", () => {
       swap: async (previous, next) => { calls.push(`swap:${previous}:${next}`); },
     });
     expect(published.ok).toBe(true);
-    expect(calls).toEqual(["render", "swap:old:png", "write"]);
+    expect(calls).toEqual(["write", "render", "swap:old:png"]);
   });
 
   it("refuses another account's media and stays off when the flag is off", async () => {

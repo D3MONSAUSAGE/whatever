@@ -91,9 +91,18 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
     setBusy(false);
   }, [patch, toast]);
 
+  const recent = useRef(new Map<string, number>());
   const enqueue = useCallback((files: File[], kind: UploadKind) => {
-    if (!files.length) return;
-    tail.current = tail.current.then(() => run(files, kind));
+    const now = Date.now();
+    const fresh = files.filter((file) => {
+      const key = `${kind}\0${file.name}\0${file.size}\0${file.lastModified}`;
+      const seen = recent.current.get(key);
+      if (seen != null && now - seen < 4000) return false;
+      recent.current.set(key, now);
+      return true;
+    });
+    if (!fresh.length) return;
+    tail.current = tail.current.then(() => run(fresh, kind));
   }, [run]);
 
   const inFlight = jobs.some((job) => job.state === "queued" || job.state === "active");

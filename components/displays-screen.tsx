@@ -8,6 +8,7 @@ import { IconTv } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { byName, SEARCH_FROM } from "@/components/playlist-list";
 import { screenNameWarning } from "@/lib/screen-names";
+import { syncLine } from "@/lib/sync-line";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
@@ -89,7 +90,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
                 <>
                   {display.reportedState && display.reportedState !== "unknown" ? (
                     <p className="w-full text-xs text-muted" data-testid="sync-state">
-                      {display.reportedState === "playing" ? "Playing on the TV" : display.reportedState === "acknowledged" ? "TV has the update" : "Assigned · TV updates within ~30 s"}
+                      {syncLine(display)}
                     </p>
                   ) : null}
                   {display.nextChange ? (

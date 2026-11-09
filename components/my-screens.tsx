@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
 import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components/tv";
+import { syncLine } from "@/lib/sync-line";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { IconTv } from "@/components/icons";
 import { ScreenActions } from "@/components/screen-actions";
@@ -80,7 +81,7 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
           <p className="text-sm text-muted mt-2"><time dateTime={display.lastSeenAt ?? undefined}>{heartbeatLabel(display.lastSeenAt)}</time></p>
           {next ? <p className="text-sm mt-3">Next change: {next.label}{next.at ? ` · ${new Date(next.at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}</p> : <p className="text-sm mt-3 text-muted">No scheduled change in the next few days.</p>}
           <p className="text-sm mt-3" data-testid="sync-state">
-            {display.reportedState === "playing" ? "Playing on the TV" : display.reportedState === "acknowledged" ? "TV has the update" : display.reportedState === "assigned" || display.reportedState === "pending" ? "Assigned · TV updates within ~30 s" : "The TV has not reported this version yet."}
+            {syncLine(display)}
           </p>
           {display.connected && !display.online ? (
             <p className="text-sm mt-3">This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.</p>

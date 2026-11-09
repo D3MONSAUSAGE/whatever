@@ -36,7 +36,9 @@ export async function POST(req: Request) {
     });
     if ("error" in saved && saved.status !== 200) return fail(saved.error, saved.status);
     return json({ menuId: saved.menuId, swapped: saved.swapped });
-  } catch {
-    return fail("Couldn't save the board.", 500);
+  } catch (err) {
+    console.error("layout-studio save failed", err instanceof Error ? err.message : "unknown");
+    const message = err instanceof Error && err.message.startsWith("Couldn't") ? err.message : "Couldn't save the board.";
+    return fail(message, 500);
   }
 }

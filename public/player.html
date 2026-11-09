@@ -52,7 +52,7 @@
 <video id="vb" class="stage" muted playsinline webkit-playsinline preload="auto"></video>
 
 <div id="pair" class="screen"><div class="center">
-  <div class="label">Enter this code in Pekko to connect this TV.</div>
+  <div id="pair-label" class="label">Getting a code&hellip;</div>
   <div id="code" class="code">&nbsp;</div>
   <div class="muted">A new code appears every 10 minutes.</div>
 </div></div>
@@ -1169,11 +1169,13 @@
     clearImages();
     setStatus('');
     shownVersion = null; loadedVersion = null; loadingVersion = null; preloadImg = null;
+    el('pair-label').innerHTML = 'Getting a code&hellip;';
     el('code').innerHTML = '&nbsp;';
     showScreen('pair');
     request('POST', '/api/player/pair', {}, null, function (status, data) {
       if (g !== gen) return;
       if (status === 200 && data && data.code && /^\d{6}$/.test(data.code)) {
+        el('pair-label').innerHTML = 'Enter this code in Pekko to connect this TV.';
         el('code').innerHTML = data.code.substr(0, 3) + ' ' + data.code.substr(3);
         pollPairing(g, data.sessionId, data.secret);
       } else {

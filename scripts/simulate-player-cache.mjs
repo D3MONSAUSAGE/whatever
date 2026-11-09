@@ -47,7 +47,7 @@ function server(method, url, body, headers) {
 function boot() {
   timers = [];
   const els = {};
-  for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "code", "status"])
+  for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "pair-label", "code", "status"])
     els[id] = { id, className: id === "status" ? "status" : id.length === 1 ? "layer" : "screen", style: {}, innerHTML: "" };
   const makeVideo = (id) => {
     const el = {

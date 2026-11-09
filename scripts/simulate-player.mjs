@@ -18,7 +18,7 @@ const setTimeout_ = (fn, ms) => { const id = ++tid; timers.push({ id, at: now + 
 const clearTimeout_ = (id) => { timers = timers.filter((t) => t.id !== id); };
 
 const els = {};
-for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "code", "status", "manual", "manual-pos", "prev", "next"]) {
+for (const id of ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "pair-label", "code", "status", "manual", "manual-pos", "prev", "next"]) {
   const base = id === "status" ? "status" : id === "manual" ? "manual" : id.length === 1 ? "layer" : (["pair","empty","connecting","paused"].includes(id) ? "screen" : "");
   els[id] = { id, className: base, style: {}, innerHTML: "", textContent: "", setAttribute() {}, getAttribute() { return null; } };
 }
