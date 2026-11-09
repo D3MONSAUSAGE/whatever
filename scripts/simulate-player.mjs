@@ -65,6 +65,16 @@ function makeVideo(id) {
               return;
             }
             if (src.indexOf("stall") !== -1) return;
+            if (src.indexOf("cold") !== -1) {
+              this.currentTime = 0;
+              if (this.onplaying) this.onplaying();
+              setTimeout_(() => {
+                this.currentTime = 0.2;
+                if (this.ontimeupdate) this.ontimeupdate();
+                if (ok) ok();
+              }, 700);
+              return;
+            }
             if (src.indexOf("slow") !== -1) {
               setTimeout_(() => {
                 this.currentTime = 0.2;
@@ -629,6 +639,7 @@ S.playlist = {
     composition: { layoutVersion: 1, fallbackUrl: "https://cdn/short.jpg", video: { mediaId: "stall", url: "https://cdn/stall-promo.mp4", box: box } },
   }, {
     mediaId: "later", url: "https://cdn/later.jpg", durationMs: 30000, kind: "image",
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/later.jpg", video: { mediaId: "later-video", url: "https://cdn/later-ok.mp4?dur=3000", box: box } },
   }],
 };
 for (let step = 0; step < 40 && (shownUrl() || "").indexOf("short.jpg") === -1; step++) run(500);
@@ -636,6 +647,26 @@ run(2000);
 check("a short slide stays on the still until the video settles", (shownUrl() || "").indexOf("short.jpg") !== -1 && S.playing.indexOf(32) === -1);
 run(8000);
 check("a stalled video acknowledges the still and reports the fallback", (shownUrl() || "").indexOf("short.jpg") !== -1 && S.playing.indexOf(32) !== -1 && String(S.playerError).indexOf("still image is showing") !== -1);
+for (let step = 0; step < 20 && (shownUrl() || "").indexOf("later.jpg") === -1; step++) run(500);
+run(800);
+check("a later successful slide clears the zone fallback note", (shownUrl() || "").indexOf("later.jpg") !== -1 && S.playerError === "");
+
+S.version = 34;
+S.playerError = "";
+S.playing = [];
+S.playlist = {
+  id: "cold",
+  transition: "none",
+  playbackMode: "auto",
+  items: [{
+    mediaId: "coldboard", url: "https://cdn/cold.jpg", durationMs: 30000, kind: "image",
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/cold.jpg", video: { mediaId: "cold", url: "https://cdn/cold-promo.mp4?dur=3000", box: box } },
+  }],
+};
+for (let step = 0; step < 40 && (shownUrl() || "").indexOf("cold.jpg") === -1; step++) run(500);
+check("a playing event without a frame does not acknowledge the version", (shownUrl() || "").indexOf("cold.jpg") !== -1 && S.playing.indexOf(34) === -1);
+run(1500);
+check("the version is acknowledged after the element has a frame", S.playing.indexOf(34) !== -1);
 
 S.version = 31;
 S.layoutStudio = true;

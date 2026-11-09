@@ -8,8 +8,16 @@ import {
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature"];
 const DRAFT_KEY = "layout-studio-draft-v1";
+const PUBLISHED_KEY = "layout-studio-published-v1";
 
-type Snapshot = { doc: LayoutDocument; imageHref: string | null; videoOn: boolean };
+type Snapshot = {
+  doc: LayoutDocument;
+  imageHref: string | null;
+  videoOn: boolean;
+  svg?: string;
+  videoBox?: { x: number; y: number; w: number; h: number } | null;
+  fontFamily?: "Inter" | "BoardFace";
+};
 
 function blankItem(): LayoutItem {
   return { name: "", price: "", description: "" };
@@ -19,12 +27,14 @@ export function LayoutStudio() {
   const [template, setTemplate] = useState<LayoutTemplate>("menu-promo-67");
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout("menu-promo-67"));
   const [imageHref, setImageHref] = useState<string | null>(null);
+  const [fontUrl, setFontUrl] = useState<string | null>(null);
   const [videoOn, setVideoOn] = useState(true);
   const [published, setPublished] = useState<Snapshot | null>(null);
   const [note, setNote] = useState("Nothing is saved to an account.");
   const spec = templateSpec(template);
   const frame = frameFor(draft.template, draft.split);
-  const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
+  const fontFamily = fontUrl ? "BoardFace" as const : "Inter" as const;
+  const svg = useMemo(() => layoutSvg(draft, { imageHref, fontFamily }), [draft, imageHref, fontFamily]);
   const videoBox = frame.video;
 
   useEffect(() => {
@@ -38,6 +48,12 @@ export function LayoutStudio() {
       setDraft(parsed.value);
       setImageHref(typeof saved.imageHref === "string" ? saved.imageHref : null);
       setVideoOn(saved.videoOn === true && frameFor(parsed.value.template, parsed.value.split).video !== null);
+      const publishedRaw = window.localStorage.getItem(PUBLISHED_KEY);
+      if (publishedRaw) {
+        const frozen = JSON.parse(publishedRaw) as Snapshot;
+        const frozenDoc = parseLayout(frozen.doc);
+        if (frozenDoc.ok) setPublished({ ...frozen, doc: frozenDoc.value });
+      }
       setNote("Restored the draft stored in this browser.");
     } catch { /* a bad draft is ignored */ }
   }, []);
@@ -73,9 +89,23 @@ export function LayoutStudio() {
   function publish() {
     const doc = checkedDraft();
     if (!doc) return;
+    const box = frameFor(doc.template, doc.split).video;
+    const snapshot: Snapshot = {
+      doc, imageHref, videoOn: videoOn && !!box, fontFamily,
+      svg: layoutSvg(doc, { imageHref, fontFamily }),
+      videoBox: box,
+    };
+    window.localStorage.setItem(PUBLISHED_KEY, JSON.stringify(snapshot));
     setDraft(doc);
-    setPublished({ doc, imageHref, videoOn: videoOn && !!videoBox });
-    setNote("Published preview is frozen below. Nothing was sent to a screen.");
+    setPublished(snapshot);
+    setNote("Published preview is frozen in this browser. It was not sent to an account or a screen.");
+  }
+
+  function onFont(file: File | undefined) {
+    if (!file) { setFontUrl(null); return; }
+    if (file.size > 2_000_000) { setNote("Use a font file under 2 MB."); return; }
+    setFontUrl(URL.createObjectURL(file));
+    setNote("This font is for the preview only. Screens keep Inter.");
   }
 
   function onPhoto(file: File | undefined) {
@@ -112,6 +142,28 @@ export function LayoutStudio() {
           <label style={fieldLabel}>Footer
             <input style={field} value={draft.footer} maxLength={MENU_LIMITS.footer} onChange={(event) => update({ ...draft, footer: event.target.value })} />
           </label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0" }}>
+            {(["classic", "fresh", "bold"] as const).map((palette) => (
+              <button key={palette} type="button" style={chip(draft.palette === palette)} onClick={() => update({ ...draft, palette })}>{palette}</button>
+            ))}
+          </div>
+          <label style={fieldLabel}>Primary color
+            <input type="color" aria-label="Primary color" value={draft.primaryColor || "#0066ff"} onChange={(event) => update({ ...draft, primaryColor: event.target.value })} />
+          </label>
+          <label style={fieldLabel}>Accent color
+            <input type="color" aria-label="Accent color" value={draft.accentColor || "#ffd34d"} onChange={(event) => update({ ...draft, accentColor: event.target.value })} />
+          </label>
+          <button type="button" style={chip(false)} onClick={() => update({ ...draft, primaryColor: null, accentColor: null })}>Use built-in colors</button>
+          <label style={fieldLabel}>Type size
+            <select aria-label="Type size" value={draft.typeScale} onChange={(event) => update({ ...draft, typeScale: event.target.value === "counter" ? "counter" : "room" })}>
+              <option value="room">Room — for a television</option>
+              <option value="counter">Counter — slightly denser</option>
+            </select>
+          </label>
+          <label style={fieldLabel}>Font file for this preview
+            <input type="file" accept=".ttf,.otf,font/ttf,font/otf" onChange={(event) => onFont(event.target.files?.[0])} />
+          </label>
+          <p style={{ fontSize: 13, color: "#5c534c" }}>A font file changes this preview only. Screens keep Inter, the same face as your other menus.</p>
           <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
             <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split}
               onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
@@ -150,16 +202,17 @@ export function LayoutStudio() {
             <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={publish}>Publish preview</button>
             <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>
           </div>
-          <p style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
+          <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
         </section>
         <section>
           <Stage svg={svg} video={videoOn && videoBox ? videoBox : null} label="Draft" />
-          {published ? <Stage svg={layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? frameFor(published.doc.template, published.doc.split).video : null} label="Published preview" /> : <p>No published preview yet.</p>}
+          {published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref, fontFamily: published.fontFamily })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split).video : null} label="Published preview" /> : <p>No published preview yet.</p>}
         </section>
       </div>
       <style>{`
         @media (max-width: 860px) { main > div { grid-template-columns: 1fr !important; } }
         figure svg { width: 100%; height: 100%; display: block; }
+        ${fontUrl ? `@font-face { font-family: BoardFace; src: url("${fontUrl}"); }` : ""}
       `}</style>
     </main>
   );
@@ -184,8 +237,8 @@ function Stage({ svg, video, label }: { svg: string; video: { x: number; y: numb
               top: `${(video.y / 1080) * 100}%`,
               width: `${(video.w / 1920) * 100}%`,
               height: `${(video.h / 1080) * 100}%`,
-              objectFit: "cover",
-              background: "#1c3330",
+              objectFit: "contain",
+              background: "transparent",
             }}
           />
         ) : null}

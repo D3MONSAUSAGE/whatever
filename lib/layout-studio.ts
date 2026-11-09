@@ -13,6 +13,9 @@ export type ZoneBox = { x: number; y: number; w: number; h: number };
 export type LayoutItem = { name: string; price: string; description: string };
 export type LayoutSection = { name: string; items: LayoutItem[] };
 
+export type BoardPalette = "classic" | "fresh" | "bold";
+export type TypeScale = "room" | "counter";
+
 export type LayoutDocument = {
   layoutVersion: 1;
   template: LayoutTemplate;
@@ -25,6 +28,15 @@ export type LayoutDocument = {
   imageMediaId: string | null;
   /** At most one. Same-account MP4. The PNG still draws a poster in this box. */
   videoMediaId: string | null;
+  /** Existing menu colorways. Absent documents stay Fresh. */
+  palette: BoardPalette;
+  primaryColor: string | null;
+  accentColor: string | null;
+  /** Room is the television size. Counter is slightly denser and still readable. */
+  typeScale: TypeScale;
+  /** Copy for the feature pane. Kept even when a video covers that pane. */
+  featureTitle: string;
+  featureDetail: string;
 };
 
 export type LayoutFrame = {
@@ -119,7 +131,7 @@ export function boxesOverlap(a: ZoneBox, b: ZoneBox) {
 function text(value: unknown, max: number): string | null {
   if (value == null) return "";
   if (typeof value !== "string") return null;
-  if (/[<>]/.test(value) || /script/i.test(value)) return null;
+  if (/[<>]/.test(value)) return null;
   const clean = value.replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").trim();
   return clean.length > max ? null : clean;
 }
@@ -170,85 +182,137 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   if (imageMediaId && !UUID.test(imageMediaId)) return { ok: false, error: "Choose a photo from your library." };
   if (videoMediaId && !UUID.test(videoMediaId)) return { ok: false, error: "Choose a video from your library." };
   if (Array.isArray(raw.videos) && raw.videos.length > 1) return { ok: false, error: "A board can play one video." };
+  const featureTitle = text(raw.featureTitle, 40);
+  const featureDetail = text(raw.featureDetail, 80);
+  if (featureTitle == null || featureDetail == null) return { ok: false, error: "Check the feature text." };
+  const palette = raw.palette === "classic" || raw.palette === "bold" || raw.palette === "fresh" ? raw.palette : "fresh";
+  const typeScale = raw.typeScale === "counter" ? "counter" : "room";
+  const primaryColor = hexColor(raw.primaryColor);
+  const accentColor = hexColor(raw.accentColor);
+  if (raw.primaryColor && !primaryColor) return { ok: false, error: "Use a color like #0066ff." };
+  if (raw.accentColor && !accentColor) return { ok: false, error: "Use a color like #ffd34d." };
   return {
     ok: true,
     value: {
       layoutVersion: 1, template: raw.template, split, title: title ?? "", subtitle: subtitle ?? "", footer: footer ?? "",
-      sections, imageMediaId, videoMediaId,
+      sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale,
+      featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
     },
   };
 }
 
+function hexColor(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value)) return null;
+  return value.toLowerCase();
+}
+
+function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId">): LayoutDocument {
+  return { layoutVersion: 1, template, imageMediaId: null, videoMediaId: null, ...fields };
+}
+
 export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): LayoutDocument {
   const samples: Record<LayoutTemplate, LayoutDocument> = {
-    "menu-promo-67": {
-      layoutVersion: 1, template, split: 0.67, title: "Casa Mesa", subtitle: "Lunch, served until 3",
-      footer: "Ask about the daily special", imageMediaId: null, videoMediaId: null,
+    "menu-promo-67": board(template, {
+      split: 0.67, palette: "fresh", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Casa Mesa", subtitle: "Lunch, served until 3", footer: "Ask about the daily special",
+      featureTitle: "Today", featureDetail: "Lunch special",
       sections: [
         { name: "Plates", items: [
           { name: "Pollo asado", price: "$14", description: "Citrus chicken, rice, salsa" },
           { name: "Carne asada", price: "$16", description: "Grilled steak and beans" },
           { name: "Market fish", price: "$18", description: "Today's catch, lime butter" },
+          { name: "Veggie bowl", price: "$13", description: "Squash, beans, crema" },
         ] },
         { name: "Sides", items: [
           { name: "Street corn", price: "$5", description: "Chile, crema, cheese" },
           { name: "Greens", price: "$6", description: "Herb vinaigrette" },
+          { name: "Rice and beans", price: "$4", description: "Garlic and cumin" },
+          { name: "Plantains", price: "$5", description: "Lime and salt" },
         ] },
       ],
-    },
-    "triple-column": {
-      layoutVersion: 1, template, split: 1 / 3, title: "Northbeam Coffee", subtitle: "Open from 7",
-      footer: "Oat and almond milk at no charge", imageMediaId: null, videoMediaId: null,
+    }),
+    "triple-column": board(template, {
+      split: 1 / 3, palette: "fresh", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Northbeam Coffee", subtitle: "Open from 7", footer: "Oat and almond milk at no charge",
+      featureTitle: "", featureDetail: "",
       sections: [
         { name: "Coffee", items: [
           { name: "Drip", price: "$3", description: "Rotating single origin" },
-          { name: "Cortado", price: "$4", description: "" },
+          { name: "Cortado", price: "$4", description: "Equal espresso and milk" },
+          { name: "Cappuccino", price: "$4.50", description: "Dry or wet" },
+          { name: "Cold brew", price: "$4.50", description: "Twelve hour steep" },
+          { name: "Mocha", price: "$5", description: "Dark chocolate" },
         ] },
         { name: "Tea", items: [
           { name: "Jasmine", price: "$3.50", description: "Loose leaf" },
           { name: "Chai", price: "$4.50", description: "Steamed milk" },
+          { name: "Earl grey", price: "$3.50", description: "Bergamot" },
+          { name: "Mint", price: "$3", description: "Fresh leaves" },
+          { name: "London fog", price: "$5", description: "Vanilla and bergamot" },
         ] },
         { name: "Bakery", items: [
           { name: "Morning bun", price: "$4", description: "Orange zest" },
           { name: "Quiche", price: "$7", description: "Seasonal vegetables" },
+          { name: "Banana bread", price: "$4", description: "Toasted walnut" },
+          { name: "Oat cookie", price: "$3", description: "Brown butter" },
+          { name: "Fruit cup", price: "$5", description: "Citrus and mint" },
         ] },
       ],
-    },
-    "split-50": {
-      layoutVersion: 1, template, split: 0.5, title: "Harbor Gym", subtitle: "Today's floor",
-      footer: "Towels at the desk", imageMediaId: null, videoMediaId: null,
+    }),
+    "split-50": board(template, {
+      split: 0.5, palette: "bold", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Harbor Gym", subtitle: "Today's floor", footer: "Towels at the desk",
+      featureTitle: "Noon ride", featureDetail: "Studio B · bikes leave at 12:15",
       sections: [
-        { name: "Classes", items: [
+        { name: "Morning", items: [
           { name: "Strength", price: "6:30", description: "Studio A" },
-          { name: "Conditioning", price: "12:00", description: "Studio B" },
-          { name: "Mobility", price: "5:30", description: "All levels" },
+          { name: "Conditioning", price: "9:00", description: "Studio B" },
+          { name: "Mobility", price: "10:30", description: "All levels" },
+        ] },
+        { name: "Evening", items: [
+          { name: "Lift", price: "5:30", description: "Studio A" },
+          { name: "Row", price: "6:15", description: "Studio B" },
+          { name: "Restore", price: "7:30", description: "Low impact" },
         ] },
       ],
-    },
-    "menu-banner": {
-      layoutVersion: 1, template, split: 0.15, title: "Field & Vine", subtitle: "Groceries and lunch",
-      footer: "Members save 10% after 4", imageMediaId: null, videoMediaId: null,
+    }),
+    "menu-banner": board(template, {
+      split: 0.18, palette: "classic", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Field & Vine", subtitle: "Groceries and lunch", footer: "Members save 10% after 4",
+      featureTitle: "", featureDetail: "",
       sections: [
         { name: "Counter", items: [
           { name: "Soup and salad", price: "$11", description: "Rotates daily" },
           { name: "Grain bowl", price: "$13", description: "Greens, grains, tahini" },
+          { name: "Half sandwich", price: "$9", description: "Chicken or veggie" },
+          { name: "Chili", price: "$8", description: "Cup or bowl" },
+        ] },
+        { name: "Market", items: [
+          { name: "Citrus bag", price: "$6", description: "Picked this morning" },
+          { name: "Sourdough", price: "$7", description: "Baked at dawn" },
+          { name: "Olive oil", price: "$14", description: "House blend" },
+          { name: "Flowers", price: "$12", description: "Mixed bunch" },
         ] },
       ],
-    },
-    signature: {
-      layoutVersion: 1, template, split: 0.55, title: "Evening service", subtitle: "From 5 PM",
-      footer: "Reserve the patio", imageMediaId: null, videoMediaId: null,
+    }),
+    signature: board(template, {
+      split: 0.55, palette: "classic", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Evening service", subtitle: "From 5 PM", footer: "Reserve the patio",
+      featureTitle: "Patio", featureDetail: "Tables held until 5:30",
       sections: [
         { name: "First", items: [
           { name: "Beet salad", price: "$12", description: "Citrus, pistachio" },
           { name: "Broth", price: "$10", description: "Ginger and greens" },
+          { name: "Crudo", price: "$16", description: "Citrus and olive oil" },
         ] },
         { name: "Mains", items: [
           { name: "Roast chicken", price: "$24", description: "Pan juices, potatoes" },
           { name: "Pasta", price: "$21", description: "Brown butter and sage" },
+          { name: "Market fish", price: "$28", description: "Charred lemon" },
         ] },
       ],
-    },
+    }),
   };
   return samples[template];
 }
@@ -297,95 +361,168 @@ export function safeImageHref(value: string | null | undefined): string | null {
   return null;
 }
 
-function clip(value: string, max: number) {
-  const chars = Math.max(4, max);
-  return value.length > chars ? `${value.slice(0, chars - 1)}…` : value;
+function measure(value: string, size: number) {
+  let units = 0;
+  for (const ch of value) {
+    if (/[ilI.,:;'!|]/.test(ch)) units += 0.28;
+    else if (/[mwMW@]/.test(ch)) units += 0.86;
+    else if (/[A-Z0-9$&]/.test(ch)) units += 0.66;
+    else if (ch === " ") units += 0.27;
+    else units += 0.56;
+  }
+  return units * size * 1.05;
 }
 
-const PAPER = "#f3ecdf";
-const INK = "#1a1614";
-const MUTED = "#5c534c";
-const FEATURE = "#1c3330";
-const FEATURE_INK = "#f3ecdf";
+function fitWidth(value: string, size: number, max: number) {
+  if (measure(value, size) <= max) return value;
+  const chars = [...value];
+  while (chars.length > 1 && measure(`${chars.join("")}…`, size) > max) chars.pop();
+  return `${chars.join("").trimEnd()}…`;
+}
 
-function itemBlock(section: LayoutSection, x: number, top: number, width: number, bottom: number) {
-  const rows: string[] = [];
+type BoardColors = {
+  paper: string; ink: string; muted: string; section: string; price: string; priceBg: string | null;
+  feature: string; featureInk: string; band: string | null;
+};
+
+const PALETTES: Record<BoardPalette, BoardColors> = {
+  classic: { paper: "#0b1220", ink: "#ffffff", muted: "#9fb0c8", section: "#4d94ff", price: "#ffffff", priceBg: null, feature: "#13203a", featureInk: "#ffffff", band: null },
+  fresh: { paper: "#f6f9fe", ink: "#0b1220", muted: "#5b6b82", section: "#0066ff", price: "#0b1220", priceBg: null, feature: "#0066ff", featureInk: "#ffffff", band: "#0066ff" },
+  bold: { paper: "#0066ff", ink: "#ffffff", muted: "#cfe0ff", section: "#ffd34d", price: "#0b1220", priceBg: "#ffd34d", feature: "#0047b3", featureInk: "#ffffff", band: null },
+};
+
+function colorsFor(doc: LayoutDocument): BoardColors {
+  const base = PALETTES[doc.palette] ?? PALETTES.fresh;
+  if (!doc.primaryColor) return base;
+  return { ...base, section: doc.accentColor || doc.primaryColor, feature: doc.primaryColor, band: base.band ? doc.primaryColor : null };
+}
+
+function face(family: string | undefined) {
+  return family === "BoardFace" ? "BoardFace" : "Inter";
+}
+
+function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string) {
+  let units = 0;
+  for (const section of sections) {
+    units += section.name ? 1.35 : 0;
+    for (const item of section.items) units += item.description ? 1.85 : 1.2;
+    units += 0.3;
+  }
+  const room = Math.max(80, bottom - top);
+  let unit = room / Math.max(units, 1);
+  if (scale === "counter") unit *= 0.88;
+  unit = Math.min(72, Math.max(40, unit));
+  const nameSize = Math.round(Math.min(40, Math.max(22, unit * 0.5)));
+  const descSize = Math.max(16, Math.round(nameSize * 0.5));
   let y = top;
-  if (section.name) {
-    rows.push(`<text x="${x}" y="${y}" font-family="Inter" font-size="18" font-weight="700" fill="${FEATURE}" letter-spacing="1.6">${esc(section.name.toUpperCase())}</text>`);
-    y += 14;
-    rows.push(`<rect x="${x}" y="${y}" width="36" height="3" fill="${FEATURE}"/>`);
-    y += 28;
-  }
-  const count = section.items.length;
-  const room = Math.max(count, 1);
-  const rowH = Math.max(34, Math.min(76, Math.floor((bottom - y) / room)));
-  const nameSize = rowH >= 64 ? 28 : rowH >= 46 ? 22 : 16;
-  const showDesc = rowH >= 48 && section.items.some((item) => item.description);
-  for (const item of section.items) {
-    rows.push(`<text x="${x}" y="${y}" font-family="Inter" font-size="${nameSize}" font-weight="700" fill="${INK}">${esc(clip(item.name, Math.floor(width / (nameSize * 0.55))))}</text>`);
-    if (item.price) rows.push(`<text x="${x + width}" y="${y}" text-anchor="end" font-family="Inter" font-size="${nameSize}" font-weight="700" fill="${INK}">${esc(item.price)}</text>`);
-    if (showDesc && item.description) {
-      rows.push(`<text x="${x}" y="${y + nameSize - 4}" font-family="Inter" font-size="15" fill="${MUTED}">${esc(clip(item.description, Math.floor(width / 8)))}</text>`);
+  for (const section of sections) {
+    if (section.name) {
+      y += unit * 0.72;
+      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(fitWidth(section.name.toUpperCase(), nameSize - 6, width))}</text>`);
+      y += unit * 0.28;
     }
-    y += rowH;
+    for (const item of section.items) {
+      y += unit * 0.78;
+      const price = item.price || "";
+      const priceW = price ? measure(price, nameSize) + (colors.priceBg ? 28 : 0) : 0;
+      const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24));
+      if (price && colors.priceBg) {
+        parts.push(`<rect x="${(x + width - priceW).toFixed(1)}" y="${(y - nameSize).toFixed(1)}" width="${priceW.toFixed(1)}" height="${(nameSize * 1.35).toFixed(1)}" rx="8" fill="${colors.priceBg}"/>`);
+      }
+      if (price) parts.push(`<text x="${(x + width - (colors.priceBg ? 12 : 0)).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-family="${family}" font-size="${nameSize}" font-weight="700" fill="${colors.price}">${esc(price)}</text>`);
+      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${nameSize}" font-weight="700" fill="${colors.ink}">${esc(name)}</text>`);
+      if (item.description) {
+        y += unit * 0.48;
+        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${descSize}" fill="${colors.muted}">${esc(fitWidth(item.description, descSize, width))}</text>`);
+      }
+    }
+    y += unit * 0.2;
   }
-  return rows.join("");
 }
 
-export type LayoutArt = { imageHref?: string | null };
+export type LayoutArt = { imageHref?: string | null; fontFamily?: "Inter" | "BoardFace" };
 
-/** Complete board. Menu text is never placed in the video box. The still does not claim a video is playing. */
+/** Complete board. Menu text stays out of the video box. The still does not say a video is playing. */
 export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const frame = frameFor(doc.template, doc.split);
+  const colors = colorsFor(doc);
+  const family = face(art?.fontFamily);
   const href = safeImageHref(art?.imageHref);
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${BOARD_W}" height="${BOARD_H}" viewBox="0 0 ${BOARD_W} ${BOARD_H}">`,
-    `<rect width="${BOARD_W}" height="${BOARD_H}" fill="${FEATURE}"/>`,
+    `<rect width="${BOARD_W}" height="${BOARD_H}" fill="${colors.feature}"/>`,
   ];
-  const feature = frame.feature;
-  const imageBox = doc.template === "signature" ? feature : (frame.video ?? feature);
-  if (href) {
-    parts.push(`<image href="${esc(href)}" x="${imageBox.x}" y="${imageBox.y}" width="${imageBox.w}" height="${imageBox.h}" preserveAspectRatio="xMidYMid slice"/>`);
-  } else if (doc.template !== "triple-column") {
-    const labelX = doc.template === "signature" ? frame.menu.w + 48 : imageBox.x + 40;
-    const labelY = imageBox.y + Math.round(imageBox.h / 2);
-    parts.push(`<text x="${labelX}" y="${labelY}" font-family="Inter" font-size="34" font-weight="700" fill="${FEATURE_INK}">${esc("Featured")}</text>`);
+  const feature = frame.video ?? frame.feature;
+  if (doc.template === "triple-column") {
+    frame.columns.forEach((column, index) => {
+      if (href && index === frame.columns.length - 1) return;
+      parts.push(`<rect x="${column.x}" y="${column.y}" width="${column.w}" height="${column.h}" fill="${colors.paper}"/>`);
+    });
+    const photo = frame.columns[frame.columns.length - 1];
+    if (href) {
+      const photoTop = photo.y + Math.round(photo.h * 0.5);
+      parts.push(`<image href="${esc(href)}" x="${photo.x}" y="${photoTop}" width="${photo.w}" height="${photo.h - (photoTop - photo.y)}" preserveAspectRatio="xMidYMid slice"/>`);
+    } else {
+      parts.push(`<rect x="${photo.x}" y="${photo.y}" width="${photo.w}" height="${photo.h}" fill="${colors.paper}"/>`);
+    }
+  } else if (href && doc.template !== "menu-banner") {
+    const box = doc.template === "signature" ? frame.feature : feature;
+    parts.push(`<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="xMidYMid slice"/>`);
   }
   if (doc.template === "signature") {
-    parts.push(`<rect x="48" y="56" width="${frame.menu.w - 96}" height="${BOARD_H - 112}" fill="${PAPER}"/>`);
+    parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${BOARD_H - 96}" fill="${colors.paper}"/>`);
   } else if (doc.template === "menu-banner") {
-    parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${PAPER}"/>`);
-  } else {
-    for (const column of frame.columns) parts.push(`<rect x="${column.x}" y="${column.y}" width="${column.w}" height="${column.h}" fill="${PAPER}"/>`);
+    parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
+  } else if (doc.template !== "triple-column") {
+    parts.push(`<rect x="${frame.menu.x}" y="${frame.menu.y}" width="${frame.menu.w}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
+  }
+  if (colors.band && doc.template !== "signature") {
+    const bandW = doc.template === "menu-banner" || doc.template === "triple-column" ? BOARD_W : frame.menu.w;
+    parts.push(`<rect x="0" y="0" width="${bandW}" height="132" fill="${colors.band}"/>`);
   }
   const menu = doc.template === "signature"
-    ? { x: 88, y: 120, w: frame.menu.w - 176, bottom: BOARD_H - 120 }
+    ? { x: 88, y: 110, w: frame.menu.w - 176, bottom: BOARD_H - 110 }
     : doc.template === "menu-banner"
-      ? { x: 72, y: 88, w: BOARD_W - 144, bottom: frame.menu.h - 48 }
-      : { x: frame.columns[0].x + 48, y: 88, w: frame.columns[0].w - 96, bottom: BOARD_H - 72 };
-  parts.push(`<text x="${menu.x}" y="${menu.y}" font-family="Inter" font-size="52" font-weight="700" fill="${INK}">${esc(clip(doc.title || "Menu", 26))}</text>`);
-  if (doc.subtitle) parts.push(`<text x="${menu.x}" y="${menu.y + 40}" font-family="Inter" font-size="20" fill="${MUTED}">${esc(clip(doc.subtitle, 52))}</text>`);
+      ? { x: 72, y: colors.band ? 156 : 72, w: BOARD_W - 144, bottom: frame.menu.h - 72 }
+      : doc.template === "triple-column"
+        ? { x: 48, y: colors.band ? 156 : 72, w: frame.columns[0].w - 80, bottom: BOARD_H - 64 }
+        : { x: frame.menu.x + 48, y: colors.band ? 168 : 88, w: frame.menu.w - 96, bottom: BOARD_H - 72 };
+  let titleSize = 64;
+  while (titleSize > 34 && measure(doc.title || "Menu", titleSize) > menu.w) titleSize -= 2;
+  const title = fitWidth(doc.title || "Menu", titleSize, menu.w);
+  const titleFill = colors.band && doc.template !== "signature" ? colors.featureInk : colors.ink;
+  parts.push(`<text x="${menu.x}" y="${colors.band && doc.template !== "signature" ? 86 : menu.y}" font-family="${family}" font-size="${titleSize}" font-weight="800" fill="${titleFill}">${esc(title)}</text>`);
+  if (doc.subtitle) {
+    const onBand = Boolean(colors.band && doc.template !== "signature");
+    parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${family}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w))}</text>`);
+  }
+  const textTop = colors.band && doc.template !== "signature" ? 180 : menu.y + (doc.subtitle ? 72 : 36);
   if (doc.template === "triple-column") {
     frame.columns.forEach((column, index) => {
       const section = doc.sections[index];
       if (!section) return;
-      parts.push(itemBlock(section, column.x + 40, 168, column.w - 80, BOARD_H - 72));
+      const photo = href && index === frame.columns.length - 1;
+      const bottom = photo ? column.y + Math.round(column.h * 0.48) : BOARD_H - 64;
+      paintItems(parts, [section], column.x + 36, 176, column.w - 72, bottom, colors, doc.typeScale, family);
     });
   } else {
-    let y = menu.y + 88;
-    const each = Math.max(120, Math.floor((menu.bottom - y) / Math.max(doc.sections.length, 1)));
-    for (const section of doc.sections) {
-      parts.push(itemBlock(section, menu.x, y, menu.w, y + each - 12));
-      y += each;
+    paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family);
+  }
+  if (doc.footer && doc.template === "menu-banner") {
+    parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${family}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144))}</text>`);
+  } else if (doc.footer) {
+    const footerY = doc.template === "signature" ? BOARD_H - 78 : BOARD_H - 40;
+    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${family}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w))}</text>`);
+  }
+  if (feature.h >= 280 && doc.template !== "triple-column") {
+    const bandY = feature.y + feature.h - 170;
+    const head = doc.featureTitle || "Featured";
+    const hx = feature.x + 40;
+    parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="170" fill="${colors.feature}"/>`);
+    parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, 40, feature.w - 80))}</text>`);
+    if (doc.featureDetail) {
+      parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80))}</text>`);
     }
-  }
-  if (doc.footer && doc.template !== "menu-banner") {
-    const footerY = doc.template === "signature" ? BOARD_H - 88 : BOARD_H - 44;
-    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="Inter" font-size="18" fill="${MUTED}">${esc(clip(doc.footer, 64))}</text>`);
-  }
-  if (doc.template === "menu-banner" && doc.footer) {
-    parts.push(`<text x="72" y="${feature.y + Math.round(feature.h / 2)}" font-family="Inter" font-size="32" font-weight="700" fill="${FEATURE_INK}">${esc(clip(doc.footer, 48))}</text>`);
   }
   parts.push("</svg>");
   return parts.join("");

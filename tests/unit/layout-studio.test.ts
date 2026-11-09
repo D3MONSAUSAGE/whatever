@@ -67,6 +67,53 @@ describe("layout studio frames", () => {
     const frame = frameFor("signature", sampleLayout("signature").split);
     expect(signature?.video && boxesOverlap(frame.menu, signature.video.box)).toBe(false);
     expect(playerComposition({ ...sampleLayout("triple-column"), videoMediaId: "00000000-0000-4000-8000-000000000001" }, "https://png", "https://mp4")).toBeNull();
+    const edited = parseLayout({
+      ...sampleLayout("menu-promo-67"),
+      title: "Casa Mesa Cantina & Grill Edited",
+      sections: [{ name: "Plates", items: [
+        { name: "Pollo asado", price: "$15.50", description: "Citrus chicken, rice, salsa" },
+        { name: "Added special", price: "$9", description: "Kept on the board" },
+      ] }],
+    });
+    expect(edited.ok).toBe(true);
+    if (edited.ok) {
+      expect(edited.value.title).toBe("Casa Mesa Cantina & Grill Edited");
+      expect(edited.value.sections[0].items[0].price).toBe("$15.50");
+      expect(layoutSvg(edited.value)).toContain("Casa Mesa Cantina &amp; Grill Edited");
+      expect(layoutSvg(edited.value)).toContain("$15.50");
+      expect(layoutSvg(edited.value)).toContain("Added special");
+    }
+    const longItems = Array.from({ length: 8 }, (_, index) => ({
+      name: `Long plate ${index + 1}`, price: "$12.00", description: `Description ${index + 1} stays visible`,
+    }));
+    const longDoc = parseLayout({ ...sampleLayout("menu-promo-67"), title: "A forty character television title ok", sections: [{ name: "Plates", items: longItems }] });
+    expect(longDoc.ok).toBe(true);
+    if (longDoc.ok) {
+      const board = layoutSvg(longDoc.value);
+      expect(board).toContain("A forty character television title ok");
+      for (const item of longItems) {
+        expect(board).toContain(item.name);
+        expect(board).toContain(item.description);
+      }
+      const sizes = [...board.matchAll(/font-size="(\d+)"/g)].map((match) => Number(match[1]));
+      expect(Math.max(...sizes)).toBeGreaterThanOrEqual(22);
+    }
+    const banner = layoutSvg(sampleLayout("menu-banner"));
+    const footerAt = banner.indexOf("Members save 10% after 4");
+    const footerSlice = banner.slice(Math.max(0, footerAt - 80), footerAt);
+    const footerY = Number(footerSlice.match(/y="([\d.]+)"/)?.[1]);
+    expect(footerY).toBeLessThan(frameFor("menu-banner", 0.18).video!.y);
+    const columnPhoto = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const triple = layoutSvg({ ...sampleLayout("triple-column"), imageMediaId: "00000000-0000-4000-8000-000000000002" }, { imageHref: columnPhoto });
+    expect(triple.lastIndexOf("<image ")).toBeGreaterThan(triple.indexOf("<rect"));
+    const split = layoutSvg(sampleLayout("split-50"));
+    expect(split).toContain("Noon ride");
+    expect(split).toContain("Studio B");
+    const head = split.indexOf("Noon ride");
+    const detail = split.indexOf("bikes leave at 12:15");
+    const headY = Number(split.slice(Math.max(0, head - 120), head).match(/y="([\d.]+)"/)?.[1]);
+    const detailY = Number(split.slice(Math.max(0, detail - 120), detail).match(/y="([\d.]+)"/)?.[1]);
+    expect(detailY - headY).toBeGreaterThanOrEqual(60);
   });
 
   it("rejects markup, a second video, and a split outside the template", () => {
@@ -119,7 +166,10 @@ describe("player composition contract", () => {
     expect(copyGroup).not.toContain("composition");
     expect(player).toContain("if (zoneVideo(item)) {");
     expect(player).toContain("placeZoneVideo(item, versionOrNull, token, function () {");
-    expect(player).toContain("ackShown(versionOrNull, false);");
+    expect(player).toContain("else if (degraded === false) clearReportedError();");
+    expect(player).toContain("box.x + box.w > 1920");
+    expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
+    expect(player).toContain("layout-studio-published-v1");
     expect(player).toContain("if (!zoneVideo(items[startAt])) shownVersion = version;");
     expect(player).toContain("v.muted = true;");
     expect(player).toContain("if (zoneOpen()) return;");

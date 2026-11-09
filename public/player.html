@@ -855,7 +855,7 @@
         });
         return;
       }
-      ackShown(versionOrNull, false);
+      ackShown(versionOrNull);
       preloadIndex((index + 1) % playlist.items.length);
       scheduleAdvance(index, item);
     }
@@ -923,6 +923,11 @@
     if (!video || !video.url || !box) return null;
     if (typeof box.x !== 'number' || typeof box.y !== 'number' || typeof box.w !== 'number' || typeof box.h !== 'number') return null;
     if (box.w < 1 || box.h < 1) return null;
+    // Server geometry is the contract. This only rejects a box outside the board
+    // or a full-bleed box, which would cover menu text.
+    if (box.x < 0 || box.y < 0) return null;
+    if (box.x + box.w > 1920 || box.y + box.h > 1080) return null;
+    if (box.w >= 1920 && box.h >= 1080) return null;
     return video;
   }
   function copyComposition(row, it) {
@@ -952,7 +957,8 @@
   function ackShown(versionOrNull, degraded) {
     if (typeof versionOrNull === 'number') shownVersion = versionOrNull;
     else if (shownVersion === null && typeof loadedVersion === 'number') shownVersion = loadedVersion;
-    if (degraded) reportError('The video in this board did not start. The still image is showing.');
+    if (degraded === true) reportError('The video in this board did not start. The still image is showing.');
+    else if (degraded === false) clearReportedError();
     else if (typeof versionOrNull === 'number') clearReportedError();
     if (typeof shownVersion === 'number') markPainted(shownVersion);
   }
@@ -970,6 +976,7 @@
       if (v.getAttribute('data-zone') !== '1') continue;
       v.onplaying = null;
       v.onerror = null;
+      v.ontimeupdate = null;
       try { v.pause(); } catch (e) {}
       v.className = 'stage';
       try { v.removeAttribute('data-zone'); } catch (e2) {}
@@ -1001,13 +1008,23 @@
     v.style.top = Math.round((sh - 1080 * scale) / 2 + box.y * scale) + 'px';
     v.style.width = Math.round(box.w * scale) + 'px';
     v.style.height = Math.round(box.h * scale) + 'px';
+    v.style.objectFit = 'contain';
     var settled = false;
+    function frameReady() { return v.videoWidth > 0 && v.currentTime > 0; }
+    function showFrame() {
+      if (token !== slideToken || settled || !frameReady()) return;
+      z += 1;
+      v.style.zIndex = String(z);
+      v.className = 'stage on';
+      settle(true);
+    }
     function settle(playing) {
       if (settled || token !== slideToken) return;
       settled = true;
       if (!playing) {
         v.onplaying = null;
         v.onerror = null;
+        v.ontimeupdate = null;
         try { v.pause(); } catch (e2) {}
         v.className = 'stage';
         try { v.removeAttribute('data-zone'); } catch (e3) {}
@@ -1016,13 +1033,9 @@
       ackShown(versionOrNull, !playing);
       if (done) done();
     }
-    v.onplaying = function () {
-      if (token !== slideToken || settled) return;
-      z += 1;
-      v.style.zIndex = String(z);
-      v.className = 'stage on';
-      settle(true);
-    };
+    // onplaying alone is not a displayed frame. Wait until the element has a size and a time.
+    v.onplaying = function () { showFrame(); };
+    v.ontimeupdate = function () { showFrame(); };
     v.onerror = function () { settle(false); };
     setTimeout(function () {
       if (!settled) settle(false);
@@ -1253,28 +1266,36 @@
   // Check right away when the network comes back.
   window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });
 
+  function publishedBoard() {
+    var raw, data, svg, box, url;
+    try { raw = window.localStorage.getItem('layout-studio-published-v1'); } catch (e) { return null; }
+    if (!raw) return null;
+    try { data = JSON.parse(raw); } catch (e2) { return null; }
+    svg = data && data.svg;
+    if (!svg || svg.indexOf('<svg') !== 0 || svg.indexOf('<script') !== -1) return null;
+    box = data.videoBox;
+    try { url = window.URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); } catch (e3) { return null; }
+    return { url: url, box: box, videoOn: data.videoOn === true };
+  }
   function startLayoutFixture() {
+    var board, item, video;
+    board = publishedBoard();
     enter('playing');
+    if (!board) {
+      setStatus('Publish a board in Layout Studio first.');
+      showScreen('empty');
+      return;
+    }
+    item = {
+      mediaId: 'layout-poster', url: board.url, durationMs: 60000, kind: 'image',
+      groupId: 'slides', groupIndex: 0, groupCount: 3
+    };
+    video = board.videoOn ? { mediaId: 'layout-promo', url: '/layout-studio/media/promo', box: board.box } : null;
+    if (video && zoneVideo({ composition: { layoutVersion: 1, video: video } })) {
+      item.composition = { layoutVersion: 1, fallbackUrl: board.url, video: video };
+    }
     showScreen('');
-    beginPlaylist(1, {
-      id: 'layout-fixture',
-      transition: 'none',
-      playbackMode: 'auto',
-      items: [{
-        mediaId: 'layout-poster',
-        url: '/layout-studio/media/poster',
-        durationMs: 60000,
-        kind: 'image',
-        groupId: 'slides',
-        groupIndex: 0,
-        groupCount: 3,
-        composition: {
-          layoutVersion: 1,
-          fallbackUrl: '/layout-studio/media/poster',
-          video: { mediaId: 'layout-promo', url: '/layout-studio/media/promo', box: { x: 1286, y: 0, w: 634, h: 1080 } }
-        }
-      }]
-    });
+    beginPlaylist(1, { id: 'layout-published', transition: 'none', playbackMode: 'auto', items: [item] });
   }
   if (layoutFixtureOn()) startLayoutFixture();
   else if (getToken()) startPlayback();
