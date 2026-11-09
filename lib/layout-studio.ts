@@ -25,7 +25,7 @@ export type LayoutDocument = {
   subtitle: string;
   footer: string;
   sections: LayoutSection[];
-  /** Same-account JPEG or PNG. Empty when the side is only the video poster. */
+  /** Same-account JPEG, PNG, or WebP. Empty when the side is only the video poster. */
   imageMediaId: string | null;
   /** At most one. Same-account MP4. The PNG still draws a poster in this box. */
   videoMediaId: string | null;
@@ -44,6 +44,11 @@ export type LayoutDocument = {
   /** Copy for the feature pane. Kept even when a video covers that pane. */
   featureTitle: string;
   featureDetail: string;
+  /** Triple column shares. Null keeps the single first-column split. */
+  columnWidths: [number, number, number] | null;
+  /** How an assigned photo fills its box. Cover matches the previous boards. */
+  imageFit: "cover" | "contain";
+  imageAnchor: "center" | "top" | "bottom" | "left" | "right";
 };
 
 export type LayoutFrame = {
@@ -98,7 +103,7 @@ function box(x: number, y: number, w: number, h: number): ZoneBox {
 }
 
 /** Integer boxes for one template. Menu columns plus one feature box cover the board. */
-export function frameFor(template: LayoutTemplate, split: number): LayoutFrame {
+export function frameFor(template: LayoutTemplate, split: number, columnWidths?: [number, number, number] | null): LayoutFrame {
   const ratio = clampSplit(template, split);
   if (template === "menu-banner") {
     const banner = Math.round(BOARD_H * ratio);
@@ -119,10 +124,11 @@ export function frameFor(template: LayoutTemplate, split: number): LayoutFrame {
     };
   }
   if (template === "triple-column") {
-    const first = Math.round(BOARD_W * ratio);
-    const rest = BOARD_W - first;
-    const second = Math.round(rest / 2);
-    const columns = [box(0, 0, first, BOARD_H), box(first, 0, second, BOARD_H), box(first + second, 0, rest - second, BOARD_H)];
+    const widths = normalizedColumns(columnWidths);
+    const first = widths ? Math.round(BOARD_W * widths[0]) : Math.round(BOARD_W * ratio);
+    const second = widths ? Math.round(BOARD_W * widths[1]) : Math.round((BOARD_W - first) / 2);
+    const third = BOARD_W - first - second;
+    const columns = [box(0, 0, first, BOARD_H), box(first, 0, second, BOARD_H), box(first + second, 0, third, BOARD_H)];
     return { template, split: ratio, menu: box(0, 0, BOARD_W, BOARD_H), feature: columns[2], video: null, columns };
   }
   const left = Math.round(BOARD_W * ratio);
@@ -208,6 +214,10 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   const accentColor = hexColor(raw.accentColor);
   const textColor = hexColor(raw.textColor);
   const backgroundColor = hexColor(raw.backgroundColor);
+  const columnWidths = readColumnWidths(raw.columnWidths);
+  if (raw.columnWidths != null && raw.columnWidths !== "" && !columnWidths) return { ok: false, error: "Set three column widths that add up to the full board." };
+  const imageFit = raw.imageFit === "contain" ? "contain" : "cover";
+  const imageAnchor = raw.imageAnchor === "top" || raw.imageAnchor === "bottom" || raw.imageAnchor === "left" || raw.imageAnchor === "right" ? raw.imageAnchor : "center";
   if (raw.primaryColor && !primaryColor) return { ok: false, error: "Use a color like #0066ff." };
   if (raw.accentColor && !accentColor) return { ok: false, error: "Use a color like #ffd34d." };
   if (raw.textColor && !textColor) return { ok: false, error: "Use a color like #112233." };
@@ -219,8 +229,19 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font,
       textColor, backgroundColor,
       featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
+      columnWidths, imageFit, imageAnchor,
     },
   };
+}
+
+function readColumnWidths(value: unknown): [number, number, number] | null {
+  if (value == null || value === "") return null;
+  if (!Array.isArray(value) || value.length !== 3) return null;
+  const nums = value.map((item) => typeof item === "number" ? item : Number.NaN);
+  if (nums.some((item) => !Number.isFinite(item) || item < 0.2 || item > 0.6)) return null;
+  const sum = nums[0] + nums[1] + nums[2];
+  if (sum < 0.98 || sum > 1.02) return null;
+  return [nums[0] / sum, nums[1] / sum, nums[2] / sum];
 }
 
 function hexColor(value: unknown): string | null {
@@ -229,10 +250,17 @@ function hexColor(value: unknown): string | null {
   return value.toLowerCase();
 }
 
-function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId" | "font" | "textColor" | "backgroundColor">): LayoutDocument {
+function normalizedColumns(value: [number, number, number] | null | undefined): [number, number, number] | null {
+  if (!value) return null;
+  const sum = value[0] + value[1] + value[2];
+  if (!(sum > 0)) return null;
+  return [value[0] / sum, value[1] / sum, value[2] / sum];
+}
+
+function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId" | "font" | "textColor" | "backgroundColor" | "columnWidths" | "imageFit" | "imageAnchor">): LayoutDocument {
   return {
     layoutVersion: 1, template, imageMediaId: null, videoMediaId: null, font: "inter",
-    textColor: null, backgroundColor: null, ...fields,
+    textColor: null, backgroundColor: null, columnWidths: null, imageFit: "cover", imageAnchor: "center", ...fields,
   };
 }
 
@@ -369,7 +397,8 @@ export type PlayerComposition = { layoutVersion: 1; fallbackUrl: string; video?:
 /** Additive player field. Omitted entirely when there is no video to play. */
 export function playerComposition(doc: LayoutDocument, fallbackUrl: string, videoUrl: string | null): PlayerComposition | null {
   if (!doc.videoMediaId || !videoUrl) return null;
-  const frame = frameFor(doc.template, doc.split);
+  // The box always comes from the template and its proportions. A box on the document is ignored.
+  const frame = frameFor(doc.template, doc.split, doc.columnWidths);
   if (!frame.video) return null;
   return {
     layoutVersion: 1,
@@ -381,9 +410,18 @@ export function playerComposition(doc: LayoutDocument, fallbackUrl: string, vide
 /** A photo href the renderer may paint. Anything else is ignored, not executed. */
 export function safeImageHref(value: string | null | undefined): string | null {
   if (!value) return null;
-  if (/^data:image\/(png|jpeg);base64,[a-z0-9+/=\s]+$/i.test(value)) return value.replace(/\s/g, "");
+  if (/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=\s]+$/i.test(value)) return value.replace(/\s/g, "");
   if (/^https:\/\/[^\s"'<>]+$/i.test(value)) return value;
   return null;
+}
+
+/** Server-owned photo fit. Cover is the previous slice behavior. */
+export function imageAspect(doc: { imageFit?: "cover" | "contain"; imageAnchor?: string }) {
+  const fit = doc.imageFit === "contain" ? "meet" : "slice";
+  const anchor = doc.imageAnchor;
+  const x = anchor === "left" ? "xMin" : anchor === "right" ? "xMax" : "xMid";
+  const y = anchor === "top" ? "YMin" : anchor === "bottom" ? "YMax" : "YMid";
+  return `${x}${y} ${fit}`;
 }
 
 function measure(value: string, size: number) {
@@ -532,7 +570,7 @@ export type LayoutArt = { imageHref?: string | null };
 
 /** Complete board. Menu text stays out of the video box. The still does not say a video is playing. */
 export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
-  const frame = frameFor(doc.template, doc.split);
+  const frame = frameFor(doc.template, doc.split, doc.columnWidths);
   const colors = colorsFor(doc);
   const family = fontFamily(doc.font);
   const href = safeImageHref(art?.imageHref);
@@ -549,20 +587,20 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const photo = frame.columns[frame.columns.length - 1];
     if (href) {
       const photoTop = photo.y + Math.round(photo.h * 0.5);
-      parts.push(`<image href="${esc(href)}" x="${photo.x}" y="${photoTop}" width="${photo.w}" height="${photo.h - (photoTop - photo.y)}" preserveAspectRatio="xMidYMid slice"/>`);
+      parts.push(`<image href="${esc(href)}" x="${photo.x}" y="${photoTop}" width="${photo.w}" height="${photo.h - (photoTop - photo.y)}" preserveAspectRatio="${imageAspect(doc)}"/>`);
     } else {
       parts.push(`<rect x="${photo.x}" y="${photo.y}" width="${photo.w}" height="${photo.h}" fill="${colors.paper}"/>`);
     }
   } else if (href && doc.template !== "menu-banner") {
     const box = doc.template === "signature" ? frame.feature : feature;
-    parts.push(`<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="xMidYMid slice"/>`);
+    parts.push(`<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${imageAspect(doc)}"/>`);
   }
   if (doc.template === "signature") {
     // Opaque card over the full-bleed background. Text stays on this card, not on the photo.
     parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${BOARD_H - 96}" fill="${colors.paper}"/>`);
   } else if (doc.template === "menu-banner") {
     parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
-    if (href) parts.push(`<image href="${esc(href)}" x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="xMidYMid slice"/>`);
+    if (href) parts.push(`<image href="${esc(href)}" x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="${imageAspect(doc)}"/>`);
   } else if (doc.template !== "triple-column") {
     parts.push(`<rect x="${frame.menu.x}" y="${frame.menu.y}" width="${frame.menu.w}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
   }

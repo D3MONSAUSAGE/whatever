@@ -5,7 +5,7 @@ import type { MenuArt } from "./menu-render";
 
 export const BRAND_UNAVAILABLE = "Branding isn't available yet. Try again after the next update.";
 const ART_MAX_BYTES = 15 * 1024 * 1024;
-const ART_TYPES = new Set(["image/png", "image/jpeg"]);
+const ART_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 export type Brand = { primaryColor: string; accentColor: string; logoMediaId: string | null; available: boolean; custom: boolean };
 

@@ -1024,6 +1024,8 @@
       v.onerror = null;
       v.ontimeupdate = null;
       try { v.pause(); } catch (e) {}
+      v.loop = false;
+      try { v.removeAttribute('loop'); } catch (eLoop) {}
       v.className = 'stage';
       try { v.removeAttribute('data-zone'); } catch (e2) {}
       try { v.removeAttribute('src'); v.load(); } catch (e3) {}
@@ -1045,7 +1047,13 @@
     if (!v) v = videos[0];
     box = video.box;
     v.muted = true;
+    v.loop = true;
+    try { v.playsInline = true; } catch (e0) {}
     try { v.setAttribute('muted', 'muted'); } catch (e) {}
+    try { v.setAttribute('loop', 'loop'); } catch (eLoop) {}
+    try { v.setAttribute('autoplay', 'autoplay'); } catch (eAuto) {}
+    try { v.setAttribute('playsinline', 'playsinline'); } catch (ePlay) {}
+    try { v.setAttribute('webkit-playsinline', 'webkit-playsinline'); } catch (eWeb) {}
     v.setAttribute('data-zone', '1');
     zoneFit = { el: v, box: box };
     applyZoneFit();
@@ -1066,6 +1074,8 @@
         v.onerror = null;
         v.ontimeupdate = null;
         try { v.pause(); } catch (e2) {}
+        v.loop = false;
+        try { v.removeAttribute('loop'); } catch (eLoop2) {}
         v.className = 'stage';
         try { v.removeAttribute('data-zone'); } catch (e3) {}
         try { v.removeAttribute('src'); v.load(); } catch (e4) {}

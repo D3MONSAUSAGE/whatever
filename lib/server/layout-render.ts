@@ -8,7 +8,7 @@ const FONTS = [
 ].map((file) => join(process.cwd(), "assets", "fonts", file));
 
 /** Whole-board PNG. The selected bundled face and the assigned photo are drawn into this file. */
-export function renderLayoutPng(doc: LayoutDocument, image?: { bytes: Uint8Array; mime: "image/png" | "image/jpeg" } | null): Buffer {
+export function renderLayoutPng(doc: LayoutDocument, image?: { bytes: Uint8Array; mime: "image/png" | "image/jpeg" | "image/webp" } | null): Buffer {
   const href = image && image.bytes.length
     ? `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`
     : null;

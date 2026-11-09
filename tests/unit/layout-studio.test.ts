@@ -368,13 +368,38 @@ describe("player composition contract", () => {
     }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
     const editor = readFileSync("components/layout-studio.tsx", "utf8");
-    expect(editor).toContain("Columns 2 and 3 share the rest equally");
-    expect(editor).not.toContain("each column width");
+    expect(editor).toContain("Each column is 20% to 60%");
+    expect(editor).toContain("TV output");
+    expect(editor).toContain("Upload video");
     const banner = layoutSvg(sampleLayout("menu-banner"));
     const flower = banner.indexOf("Flowers");
     const flowerY = Number(banner.slice(Math.max(0, flower - 160), flower).match(/y="([\d.]+)"/g)?.at(-1)?.match(/[\d.]+/)?.[0]);
     expect(flowerY).toBeGreaterThan(700);
     expect(flowerY).toBeLessThan(frameFor("menu-banner", 0.18).menu.h);
+    expect(player).toContain("v.loop = true");
+    expect(player).toContain("playsinline");
+    expect(player).toContain("webkit-playsinline");
+    const tampered = {
+      ...sampleLayout("menu-promo-67"),
+      videoMediaId: "00000000-0000-4000-8000-000000000099",
+      box: { x: 0, y: 0, w: 1919, h: 1080 },
+      video: { box: { x: 0, y: 0, w: 1919, h: 1080 } },
+    };
+    const parsedBox = parseLayout(tampered);
+    expect(parsedBox.ok).toBe(true);
+    if (parsedBox.ok) {
+      expect(parsedBox.value).not.toHaveProperty("box");
+      const owned = playerComposition(parsedBox.value, "https://png", "https://mp4");
+      expect(owned?.video?.box).toEqual(frameFor(parsedBox.value.template, parsedBox.value.split, parsedBox.value.columnWidths).video);
+      expect(owned?.video?.box.w).toBeLessThan(1000);
+    }
+    const columns = parseLayout({ ...sampleLayout("triple-column"), columnWidths: [0.5, 0.25, 0.25] });
+    expect(columns.ok).toBe(true);
+    if (columns.ok) {
+      const sized = frameFor("triple-column", columns.value.split, columns.value.columnWidths);
+      expect(sized.columns[0].w).toBeGreaterThan(sized.columns[1].w);
+      expect(sized.video).toBeNull();
+    }
     expect(player).toContain("function boardFrame()");
     expect(player).toContain("layer.style.backgroundSize");
     const phone = containedBoard(400, 985);

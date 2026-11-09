@@ -22,7 +22,7 @@ export function libraryError(accountId: string, file: LibraryFile | null, role: 
   if (!file || file.accountId !== accountId) {
     return role === "photo" ? "That photo isn't in your media library." : "That video isn't in your media library.";
   }
-  if (role === "photo" && file.mime !== "image/jpeg" && file.mime !== "image/png") return "Use a JPG or PNG from your library.";
+  if (role === "photo" && file.mime !== "image/jpeg" && file.mime !== "image/png" && file.mime !== "image/webp") return "Use a JPG, PNG, or WebP from your library.";
   if (role === "video" && file.kind !== "video") return "Use a video from your library.";
   return null;
 }

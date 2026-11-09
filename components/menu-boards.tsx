@@ -94,8 +94,8 @@ export function MenuBoards({ studioHref = null }: { studioHref?: string | null }
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Menu boards">
           {menus.data.menus.map((menu) => (
             <li key={menu.id} className="card overflow-hidden">
-              <div className="aspect-video bg-ink">
-                {menu.imageUrl ? <img src={menu.imageUrl} alt={`${menu.name} preview`} className="w-full h-full object-cover" /> : null}
+              <div className="relative aspect-video bg-ink">
+                {menu.imageUrl ? <img src={menu.imageUrl} alt={`${menu.name} preview`} referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-contain" /> : null}
               </div>
               <div className="p-4">
                 <p className="font-semibold break-words">{menu.name}</p>

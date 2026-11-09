@@ -5,7 +5,7 @@ import { BUCKET, db } from "@/lib/server/supabase";
 function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
   if (kind === "video") return "video";
   if (kind === "presentation") return null;
-  if (mime === "image/jpeg" || mime === "image/png") return "image";
+  if (mime === "image/jpeg" || mime === "image/png" || mime === "image/webp") return "image";
   return null;
 }
 
@@ -112,7 +112,7 @@ export async function saveLayoutForAccount(accountId: string, body: {
       const { renderLayoutPng } = await import("@/lib/server/layout-render");
       const png = renderLayoutPng(document, bytes && bytes.length ? { bytes, mime } : null);
       const { storeRenderedImage } = await import("@/lib/server/menus");
-      const id = await storeRenderedImage(accountId, `${(document.title || "Menu").slice(0, 60)}.png`, png);
+      const id = await storeRenderedImage(accountId, `${(document.title || "Menu").slice(0, 50)} (menu).png`, png);
       if (!id) throw new Error("Couldn't store the board.");
       return id;
     },

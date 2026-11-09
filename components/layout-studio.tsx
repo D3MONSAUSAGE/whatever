@@ -10,6 +10,7 @@ import {
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import { api } from "@/lib/api";
+import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature"];
@@ -40,7 +41,9 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [note, setNote] = useState(accountMode ? "Loading this account." : "This browser copy does not write an account.");
   const spec = templateSpec(template);
-  const frame = frameFor(draft.template, draft.split);
+  const frame = frameFor(draft.template, draft.split, draft.columnWidths);
+  const [step, setStep] = useState<"template" | "section" | "content" | "style" | "publish">("template");
+  const [zone, setZone] = useState<"menu" | "feature" | "background">("menu");
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const videoBox = frame.video;
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId);
@@ -185,7 +188,7 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
 
   function onPhoto(file: File | undefined) {
     if (!file) { setImageHref(null); return; }
-    if (file.type !== "image/jpeg" && file.type !== "image/png") { setNote("Use a JPEG or PNG."); return; }
+    if (file.type !== "image/jpeg" && file.type !== "image/png" && file.type !== "image/webp") { setNote("Use a JPEG, PNG, or WebP."); return; }
     if (!accountMode && file.size > 1_500_000) { setNote("Use a photo under 1.5 MB."); return; }
     if (accountMode || sessionToken) {
       const form = new FormData();
@@ -218,13 +221,51 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
     reader.readAsDataURL(file);
   }
 
+  async function onVideo(file: File | undefined) {
+    if (!file) return;
+    if (!videoBox) { setNote("This layout has no video area."); return; }
+    if (draft.videoMediaId) { setNote("Remove the current video before adding another. A board plays one video."); return; }
+    if (!accountMode && !sessionToken) { setNote("Video upload uses your media library. Sign in to add one."); return; }
+    try {
+      const prepared = await prepareVideo(file);
+      const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/upload", {
+        method: "POST",
+        body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
+      });
+      await uploadToSignedUrl(signed.signedUrl, file, () => undefined, file.name);
+      await api("/api/media/upload/complete", {
+        method: "POST",
+        body: JSON.stringify({
+          mediaId: signed.mediaId,
+          fileName: file.name,
+          durationMs: prepared.durationMs,
+          width: prepared.width,
+          height: prepared.height,
+          thumbnailBase64: await blobToBase64(prepared.thumbnail),
+        }),
+      });
+      const loaded = await reloadAccount(menuId);
+      const entry = loaded.library.find((item) => item.id === signed.mediaId) ?? null;
+      if (entry) update(applyLibraryFile(draft, entry, "video"));
+      setNote("Video is in this account's library. Publish plays it in the safe area.");
+    } catch (err) {
+      setNote((err as Error).message || "Couldn't upload that video.");
+    }
+  }
+
   return (
     <main style={{ minHeight: "100vh", background: "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
-      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px 72px", display: "grid", gap: 28, gridTemplateColumns: "minmax(280px, 380px) minmax(0, 1fr)" }}>
+      <div className="studio-grid" style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 20px 72px", display: "grid", gap: 28, gridTemplateColumns: "minmax(280px, 380px) minmax(0, 1fr)" }}>
         <section>
           <p style={{ letterSpacing: "0.14em", textTransform: "uppercase", fontSize: 12, margin: 0 }}>{accountMode ? "Media" : "Isolated preview"}</p>
           <h1 style={{ fontSize: 36, lineHeight: 1.1, margin: "8px 0" }}>Layout Studio</h1>
-          <p style={{ lineHeight: 1.5, marginTop: 0 }}>{accountMode ? "Save a draft on this account without moving screens. Publish renders the board and updates the screens that already show this menu." : "Edit the board, then open the player check. This page does not write an account."}</p>
+          <p style={{ lineHeight: 1.5, marginTop: 0 }}>{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+          <div className="studio-tabs" role="tablist" aria-label="Editor steps">
+            {(["template", "section", "content", "style", "publish"] as const).map((id) => (
+              <button key={id} type="button" role="tab" aria-selected={step === id} style={chip(step === id)} onClick={() => setStep(id)}>{stepLabel(id)}</button>
+            ))}
+          </div>
+          <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>
             {TEMPLATES.map((id) => (
               <button key={id} type="button" onClick={() => choose(id)} style={chip(id === template)}>{templateSpec(id).name}</button>
@@ -275,6 +316,9 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
               onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
           </label>
           <p id="proportion-note" style={{ fontSize: 13, color: "#5c534c", marginTop: 0 }}>{proportionNote(template)}</p>
+          {template === "triple-column" ? <ColumnWidths draft={draft} update={update} /> : null}
+          </div>
+          <div className={step === "section" || step === "content" ? "studio-pane on" : "studio-pane"} data-step="content">
           {template === "split-50" || template === "signature" || template === "menu-promo-67" ? (
             <>
               <label style={fieldLabel}>{template === "split-50" ? "Right side title" : template === "signature" ? "Side title" : "Feature title"}
@@ -350,9 +394,35 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
               {account.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>Classic menus stay in the menu editor: {account.legacy.map((item) => item.name).join(", ")}.</p> : null}
             </>
           ) : null}
-          <label style={{ ...fieldLabel, marginTop: 16 }}>{template === "signature" ? "Background image" : "Photo for the feature area"}
-            <input aria-label={template === "signature" ? "Background image" : "Feature photo"} type="file" accept="image/jpeg,image/png" onChange={(event) => onPhoto(event.target.files?.[0])} />
+          </div>
+          <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
+          <p style={{ fontSize: 14 }}>Selected area: {zone === "menu" ? "Menu" : zone === "feature" ? "Feature" : "Background"}</p>
+          <label style={fieldLabel}>Photo fit
+            <select aria-label="Photo fit" value={draft.imageFit} onChange={(event) => update({ ...draft, imageFit: event.target.value === "contain" ? "contain" : "cover" })}>
+              <option value="cover">Fill the area</option>
+              <option value="contain">Fit inside the area</option>
+            </select>
           </label>
+          <label style={fieldLabel}>Photo position
+            <select aria-label="Photo position" value={draft.imageAnchor} onChange={(event) => update({ ...draft, imageAnchor: anchorValue(event.target.value) })}>
+              <option value="center">Center</option>
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+          </div>
+          <div className={step === "publish" || step === "content" ? "studio-pane on" : "studio-pane"} data-step="publish">
+          <label style={{ ...fieldLabel, marginTop: 16 }}>{zone === "background" || template === "signature" ? "Background image" : "Photo for this area"}
+            <input aria-label={template === "signature" ? "Background image" : "Feature photo"} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onPhoto(event.target.files?.[0])} />
+          </label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" style={chip(false)} onClick={() => setZone(template === "signature" ? "background" : "feature")}>Choose from library</button>
+            {videoBox ? <label style={{ ...chip(false) }}>Upload video
+              <input aria-label="Upload video" type="file" accept="video/mp4" style={{ display: "block", marginTop: 6 }} onChange={(event) => onVideo(event.target.files?.[0])} />
+            </label> : null}
+          </div>
           {accountMode ? null : (
             <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
               <input type="checkbox" checked={videoOn && !!videoBox && !draft.videoMediaId} disabled={!videoBox || Boolean(draft.videoMediaId)} onChange={(event) => setVideoOn(event.target.checked)} />
@@ -369,15 +439,34 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
             {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
           </div>
           <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
+          </div>
         </section>
-        <section>
+        <section className="studio-preview">
+          <p style={{ margin: "0 0 8px", fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase" }}>TV output</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            <button type="button" style={chip(zone === "menu")} onClick={() => { setZone("menu"); setStep("content"); }}>Edit menu</button>
+            {videoBox ? <button type="button" style={chip(zone === "feature")} onClick={() => { setZone("feature"); setStep("content"); }}>Edit feature</button> : null}
+            <button type="button" style={chip(zone === "background")} onClick={() => { setZone("background"); setStep("style"); }}>Edit background</button>
+          </div>
           <Stage svg={svg} video={showZone ? videoBox : null} videoSrc={zoneSrc} label={accountMode ? "Board" : "Draft"} />
           {!accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" /> : null}
           {!accountMode && !published ? <p>No published preview yet.</p> : null}
         </section>
       </div>
       <style>{`
-        @media (max-width: 860px) { main > div { grid-template-columns: 1fr !important; } }
+        @media (max-width: 860px) {
+          .studio-grid { display: flex !important; flex-direction: column; overflow-x: hidden; }
+          .studio-preview { order: -1; }
+          .studio-tabs { display: flex; }
+          .studio-pane { display: none; }
+          .studio-pane.on { display: block; }
+        }
+        @media (min-width: 861px) {
+          .studio-tabs { display: none; }
+          .studio-pane { display: block; }
+        }
+        .studio-tabs { display: none; flex-wrap: wrap; gap: 8px; }
+        .studio-tabs button, .studio-preview button { min-height: 44px; min-width: 44px; }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-bold") format("truetype"); font-weight: 700; font-style: normal; }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-extrabold") format("truetype"); font-weight: 800; font-style: normal; }
@@ -442,6 +531,44 @@ function setItem(draft: LayoutDocument, si: number, ii: number, patch: Partial<L
   });
 }
 
+function stepLabel(step: "template" | "section" | "content" | "style" | "publish") {
+  if (step === "template") return "Template";
+  if (step === "section") return "Section";
+  if (step === "content") return "Content";
+  if (step === "style") return "Style";
+  return "Publish";
+}
+
+function anchorValue(value: string): LayoutDocument["imageAnchor"] {
+  if (value === "top" || value === "bottom" || value === "left" || value === "right") return value;
+  return "center";
+}
+
+function ColumnWidths({ draft, update }: { draft: LayoutDocument; update: (next: LayoutDocument) => void }) {
+  const widths = draft.columnWidths ?? [draft.split, (1 - draft.split) / 2, (1 - draft.split) / 2];
+  function setWidth(index: number, next: number) {
+    const current: [number, number, number] = [widths[0], widths[1], widths[2]];
+    current[index] = Math.min(0.6, Math.max(0.2, next));
+    const others = [0, 1, 2].filter((item) => item !== index);
+    const remain = 1 - current[index];
+    const otherSum = current[others[0]] + current[others[1]] || 1;
+    current[others[0]] = remain * current[others[0]] / otherSum;
+    current[others[1]] = remain - current[others[0]];
+    update({ ...draft, columnWidths: current });
+  }
+  return (
+    <fieldset style={{ border: "1px solid #ddd4c6", borderRadius: 12, padding: 12 }}>
+      <legend>Column widths</legend>
+      {widths.map((width, index) => (
+        <label key={index} style={fieldLabel}>Column {index + 1} {Math.round(width * 100)}%
+          <input aria-label={`Column ${index + 1} width`} type="range" min={0.2} max={0.6} step={0.01} value={width} onChange={(event) => setWidth(index, Number(event.target.value))} />
+        </label>
+      ))}
+      <p style={{ fontSize: 13, color: "#5c534c" }}>Each column is 20% to 60%. They always add up to the full board.</p>
+    </fieldset>
+  );
+}
+
 function proportionLabel(template: LayoutTemplate) {
   if (template === "menu-banner") return "Banner height";
   if (template === "triple-column") return "First column width";
@@ -451,7 +578,7 @@ function proportionLabel(template: LayoutTemplate) {
 }
 
 function proportionNote(template: LayoutTemplate) {
-  if (template === "triple-column") return "Only the first column is adjustable, from 25% to 45%. Columns 2 and 3 share the rest equally. There is no separate width for each column.";
+  if (template === "triple-column") return "Each column is 20% to 60% and the three widths add up to the full board. This layout has no video area.";
   if (template === "menu-banner") return "Banner height is 12% to 28% of the board. The menu uses the space above it.";
   if (template === "menu-promo-67") return "Menu width is 55% to 75%. The promotion uses the rest.";
   if (template === "split-50") return "The left side is 40% to 60%. The right side uses the rest.";

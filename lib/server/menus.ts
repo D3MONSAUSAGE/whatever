@@ -82,7 +82,11 @@ export async function signedUrls(paths: string[]) {
   const urls = new Map<string, string>();
   if (!paths.length) return urls;
   const { data } = await db().storage.from(BUCKET).createSignedUrls(paths, 3600);
-  data?.forEach((s) => s.path && s.signedUrl && urls.set(s.path, s.signedUrl));
+  data?.forEach((s, index) => {
+    if (!s.signedUrl) return;
+    if (s.path) urls.set(s.path, s.signedUrl);
+    if (paths[index]) urls.set(paths[index], s.signedUrl);
+  });
   return urls;
 }
 
@@ -94,17 +98,21 @@ export async function menuView(accountId: string, rows: MenuRow[]) {
     for (const m of media.data ?? []) paths.set(String(m.id), String(m.storage_path));
   }
   const urls = await signedUrls([...paths.values()]);
-  return rows.map((r) => ({
+  return rows.map((r) => {
+    const mediaId = r.media_id ? String(r.media_id) : "";
+    const path = mediaId ? paths.get(mediaId) : undefined;
+    return {
     id: r.id,
     name: r.name,
     template: r.template,
     content: r.content,
     mediaId: r.media_id,
     playlistId: r.playlist_id,
-    imageUrl: r.media_id && paths.has(r.media_id) ? urls.get(paths.get(r.media_id)!) ?? null : null,
+    imageUrl: path ? urls.get(path) ?? null : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-  }));
+  };
+  });
 }
 
 export { isMissingSchema };

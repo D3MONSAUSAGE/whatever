@@ -97,7 +97,7 @@ export function readAccountStudio(body: unknown): AccountStudio | null {
 export function applyLibraryFile(doc: LayoutDocument, entry: AccountLibraryFile | null, role: "photo" | "video"): LayoutDocument {
   if (role === "photo") {
     if (!entry || entry.kind !== "image") return { ...doc, imageMediaId: null };
-    if (entry.mime !== "image/jpeg" && entry.mime !== "image/png") return doc;
+    if (entry.mime !== "image/jpeg" && entry.mime !== "image/png" && entry.mime !== "image/webp") return doc;
     return { ...doc, imageMediaId: entry.id };
   }
   if (!entry || entry.kind !== "video") return { ...doc, videoMediaId: null };
