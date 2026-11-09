@@ -153,7 +153,9 @@ describe("layout studio account route", () => {
     expect(shown[0]).not.toBe(oldMedia);
     expect(store.menus.find((item) => item.id === legacy)?.content).toMatchObject({ title: "Classic lunch" });
 
-    const items = [{ mediaId: shown[0], url: "https://signed.test/board.png", kind: "image" as const }];
+    const items: Parameters<typeof attachLayoutCompositions>[0] = [
+      { mediaId: shown[0], url: "https://signed.test/board.png", kind: "image" },
+    ];
     await attachLayoutCompositions(items);
     const box = items[0].composition?.video?.box;
     const frame = frameFor("menu-promo-67", 0.61);

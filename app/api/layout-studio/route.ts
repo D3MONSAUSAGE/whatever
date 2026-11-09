@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const loaded = await loadLayoutStudio(admin.accountId);
-  if ("error" in loaded) return fail(loaded.error, loaded.status);
+  if (loaded.status !== 200) return fail(loaded.error, loaded.status);
   return json({ boards: loaded.boards, legacy: loaded.legacy, library: loaded.library });
 }
 
