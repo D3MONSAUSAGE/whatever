@@ -30,7 +30,7 @@ function GroupPreview({ impact, memberIds }: { impact: Impact; memberIds: string
       {copy.unchanged.length ? <p><span className="font-semibold">Also showing this (unchanged).</span> {names(copy.unchanged)}</p> : null}
       {copy.kept.length ? <p><span className="font-semibold">Kept.</span> {names(copy.kept)}</p> : null}
       <p><span className="font-semibold">Overridden by schedule.</span> {copy.overriddenBySchedule.length ? copy.overriddenBySchedule.map((item) => `${item.name} (${item.scheduleName})`).join(", ") : "None"}</p>
-      <p><span className="font-semibold">Offline.</span> {names(copy.offline)}</p>
+      <p className="text-muted">Replace is not offered here. Screens outside this group keep what they have.</p>
       {copy.othersLeftAlone ? <p>{copy.othersLeftAlone === 1 ? "1 other screen is left alone." : `${copy.othersLeftAlone} other screens are left alone.`}</p> : null}
     </div>
   );

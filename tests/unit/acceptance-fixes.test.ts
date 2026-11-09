@@ -88,6 +88,18 @@ describe("acceptance fixes", () => {
     }, ["window-2"], true);
     expect(replacing.willBeCleared.map((item) => item.name)).toEqual(["Window 2"]);
     expect(replacing.unchanged).toEqual([]);
+    const offline = groupPreviewCopy({
+      affected: [],
+      kept: [],
+      willBeCleared: [],
+      overriddenBySchedule: [],
+      offline: [{ id: "patio", name: "Patio" }, { id: "window", name: "Window" }, { id: "bar", name: "Bar" }],
+    }, ["patio", "window", "bar", "counter"], false);
+    expect(offline.affected.map((item) => item.name)).toEqual([
+      "Patio (will update when back online)",
+      "Window (will update when back online)",
+      "Bar (will update when back online)",
+    ]);
   });
 
   it("publishes only the screens that belong to the group", () => {

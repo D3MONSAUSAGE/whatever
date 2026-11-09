@@ -33,13 +33,19 @@ export function groupPreviewCopy(impact: {
     ...impact.kept.filter((item) => !members.has(item.id)).map((item) => item.id),
     ...impact.willBeCleared.filter((item) => !members.has(item.id)).map((item) => item.id),
   ]).size;
+  const offline = inside(impact.offline);
+  const offlineIds = new Set(offline.map((item) => item.id));
+  const affected = [
+    ...inside(impact.affected).filter((item) => !offlineIds.has(item.id)),
+    ...offline.map((item) => ({ ...item, name: `${item.name} (will update when back online)` })),
+  ];
   return {
-    affected: inside(impact.affected),
+    affected,
     unchanged: replace ? [] : inside(impact.willBeCleared),
     willBeCleared: replace ? inside(impact.willBeCleared) : [],
     kept: inside(impact.kept),
     overriddenBySchedule: inside(impact.overriddenBySchedule),
-    offline: inside(impact.offline),
+    offline,
     othersLeftAlone: outside,
   };
 }
