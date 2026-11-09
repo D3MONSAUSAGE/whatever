@@ -16,7 +16,6 @@ type Snapshot = {
   videoOn: boolean;
   svg?: string;
   videoBox?: { x: number; y: number; w: number; h: number } | null;
-  fontFamily?: "Inter" | "BoardFace";
 };
 
 function blankItem(): LayoutItem {
@@ -27,14 +26,12 @@ export function LayoutStudio() {
   const [template, setTemplate] = useState<LayoutTemplate>("menu-promo-67");
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout("menu-promo-67"));
   const [imageHref, setImageHref] = useState<string | null>(null);
-  const [fontUrl, setFontUrl] = useState<string | null>(null);
   const [videoOn, setVideoOn] = useState(true);
   const [published, setPublished] = useState<Snapshot | null>(null);
   const [note, setNote] = useState("Nothing is saved to an account.");
   const spec = templateSpec(template);
   const frame = frameFor(draft.template, draft.split);
-  const fontFamily = fontUrl ? "BoardFace" as const : "Inter" as const;
-  const svg = useMemo(() => layoutSvg(draft, { imageHref, fontFamily }), [draft, imageHref, fontFamily]);
+  const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const videoBox = frame.video;
 
   useEffect(() => {
@@ -91,21 +88,14 @@ export function LayoutStudio() {
     if (!doc) return;
     const box = frameFor(doc.template, doc.split).video;
     const snapshot: Snapshot = {
-      doc, imageHref, videoOn: videoOn && !!box, fontFamily,
-      svg: layoutSvg(doc, { imageHref, fontFamily }),
+      doc, imageHref, videoOn: videoOn && !!box,
+      svg: layoutSvg(doc, { imageHref }),
       videoBox: box,
     };
     window.localStorage.setItem(PUBLISHED_KEY, JSON.stringify(snapshot));
     setDraft(doc);
     setPublished(snapshot);
     setNote("Published preview is frozen in this browser. It was not sent to an account or a screen.");
-  }
-
-  function onFont(file: File | undefined) {
-    if (!file) { setFontUrl(null); return; }
-    if (file.size > 2_000_000) { setNote("Use a font file under 2 MB."); return; }
-    setFontUrl(URL.createObjectURL(file));
-    setNote("This font is for the preview only. Screens keep Inter.");
   }
 
   function onPhoto(file: File | undefined) {
@@ -160,10 +150,13 @@ export function LayoutStudio() {
               <option value="counter">Counter — slightly denser</option>
             </select>
           </label>
-          <label style={fieldLabel}>Font file for this preview
-            <input type="file" accept=".ttf,.otf,font/ttf,font/otf" onChange={(event) => onFont(event.target.files?.[0])} />
+          <label style={fieldLabel}>Font
+            <select aria-label="Font" value={draft.font} onChange={(event) => update({ ...draft, font: event.target.value === "noto-serif" ? "noto-serif" : "inter" })}>
+              <option value="inter">Inter</option>
+              <option value="noto-serif">Noto Serif</option>
+            </select>
           </label>
-          <p style={{ fontSize: 13, color: "#5c534c" }}>A font file changes this preview only. Screens keep Inter, the same face as your other menus.</p>
+          <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif are drawn into the published image. This preview uses the same face.</p>
           <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
             <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split}
               onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
@@ -206,13 +199,14 @@ export function LayoutStudio() {
         </section>
         <section>
           <Stage svg={svg} video={videoOn && videoBox ? videoBox : null} label="Draft" />
-          {published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref, fontFamily: published.fontFamily })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split).video : null} label="Published preview" /> : <p>No published preview yet.</p>}
+          {published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split).video : null} label="Published preview" /> : <p>No published preview yet.</p>}
         </section>
       </div>
       <style>{`
         @media (max-width: 860px) { main > div { grid-template-columns: 1fr !important; } }
+        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif") format("truetype"); font-weight: 400; }
+        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif-bold") format("truetype"); font-weight: 700; }
         figure svg { width: 100%; height: 100%; display: block; }
-        ${fontUrl ? `@font-face { font-family: BoardFace; src: url("${fontUrl}"); }` : ""}
       `}</style>
     </main>
   );

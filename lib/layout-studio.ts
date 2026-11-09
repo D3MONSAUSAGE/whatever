@@ -15,6 +15,7 @@ export type LayoutSection = { name: string; items: LayoutItem[] };
 
 export type BoardPalette = "classic" | "fresh" | "bold";
 export type TypeScale = "room" | "counter";
+export type BoardFont = "inter" | "noto-serif";
 
 export type LayoutDocument = {
   layoutVersion: 1;
@@ -34,6 +35,8 @@ export type LayoutDocument = {
   accentColor: string | null;
   /** Room is the television size. Counter is slightly denser and still readable. */
   typeScale: TypeScale;
+  /** Bundled face used for both the preview and the published PNG. */
+  font: BoardFont;
   /** Copy for the feature pane. Kept even when a video covers that pane. */
   featureTitle: string;
   featureDetail: string;
@@ -187,6 +190,8 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   if (featureTitle == null || featureDetail == null) return { ok: false, error: "Check the feature text." };
   const palette = raw.palette === "classic" || raw.palette === "bold" || raw.palette === "fresh" ? raw.palette : "fresh";
   const typeScale = raw.typeScale === "counter" ? "counter" : "room";
+  const font = raw.font === "noto-serif" || raw.font === "inter" ? raw.font : raw.font == null || raw.font === "" ? "inter" : null;
+  if (font == null) return { ok: false, error: "Choose Inter or Noto Serif." };
   const primaryColor = hexColor(raw.primaryColor);
   const accentColor = hexColor(raw.accentColor);
   if (raw.primaryColor && !primaryColor) return { ok: false, error: "Use a color like #0066ff." };
@@ -195,7 +200,7 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
     ok: true,
     value: {
       layoutVersion: 1, template: raw.template, split, title: title ?? "", subtitle: subtitle ?? "", footer: footer ?? "",
-      sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale,
+      sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font,
       featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
     },
   };
@@ -207,8 +212,8 @@ function hexColor(value: unknown): string | null {
   return value.toLowerCase();
 }
 
-function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId">): LayoutDocument {
-  return { layoutVersion: 1, template, imageMediaId: null, videoMediaId: null, ...fields };
+function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId" | "font">): LayoutDocument {
+  return { layoutVersion: 1, template, imageMediaId: null, videoMediaId: null, font: "inter", ...fields };
 }
 
 export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): LayoutDocument {
@@ -397,8 +402,8 @@ function colorsFor(doc: LayoutDocument): BoardColors {
   return { ...base, section: doc.accentColor || doc.primaryColor, feature: doc.primaryColor, band: base.band ? doc.primaryColor : null };
 }
 
-function face(family: string | undefined) {
-  return family === "BoardFace" ? "BoardFace" : "Inter";
+export function fontFamily(font: BoardFont | undefined) {
+  return font === "noto-serif" ? "Noto Serif" : "Inter";
 }
 
 function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string) {
@@ -440,13 +445,13 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
   }
 }
 
-export type LayoutArt = { imageHref?: string | null; fontFamily?: "Inter" | "BoardFace" };
+export type LayoutArt = { imageHref?: string | null };
 
 /** Complete board. Menu text stays out of the video box. The still does not say a video is playing. */
 export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const frame = frameFor(doc.template, doc.split);
   const colors = colorsFor(doc);
-  const family = face(art?.fontFamily);
+  const family = fontFamily(doc.font);
   const href = safeImageHref(art?.imageHref);
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${BOARD_W}" height="${BOARD_H}" viewBox="0 0 ${BOARD_W} ${BOARD_H}">`,

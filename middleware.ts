@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const allowed = path === "/layout-studio"
     || path.startsWith("/layout-studio/")
+    || path.startsWith("/layout-studio/media/font/")
     || path === "/dev/layout-studio"
     || path.startsWith("/_next/")
     || path === "/favicon.ico";
