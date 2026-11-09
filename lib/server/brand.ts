@@ -35,8 +35,8 @@ export async function checkArtMedia(accountId: string, mediaId: string, what: "l
   return null;
 }
 
-/** Read an image from storage as a data URI for the renderer. Missing or unsupported files are skipped. */
-export async function imageDataUri(accountId: string, mediaId: string | null | undefined) {
+/** Read an image from storage. Missing or unsupported files are skipped. */
+export async function imageBytes(accountId: string, mediaId: string | null | undefined) {
   if (!mediaId) return null;
   const row = await db().from("media").select("storage_path, mime_type, size_bytes").eq("id", mediaId).eq("account_id", accountId).maybeSingle();
   if (row.error || !row.data) return null;
@@ -46,8 +46,14 @@ export async function imageDataUri(accountId: string, mediaId: string | null | u
   if (!path.startsWith(`${accountId}/`)) return null;
   const file = await db().storage.from(BUCKET).download(path);
   if (file.error || !file.data) return null;
-  const bytes = Buffer.from(await file.data.arrayBuffer());
-  return `data:${mime};base64,${bytes.toString("base64")}`;
+  return { bytes: Buffer.from(await file.data.arrayBuffer()), mime };
+}
+
+/** Read an image from storage as a data URI for the renderer. Missing or unsupported files are skipped. */
+export async function imageDataUri(accountId: string, mediaId: string | null | undefined) {
+  const file = await imageBytes(accountId, mediaId);
+  if (!file) return null;
+  return `data:${file.mime};base64,${file.bytes.toString("base64")}`;
 }
 
 export async function artFor(accountId: string, content: Pick<MenuContent, "useBrand" | "photoMediaId">): Promise<MenuArt> {

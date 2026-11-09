@@ -1234,6 +1234,8 @@
       } else {
         // Keep the last image (or the empty state) and say we're retrying.
         setStatus('Reconnecting...');
+        // A board publish can stall one poll. Ask again quickly so the note does not sit for a full interval.
+        if (hasImage || shownVersion !== null) wait = 2000;
       }
       later(g, function () { pollState(g); }, wait);
     });

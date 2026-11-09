@@ -6,7 +6,7 @@ import {
   BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, containedBoard, fontFamily, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, mediaVideoBox, MENU_LIMITS, paintAfterStill, PROMO_BAND, promoBandHeight, zoneOnBoard,
   paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, zoneVideoStyle, type LayoutTemplate, type ZoneBox,
 } from "@/lib/layout-studio";
-import { renderLayoutPng } from "@/lib/server/layout-render";
+import { prepareBoardPhoto, renderLayoutPng } from "@/lib/server/layout-render";
 
 function pngPixel(png: Buffer, x: number, y: number): [number, number, number] {
   let offset = 8;
@@ -262,6 +262,28 @@ describe("layout studio frames", () => {
     expect(drip).toBeGreaterThan(10);
     expect(jasmine).toBe(drip);
     expect(bun).toBe(drip);
+  });
+
+  it("draws a changed promo title from a board-sized photo in a few seconds", async () => {
+    const { createCanvas, loadImage } = await import("@napi-rs/canvas");
+    const canvas = createCanvas(4000, 3000);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#c45b2d";
+    ctx.fillRect(0, 0, 4000, 3000);
+    const raw = canvas.toBuffer("image/jpeg", 90);
+    const started = Date.now();
+    const fitted = await prepareBoardPhoto(raw, "image/jpeg");
+    const png = renderLayoutPng({ ...sampleLayout("split-50"), featureTitle: "Afternoon pour" }, { bytes: fitted.bytes, mime: fitted.mime });
+    const elapsed = Date.now() - started;
+    console.info(`split-publish-render-ms ${elapsed} raw-bytes ${raw.length} fitted-bytes ${fitted.bytes.length}`);
+    expect(elapsed).toBeLessThan(3000);
+    expect(Math.max((await loadImage(fitted.bytes)).width, (await loadImage(fitted.bytes)).height)).toBeLessThanOrEqual(1920);
+    expect(png.readUInt32BE(16)).toBe(1920);
+    expect(png.readUInt32BE(20)).toBe(1080);
+    const editor = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(editor).toContain("Publishing…");
+    expect(editor).toContain("disabled={saving !== null}");
+    expect(readFileSync("components/displays-screen.tsx", "utf8")).toContain("already uses this name");
   });
 
   it("draws a complete board, including the video slot", () => {

@@ -64,7 +64,8 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
         <button type="button" className="btn" onClick={() => setAssigning([])}>Assign playlist</button>
       </PageHeader>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
-      <PairForm onPaired={() => { toast.show("Connected. The TV will switch over in a few seconds."); displays.reload(); }}
+      <PairForm names={(displays.data ?? []).map((display) => display.name)}
+        onPaired={() => { toast.show("Connected. The TV will switch over in a few seconds."); displays.reload(); }}
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
@@ -146,7 +147,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   );
 }
 
-function PairForm({ onPaired, onError }: { onPaired: () => void; onError: (message: string) => void }) {
+function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: () => void; onError: (message: string) => void }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -182,6 +183,9 @@ function PairForm({ onPaired, onError }: { onPaired: () => void; onError: (messa
           value={name} onChange={(event) => setName(event.target.value)} aria-label="TV name" />
         <button className="btn btn-primary" disabled={busy}>{busy ? "Connecting…" : "Connect TV"}</button>
       </div>
+      {name.trim() && names.some((existing) => existing.trim().toLowerCase() === name.trim().toLowerCase()) ? (
+        <p role="status" className="text-sm mt-3">Another screen in this account already uses this name. You can still connect it.</p>
+      ) : null}
       <p className="text-xs text-muted mt-3">The TV address is also in <a className="underline" href="/dashboard/settings" aria-label="Open the page with the TV address">Settings</a>.</p>
     </form>
   );

@@ -5,6 +5,9 @@ import { loadLayoutStudio, saveLayoutForAccount } from "@/lib/server/layout-boar
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The board PNG is drawn in this function. The photo is reduced to the board first;
+// 60s is the ceiling if storage is slow, not the expected time.
+export const maxDuration = 60;
 
 /** Account load. Refuses before any database call unless LAYOUT_STUDIO is exactly "1". */
 export async function GET(req: Request) {

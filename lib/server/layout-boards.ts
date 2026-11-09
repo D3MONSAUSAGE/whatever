@@ -1,6 +1,6 @@
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { applyLayoutSave, type LibraryFile } from "@/lib/layout-publish";
-import { imageDataUri } from "@/lib/server/brand";
+import { imageBytes } from "@/lib/server/brand";
 import { BUCKET, db } from "@/lib/server/supabase";
 function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
   if (kind === "video") return "video";
@@ -106,11 +106,10 @@ export async function saveLayoutForAccount(accountId: string, body: {
       menuId = String(inserted.data.id);
     },
     render: async (document) => {
-      const photo = document.imageMediaId ? await imageDataUri(accountId, document.imageMediaId) : null;
-      const bytes = photo ? Buffer.from(photo.split(",")[1] || "", "base64") : null;
-      const mime = photo?.startsWith("data:image/png") ? "image/png" as const : "image/jpeg" as const;
-      const { renderLayoutPng } = await import("@/lib/server/layout-render");
-      const png = renderLayoutPng(document, bytes && bytes.length ? { bytes, mime } : null);
+      const raw = document.imageMediaId ? await imageBytes(accountId, document.imageMediaId) : null;
+      const { prepareBoardPhoto, renderLayoutPng } = await import("@/lib/server/layout-render");
+      const fitted = raw && raw.bytes.length ? await prepareBoardPhoto(raw.bytes, raw.mime) : null;
+      const png = renderLayoutPng(document, fitted);
       const { storeRenderedImage } = await import("@/lib/server/menus");
       const id = await storeRenderedImage(accountId, `${(document.title || "Menu").slice(0, 50)} (menu).png`, png);
       if (!id) throw new Error("Couldn't store the board.");

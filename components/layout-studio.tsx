@@ -49,6 +49,8 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
   const [sectionIndex, setSectionIndex] = useState(0);
   const [progress, setProgress] = useState<string | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
+  const saveLock = useRef<"draft" | "publish" | null>(null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const videoBox = mediaVideoBox(draft);
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
@@ -134,6 +136,7 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
 
   function update(next: LayoutDocument) {
     setDraft(next);
+    if (saveLock.current) return;
     setNote("Editing the draft. It is not on a screen.");
   }
 
@@ -181,17 +184,28 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
   }
 
   async function saveAccount(saveMode: "draft" | "publish") {
+    if (saveLock.current) return;
     const doc = checkedDraft();
     if (!doc) return;
-    const body = await api<{ menuId?: string }>("/api/layout-studio", {
-      method: "POST",
-      body: JSON.stringify(accountSaveBody({ mode: saveMode, menuId, name: doc.title || "Menu", document: doc })),
-    });
-    const nextId = typeof body.menuId === "string" ? body.menuId : menuId;
-    await reloadAccount(nextId);
-    setNote(saveMode === "publish"
-      ? "Published to this account. The player uses the new image."
-      : "Draft reloaded from this account. Screens were not moved.");
+    saveLock.current = saveMode;
+    setSaving(saveMode);
+    setNote(saveMode === "publish" ? "Publishing…" : "Saving draft…");
+    try {
+      const body = await api<{ menuId?: string }>("/api/layout-studio", {
+        method: "POST",
+        body: JSON.stringify(accountSaveBody({ mode: saveMode, menuId, name: doc.title || "Menu", document: doc })),
+      });
+      const nextId = typeof body.menuId === "string" ? body.menuId : menuId;
+      await reloadAccount(nextId);
+      setNote(saveMode === "publish"
+        ? "Published to this account. The player uses the new image."
+        : "Draft saved on this account. Screens were not moved.");
+    } catch (err) {
+      setNote((err as Error).message || (saveMode === "publish" ? "Couldn't publish that board." : "Couldn't save that draft."));
+    } finally {
+      setSaving(null);
+      setTimeout(() => { saveLock.current = null; }, 0);
+    }
   }
 
   function openZone(next: string) {
@@ -517,8 +531,8 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {accountMode ? null : <button type="button" style={chip(false)} onClick={saveDraft}>Save draft</button>}
               {accountMode ? null : <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={publish}>Publish preview</button>}
-              {accountMode || account ? <button type="button" style={chip(false)} onClick={() => saveAccount("draft").catch((err: Error) => setNote(err.message || "Couldn't reload the account."))}>Save draft</button> : null}
-              {accountMode || account ? <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={() => saveAccount("publish").catch((err: Error) => setNote(err.message || "Couldn't reload the account."))}>Publish</button> : null}
+              {accountMode || account ? <button type="button" style={chip(false)} disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button> : null}
+              {accountMode || account ? <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : null}
               {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
             </div>
             <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
