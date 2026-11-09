@@ -23,7 +23,7 @@ Schedules sit on top of the saved assignment, by time.
 2. Higher priority, then the newest update, then the lowest id.
 3. When no schedule matches, the screen plays its saved assignment.
 
-Publishing a playlist uses `publish_playlist`. Screens on that playlist that are not in the request lose it. The dry-run lists them before anything is written. Assigning one layout board points only that screen at the board's playlist and does not clear the others. A later publish of the board still swaps the picture with `menu_swap_media`.
+`POST /api/displays/publish` adds the playlist to the screens you pick. `willBeCleared` lists screens already playing it that you did not pick. They keep it unless `replace` is true, and the website asks before that. `POST /api/playlists/:id/publish` still uses `publish_playlist` as before. Assigning one layout board points only that screen at the board's playlist. A later publish of the board still swaps the picture with `menu_swap_media`.
 
 ## URLs
 

@@ -82,7 +82,7 @@ After a publish, `GET /api/player/state` adds `catchupMs: 2500` and `catchupForM
 | `GET /api/layout-studio/boards` | `{ boards: [{ id, name, template, thumbnailUrl }] }`. 404 when Layout Studio is off. Thumbnail is a signed still |
 | `POST /api/layout-studio/assign` | `{ menuId, displayId }`. Points that one screen at the board's playlist. Other screens stay. The board must already be published. Republishing the board still uses `menu_swap_media` |
 | `GET /api/displays/:id/timeline` | `{ displayId, timezone, nextChange }` |
-| `POST /api/displays/publish` | `{ playlistId, displayIds or groupId, commit: false }` previews `{ affected, kept, overriddenBySchedule, offline }`. `commit: true` calls `publish_playlist`, the same function as `POST /api/playlists/:id/publish`. Screens on that playlist that are not selected are cleared |
+| `POST /api/displays/publish` | `{ playlistId, displayIds or groupId, commit, replace }`. The preview includes `willBeCleared`: screens already on this playlist that were not selected. They keep it unless `replace` is true. `commit: true` still calls `publish_playlist`, passing those screens as well when `replace` is false so the old function does not drop them. `POST /api/playlists/:id/publish` is unchanged and can still clear |
 | `GET /api/config` | Public. `{ appUrl, pairUrl, tvUrl }` on `https://pekkotv.com`. No Vercel hostname |
 
 The studio deep link is `/dashboard/media/layout-studio?screen=<id>`. A signed-out visit goes to `/login?next=` that same path, then back to it.

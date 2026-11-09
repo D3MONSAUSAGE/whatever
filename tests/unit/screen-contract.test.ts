@@ -75,10 +75,8 @@ describe("screen contract helpers", () => {
       { id: "d", name: "Office", playlistId: "other", online: true, scheduleName: null, scheduleTarget: null },
     ];
     const impact = publishImpact("playlist", selected, others);
-    expect(impact.affected).toEqual([
-      { id: "a", name: "Counter", change: "assign" },
-      { id: "c", name: "Bar", change: "clear" },
-    ]);
+    expect(impact.affected).toEqual([{ id: "a", name: "Counter", change: "assign" }]);
+    expect(impact.willBeCleared.map((item) => item.id)).toEqual(["c"]);
     expect(impact.kept.map((item) => item.id)).toEqual(["d"]);
     expect(impact.overriddenBySchedule.map((item) => item.id)).toEqual(["a"]);
     expect(impact.offline.map((item) => item.id)).toEqual(["b"]);

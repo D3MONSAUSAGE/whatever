@@ -47,10 +47,10 @@ test("login, logout, and navigation at desktop, tablet, and mobile", async ({ br
       const sidebar = page.getByRole("navigation", { name: "Main" });
       const mobile = page.getByRole("navigation", { name: "Mobile" });
       if (viewport.width >= 768) {
-        await expect(sidebar.getByRole("link", { name: "Media" })).toBeVisible();
+        await expect(sidebar.getByRole("link", { name: "Content" })).toBeVisible();
         await expect(mobile).toBeHidden();
       } else {
-        await expect(mobile.getByRole("link", { name: "Media" })).toBeVisible();
+        await expect(mobile.getByRole("link", { name: "Content" })).toBeVisible();
         await expect(sidebar).toBeHidden();
       }
     }

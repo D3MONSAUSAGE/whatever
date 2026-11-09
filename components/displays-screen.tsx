@@ -297,6 +297,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
   const playlists = useApi<PlaylistSummary[]>("/api/playlists");
   const confirm = useConfirm();
   const [playlistId, setPlaylistId] = useState("");
+  const [replace, setReplace] = useState(false);
   const [chosen, setChosen] = useState<Record<string, boolean>>(() => {
     const next: Record<string, boolean> = {};
     for (const id of initialIds) next[id] = true;
@@ -318,26 +319,28 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
     setBusy(true);
     try {
       const preview = await api<{
-        affected: { name: string; change: "assign" | "clear" }[];
+        affected: { name: string; change: "assign" }[];
         kept: { name: string }[];
+        willBeCleared: { name: string }[];
         overriddenBySchedule: { name: string; scheduleName: string }[];
         offline: { name: string }[];
       }>("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: false }) });
-      const assign = preview.affected.filter((item) => item.change === "assign").map((item) => item.name);
-      const clear = preview.affected.filter((item) => item.change === "clear").map((item) => item.name);
+      const assign = preview.affected.map((item) => item.name);
+      const cleared = preview.willBeCleared.map((item) => item.name);
       const ok = await confirm.ask({
-        title: "Publish to these screens?",
+        title: replace ? "Replace on the screens you didn't check?" : "Publish to these screens?",
         body: [
-          assign.length ? `Will play it: ${assign.join(", ")}.` : "Those screens already play it.",
-          clear.length ? `Will stop playing it: ${clear.join(", ")}.` : "",
+          assign.length ? `Will play it: ${assign.join(", ")}.` : "The checked screens already play it.",
+          cleared.length && replace ? `Will take it off: ${cleared.join(", ")}. Their current playlist is removed.` : "",
+          cleared.length && !replace ? `Will keep it: ${cleared.join(", ")}. They were not checked, and their content stays.` : "",
           preview.kept.length ? `${preview.kept.length} other screens keep their own content.` : "",
           preview.overriddenBySchedule.length ? `A schedule still wins on: ${preview.overriddenBySchedule.map((item) => item.name).join(", ")}.` : "",
           preview.offline.length ? `Offline until they reconnect: ${preview.offline.map((item) => item.name).join(", ")}.` : "",
         ].filter(Boolean).join(" "),
-        confirmLabel: "Publish",
+        confirmLabel: replace ? "Replace and publish" : "Publish",
       });
       if (ok !== true) { setBusy(false); return; }
-      await api("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: true }) });
+      await api("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: true, replace }) });
       onDone("Published. Assigned · TV updates within ~30 s, then it shows as playing.");
     } catch (err) {
       onError((err as Error).message);
@@ -355,7 +358,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
           <button type="button" className="btn btn-quiet px-3" onClick={onClose}>Close</button>
         </div>
         <p className="text-sm text-muted mb-4">
-          This publishes the playlist&apos;s saved draft to every screen you check. Screens already playing this playlist start checked. Unchecking one takes the playlist off that screen.
+          Checked screens get this playlist. Screens you leave unchecked keep what they have, including this playlist. Replace is the only way to take it off them.
         </p>
         {!playlists.data ? <LoadState error={playlists.error} /> : playlists.data.length === 0 ? (
           <p className="text-muted">Create a playlist first.</p>
@@ -382,6 +385,10 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
                 </li>
               ))}
             </ul>
+            <label className="flex items-center gap-3 min-h-11 mb-4 text-sm">
+              <input type="checkbox" className="size-5" checked={replace} onChange={(event) => setReplace(event.target.checked)} aria-label="Replace on unchecked screens" />
+              <span>Replace: take this playlist off screens you didn&apos;t check</span>
+            </label>
             <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={publish}>
               {busy ? "Publishing…" : "Publish to selected screens"}
             </button>

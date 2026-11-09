@@ -167,6 +167,11 @@ describe("screen API contract", () => {
       id: crypto.randomUUID(), playlist_id: playlistId, account_id: account,
       media_id: crypto.randomUUID(), kind: "draft", position: 0, duration_ms: 10000,
     });
+    const other = crypto.randomUUID();
+    store.displays.push({
+      id: other, account_id: account, name: "Patio", status: "active",
+      content_version: 1, assigned_playlist_id: playlistId, token_hash: "kept",
+    });
     const group = await call(createGroup, "http://localhost/api/screen-groups", auth("token-a", {
       method: "POST",
       body: JSON.stringify({ name: "Floor", displayIds: [id] }),
@@ -178,6 +183,7 @@ describe("screen API contract", () => {
     }));
     expect(preview.status).toBe(200);
     expect(preview.body.commit).toBe(false);
+    expect(preview.body.willBeCleared.map((item: { id: string }) => item.id)).toEqual([other]);
     expect(store.displays[0].assigned_playlist_id).toBeNull();
     const committed = await call(publishScreens, "http://localhost/api/displays/publish", auth("token-a", {
       method: "POST",
@@ -185,6 +191,13 @@ describe("screen API contract", () => {
     }));
     expect(committed.status).toBe(200);
     expect(store.displays[0].assigned_playlist_id).toBe(playlistId);
+    expect(store.displays.find((item) => item.id === other)?.assigned_playlist_id).toBe(playlistId);
+    const replaced = await call(publishScreens, "http://localhost/api/displays/publish", auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ playlistId, displayIds: [id], commit: true, replace: true }),
+    }));
+    expect(replaced.status).toBe(200);
+    expect(store.displays.find((item) => item.id === other)?.assigned_playlist_id).toBeNull();
     const foreign = await call(publishScreens, "http://localhost/api/displays/publish", auth("token-b", {
       method: "POST",
       body: JSON.stringify({ playlistId, displayIds: [id], commit: false }),

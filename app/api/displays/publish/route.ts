@@ -11,8 +11,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Dry-run unless commit is true. Commit calls the same publish_playlist
- * function as POST /api/playlists/:id/publish.
+ * Dry-run unless commit is true. Without replace, screens already on this
+ * playlist stay on it. replace:true passes only the selection to publish_playlist,
+ * which is what clears the others. POST /api/playlists/:id/publish is unchanged.
  */
 export async function POST(req: Request) {
   const admin = await requireAdmin(req);
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   const playlistId = body.playlistId;
   if (!isUuid(playlistId)) return fail("Playlist not found.", 404);
   const commit = body.commit === true;
+  const replace = body.replace === true;
   const requested = Array.isArray(body.displayIds) ? body.displayIds.filter(isUuid) : null;
   const groupId = isUuid(body.groupId) ? body.groupId : null;
   if (body.groupId != null && body.groupId !== "" && !groupId) return fail("Screen group not found.", 404);
@@ -83,19 +85,25 @@ export async function POST(req: Request) {
   const others = rows.filter((row) => !selectedSet.has(String(row.id))).map(asScreen);
   const impact = publishImpact(playlistId, selected, others);
 
-  if (!commit) return json({ commit: false, playlistId, ...impact });
+  if (!commit) return json({ commit: false, replace, playlistId, ...impact });
+
+  const keepIds = replace ? [] : rows
+    .filter((row) => String(row.assigned_playlist_id ?? "") === playlistId && !selectedSet.has(String(row.id)))
+    .map((row) => String(row.id));
+  const publishIds = [...new Set([...selectedIds, ...keepIds])];
+  if (publishIds.length > 50) return fail("Choose fewer screens. Fifty is the limit for one publish.", 400);
 
   const limited = await enforceLimit(`publish:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
   if (limited) return limited;
   const published = await db().rpc("publish_playlist", {
     p_account_id: admin.accountId,
     p_playlist_id: playlistId,
-    p_display_ids: selectedIds,
+    p_display_ids: publishIds,
   });
   if (published.error) {
     if (isMissingSchema(published.error)) return fail(PLAYLISTS_UNAVAILABLE, 503);
     return fail("Couldn't publish the playlist.", 500);
   }
   if (!published.data) return fail("Add at least one image, then choose screens from this account.", 400);
-  return json({ commit: true, playlistId, ...impact });
+  return json({ commit: true, replace, playlistId, ...impact });
 }

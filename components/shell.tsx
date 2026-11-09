@@ -10,15 +10,13 @@ import { AlertsBanner } from "@/components/alerts";
 import { BillingBanner } from "@/components/billing-banner";
 import { isRecoveryUrl } from "@/components/auth-frame";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
-import { IconCalendar, IconChart, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
+import { IconCalendar, IconGear, IconImage, IconList, IconTv } from "@/components/icons";
 
 const NAV = [
-  { href: "/dashboard", label: "Overview", icon: IconGrid },
-  { href: "/dashboard/media", label: "Media", icon: IconImage },
-  { href: "/dashboard/displays", label: "Displays", icon: IconTv },
+  { href: "/dashboard/screens", label: "My Screens", icon: IconTv },
+  { href: "/dashboard/media", label: "Content", icon: IconImage },
   { href: "/dashboard/playlists", label: "Playlists", icon: IconList },
   { href: "/dashboard/schedule", label: "Schedule", icon: IconCalendar },
-  { href: "/dashboard/analytics", label: "Analytics", icon: IconChart },
   { href: "/dashboard/settings", label: "Settings", icon: IconGear },
 ];
 
@@ -97,7 +95,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           {children}
         </main>
       </div>
-      <nav aria-label="Mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]">
         {NAV.map((item) => (
           <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
             className={`flex min-w-0 flex-col items-center justify-center gap-1 min-h-16 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-primary" : "text-muted"}`}>
