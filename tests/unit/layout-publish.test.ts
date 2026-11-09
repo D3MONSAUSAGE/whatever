@@ -17,7 +17,7 @@ function files(): LibraryFile[] {
 
 describe("layout save", () => {
   it("keeps a draft off screens and publishes through the existing swap", async () => {
-    expect(boardSaveEffect("draft")).toEqual({ writeContent: true, renderPng: false, swapMedia: false, bumpScreens: false });
+    expect(boardSaveEffect("draft")).toEqual({ writeContent: true, renderPng: true, swapMedia: false, bumpScreens: false });
     expect(boardSaveEffect("publish").swapMedia).toBe(true);
     const doc = { ...sampleLayout("menu-promo-67"), imageMediaId: photo, videoMediaId: video };
     const calls: string[] = [];
@@ -27,9 +27,10 @@ describe("layout save", () => {
       writeContent: async () => { calls.push("write"); },
       render: async () => { calls.push("render"); return "new"; },
       swap: async () => { calls.push("swap"); },
+      preview: async () => { calls.push("preview"); },
     });
     expect(draft.ok).toBe(true);
-    expect(calls).toEqual(["write"]);
+    expect(calls).toEqual(["write", "render", "preview"]);
     if (draft.ok) {
       expect(draft.swapped).toBe(false);
       expect(draft.document.sections).toEqual(doc.sections);

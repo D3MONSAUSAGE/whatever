@@ -121,10 +121,21 @@ export async function saveLayoutForAccount(accountId: string, body: {
       if (!id) throw new Error("Couldn't store the board.");
       return id;
     },
+    preview: async (mediaId) => {
+      if (!menuId) return;
+      const saved = await db().from("menus").update({ media_id: mediaId }).eq("id", menuId).eq("account_id", accountId);
+      if (saved.error) console.error("layout draft preview failed", saved.error.message);
+    },
     swap: async (previous, next) => {
       if (!menuId) throw new Error("Couldn't save the board.");
-      if (previous) {
-        const swapped = await db().rpc("menu_swap_media", { p_account_id: accountId, p_old_media_id: previous, p_new_media_id: next });
+      let from = previous;
+      if (playlistId) {
+        const item = await db().from("playlist_items").select("media_id").eq("playlist_id", playlistId).eq("account_id", accountId).limit(1);
+        const onScreen = item.data?.[0]?.media_id ? String(item.data[0].media_id) : "";
+        if (onScreen) from = onScreen;
+      }
+      if (from) {
+        const swapped = await db().rpc("menu_swap_media", { p_account_id: accountId, p_old_media_id: from, p_new_media_id: next });
         if (swapped.error || !swapped.data) throw new Error("Couldn't update the screens.");
         await db().from("menus").update({ media_id: next }).eq("id", menuId).eq("account_id", accountId);
         return;

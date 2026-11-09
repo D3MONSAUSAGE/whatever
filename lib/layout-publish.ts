@@ -10,7 +10,7 @@ export type LibraryFile = {
 /** What a save is allowed to change. Draft never reaches a screen. */
 export function boardSaveEffect(mode: "draft" | "publish") {
   if (mode === "publish") return { writeContent: true, renderPng: true, swapMedia: true, bumpScreens: true };
-  return { writeContent: true, renderPng: false, swapMedia: false, bumpScreens: false };
+  return { writeContent: true, renderPng: true, swapMedia: false, bumpScreens: false };
 }
 
 /** The menus.template column only allows the three existing colorways. The layout id stays in content. */
@@ -31,6 +31,8 @@ export type LayoutSaveDeps = {
   writeContent: (doc: LayoutDocument, template: "classic" | "fresh" | "bold") => Promise<void>;
   render: (doc: LayoutDocument) => Promise<string>;
   swap: (previousMediaId: string | null, nextMediaId: string) => Promise<void>;
+  /** Stores the new still for boardPreviewUrl. Does not assign screens. */
+  preview?: (mediaId: string) => Promise<void>;
 };
 
 /**
@@ -63,8 +65,13 @@ export async function applyLayoutSave(input: {
   // swap that publishes it has to update that row.
   await deps.writeContent(doc, storedMenuTemplate(doc));
   if (effect.renderPng) {
-    const mediaId = await deps.render(doc);
-    await deps.swap(input.previousMediaId, mediaId);
+    try {
+      const mediaId = await deps.render(doc);
+      if (effect.swapMedia) await deps.swap(input.previousMediaId, mediaId);
+      else await deps.preview?.(mediaId);
+    } catch (err) {
+      if (effect.swapMedia) throw err;
+    }
   }
   return { ok: true, swapped: effect.swapMedia, document: doc };
 }

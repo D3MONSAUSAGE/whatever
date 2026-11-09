@@ -88,6 +88,33 @@ export function isLayoutTemplate(value: unknown): value is LayoutTemplate {
   return typeof value === "string" && value in TEMPLATES;
 }
 
+export type ZoneCapability = { id: string; label: string; text: boolean; image: boolean; video: boolean };
+
+/** What each tappable zone can hold. Video is only where it cannot cover the menu. */
+export function zoneCapabilities(template: LayoutTemplate): ZoneCapability[] {
+  const text = { text: true, image: false, video: false };
+  const media = { text: true, image: true, video: true };
+  const photo = { text: false, image: true, video: false };
+  if (template === "triple-column") {
+    return [
+      { id: "column-0", label: "Column 1", ...text },
+      { id: "column-1", label: "Column 2", ...text },
+      { id: "column-2", label: "Column 3", ...text },
+      { id: "photo", label: "Board photo", ...photo },
+    ];
+  }
+  if (template === "signature") {
+    return [
+      { id: "menu", label: "Menu", ...text },
+      { id: "feature", label: "Video", text: true, image: false, video: true },
+      { id: "background", label: "Background", ...photo },
+    ];
+  }
+  if (template === "menu-banner") return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Banner", ...media }];
+  if (template === "split-50") return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Right side", ...media }];
+  return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Promotion", ...media }];
+}
+
 export function templateSpec(template: LayoutTemplate) {
   return TEMPLATES[template];
 }

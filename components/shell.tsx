@@ -54,6 +54,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
 
   if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">Loading…</div>;
 
+  const studio = path.startsWith("/dashboard/media/layout-studio") || path.startsWith("/layout-studio");
   const isActive = (href: string) => {
     if (href === "/dashboard/content") return path.startsWith("/dashboard/content") || path.startsWith("/dashboard/media");
     if (href === "/dashboard/account") return path.startsWith("/dashboard/account") || path.startsWith("/dashboard/settings") || path.startsWith("/dashboard/billing");
@@ -92,14 +93,14 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
             <button type="button" onClick={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</button>
           </span>
         </header>
-        <main className="px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12 max-w-6xl">
+        <main className={`px-4 pt-5 md:px-8 md:pt-8 md:pb-12 max-w-6xl ${studio ? "pb-4" : "pb-28"}`}>
           <UploadProgress />
-          {preview ? null : <BillingBanner />}
-          {preview ? null : <AlertsBanner />}
+          {preview || studio ? null : <BillingBanner />}
+          {preview || studio ? null : <AlertsBanner />}
           {children}
         </main>
       </div>
-      <nav aria-label="Mobile" className="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="Mobile" className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
         {NAV.map((item) => (
           <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
             className={`flex min-w-0 flex-col items-center justify-center gap-1 min-h-16 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-primary" : "text-muted"}`}>

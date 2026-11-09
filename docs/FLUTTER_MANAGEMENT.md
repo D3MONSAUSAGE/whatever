@@ -67,7 +67,7 @@ Additive fields. Old app builds ignore them. They are never a replacement for `c
 | `acknowledgedAt` | ISO string or null | When the TV reported that version. Null until a player reports it |
 | `playingAt` | ISO string or null | When the TV reported that version on screen. Null until a player reports it |
 | `nextChange` | `{ at, label, kind }` or null | Next time the winner changes. `kind` is `schedule` or `assignment`. Same object as `GET /api/displays/:id/timeline` |
-| `boardPreviewUrl` | string or null | Signed still of the layout board on this screen's playlist. Does not replace `media.url` or `playlist.url` |
+| `boardPreviewUrl` | string or null | Signed still of the layout board on this screen's playlist. Save Draft redraws this still without moving screens. Publish still assigns the screen. Does not replace `media.url` or `playlist.url` |
 
 `GET /api/overview` stays `{ screens, online, offline, media, playlists, activeSchedules }`, all numbers.
 
