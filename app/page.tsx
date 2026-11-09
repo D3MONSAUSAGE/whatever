@@ -7,7 +7,7 @@ import { FaqList, FeatureGrid, PricingCards, Screenshot, SectionHeading, SIGNUP_
 
 export const metadata: Metadata = {
   title: "Pekko · Digital signage for your business",
-  description: `Show your menu, offers and videos on any TV. Try Pekko free for ${TRIAL.days} days, no card needed.`,
+  description: `Menus, offers, and presentations on your screens. Try Pekko free for ${TRIAL.days} days, no card needed.`,
   alternates: { canonical: "/" },
 };
 
@@ -18,7 +18,7 @@ const SIGNED_IN_REDIRECT = `try{for(var i=0;i<localStorage.length;i++){var k=loc
 const STEPS = [
   { title: "Open the player on your screen", body: "Open the Pekko player in the screen's web browser. It shows a 6-digit code." },
   { title: "Connect it to your account", body: "Enter the code in your dashboard to pair the screen." },
-  { title: "Publish your content", body: "Upload images and videos, build a playlist or menu, and publish. Your screens update on their own." },
+  { title: "Add your content", body: "Upload images, videos, or a presentation, arrange your playlist, and publish it to your connected screens." },
 ];
 
 const HIGHLIGHTS = [
@@ -35,8 +35,8 @@ export default function Home() {
         <div className="mx-auto max-w-6xl grid gap-10 lg:grid-cols-2 lg:items-center">
           <div className="text-center lg:text-left">
             <p className="text-sm font-semibold uppercase tracking-wider text-primary">Digital signage made simple</p>
-            <h1 className="mt-3 text-4xl md:text-5xl font-extrabold tracking-tight">Your menu and offers on every screen</h1>
-            <p className="mt-4 text-muted text-lg max-w-xl mx-auto lg:mx-0">Pekko is simple digital signage for your business. Upload, build a playlist, and publish to your TVs, tablets and computers from your phone or computer.</p>
+            <h1 className="mt-3 text-4xl md:text-5xl font-extrabold tracking-tight">Menus, offers, and presentations on your screens.</h1>
+            <p className="mt-4 text-muted text-lg max-w-xl mx-auto lg:mx-0">Show restaurant specials, business promotions, and team updates. Bring images, videos, and presentations together in playlists, and manage your screens from your phone or computer.</p>
             <div className="mt-7 flex flex-wrap justify-center lg:justify-start gap-3">
               <Link href={SIGNUP_HREF} className="btn btn-primary text-base px-6" data-testid="start-trial">Start free trial</Link>
               <Link href="/pricing" className="btn btn-quiet text-base px-6">See pricing</Link>

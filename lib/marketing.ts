@@ -3,7 +3,7 @@ import { TRIAL } from "@/lib/plans";
 /** Marketing copy. Every claim here maps to a feature that exists on main; don't add unbuilt ones. */
 export const FEATURES = [
   { id: "devices", title: "Any screen with a web browser", body: "Smart TVs, tablets, computers and TV sticks run the Pekko player in their browser. Open the player, type the 6-digit code into your dashboard, and the screen is paired." },
-  { id: "media", title: "Images, videos and menu boards", body: "Upload images and MP4 videos to your media library, or build digital menu boards from ready-made templates." },
+  { id: "media", title: "Turn presentations into screen content", body: "Upload a PowerPoint (.pptx) or PDF to share menus, promotions, or office announcements. Pekko converts each slide or page into a still image you can use in your playlists." },
   { id: "playlists", title: "Playlists", body: "Arrange slides, set how long each one shows, and preview the result before you publish it to your screens." },
   { id: "schedules", title: "Schedules", body: "Show breakfast in the morning and dinner at night. Schedule playlists by day and time for single screens or screen groups, per location and time zone." },
   { id: "screens", title: "Multiple screens and locations", body: "Manage every screen from one dashboard. Group screens and run different content in each location." },
@@ -32,4 +32,5 @@ export const FAQ: { q: string; a: string }[] = [
   { q: "Do I need special hardware?", a: "No. If your TV has a web browser, open the Pekko player on it. Otherwise, a computer or TV stick connected to the screen works." },
   { q: "What if the internet goes down?", a: "The player keeps showing content it has already saved and updates when the connection comes back. Your dashboard shows the screen as offline in the meantime." },
   { q: "Can I cancel or delete my account?", a: "There's no card on file during the trial, so there's nothing to cancel. You can delete your account at any time from Settings; deletion runs 7 days later and you can cancel it until then." },
+  { q: "Can I upload PowerPoint presentations or PDFs?", a: "Yes. Upload a .pptx or PDF file, up to 50 MB and 40 slides or pages. Pekko converts slides and pages into still images for your playlists. Animations, transitions, and embedded videos won't play. Older .ppt and macro-enabled .pptm files aren't supported." },
 ];
