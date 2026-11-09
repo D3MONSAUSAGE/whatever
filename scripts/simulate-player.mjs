@@ -4,6 +4,16 @@ const html = readFileSync(new URL("../public/player.html", import.meta.url), "ut
 const js = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
 let now = 0, timers = [], tid = 0;
+const RealDate = Date;
+const timeOrigin = RealDate.now();
+function syncClock() {
+  const at = timeOrigin + now;
+  global.Date = class VDate extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [at])); }
+    static now() { return timeOrigin + now; }
+  };
+}
+syncClock();
 const setTimeout_ = (fn, ms) => { const id = ++tid; timers.push({ id, at: now + (ms || 0), fn }); return id; };
 const clearTimeout_ = (id) => { timers = timers.filter((t) => t.id !== id); };
 
@@ -55,6 +65,14 @@ function makeVideo(id) {
               return;
             }
             if (src.indexOf("stall") !== -1) return;
+            if (src.indexOf("slow") !== -1) {
+              setTimeout_(() => {
+                this.currentTime = 0.2;
+                if (this.onplaying) this.onplaying();
+                if (ok) ok();
+              }, 5000);
+              return;
+            }
             this.currentTime = 0.2;
             if (this.onplaying) this.onplaying();
             if (ok) ok();
@@ -134,7 +152,8 @@ function server(method, url, body, headers) {
     const cmds = Array.isArray(S.pendingCommands) ? S.pendingCommands.slice() : [];
     const mode = S.playlist && S.playlist.playbackMode === "manual" ? "manual" : "auto";
     const pollMs = mode === "manual" || cmds.length ? 1500 : 10000;
-    if (v !== "" && Number(v) === S.version && !refresh) return [200, { version: S.version, unchanged: true, pollMs, commands: cmds }];
+    const studio = typeof S.layoutStudio === "boolean" ? { layoutStudio: S.layoutStudio } : {};
+    if (v !== "" && Number(v) === S.version && !refresh) return [200, { version: S.version, unchanged: true, pollMs, commands: cmds, ...studio }];
     if (S.playlist && !S.url) {
       return [200, {
         version: S.version,
@@ -143,6 +162,7 @@ function server(method, url, body, headers) {
         playlist: S.playlist,
         pollMs,
         commands: cmds,
+        ...studio,
       }];
     }
     return [200, { version: S.version, mediaId: S.url ? "m" : null, url: S.url ? S.url + "?sig=" + now : null, pollMs, commands: cmds }];
@@ -181,7 +201,7 @@ function run(ms) {
     timers.sort((x, y) => x.at - y.at);
     const t = timers[0];
     if (!t || t.at > end) break;
-    timers.shift(); now = t.at; t.fn();
+    timers.shift(); now = t.at; syncClock(); t.fn();
     if (mustShowImage && visible().length === 0) blankFrames++;
     if (slideLog) {
       const url = shownUrl() || "";
@@ -197,6 +217,7 @@ function run(ms) {
     }
   }
   now = end;
+  syncClock();
 }
 const clipName = (url) => {
   const match = /\/([A-Za-z0-9_-]+)\.(?:jpg|mp4)/.exec(url || "");
@@ -557,11 +578,13 @@ check("automatic mode still advances by duration after manual", slideLog.map((ur
 slideLog = null;
 mediaLog = null;
 
-// A board with one video zone. The version is not shown until that video plays,
-// or until it fails and the full still is what remains.
+// A board with one video zone. The still has to be visible before the video
+// starts, and the version stays unacknowledged during that gap.
 const box = { x: 1286, y: 0, w: 634, h: 1080 };
 S.version = 30;
 S.url = null;
+S.layoutStudio = true;
+S.playerError = "";
 S.playlist = {
   id: "board",
   transition: "none",
@@ -569,19 +592,54 @@ S.playlist = {
   items: [{
     mediaId: "board", url: "https://cdn/board.jpg", durationMs: 30000, kind: "image",
     groupId: "deck", groupIndex: 2, groupCount: 4,
-    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/board.jpg", video: { mediaId: "promo", url: "https://cdn/promo.mp4?dur=3000", box: box } },
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/board.jpg", video: { mediaId: "promo", url: "https://cdn/slow-promo.mp4?dur=3000", box: box } },
+  }, {
+    mediaId: "after", url: "https://cdn/after.mp4?dur=3000", durationMs: 30000, kind: "video",
   }],
 };
 S.playing = [];
 S.queried = [];
-run(1800);
-check("a video zone is not acknowledged before it is on screen", S.playing.length === 0 && S.queried.indexOf("30") === -1);
+let sawStillBeforeAck = false;
+for (let step = 0; step < 80 && S.playing.indexOf(30) === -1; step++) {
+  run(200);
+  const stillUp = (shownUrl() || "").indexOf("board.jpg") !== -1;
+  const videoOn = ["va", "vb"].some((id) => els[id].className.indexOf("on") !== -1);
+  if (stillUp && !videoOn) sawStillBeforeAck = true;
+}
+check("the still is visible while the slow video is not yet acknowledged", sawStillBeforeAck && S.playing.indexOf(30) !== -1);
+check("one muted video plays in the board and the version is acknowledged", ["va", "vb"].filter((id) => els[id].getAttribute("data-zone") === "1" && els[id].className.indexOf("on") !== -1).length === 1 && els.va.muted === true && (shownUrl() || "").indexOf("board.jpg") !== -1);
+check("the other video element is not armed while the zone plays", ["va", "vb"].filter((id) => els[id].getAttribute("data-src")).length === 1);
+
+// Flag off, same content version: the zone is removed without waiting for a new version.
+S.layoutStudio = false;
+run(15000);
+check("flag off drops the zone without a version bump", ["va", "vb"].every((id) => els[id].getAttribute("data-zone") !== "1") && S.playing.indexOf(30) !== -1);
+
+// Short slide must not advance before the video settles. A stall falls back to the still, then the clock starts.
+S.version = 32;
+S.layoutStudio = true;
+S.playerError = "";
+S.playing = [];
+S.playlist = {
+  id: "short",
+  transition: "none",
+  playbackMode: "auto",
+  items: [{
+    mediaId: "short", url: "https://cdn/short.jpg", durationMs: 1500, kind: "image",
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/short.jpg", video: { mediaId: "stall", url: "https://cdn/stall-promo.mp4", box: box } },
+  }, {
+    mediaId: "later", url: "https://cdn/later.jpg", durationMs: 30000, kind: "image",
+  }],
+};
+for (let step = 0; step < 40 && (shownUrl() || "").indexOf("short.jpg") === -1; step++) run(500);
+run(2000);
+check("a short slide stays on the still until the video settles", (shownUrl() || "").indexOf("short.jpg") !== -1 && S.playing.indexOf(32) === -1);
 run(8000);
-const zone = ["va", "vb"].filter((id) => els[id].getAttribute("data-zone") === "1" && els[id].className.indexOf("on") !== -1);
-check("one muted video plays in the board and the version is acknowledged", zone.length === 1 && els[zone[0]].muted === true && S.playing.indexOf(30) !== -1 && (shownUrl() || "").indexOf("board.jpg") !== -1);
-check("the other video element stays the preload, not a second zone", ["va", "vb"].filter((id) => els[id].getAttribute("data-zone") === "1").length === 1);
+check("a stalled video acknowledges the still and reports the fallback", (shownUrl() || "").indexOf("short.jpg") !== -1 && S.playing.indexOf(32) !== -1 && String(S.playerError).indexOf("still image is showing") !== -1);
 
 S.version = 31;
+S.layoutStudio = true;
+S.playerError = "";
 S.playlist = {
   id: "board-fallback",
   transition: "none",
@@ -592,9 +650,32 @@ S.playlist = {
     composition: { layoutVersion: 1, fallbackUrl: "https://cdn/board2.jpg", video: { mediaId: "bad", url: "https://cdn/bad-promo.mp4", box: box } },
   }],
 };
-run(8000);
+for (let step = 0; step < 40 && (shownUrl() || "").indexOf("board2.jpg") === -1; step++) run(500);
+run(4000);
 check("a failed video leaves the whole still and only then acknowledges", (shownUrl() || "").indexOf("board2.jpg") !== -1 && ["va", "vb"].every((id) => els[id].className.indexOf("on") === -1) && S.playing.indexOf(31) !== -1);
 check("slide counters stay on the presentation, not the video zone", els["manual-pos"].innerHTML === "3/4 · 1 / 1");
+check("a failed video reports the still fallback instead of clearing the error", String(S.playerError).indexOf("still image is showing") !== -1);
+
+// Same version, signed URL refresh: the new video URL replaces the old one. Removing composition removes the zone.
+S.version = 33;
+S.layoutStudio = true;
+S.playlist = {
+  id: "renew",
+  transition: "none",
+  playbackMode: "auto",
+  items: [{
+    mediaId: "renew", url: "https://cdn/renew.jpg", durationMs: 60000, kind: "image",
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/renew.jpg", video: { mediaId: "promo", url: "https://cdn/promo-old.mp4?dur=3000", box: box } },
+  }],
+};
+for (let step = 0; step < 40 && (shownUrl() || "").indexOf("renew.jpg") === -1; step++) run(500);
+run(4000);
+S.playlist.items[0].composition.video.url = "https://cdn/promo-new.mp4?dur=3000";
+run(33 * 60 * 1000);
+check("a refreshed signature replaces the zone video url", ["va", "vb"].some((id) => (els[id].src || "").indexOf("promo-new.mp4") !== -1));
+delete S.playlist.items[0].composition;
+run(32 * 60 * 1000);
+check("a same-version refresh removes the zone when composition is gone", ["va", "vb"].every((id) => els[id].getAttribute("data-zone") !== "1"));
 
 // Restore a single still image so the paused/resume checks stay independent of manual tests.
 S.version = 22;

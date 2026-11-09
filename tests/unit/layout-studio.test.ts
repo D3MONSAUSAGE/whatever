@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  BOARD_H, BOARD_W, frameFor, layoutStudioEnabled, layoutSvg, paintAfterStill, paintAfterVideoFailed,
-  paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, type LayoutTemplate, type ZoneBox,
+  BOARD_H, BOARD_W, boxesOverlap, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, MENU_LIMITS, paintAfterStill,
+  paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, type LayoutTemplate, type ZoneBox,
 } from "@/lib/layout-studio";
 import { renderLayoutPng } from "@/lib/server/layout-render";
 
@@ -32,8 +32,9 @@ describe("layout studio frames", () => {
       expect(frame.feature.w).toBeGreaterThan(0);
       if (template === "signature") {
         expect(frame.feature).toEqual({ x: 0, y: 0, w: BOARD_W, h: BOARD_H });
-        expect(frame.menu.x).toBe(0);
-        expect(frame.menu.w).toBeLessThan(BOARD_W);
+        expect(frame.video && frame.video.x).toBe(frame.menu.w);
+        expect(frame.video && frame.menu.w + frame.video.w).toBe(BOARD_W);
+        expect(boxesOverlap(frame.menu, frame.video!)).toBe(false);
       } else if (template === "triple-column") {
         expect(covered(frame.columns)).toBe(BOARD_W * BOARD_H);
         expect(frame.feature).toEqual(frame.columns[2]);
@@ -41,7 +42,31 @@ describe("layout studio frames", () => {
         expect(covered([frame.menu, frame.feature])).toBe(BOARD_W * BOARD_H);
       }
     }
-    expect(frameFor("menu-promo-67", 0.67).feature).toEqual({ x: 1286, y: 0, w: 634, h: 1080 });
+    expect(frameFor("menu-promo-67", 0.67).video).toEqual({ x: 1286, y: 0, w: 634, h: 1080 });
+    expect(frameFor("triple-column", 1 / 3).video).toBeNull();
+  });
+
+  it("keeps every existing menu item and draws an assigned photo", () => {
+    const sample = sampleLayout("menu-promo-67");
+    const items = Array.from({ length: MENU_LIMITS.itemsPerSection }, (_, index) => ({
+      name: `Plate ${index + 1}`, price: "$9", description: "Served today",
+    }));
+    const parsed = parseLayout({ ...sample, sections: [{ name: "Plates", items }] });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.sections[0].items).toHaveLength(MENU_LIMITS.itemsPerSection);
+    const svg = layoutSvg(parsed.value);
+    expect(svg).toContain("Plate 1");
+    expect(svg).toContain(`Plate ${MENU_LIMITS.itemsPerSection}`);
+    expect(svg).not.toContain("Playing on this screen");
+    expect(parseLayout({ ...sample, sections: [{ name: "Plates", items: items.concat([{ name: "Extra", price: "$1", description: "" }]) }] }).ok).toBe(false);
+    const photo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    expect(layoutSvg(sample, { imageHref: photo })).toContain("<image ");
+    expect(layoutSvg(sample, { imageHref: "javascript:alert(1)" })).not.toContain("<image ");
+    const signature = playerComposition({ ...sampleLayout("signature"), videoMediaId: "00000000-0000-4000-8000-000000000001" }, "https://png", "https://mp4");
+    const frame = frameFor("signature", sampleLayout("signature").split);
+    expect(signature?.video && boxesOverlap(frame.menu, signature.video.box)).toBe(false);
+    expect(playerComposition({ ...sampleLayout("triple-column"), videoMediaId: "00000000-0000-4000-8000-000000000001" }, "https://png", "https://mp4")).toBeNull();
   });
 
   it("rejects markup, a second video, and a split outside the template", () => {
@@ -65,6 +90,9 @@ describe("layout studio frames", () => {
     const composition = playerComposition(doc, "https://png", "https://mp4");
     expect(composition?.video?.box).toEqual({ x: 1286, y: 0, w: 634, h: 1080 });
     expect(composition).not.toHaveProperty("groupIndex");
+    expect(layoutStudioPreviewOpen({ VERCEL_ENV: "production" })).toBe(false);
+    expect(layoutStudioPreviewOpen({ VERCEL_ENV: "preview" })).toBe(true);
+    expect(layoutStudioPreviewOpen({})).toBe(true);
     expect(layoutStudioEnabled({})).toBe(false);
     expect(layoutStudioEnabled({ LAYOUT_STUDIO: "true" })).toBe(false);
     expect(layoutStudioEnabled({ LAYOUT_STUDIO: "1" })).toBe(true);
@@ -89,12 +117,19 @@ describe("player composition contract", () => {
     const copyGroup = player.slice(player.indexOf("function copyGroup"), player.indexOf("function zoneVideo"));
     expect(copyGroup).toContain("groupIndex");
     expect(copyGroup).not.toContain("composition");
-    expect(player).toContain("if (zoneVideo(item)) placeZoneVideo(item, versionOrNull, token);");
-    expect(player).toContain("else ackShown(versionOrNull);");
+    expect(player).toContain("if (zoneVideo(item)) {");
+    expect(player).toContain("placeZoneVideo(item, versionOrNull, token, function () {");
+    expect(player).toContain("ackShown(versionOrNull, false);");
     expect(player).toContain("if (!zoneVideo(items[startAt])) shownVersion = version;");
     expect(player).toContain("v.muted = true;");
-    expect(player).toContain("The other element stays the next-item preload.");
-    expect(player).toContain("settle(false)");
+    expect(player).toContain("if (zoneOpen()) return;");
+    expect(player).toContain("The video in this board did not start. The still image is showing.");
+    expect(player).toContain("if (data.layoutStudio === false) dropZoneCompositions();");
+    expect(player).toContain("ZONE_SETTLE_MS");
+    expect(player).toContain("scheduleAdvance(index, item);");
+    expect(player).toContain("pekkotv.com");
+    expect(player).toContain("pantalla-chi.vercel.app");
+    expect(player).toContain("/layout-studio/player");
     expect(route).toContain("await attachLayoutCompositions(items);");
     expect(attach).toContain("if (!layoutStudioEnabled()) return;");
     expect(attach).not.toContain("groupIndex");

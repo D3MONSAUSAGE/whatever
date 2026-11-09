@@ -1,5 +1,9 @@
 /** Layout Studio boards. Shared by the editor and the server. No database and no HTML from clients. */
 
+import { MENU_LIMITS } from "@/lib/menu-templates";
+
+export { MENU_LIMITS };
+
 export const LAYOUT_VERSION = 1;
 export const BOARD_W = 1920;
 export const BOARD_H = 1080;
@@ -27,7 +31,13 @@ export type LayoutFrame = {
   template: LayoutTemplate;
   split: number;
   menu: ZoneBox;
+  /** Painted region for the still. Signature uses the full board as the background. */
   feature: ZoneBox;
+  /**
+   * Where a muted video may sit. Null when a video would cover menu text.
+   * The three-column template has no safe video region: every column is menu text.
+   */
+  video: ZoneBox | null;
   columns: ZoneBox[];
 };
 
@@ -43,6 +53,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function layoutStudioEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.LAYOUT_STUDIO === "1";
+}
+
+/** Local and Vercel preview only. Production stays closed. */
+export function layoutStudioPreviewOpen(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV !== "production";
 }
 
 export function isLayoutTemplate(value: unknown): value is LayoutTemplate {
@@ -70,15 +85,18 @@ export function frameFor(template: LayoutTemplate, split: number): LayoutFrame {
     const banner = Math.round(BOARD_H * ratio);
     const menu = box(0, 0, BOARD_W, BOARD_H - banner);
     const feature = box(0, BOARD_H - banner, BOARD_W, banner);
-    return { template, split: ratio, menu, feature, columns: [menu] };
+    return { template, split: ratio, menu, feature, video: feature, columns: [menu] };
   }
   if (template === "signature") {
     const overlay = Math.round(BOARD_W * ratio);
+    const menu = box(0, 0, overlay, BOARD_H);
+    // The still's background is the full board. The video stays in the strip
+    // beside the menu card so it cannot cover the menu text.
     return {
-      template, split: ratio,
-      menu: box(0, 0, overlay, BOARD_H),
+      template, split: ratio, menu,
       feature: box(0, 0, BOARD_W, BOARD_H),
-      columns: [box(0, 0, overlay, BOARD_H)],
+      video: box(overlay, 0, BOARD_W - overlay, BOARD_H),
+      columns: [menu],
     };
   }
   if (template === "triple-column") {
@@ -86,12 +104,16 @@ export function frameFor(template: LayoutTemplate, split: number): LayoutFrame {
     const rest = BOARD_W - first;
     const second = Math.round(rest / 2);
     const columns = [box(0, 0, first, BOARD_H), box(first, 0, second, BOARD_H), box(first + second, 0, rest - second, BOARD_H)];
-    return { template, split: ratio, menu: box(0, 0, BOARD_W, BOARD_H), feature: columns[2], columns };
+    return { template, split: ratio, menu: box(0, 0, BOARD_W, BOARD_H), feature: columns[2], video: null, columns };
   }
   const left = Math.round(BOARD_W * ratio);
   const menu = box(0, 0, left, BOARD_H);
   const feature = box(left, 0, BOARD_W - left, BOARD_H);
-  return { template, split: ratio, menu, feature, columns: [menu] };
+  return { template, split: ratio, menu, feature, video: feature, columns: [menu] };
+}
+
+export function boxesOverlap(a: ZoneBox, b: ZoneBox) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
 function text(value: unknown, max: number): string | null {
@@ -114,7 +136,9 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   const subtitle = text(raw.subtitle, 80);
   const footer = text(raw.footer, 80);
   if (title == null || subtitle == null || footer == null) return { ok: false, error: "Check the title and footer." };
-  if (!Array.isArray(raw.sections) || raw.sections.length > 4) return { ok: false, error: "Use up to 4 sections." };
+  if (!Array.isArray(raw.sections) || raw.sections.length > MENU_LIMITS.sections) {
+    return { ok: false, error: `Use up to ${MENU_LIMITS.sections} sections.` };
+  }
   const sections: LayoutSection[] = [];
   let total = 0;
   for (const section of raw.sections) {
@@ -122,7 +146,9 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
     const sec = section as Record<string, unknown>;
     const name = text(sec.name, 30);
     if (name == null) return { ok: false, error: "Check your sections." };
-    if (!Array.isArray(sec.items) || sec.items.length > 8) return { ok: false, error: "Use up to 8 items in a column." };
+    if (!Array.isArray(sec.items) || sec.items.length > MENU_LIMITS.itemsPerSection) {
+      return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
+    }
     const items: LayoutItem[] = [];
     for (const item of sec.items) {
       if (!item || typeof item !== "object") return { ok: false, error: "Check your items." };
@@ -131,13 +157,14 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       const price = text(row.price, 12);
       const description = text(row.description, 80);
       if (itemName == null || price == null || description == null) return { ok: false, error: "Check your items." };
+      // Blank rows are ignored, same as the existing menu editor. Named items are kept.
       if (!itemName) continue;
       items.push({ name: itemName, price: price ?? "", description: description ?? "" });
     }
     total += items.length;
     if (name || items.length) sections.push({ name: name ?? "", items });
   }
-  if (total > 18) return { ok: false, error: "Use up to 18 items." };
+  if (total > MENU_LIMITS.items) return { ok: false, error: `Use up to ${MENU_LIMITS.items} items.` };
   const imageMediaId = raw.imageMediaId == null || raw.imageMediaId === "" ? null : String(raw.imageMediaId);
   const videoMediaId = raw.videoMediaId == null || raw.videoMediaId === "" ? null : String(raw.videoMediaId);
   if (imageMediaId && !UUID.test(imageMediaId)) return { ok: false, error: "Choose a photo from your library." };
@@ -254,86 +281,111 @@ export type PlayerComposition = { layoutVersion: 1; fallbackUrl: string; video?:
 export function playerComposition(doc: LayoutDocument, fallbackUrl: string, videoUrl: string | null): PlayerComposition | null {
   if (!doc.videoMediaId || !videoUrl) return null;
   const frame = frameFor(doc.template, doc.split);
+  if (!frame.video) return null;
   return {
     layoutVersion: 1,
     fallbackUrl,
-    video: { mediaId: doc.videoMediaId, url: videoUrl, box: frame.feature },
+    video: { mediaId: doc.videoMediaId, url: videoUrl, box: frame.video },
   };
 }
 
-function clip(value: string, max: number) {
-  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+/** A photo href the renderer may paint. Anything else is ignored, not executed. */
+export function safeImageHref(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^data:image\/(png|jpeg);base64,[a-z0-9+/=\s]+$/i.test(value)) return value.replace(/\s/g, "");
+  if (/^https:\/\/[^\s"'<>]+$/i.test(value)) return value;
+  return null;
 }
 
-function itemRows(section: LayoutSection, x: number, y: number, width: number) {
+function clip(value: string, max: number) {
+  const chars = Math.max(4, max);
+  return value.length > chars ? `${value.slice(0, chars - 1)}…` : value;
+}
+
+const PAPER = "#f3ecdf";
+const INK = "#1a1614";
+const MUTED = "#5c534c";
+const FEATURE = "#1c3330";
+const FEATURE_INK = "#f3ecdf";
+
+function itemBlock(section: LayoutSection, x: number, top: number, width: number, bottom: number) {
   const rows: string[] = [];
-  let top = y;
+  let y = top;
   if (section.name) {
-    rows.push(`<text x="${x}" y="${top}" font-family="Inter" font-size="22" font-weight="700" fill="#1c1917" letter-spacing="1.5">${esc(section.name.toUpperCase())}</text>`);
-    top += 18;
-    rows.push(`<rect x="${x}" y="${top}" width="42" height="3" fill="#1f3a34"/>`);
-    top += 36;
+    rows.push(`<text x="${x}" y="${y}" font-family="Inter" font-size="18" font-weight="700" fill="${FEATURE}" letter-spacing="1.6">${esc(section.name.toUpperCase())}</text>`);
+    y += 14;
+    rows.push(`<rect x="${x}" y="${y}" width="36" height="3" fill="${FEATURE}"/>`);
+    y += 28;
   }
+  const count = section.items.length;
+  const room = Math.max(count, 1);
+  const rowH = Math.max(34, Math.min(76, Math.floor((bottom - y) / room)));
+  const nameSize = rowH >= 64 ? 28 : rowH >= 46 ? 22 : 16;
+  const showDesc = rowH >= 48 && section.items.some((item) => item.description);
   for (const item of section.items) {
-    rows.push(`<text x="${x}" y="${top}" font-family="Inter" font-size="28" font-weight="650" fill="#1c1917">${esc(clip(item.name, 28))}</text>`);
-    if (item.price) rows.push(`<text x="${x + width}" y="${top}" text-anchor="end" font-family="Inter" font-size="28" font-weight="650" fill="#1c1917">${esc(item.price)}</text>`);
-    top += item.description ? 30 : 44;
-    if (item.description) {
-      rows.push(`<text x="${x}" y="${top}" font-family="Inter" font-size="18" fill="#57534e">${esc(clip(item.description, 42))}</text>`);
-      top += 40;
+    rows.push(`<text x="${x}" y="${y}" font-family="Inter" font-size="${nameSize}" font-weight="700" fill="${INK}">${esc(clip(item.name, Math.floor(width / (nameSize * 0.55))))}</text>`);
+    if (item.price) rows.push(`<text x="${x + width}" y="${y}" text-anchor="end" font-family="Inter" font-size="${nameSize}" font-weight="700" fill="${INK}">${esc(item.price)}</text>`);
+    if (showDesc && item.description) {
+      rows.push(`<text x="${x}" y="${y + nameSize - 4}" font-family="Inter" font-size="15" fill="${MUTED}">${esc(clip(item.description, Math.floor(width / 8)))}</text>`);
     }
+    y += rowH;
   }
   return rows.join("");
 }
 
-/** Complete board. The feature rectangle is always painted, including when a video will cover it. */
-export function layoutSvg(doc: LayoutDocument): string {
+export type LayoutArt = { imageHref?: string | null };
+
+/** Complete board. Menu text is never placed in the video box. The still does not claim a video is playing. */
+export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const frame = frameFor(doc.template, doc.split);
+  const href = safeImageHref(art?.imageHref);
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${BOARD_W}" height="${BOARD_H}" viewBox="0 0 ${BOARD_W} ${BOARD_H}">`,
-    `<rect width="${BOARD_W}" height="${BOARD_H}" fill="#1c1917"/>`,
+    `<rect width="${BOARD_W}" height="${BOARD_H}" fill="${FEATURE}"/>`,
   ];
   const feature = frame.feature;
-  parts.push(`<rect x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" fill="#1f3a34"/>`);
-  if (doc.template !== "menu-banner") {
-    const label = doc.videoMediaId ? "Playing on this screen" : "Today's feature";
-    const labelX = doc.template === "signature" ? frame.menu.w + 48 : feature.x + 48;
-    const labelY = feature.y + Math.round(feature.h / 2);
-    parts.push(`<text x="${labelX}" y="${labelY}" font-family="Inter" font-size="36" font-weight="650" fill="#f6f1e7">${esc(label)}</text>`);
+  const imageBox = doc.template === "signature" ? feature : (frame.video ?? feature);
+  if (href) {
+    parts.push(`<image href="${esc(href)}" x="${imageBox.x}" y="${imageBox.y}" width="${imageBox.w}" height="${imageBox.h}" preserveAspectRatio="xMidYMid slice"/>`);
+  } else if (doc.template !== "triple-column") {
+    const labelX = doc.template === "signature" ? frame.menu.w + 48 : imageBox.x + 40;
+    const labelY = imageBox.y + Math.round(imageBox.h / 2);
+    parts.push(`<text x="${labelX}" y="${labelY}" font-family="Inter" font-size="34" font-weight="700" fill="${FEATURE_INK}">${esc("Featured")}</text>`);
   }
   if (doc.template === "signature") {
-    parts.push(`<rect x="${frame.menu.x}" y="80" width="${frame.menu.w}" height="${BOARD_H - 160}" fill="#f6f1e7"/>`);
-  } else if (doc.template !== "menu-banner") {
-    for (const column of frame.columns) parts.push(`<rect x="${column.x}" y="${column.y}" width="${column.w}" height="${column.h}" fill="#f6f1e7"/>`);
+    parts.push(`<rect x="48" y="56" width="${frame.menu.w - 96}" height="${BOARD_H - 112}" fill="${PAPER}"/>`);
+  } else if (doc.template === "menu-banner") {
+    parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${PAPER}"/>`);
   } else {
-    parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="#f6f1e7"/>`);
+    for (const column of frame.columns) parts.push(`<rect x="${column.x}" y="${column.y}" width="${column.w}" height="${column.h}" fill="${PAPER}"/>`);
   }
   const menu = doc.template === "signature"
-    ? { x: 64, y: 140, w: frame.menu.w - 128, h: BOARD_H - 280 }
+    ? { x: 88, y: 120, w: frame.menu.w - 176, bottom: BOARD_H - 120 }
     : doc.template === "menu-banner"
-      ? { x: 72, y: 72, w: BOARD_W - 144, h: frame.menu.h - 120 }
-      : { x: frame.columns[0].x + 48, y: 72, w: frame.columns[0].w - 96, h: BOARD_H - 140 };
-  parts.push(`<text x="${menu.x}" y="${menu.y}" font-family="Inter" font-size="54" font-weight="700" fill="#1c1917">${esc(clip(doc.title || "Menu", 28))}</text>`);
-  if (doc.subtitle) parts.push(`<text x="${menu.x}" y="${menu.y + 44}" font-family="Inter" font-size="22" fill="#57534e">${esc(clip(doc.subtitle, 48))}</text>`);
+      ? { x: 72, y: 88, w: BOARD_W - 144, bottom: frame.menu.h - 48 }
+      : { x: frame.columns[0].x + 48, y: 88, w: frame.columns[0].w - 96, bottom: BOARD_H - 72 };
+  parts.push(`<text x="${menu.x}" y="${menu.y}" font-family="Inter" font-size="52" font-weight="700" fill="${INK}">${esc(clip(doc.title || "Menu", 26))}</text>`);
+  if (doc.subtitle) parts.push(`<text x="${menu.x}" y="${menu.y + 40}" font-family="Inter" font-size="20" fill="${MUTED}">${esc(clip(doc.subtitle, 52))}</text>`);
   if (doc.template === "triple-column") {
     frame.columns.forEach((column, index) => {
       const section = doc.sections[index];
       if (!section) return;
-      parts.push(itemRows(section, column.x + 48, 180, column.w - 96));
+      parts.push(itemBlock(section, column.x + 40, 168, column.w - 80, BOARD_H - 72));
     });
   } else {
-    let y = menu.y + 100;
+    let y = menu.y + 88;
+    const each = Math.max(120, Math.floor((menu.bottom - y) / Math.max(doc.sections.length, 1)));
     for (const section of doc.sections) {
-      parts.push(itemRows(section, menu.x, y, menu.w));
-      y += 70 + section.items.length * 74;
+      parts.push(itemBlock(section, menu.x, y, menu.w, y + each - 12));
+      y += each;
     }
   }
-  if (doc.footer) {
-    const onBanner = doc.template === "menu-banner";
-    const footerY = onBanner ? feature.y + Math.round(feature.h / 2) + 8 : doc.template === "signature" ? BOARD_H - 128 : BOARD_H - 56;
-    const footerX = onBanner ? 72 : menu.x;
-    const fill = onBanner ? "#f6f1e7" : "#57534e";
-    parts.push(`<text x="${footerX}" y="${footerY}" font-family="Inter" font-size="20" fill="${fill}">${esc(clip(doc.footer, 60))}</text>`);
+  if (doc.footer && doc.template !== "menu-banner") {
+    const footerY = doc.template === "signature" ? BOARD_H - 88 : BOARD_H - 44;
+    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="Inter" font-size="18" fill="${MUTED}">${esc(clip(doc.footer, 64))}</text>`);
+  }
+  if (doc.template === "menu-banner" && doc.footer) {
+    parts.push(`<text x="72" y="${feature.y + Math.round(feature.h / 2)}" font-family="Inter" font-size="32" font-weight="700" fill="${FEATURE_INK}">${esc(clip(doc.footer, 48))}</text>`);
   }
   parts.push("</svg>");
   return parts.join("");

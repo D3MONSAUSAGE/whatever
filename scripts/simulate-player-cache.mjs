@@ -229,5 +229,19 @@ const c0 = S.stateCalls;
 await run(60000);
 check("without pollMs the player keeps polling every 10 s", S.stateCalls - c0 >= 5, S.stateCalls - c0);
 
+// A zone video is not added to the cache. Offline playback is the PNG only.
+const fetchesBeforeZone = fetches.length;
+S.version = 5;
+S.playlist = { id: "board", transition: "none", items: [{
+  mediaId: "board", url: "https://cdn/board.jpg", durationMs: 30000, kind: "image",
+  composition: { layoutVersion: 1, fallbackUrl: "https://cdn/board.jpg", video: { mediaId: "promo", url: "https://cdn/promo.mp4", box: { x: 1286, y: 0, w: 634, h: 1080 } } },
+}] };
+await run(20000);
+check("the zone video is not downloaded into the cache", fetches.slice(fetchesBeforeZone).every((url) => url.indexOf("promo.mp4") === -1) && fetches.slice(fetchesBeforeZone).some((url) => url.indexOf("board.jpg") !== -1), fetches.slice(fetchesBeforeZone));
+S.online = false;
+tv = boot();
+await run(15000);
+check("offline playback shows the cached still and does not restore the zone video", /blob:/.test(shown(tv.els)) && ["va", "vb"].every((id) => (tv.els[id].src || "").indexOf("promo.mp4") === -1), shown(tv.els));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -7,6 +7,7 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { playerPollMs } from "@/lib/server/limits";
 import { expandPresentationRows } from "@/lib/server/presentation-groups";
 import { attachLayoutCompositions } from "@/lib/server/layout-player";
+import { layoutStudioEnabled } from "@/lib/layout-studio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,9 +95,11 @@ export async function GET(req: Request) {
   const version = schedule.kind === "on" ? schedule.version : Number(row.content_version);
   const commands = await pendingCommands(tokenHash);
   const modeHint = await playbackModeHint(String(row.display_id));
-  const extra: { pollMs: number; nextTransitionAt?: string; commands: { seq: number; command: "next" | "prev" }[] } = {
+  const extra: { pollMs: number; nextTransitionAt?: string; commands: { seq: number; command: "next" | "prev" }[]; layoutStudio: boolean } = {
     pollMs: pollFor(modeHint, commands),
     commands,
+    // false tells an updated player to drop a zone even when the content version did not change.
+    layoutStudio: layoutStudioEnabled(),
   };
   if (schedule.kind === "on" && schedule.nextTransitionAt) extra.nextTransitionAt = schedule.nextTransitionAt;
   const overrideId = schedule.kind === "on" ? schedule.overridePlaylistId : null;

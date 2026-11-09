@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { LayoutStudio } from "@/components/layout-studio";
+import { layoutStudioPreviewOpen } from "@/lib/layout-studio";
 
 export default function LayoutStudioPage() {
-  if (process.env.NODE_ENV === "production") notFound();
+  if (!layoutStudioPreviewOpen()) notFound();
   return <LayoutStudio />;
 }

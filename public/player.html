@@ -117,7 +117,16 @@
       return !!(window.caches && window.fetch && window.Promise && window.URL && window.URL.createObjectURL);
     } catch (e) { return false; }
   })();
-  if (canCache) {
+  function layoutFixtureOn() {
+    var loc, host, path;
+    try { loc = window.location; } catch (eLoc) { return false; }
+    if (!loc || !loc.hostname) return false;
+    host = String(loc.hostname).toLowerCase();
+    path = String(loc.pathname || "");
+    if (host === "pekkotv.com" || host === "www.pekkotv.com" || host === "pantalla-chi.vercel.app") return false;
+    return path === "/layout-studio/player" || path === "/layout-studio/player/";
+  }
+  if (canCache && !layoutFixtureOn()) {
     try { if (window.navigator && window.navigator.storage && window.navigator.storage.persist) window.navigator.storage.persist(); } catch (e) {}
     // Lets the player page itself open with no internet (network first; see player-sw.js).
     try {
@@ -161,6 +170,7 @@
       for (i = 0; i < d.playlist.items.length; i++) {
         it = d.playlist.items[i];
         if (it && it.mediaId && it.url) out.push({ mediaId: it.mediaId, url: it.url });
+        // The zone video is not queued. Offline playback keeps the cached PNG only.
       }
     } else if (d.mediaId && d.url) {
       out.push({ mediaId: d.mediaId, url: d.url });
@@ -246,7 +256,8 @@
         for (k = 0; k < last.playlist.items.length; k++) {
           it = last.playlist.items[k];
           if (it && it.mediaId && blobs[it.mediaId] && !(it.kind === 'video' && blobVideoBad)) {
-            items.push({ mediaId: it.mediaId, url: blobs[it.mediaId], durationMs: it.durationMs, kind: it.kind });
+            // Offline is the cached still. composition is omitted on purpose: the zone video was not stored.
+            items.push({ mediaId: it.mediaId, url: blobs[it.mediaId], durationMs: it.durationMs, kind: it.kind, groupId: it.groupId, groupIndex: it.groupIndex, groupCount: it.groupCount });
           }
         }
         if (!items.length) return;
@@ -551,7 +562,12 @@
       preloadIndex((index + 1) % playlist.items.length, (depth || 0) + 1);
       return;
     }
-    if (item.kind === 'video') { preloadVideo(index); return; }
+    if (item.kind === 'video') {
+      // A board video is already using one element. Do not arm the other one.
+      if (zoneOpen()) return;
+      preloadVideo(index);
+      return;
+    }
     url = resolveUrl(item);
     if ((item.mediaId && stableSrc[item.mediaId]) || loadedUrls[url] === 1) return;
     img = new Image();
@@ -828,23 +844,20 @@
       if (token !== slideToken || !playlist) return;
       nextItem = nextGoodItem(index);
       swapTo(src, playlist.transition === 'fade');
-      buryVideos(nextItem && nextItem.kind === 'video' && !badSkips[itemKey(nextItem)] ? (nextItem.mediaId || '') : '');
+      // While this slide has a zone video, do not keep a second clip armed.
+      buryVideos(zoneVideo(item) ? '' : (nextItem && nextItem.kind === 'video' && !badSkips[itemKey(nextItem)] ? (nextItem.mediaId || '') : ''));
       slideIndex = index;
-      // A video zone is not "shown" until it plays, or until it fails and this still remains.
-      if (zoneVideo(item)) placeZoneVideo(item, versionOrNull, token);
-      else ackShown(versionOrNull);
-      preloadIndex((index + 1) % playlist.items.length);
-      clearSlideTimer();
       updateManualPos();
-      if (isManual()) {
-        // Hold until Next/Previous or a keypress. Duration is ignored.
+      if (zoneVideo(item)) {
+        placeZoneVideo(item, versionOrNull, token, function () {
+          preloadIndex((index + 1) % playlist.items.length);
+          scheduleAdvance(index, item);
+        });
         return;
       }
-      var waitToken = slideToken;
-      slideTimer = setTimeout(function () {
-        if (waitToken !== slideToken || !playlist) return;
-        present((index + 1) % playlist.items.length, null);
-      }, item.durationMs);
+      ackShown(versionOrNull, false);
+      preloadIndex((index + 1) % playlist.items.length);
+      scheduleAdvance(index, item);
     }
     if ((item.mediaId && stableSrc[item.mediaId]) || loadedUrls[src] === 1) { commit(); return; }
     var img = new Image();
@@ -882,9 +895,12 @@
         playlist.items[i].url = items[i].url;
         playlist.items[i].durationMs = items[i].durationMs;
         if (items[i].kind === 'video' || items[i].kind === 'image') playlist.items[i].kind = items[i].kind;
-        if (playlist.items[i].composition && playlist.items[i].composition.video && items[i].composition && items[i].composition.video && items[i].composition.video.url) {
-          playlist.items[i].composition.video.url = items[i].composition.video.url;
-          playlist.items[i].composition.fallbackUrl = items[i].url;
+        if (zoneVideo(items[i])) {
+          copyComposition(playlist.items[i], items[i]);
+          if (playlist.items[i].composition) playlist.items[i].composition.fallbackUrl = items[i].url;
+        } else if (playlist.items[i].composition) {
+          delete playlist.items[i].composition;
+          if (i === slideIndex) clearZoneVideo();
         }
       }
     }
@@ -919,9 +935,33 @@
     };
     return row;
   }
-  function ackShown(versionOrNull) {
-    if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
+  function zoneOpen() {
+    var i;
+    for (i = 0; i < videos.length; i++) if (videos[i].getAttribute('data-zone') === '1') return true;
+    return false;
+  }
+  function scheduleAdvance(index, item) {
+    clearSlideTimer();
+    if (isManual()) return;
+    var waitToken = slideToken;
+    slideTimer = setTimeout(function () {
+      if (waitToken !== slideToken || !playlist) return;
+      present((index + 1) % playlist.items.length, null);
+    }, item.durationMs);
+  }
+  function ackShown(versionOrNull, degraded) {
+    if (typeof versionOrNull === 'number') shownVersion = versionOrNull;
+    else if (shownVersion === null && typeof loadedVersion === 'number') shownVersion = loadedVersion;
+    if (degraded) reportError('The video in this board did not start. The still image is showing.');
+    else if (typeof versionOrNull === 'number') clearReportedError();
     if (typeof shownVersion === 'number') markPainted(shownVersion);
+  }
+  function dropZoneCompositions() {
+    var i;
+    clearZoneVideo();
+    if (!playlist || !playlist.items) return;
+    for (i = 0; i < playlist.items.length; i++) delete playlist.items[i].composition;
+    if (shownVersion === null && hasImage) ackShown(null, false);
   }
   function clearZoneVideo() {
     var i, v;
@@ -936,11 +976,14 @@
       try { v.removeAttribute('src'); v.load(); } catch (e3) {}
     }
   }
-  // One muted video inside the board. The other element stays the next-item preload.
-  function placeZoneVideo(item, versionOrNull, token) {
+  // One muted video inside the board. The other element is not started while this one is open.
+  // That is not a device test that the TV has only one decoder.
+  // ZONE_SETTLE_MS: if no frame arrives within 8 seconds, hide the video and acknowledge the still.
+  function placeZoneVideo(item, versionOrNull, token, done) {
     var video = zoneVideo(item);
     var v = null, i, sw, sh, scale, box, play;
-    if (!video) { ackShown(versionOrNull); return; }
+    var ZONE_SETTLE_MS = 8000;
+    if (!video) { ackShown(versionOrNull, false); if (done) done(); return; }
     for (i = 0; i < videos.length; i++) {
       if (videos[i].getAttribute('data-id')) continue;
       v = videos[i];
@@ -963,20 +1006,27 @@
       if (settled || token !== slideToken) return;
       settled = true;
       if (!playing) {
+        v.onplaying = null;
+        v.onerror = null;
         try { v.pause(); } catch (e2) {}
         v.className = 'stage';
+        try { v.removeAttribute('data-zone'); } catch (e3) {}
+        try { v.removeAttribute('src'); v.load(); } catch (e4) {}
       }
-      ackShown(versionOrNull);
+      ackShown(versionOrNull, !playing);
+      if (done) done();
     }
     v.onplaying = function () {
       if (token !== slideToken || settled) return;
+      z += 1;
+      v.style.zIndex = String(z);
       v.className = 'stage on';
       settle(true);
     };
     v.onerror = function () { settle(false); };
     setTimeout(function () {
       if (!settled) settle(false);
-    }, 8000);
+    }, ZONE_SETTLE_MS);
     if (v.getAttribute('data-src') !== video.url) {
       v.setAttribute('data-src', video.url);
       v.src = video.url;
@@ -1109,6 +1159,7 @@
           var until = wakeAt - new Date().getTime() + 1500;
           if (until > 0 && until < wait) wait = Math.max(1000, until);
         }
+        if (data.layoutStudio === false) dropZoneCompositions();
         if (!data.unchanged) { rememberState(data); apply(data); }
         applyRemoteCommands(data.commands);
         schedulePlaybackReport();
@@ -1202,7 +1253,32 @@
   // Check right away when the network comes back.
   window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });
 
-  if (getToken()) startPlayback(); else startPairing();
+  function startLayoutFixture() {
+    enter('playing');
+    showScreen('');
+    beginPlaylist(1, {
+      id: 'layout-fixture',
+      transition: 'none',
+      playbackMode: 'auto',
+      items: [{
+        mediaId: 'layout-poster',
+        url: '/layout-studio/media/poster',
+        durationMs: 60000,
+        kind: 'image',
+        groupId: 'slides',
+        groupIndex: 0,
+        groupCount: 3,
+        composition: {
+          layoutVersion: 1,
+          fallbackUrl: '/layout-studio/media/poster',
+          video: { mediaId: 'layout-promo', url: '/layout-studio/media/promo', box: { x: 1286, y: 0, w: 634, h: 1080 } }
+        }
+      }]
+    });
+  }
+  if (layoutFixtureOn()) startLayoutFixture();
+  else if (getToken()) startPlayback();
+  else startPairing();
 })();
 </script>
 </body>

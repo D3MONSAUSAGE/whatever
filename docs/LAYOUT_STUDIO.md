@@ -47,9 +47,17 @@ The non-video zones are drawn to one opaque 1920×1080 PNG, including a poster i
 
 A player that does not understand `composition` paints the PNG and acknowledges `version` when that image is on screen. The PNG is the whole board, so this is not a partial zone.
 
-A player that understands `layoutVersion: 1` paints the PNG, then starts at most one muted video in the box, using the existing video element. It must not send `playing.version` or treat `?v=` as that version until either the video is actually playing, or the video has failed and the full PNG (poster included) is what remains on screen. A pending video is not an acknowledgement. A hole, a menu with the video area missing, or a version ack for a frame that was not painted is not allowed.
+A player that understands `layoutVersion: 1` paints the PNG, then starts at most one muted video in the safe box, using one existing video element. It does not set a source on the other element while that zone is open. That is not a device test that the television has only one decoder.
 
-There is no per-zone clock. The playlist item's existing `durationMs` is the only timer. Manual mode still ignores duration. Cache and offline keep using `mediaId`. The PNG and the video are separate cached files. If the video file is missing offline, the player falls back to the whole PNG and only then acknowledges.
+The slide clock starts only after the zone settles. Settled means the muted video has produced a frame, or 8 seconds have passed with no frame. Until then the player does not send `playing.version` and does not send that version as `?v=`, even if `present` is later called without a version number. A pending video is not an acknowledgement. A hole, or menu text covered by the video, is not allowed.
+
+The signature background is the full board. Its video box is only the strip beside the menu card. The three-column template has no video box, because every column is menu text. The still never says the video is playing. An assigned photo is drawn in the feature area. If the video does not start, the player hides it, reports that the still image is showing, and acknowledges that degraded frame. A successful video clears that note.
+
+There is no per-zone clock. After the zone settles, the playlist item's existing `durationMs` is how long that settled frame stays up. Manual mode still ignores duration.
+
+The cached file is the board PNG (`mediaId` of the playlist item). The zone video is not written to the cache. Offline playback shows that PNG and drops `composition`. This is not offline video.
+
+Item limits match the existing menu editor: 4 sections, 12 items in a section, 24 items in total. Blank rows are ignored. Every kept item is drawn, with type sized to the column. A long line is ellipsized on the board; the stored text is unchanged.
 
 ### Example
 
@@ -75,10 +83,10 @@ There is no per-zone clock. The playlist item's existing `durationMs` is the onl
 
 `groupIndex` is not in this object. A presentation slide beside this board still carries its own slide counters.
 
-Rollback is the flag off and the previous player script. Boards already published remain ordinary images. Existing menus, playlists, screens, and subscriptions are not rewritten.
+Rollback does not require a new content version. While `LAYOUT_STUDIO` is not exactly `1`, player responses include `layoutStudio: false`. The player deletes `composition` and hides the zone video. A same-version URL refresh does the same when the new payload has no `composition`. Boards already published remain ordinary images. Existing menus, playlists, screens, and subscriptions are not rewritten. Flutter is not changed and does not call `/api/player/*`.
 
 ## Isolated preview
 
-`/dev/layout-studio` returns 404 when `NODE_ENV` is production. It does not write menus, playlists, or screens. Draft is the editor. Publish preview only freezes that picture in the browser.
+`/layout-studio` and `/dev/layout-studio` return 404 when `VERCEL_ENV` is `production`. A local server and a Vercel preview can open them. They do not write menus, playlists, or screens. Draft is the editor. Publish preview only freezes that picture in the browser. This branch's preview deployment does not serve the rest of the app.
 
 Tests cover the five frames, rejected HTML and out-of-range splits, one-video parsing, and the acknowledgement rule: a video zone does not count as shown until it is playing, or until playback fails and the full still remains. They do not claim a device played two decoders.
