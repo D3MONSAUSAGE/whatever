@@ -31,7 +31,11 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   // The TV player is a plain static HTML page (no React) for old Tizen/webOS browsers.
   async rewrites() {
-    return [{ source: "/player", destination: "/player.html" }];
+    return [
+      { source: "/player", destination: "/player.html" },
+      { source: "/tv", destination: "/player.html" },
+      { source: "/pair", destination: "/player.html" },
+    ];
   },
   async headers() {
     const security = [
@@ -41,7 +45,7 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/:path*", headers: security },
-      ...["/player", "/player.html"].map((source) => ({
+      ...["/player", "/player.html", "/tv", "/pair"].map((source) => ({
         source,
         headers: [
           ...security,

@@ -1,7 +1,7 @@
 import { db } from "./supabase";
 import { isMissingSchema } from "./schema";
 import { ownerFields, promoByPlaylist } from "./schedule-owner";
-import { compareRules, isValidTimeZone, nextTransition, ruleFromRow, ruleMatches, scheduleNow, type ScheduleRule } from "./schedule";
+import { compareRules, isValidTimeZone, nextChange, nextTransition, ruleFromRow, ruleMatches, scheduleNow, type NextChange, type ScheduleRule } from "./schedule";
 
 export type ScheduleSummary = {
   id: string;
@@ -19,6 +19,8 @@ export type DisplaySchedules = {
   activeSchedules: ScheduleSummary[];
   /** The winning rule, or null when the saved assignment plays. `until` is the next change, if within 8 days. */
   currentSchedule: (ScheduleSummary & { until: string | null }) | null;
+  /** Same value GET /api/displays/:id/timeline returns. Null when nothing changes within 8 days. */
+  nextChange: NextChange | null;
 };
 
 const COLUMNS = "id, name, playlist_id, display_id, group_id, weekdays, start_minute, end_minute, starts_on, ends_on, priority, updated_at, enabled";
@@ -38,7 +40,7 @@ export async function loadDisplaySchedules(
   if (schedules.error) return isMissingSchema(schedules.error) ? out : null;
   const rows = (schedules.data ?? []) as Parameters<typeof ruleFromRow>[0][] as (Parameters<typeof ruleFromRow>[0] & { display_id: string | null; group_id: string | null })[];
   if (!rows.length) {
-    for (const display of displays) out.set(display.id, { activeSchedules: [], currentSchedule: null });
+    for (const display of displays) out.set(display.id, { activeSchedules: [], currentSchedule: null, nextChange: null });
     return out;
   }
 
@@ -79,11 +81,13 @@ export async function loadDisplaySchedules(
     const timeZone = display.timeZone && isValidTimeZone(display.timeZone) ? display.timeZone : "UTC";
     const active = rules.filter((rule) => ruleMatches(rule, now, timeZone)).sort(compareRules);
     const winner = active[0];
+    const change = nextChange(rules, now, timeZone);
     out.set(display.id, {
       activeSchedules: active.map(summary),
       currentSchedule: winner
         ? { ...summary(winner), until: nextTransition(rules, now, timeZone)?.toISOString() ?? null }
         : null,
+      nextChange: change,
     });
   }
   return out;

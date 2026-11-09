@@ -5,6 +5,7 @@ import { fail, json, readJson } from "@/lib/server/http";
 import { readPlaybackSchedule } from "@/lib/server/playback";
 import { isMissingSchema } from "@/lib/server/schema";
 import { playerPollMs } from "@/lib/server/limits";
+import { catchupPoll } from "@/lib/server/playback-report";
 import { expandPresentationRows } from "@/lib/server/presentation-groups";
 import { attachLayoutCompositions } from "@/lib/server/layout-player";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
@@ -26,6 +27,16 @@ async function pendingCommands(tokenHash: string): Promise<{ seq: number; comman
 function pollFor(mode: "auto" | "manual" | null, commands: { seq: number }[]): number {
   if (mode === "manual" || commands.length) return MANUAL_POLL_MS;
   return playerPollMs();
+}
+
+async function displaySync(displayId: string) {
+  const rich = await db().from("displays").select("confirmed_version, confirmed_at, acknowledged_at").eq("id", displayId).maybeSingle();
+  if (!rich.error && rich.data) {
+    return { confirmedVersion: rich.data.confirmed_version, confirmedAt: rich.data.acknowledged_at || rich.data.confirmed_at };
+  }
+  const plain = await db().from("displays").select("confirmed_version, confirmed_at").eq("id", displayId).maybeSingle();
+  if (plain.error || !plain.data) return { confirmedVersion: null, confirmedAt: null };
+  return { confirmedVersion: plain.data.confirmed_version, confirmedAt: plain.data.confirmed_at };
 }
 
 async function playbackModeHint(displayId: string): Promise<"auto" | "manual" | null> {
@@ -95,11 +106,20 @@ export async function GET(req: Request) {
   const version = schedule.kind === "on" ? schedule.version : Number(row.content_version);
   const commands = await pendingCommands(tokenHash);
   const modeHint = await playbackModeHint(String(row.display_id));
-  const extra: { pollMs: number; nextTransitionAt?: string; commands: { seq: number; command: "next" | "prev" }[]; layoutStudio: boolean } = {
+  const sync = await displaySync(String(row.display_id));
+  const extra: {
+    pollMs: number;
+    nextTransitionAt?: string;
+    commands: { seq: number; command: "next" | "prev" }[];
+    layoutStudio: boolean;
+    catchupMs?: number;
+    catchupForMs?: number;
+  } = {
     pollMs: pollFor(modeHint, commands),
     commands,
     // false tells an updated player to drop a zone even when the content version did not change.
     layoutStudio: layoutStudioEnabled(),
+    ...catchupPoll(version, sync.confirmedVersion, sync.confirmedAt),
   };
   if (schedule.kind === "on" && schedule.nextTransitionAt) extra.nextTransitionAt = schedule.nextTransitionAt;
   const overrideId = schedule.kind === "on" ? schedule.overridePlaylistId : null;
@@ -162,6 +182,23 @@ export async function POST(req: Request) {
   if (token.length < 20 || token.length > 200) return fail("unauthorized", 401);
   const body = await readJson(req);
   // M8 proof of play: { playing: { version } } is sent once after the TV paints new content.
+  if (body.acknowledged && typeof body.acknowledged === "object") {
+    const version = Number((body.acknowledged as { version?: unknown }).version);
+    if (!Number.isSafeInteger(version) || version < 0) return fail("bad version", 400);
+    const acked = await db()
+      .from("displays")
+      .update({ acknowledged_version: version, acknowledged_at: new Date().toISOString() })
+      .eq("token_hash", sha256(token))
+      .eq("status", "active")
+      .select("id")
+      .maybeSingle();
+    if (acked.error) {
+      if (isMissingSchema(acked.error)) return json({ ok: true });
+      return fail("unavailable", 503);
+    }
+    if (!acked.data) return fail("unauthorized", 401);
+    return json({ ok: true });
+  }
   if (body.playing && typeof body.playing === "object") {
     const version = Number((body.playing as { version?: unknown }).version);
     if (!Number.isSafeInteger(version) || version < 0) return fail("bad version", 400);

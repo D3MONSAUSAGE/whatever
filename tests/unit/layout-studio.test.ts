@@ -283,7 +283,7 @@ describe("layout studio frames", () => {
     const editor = readFileSync("components/layout-studio.tsx", "utf8");
     expect(editor).toContain("Publishing…");
     expect(editor).toContain("disabled={saving !== null}");
-    expect(readFileSync("components/displays-screen.tsx", "utf8")).toContain("already uses this name");
+    expect(readFileSync("components/displays-screen.tsx", "utf8")).toContain("screenNameWarning");
   });
 
   it("draws a complete board, including the video slot", () => {

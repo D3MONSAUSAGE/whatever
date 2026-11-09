@@ -7,6 +7,8 @@ import { fail, json } from "@/lib/server/http";
 import { loadLocations } from "@/lib/server/locations";
 import { billingEnforced, entitledDisplayIds } from "@/lib/server/entitlements";
 import { loadDisplaySchedules } from "@/lib/server/display-schedules";
+import { parseLayout } from "@/lib/layout-studio";
+import { playbackReport } from "@/lib/server/playback-report";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +25,11 @@ export async function GET(req: Request) {
   type MediaJoin = { id: string; file_name: string; storage_path: string };
   type Row = {
     id: string; name: string; token_hash: string | null; last_seen_at: string | null;
+    content_version?: number | null;
+    confirmed_version?: number | null;
+    confirmed_at?: string | null;
+    acknowledged_version?: number | null;
+    acknowledged_at?: string | null;
     location_id?: string | null;
     assigned_playlist_id?: string | null;
     player_error?: string | null;
@@ -54,6 +61,7 @@ export async function GET(req: Request) {
   if (locations === "error") return fail("Couldn't load displays.", 500);
   const locationById = new Map(locations.map((location) => [location.id, location]));
 
+  const boardPreview = await boardPreviewUrls(admin.accountId, list.map((d) => d.assigned_playlist_id).filter(Boolean) as string[]);
   const scheduleInfo = await loadDisplaySchedules(
     admin.accountId,
     list.map((d) => ({ id: d.id, timeZone: d.location_id ? locationById.get(d.location_id)?.timezone ?? null : null })),
@@ -87,6 +95,18 @@ export async function GET(req: Request) {
         // Additive (milestone 3): the rules playing now, winner first, and the winner with its end time.
         activeSchedules: scheduleInfo.get(d.id)?.activeSchedules ?? [],
         currentSchedule: scheduleInfo.get(d.id)?.currentSchedule ?? null,
+        // Additive sync report. Old players have not acknowledged a version, so the state stays unknown.
+        // contentVersion is the version assigned by the dashboard, not a claim the TV has it.
+        ...playbackReport({
+          content_version: d.content_version,
+          confirmed_version: d.confirmed_version,
+          confirmed_at: d.confirmed_at,
+          acknowledged_version: d.acknowledged_version,
+          acknowledged_at: d.acknowledged_at,
+          hasAssignment: Boolean(media || (d.assigned_playlist_id && playlistInfo.get(d.assigned_playlist_id))),
+        }),
+        nextChange: scheduleInfo.get(d.id)?.nextChange ?? null,
+        boardPreviewUrl: d.assigned_playlist_id ? boardPreview.get(d.assigned_playlist_id) ?? null : null,
       };
     });
   if (!page) return json(out);
@@ -95,8 +115,10 @@ export async function GET(req: Request) {
 
 async function loadDisplayRows(accountId: string) {
   const media = "media:assigned_media_id (id, file_name, storage_path)";
-  const base = `id, name, location_id, token_hash, last_seen_at, created_at, ${media}`;
+  const base = `id, name, location_id, token_hash, last_seen_at, content_version, created_at, ${media}`;
   const attempts = [
+    { columns: `${base}, confirmed_version, confirmed_at, acknowledged_version, acknowledged_at, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
+    { columns: `${base}, confirmed_version, confirmed_at, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
     { columns: `${base}, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
     { columns: `${base}, assigned_playlist_id`, playlistColumn: true },
     { columns: base, playlistColumn: false },
@@ -175,3 +197,32 @@ async function loadPlaylists(accountId: string, rows: { assigned_playlist_id?: s
   }
   return info;
 }
+
+/** Signed still for a layout board's playlist. A failure leaves the screens list intact. */
+async function boardPreviewUrls(accountId: string, playlistIds: string[]) {
+  const urls = new Map<string, string | null>();
+  const ids = [...new Set(playlistIds)];
+  if (!ids.length) return urls;
+  try {
+    const menus = await db().from("menus").select("playlist_id, media_id, content").eq("account_id", accountId).in("playlist_id", ids);
+    if (menus.error || !menus.data) return urls;
+    const wanted: { playlistId: string; mediaId: string }[] = [];
+    for (const menu of menus.data) {
+      if (!menu.media_id || !parseLayout(menu.content).ok) continue;
+      wanted.push({ playlistId: String(menu.playlist_id), mediaId: String(menu.media_id) });
+    }
+    if (!wanted.length) return urls;
+    const media = await db().from("media").select("id, storage_path").eq("account_id", accountId).in("id", wanted.map((row) => row.mediaId));
+    if (media.error || !media.data) return urls;
+    const pathById = new Map(media.data.map((row) => [String(row.id), String(row.storage_path ?? "")]));
+    const signed = await signAll([...pathById.values()].filter(Boolean));
+    for (const row of wanted) {
+      const path = pathById.get(row.mediaId);
+      urls.set(row.playlistId, path ? signed.get(path) ?? null : null);
+    }
+  } catch {
+    return urls;
+  }
+  return urls;
+}
+

@@ -39,6 +39,54 @@ Pairing is two steps. The TV creates a code. The phone submits that code. The ph
 
 `POST /api/player/pair` and `POST /api/player/pair/status` are the TV's unauthenticated code exchange. The phone does not call them.
 
+### Screen row contract (build +10 and later)
+
+`GET /api/displays` returns an array. `GET /api/displays/:id` returns that same object for one screen. One row with a wrong type fails the app's whole list, so these names and types stay:
+
+| Field | Type |
+| --- | --- |
+| `id` | non-empty string |
+| `name` | string |
+| `connected` | boolean |
+| `online` | boolean, computed on the server |
+| `lastSeenAt` | ISO string or null |
+| `playerError` | string or null |
+| `media` | `{ id, fileName, url }` or null. `url` is a signed thumbnail or still, or null |
+| `playlist` | `{ id, name, url }` or null. `url` is a signed thumbnail of the first published slide, or null |
+| `location` | `{ id, name }` (timezone may also be present) or null |
+| `currentSchedule` | object or null |
+| `activeSchedules` | array |
+| `entitled` | boolean. Anything other than `false` means the screen may play |
+
+Additive fields. Old app builds ignore them. They are never a replacement for `connected` or `online`.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `reportedState` | `assigned` \| `acknowledged` \| `playing` \| `pending` \| `unknown` | `assigned` until the TV accepts the version, then `acknowledged`, then `playing`. No assignment stays `unknown` |
+| `contentVersion` | number or null | The version the dashboard has assigned |
+| `acknowledgedAt` | ISO string or null | When the TV reported that version. Null until a player reports it |
+| `playingAt` | ISO string or null | When the TV reported that version on screen. Null until a player reports it |
+| `nextChange` | `{ at, label, kind }` or null | Next time the winner changes. `kind` is `schedule` or `assignment`. Same object as `GET /api/displays/:id/timeline` |
+| `boardPreviewUrl` | string or null | Signed still of the layout board on this screen's playlist. Does not replace `media.url` or `playlist.url` |
+
+`GET /api/overview` stays `{ screens, online, offline, media, playlists, activeSchedules }`, all numbers.
+
+`POST /api/displays/pair` stays `{ code, name }` and still returns `{ id }`. It may also return `nameWarning` and `suggestedName` when another screen already uses that name, ignoring case and extra spaces. Pairing is never refused for a duplicate name. `PATCH /api/displays/:id` with `{ name }` may return the same warning. `DELETE /api/displays/:id` is unchanged. `GET /api/screen-groups` stays `{ id, name, displayIds, updatedAt }`.
+
+After a publish, `GET /api/player/state` adds `catchupMs: 2500` and `catchupForMs: 120000` until the TV reports the version, and for two minutes after that. `pollMs` stays the normal interval. The player posts `{ acknowledged: { version } }` when it accepts the version and `{ playing: { version } }` when the picture is on screen.
+
+### App additions
+
+| Call | Body / response |
+| --- | --- |
+| `GET /api/layout-studio/boards` | `{ boards: [{ id, name, template, thumbnailUrl }] }`. 404 when Layout Studio is off. Thumbnail is a signed still |
+| `POST /api/layout-studio/assign` | `{ menuId, displayId }`. Points that one screen at the board's playlist. Other screens stay. The board must already be published. Republishing the board still uses `menu_swap_media` |
+| `GET /api/displays/:id/timeline` | `{ displayId, timezone, nextChange }` |
+| `POST /api/displays/publish` | `{ playlistId, displayIds or groupId, commit: false }` previews `{ affected, kept, overriddenBySchedule, offline }`. `commit: true` calls `publish_playlist`, the same function as `POST /api/playlists/:id/publish`. Screens on that playlist that are not selected are cleared |
+| `GET /api/config` | Public. `{ appUrl, pairUrl, tvUrl }` on `https://pekkotv.com`. No Vercel hostname |
+
+The studio deep link is `/dashboard/media/layout-studio?screen=<id>`. A signed-out visit goes to `/login?next=` that same path, then back to it.
+
 ## Uploads and media
 
 Bytes are private. Clients receive a short-lived signed URL, not a public object path. Image bytes go through the function. Video and presentation bytes go to Storage with a signed upload URL, then a complete call checks the file.

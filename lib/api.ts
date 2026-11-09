@@ -43,6 +43,12 @@ export type DisplayItem = {
   location?: { id: string; name: string; timezone: string } | null;
   activeSchedules?: ScheduleSummary[];
   currentSchedule?: (ScheduleSummary & { until: string | null }) | null;
+  reportedState?: "assigned" | "acknowledged" | "playing" | "pending" | "unknown";
+  contentVersion?: number | null;
+  acknowledgedAt?: string | null;
+  playingAt?: string | null;
+  nextChange?: { at: string; label: string; kind: "schedule" | "assignment" } | null;
+  boardPreviewUrl?: string | null;
 };
 
 export type ScheduleSummary = { id: string; name: string; playlistId: string; playlistName: string; target: "display" | "group"; priority: number };

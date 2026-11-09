@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/limits";
 import { billingEnforced } from "@/lib/server/entitlements";
 import { normalizeDisplayName, normalizePairingCode } from "@/lib/server/validate";
+import { screenNameWarning } from "@/lib/screen-names";
 import { allow, clientIp, fail, json, readJson } from "@/lib/server/http";
 
 export const runtime = "nodejs";
@@ -53,5 +54,10 @@ export async function POST(req: Request) {
   if (!displayId) {
     return fail("That code doesn't match a TV. Check the screen — codes expire after 10 minutes.", 404);
   }
-  return json({ id: displayId });
+  const existing = await db().from("displays").select("id, name").eq("account_id", admin.accountId).eq("status", "active");
+  const names = (existing.data ?? [])
+    .filter((row) => String(row.id) !== String(displayId))
+    .map((row) => String(row.name ?? ""));
+  const warning = existing.error ? null : screenNameWarning(name, names);
+  return json({ id: displayId, ...(warning ?? {}) });
 }

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { AuthFrame, friendlyAuthError, isRecoveryUrl, MIN_PASSWORD } from "@/components/auth-frame";
+import { safeDashboardNext } from "@/lib/safe-next";
 
 export default function LoginPage() {
   return (
@@ -91,6 +92,5 @@ function Login() {
 /** Only same-site dashboard paths are honoured, so ?next= can't redirect off Pekko. */
 function nextPath() {
   if (typeof window === "undefined") return "/dashboard";
-  const raw = new URLSearchParams(window.location.search).get("next") || "";
-  return /^\/dashboard(\/[A-Za-z0-9/_-]*)?(\?[^#]*)?$/.test(raw) ? raw : "/dashboard";
+  return safeDashboardNext(new URLSearchParams(window.location.search).get("next") || "");
 }

@@ -31,7 +31,7 @@ function blankItem(): LayoutItem {
   return { name: "", price: "", description: "" };
 }
 
-export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account" } = {}) {
+export function LayoutStudio({ mode = "preview", screenId = null }: { mode?: "preview" | "account"; screenId?: string | null } = {}) {
   const accountMode = mode === "account";
   const [template, setTemplate] = useState<LayoutTemplate>("menu-promo-67");
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout("menu-promo-67"));
@@ -196,9 +196,18 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
         body: JSON.stringify(accountSaveBody({ mode: saveMode, menuId, name: doc.title || "Menu", document: doc })),
       });
       const nextId = typeof body.menuId === "string" ? body.menuId : menuId;
-      await reloadAccount(nextId);
+      const loaded = await reloadAccount(nextId);
+      const boardId = typeof body.menuId === "string" ? body.menuId : nextId;
+      const board = loaded.boards.find((item) => item.id === boardId);
+      let assigned = false;
+      if (saveMode === "publish" && screenId && board?.playlistId) {
+        await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: board.id, displayId: screenId }) });
+        assigned = true;
+      }
       setNote(saveMode === "publish"
-        ? "Published to this account. The player uses the new image."
+        ? assigned
+          ? "Published and assigned to this screen. TV updates within ~30 s, then it shows as playing."
+          : "Published to this account. TV updates within ~30 s, then it shows as playing."
         : "Draft saved on this account. Screens were not moved.");
     } catch (err) {
       setNote((err as Error).message || (saveMode === "publish" ? "Couldn't publish that board." : "Couldn't save that draft."));
@@ -323,6 +332,7 @@ export function LayoutStudio({ mode = "preview" }: { mode?: "preview" | "account
           <p style={{ letterSpacing: "0.14em", textTransform: "uppercase", fontSize: 12, margin: 0 }}>{accountMode ? "Media" : "Isolated preview"}</p>
           <h1 style={{ fontSize: 36, lineHeight: 1.1, margin: "8px 0" }}>Layout Studio</h1>
           <p style={{ lineHeight: 1.5, marginTop: 0 }}>{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+          {screenId ? <p style={{ fontSize: 14 }}>This edit is for one screen. Publish assigns the board to that screen and leaves the others as they are.</p> : null}
 
           <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>

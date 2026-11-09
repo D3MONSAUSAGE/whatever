@@ -1,0 +1,101 @@
+import { ONLINE_MS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS } from "@/lib/server/limits";
+import { requireAdmin } from "@/lib/server/auth";
+import { isUuid } from "@/lib/server/crypto";
+import { loadDisplaySchedules } from "@/lib/server/display-schedules";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
+import { publishImpact } from "@/lib/server/screen-publish";
+import { db } from "@/lib/server/supabase";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Dry-run unless commit is true. Commit calls the same publish_playlist
+ * function as POST /api/playlists/:id/publish.
+ */
+export async function POST(req: Request) {
+  const admin = await requireAdmin(req);
+  if (admin instanceof Response) return admin;
+  const body = await readJson(req);
+  const playlistId = body.playlistId;
+  if (!isUuid(playlistId)) return fail("Playlist not found.", 404);
+  const commit = body.commit === true;
+  const requested = Array.isArray(body.displayIds) ? body.displayIds.filter(isUuid) : null;
+  const groupId = isUuid(body.groupId) ? body.groupId : null;
+  if (body.groupId != null && body.groupId !== "" && !groupId) return fail("Screen group not found.", 404);
+
+  const playlist = await db().from("playlists").select("id").eq("id", playlistId).eq("account_id", admin.accountId).maybeSingle();
+  if (playlist.error) return fail("Couldn't preview that publish.", 500);
+  if (!playlist.data) return fail("Playlist not found.", 404);
+
+  let memberIds: string[] | null = null;
+  if (groupId) {
+    const group = await db().from("screen_groups").select("id").eq("id", groupId).eq("account_id", admin.accountId).maybeSingle();
+    if (group.error) return fail("Couldn't preview that publish.", 500);
+    if (!group.data) return fail("Screen group not found.", 404);
+    const members = await db().from("screen_group_members").select("display_id").eq("group_id", groupId).eq("account_id", admin.accountId);
+    if (members.error) return fail("Couldn't preview that publish.", 500);
+    memberIds = (members.data ?? []).map((row) => String(row.display_id));
+  }
+
+  const displays = await db()
+    .from("displays")
+    .select("id, name, assigned_playlist_id, last_seen_at, token_hash, location_id")
+    .eq("account_id", admin.accountId)
+    .eq("status", "active");
+  if (displays.error) return fail("Couldn't preview that publish.", 500);
+  const rows = displays.data ?? [];
+  const known = new Set(rows.map((row) => String(row.id)));
+
+  let selectedIds: string[];
+  if (requested && requested.length) {
+    if (requested.some((id) => !known.has(id))) return fail("One of those screens isn't in this account.", 400);
+    if (memberIds && requested.some((id) => !memberIds!.includes(id))) return fail("One of those screens isn't in this group.", 400);
+    selectedIds = requested;
+  } else if (memberIds) {
+    selectedIds = memberIds.filter((id) => known.has(id));
+  } else {
+    return fail("Choose at least one screen.", 400);
+  }
+  if (!selectedIds.length || selectedIds.length > 50) return fail("Choose at least one screen.", 400);
+
+  const schedules = await loadDisplaySchedules(
+    admin.accountId,
+    rows.map((row) => ({ id: String(row.id), timeZone: null })),
+  );
+  if (schedules === null) return fail("Couldn't preview that publish.", 500);
+  const now = Date.now();
+  const asScreen = (row: (typeof rows)[number]) => {
+    const current = schedules.get(String(row.id))?.currentSchedule ?? null;
+    const seen = row.last_seen_at ? new Date(String(row.last_seen_at)).getTime() : NaN;
+    return {
+      id: String(row.id),
+      name: String(row.name),
+      playlistId: row.assigned_playlist_id ? String(row.assigned_playlist_id) : null,
+      online: !!row.token_hash && !Number.isNaN(seen) && now - seen < ONLINE_MS,
+      scheduleName: current?.name ?? null,
+      scheduleTarget: current?.target ?? null,
+    };
+  };
+  const selectedSet = new Set(selectedIds);
+  const selected = rows.filter((row) => selectedSet.has(String(row.id))).map(asScreen);
+  const others = rows.filter((row) => !selectedSet.has(String(row.id))).map(asScreen);
+  const impact = publishImpact(playlistId, selected, others);
+
+  if (!commit) return json({ commit: false, playlistId, ...impact });
+
+  const limited = await enforceLimit(`publish:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
+  if (limited) return limited;
+  const published = await db().rpc("publish_playlist", {
+    p_account_id: admin.accountId,
+    p_playlist_id: playlistId,
+    p_display_ids: selectedIds,
+  });
+  if (published.error) {
+    if (isMissingSchema(published.error)) return fail(PLAYLISTS_UNAVAILABLE, 503);
+    return fail("Couldn't publish the playlist.", 500);
+  }
+  if (!published.data) return fail("Add at least one image, then choose screens from this account.", 400);
+  return json({ commit: true, playlistId, ...impact });
+}

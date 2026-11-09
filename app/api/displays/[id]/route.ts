@@ -3,10 +3,24 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json, readJson } from "@/lib/server/http";
+import { GET as listDisplays } from "../route";
+import { screenNameWarning } from "@/lib/screen-names";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
+
+// One screen, same object as a row of GET /api/displays. The phone parses this strictly.
+export async function GET(req: Request, { params }: Ctx) {
+  const { id } = await params;
+  if (!isUuid(id)) return fail("Display not found.", 404);
+  const listed = await listDisplays(new Request(new URL("/api/displays", req.url), { headers: req.headers }));
+  if (!listed.ok) return listed;
+  const body = await listed.json().catch(() => null);
+  const row = Array.isArray(body) ? body.find((item) => item && item.id === id) : null;
+  if (!row) return fail("Display not found.", 404);
+  return json(row);
+}
 
 // Rename ({ name }), move or clear a location ({ locationId }, null clears),
 // or publish ({ mediaId }, null clears the screen). A body with mediaId ignores the rest.
@@ -74,6 +88,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
       .maybeSingle();
     if (error) return fail("Couldn't rename. Try again.", 500);
     if (!data) return fail("Display not found.", 404);
+    const others = await db().from("displays").select("id, name").eq("account_id", admin.accountId).eq("status", "active");
+    const warning = others.error ? null : screenNameWarning(name, (others.data ?? []).filter((row) => String(row.id) !== id).map((row) => String(row.name ?? "")));
+    return json({ ok: true, ...(warning ?? {}) });
   }
 
   return json({ ok: true });

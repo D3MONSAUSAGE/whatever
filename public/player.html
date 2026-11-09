@@ -102,7 +102,7 @@
   var videos = [el('va'), el('vb')];
   var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0, zoneFit = null;
   // Polling: the server may send pollMs (older servers do not; then STATE_MS stays).
-  var pollMs = STATE_MS, wakeAt = 0;
+  var pollMs = STATE_MS, wakeAt = 0, catchupUntil = 0, catchupEvery = 0, ackedVersion = null;
 
   // ---- persistent media cache (only where the TV browser supports it; otherwise nothing changes)
   // Files are kept by mediaId, which never changes for an upload, so each file is
@@ -483,6 +483,12 @@
   function markPainted(v) {
     paintedVersion = v;
     confirmPlaying();
+  }
+  function noteAssigned(version) {
+    var token = getToken();
+    if (!token || ackedVersion === version) return;
+    ackedVersion = version;
+    request('POST', '/api/player/state', { acknowledged: { version: version } }, token, function () {});
   }
   function confirmPlaying() {
     var token = getToken();
@@ -1215,7 +1221,15 @@
       if (status === 200 && data) {
         setStatus('');
         if (typeof data.pollMs === 'number' && data.pollMs >= 1000 && data.pollMs <= 120000) pollMs = data.pollMs;
+        if (typeof data.catchupMs === 'number' && data.catchupMs >= 2000 && data.catchupMs <= 5000) {
+          catchupEvery = data.catchupMs;
+          var forMs = (typeof data.catchupForMs === 'number' && data.catchupForMs >= 1000) ? data.catchupForMs : 120000;
+          if (forMs > 180000) forMs = 180000;
+          catchupUntil = new Date().getTime() + forMs;
+        }
         wait = pollMs;
+        if (catchupUntil && new Date().getTime() < catchupUntil && catchupEvery && catchupEvery < wait) wait = catchupEvery;
+        if (typeof data.version === 'number') noteAssigned(data.version);
         wakeAt = data.nextTransitionAt ? Date.parse(data.nextTransitionAt) || 0 : 0;
         if (wakeAt) {
           // Ask again just after a scheduled switch, so schedules stay on time.

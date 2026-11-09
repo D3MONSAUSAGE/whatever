@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { byName, SEARCH_FROM } from "@/components/playlist-list";
+import { screenNameWarning } from "@/lib/screen-names";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
@@ -28,6 +29,9 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
       input: { label: "Name", ariaLabel: "New TV name", defaultValue: display.name, maxLength: 60 },
     });
     if (typeof name !== "string" || name === display.name) return;
+    const others = (displays.data ?? []).filter((item) => item.id !== display.id).map((item) => item.name);
+    const dup = screenNameWarning(name, others);
+    if (dup) toast.show(`${dup.nameWarning} Suggested: ${dup.suggestedName}`);
     try {
       await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
       toast.show("Renamed");
@@ -65,7 +69,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
       </PageHeader>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
-        onPaired={() => { toast.show("Connected. The TV will switch over in a few seconds."); displays.reload(); }}
+        onPaired={(warning) => { toast.show(warning || "Connected. The TV will switch over in a few seconds."); displays.reload(); }}
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
@@ -83,6 +87,14 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
             <li key={display.id}>
               <ScreenCard display={display} actions={
                 <>
+                  {display.reportedState && display.reportedState !== "unknown" ? (
+                    <p className="w-full text-xs text-muted" data-testid="sync-state">
+                      {display.reportedState === "playing" ? "Playing on the TV" : display.reportedState === "acknowledged" ? "TV has the update" : "Assigned · TV updates within ~30 s"}
+                    </p>
+                  ) : null}
+                  {display.nextChange ? (
+                    <p className="w-full text-xs text-muted">Next change: {display.nextChange.label}</p>
+                  ) : null}
                   {display.currentSchedule ? (
                     <p className="w-full text-xs text-muted" data-testid="current-schedule">
                       <span className="badge badge-live mr-1">Scheduled</span>
@@ -147,7 +159,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   );
 }
 
-function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: () => void; onError: (message: string) => void }) {
+function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: (warning?: string) => void; onError: (message: string) => void }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -155,10 +167,10 @@ function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: () 
     event.preventDefault();
     setBusy(true);
     try {
-      await api("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
+      const paired = await api<{ nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
       setCode("");
       setName("");
-      onPaired();
+      onPaired(paired.nameWarning ? `${paired.nameWarning} Suggested: ${paired.suggestedName}` : undefined);
     } catch (err) {
       onError((err as Error).message);
     } finally {
@@ -183,8 +195,8 @@ function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: () 
           value={name} onChange={(event) => setName(event.target.value)} aria-label="TV name" />
         <button className="btn btn-primary" disabled={busy}>{busy ? "Connecting…" : "Connect TV"}</button>
       </div>
-      {name.trim() && names.some((existing) => existing.trim().toLowerCase() === name.trim().toLowerCase()) ? (
-        <p role="status" className="text-sm mt-3">Another screen in this account already uses this name. You can still connect it.</p>
+      {screenNameWarning(name, names) ? (
+        <p role="status" className="text-sm mt-3">{screenNameWarning(name, names)?.nameWarning}</p>
       ) : null}
       <p className="text-xs text-muted mt-3">The TV address is also in <a className="underline" href="/dashboard/settings" aria-label="Open the page with the TV address">Settings</a>.</p>
     </form>
@@ -283,6 +295,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
   onError: (message: string) => void;
 }) {
   const playlists = useApi<PlaylistSummary[]>("/api/playlists");
+  const confirm = useConfirm();
   const [playlistId, setPlaylistId] = useState("");
   const [chosen, setChosen] = useState<Record<string, boolean>>(() => {
     const next: Record<string, boolean> = {};
@@ -304,8 +317,28 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
     if (!displayIds.length) return onError("Choose at least one screen.");
     setBusy(true);
     try {
-      await api(`/api/playlists/${playlistId}/publish`, { method: "POST", body: JSON.stringify({ displayIds }) });
-      onDone("Published to the selected screens. They update within about 10 seconds.");
+      const preview = await api<{
+        affected: { name: string; change: "assign" | "clear" }[];
+        kept: { name: string }[];
+        overriddenBySchedule: { name: string; scheduleName: string }[];
+        offline: { name: string }[];
+      }>("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: false }) });
+      const assign = preview.affected.filter((item) => item.change === "assign").map((item) => item.name);
+      const clear = preview.affected.filter((item) => item.change === "clear").map((item) => item.name);
+      const ok = await confirm.ask({
+        title: "Publish to these screens?",
+        body: [
+          assign.length ? `Will play it: ${assign.join(", ")}.` : "Those screens already play it.",
+          clear.length ? `Will stop playing it: ${clear.join(", ")}.` : "",
+          preview.kept.length ? `${preview.kept.length} other screens keep their own content.` : "",
+          preview.overriddenBySchedule.length ? `A schedule still wins on: ${preview.overriddenBySchedule.map((item) => item.name).join(", ")}.` : "",
+          preview.offline.length ? `Offline until they reconnect: ${preview.offline.map((item) => item.name).join(", ")}.` : "",
+        ].filter(Boolean).join(" "),
+        confirmLabel: "Publish",
+      });
+      if (ok !== true) { setBusy(false); return; }
+      await api("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId, displayIds, commit: true }) });
+      onDone("Published. Assigned · TV updates within ~30 s, then it shows as playing.");
     } catch (err) {
       onError((err as Error).message);
       setBusy(false);

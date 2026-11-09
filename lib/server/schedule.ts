@@ -322,6 +322,17 @@ function candidateInstants(rules: ScheduleRule[], from: Date, until: Date, timeZ
   return [...times].filter((instant) => instant >= from.getTime() && instant <= until.getTime()).sort((a, b) => a - b);
 }
 
+export type NextChange = { at: string; label: string; kind: "schedule" | "assignment" };
+
+/** The next time the winning rule changes. The display list and the timeline route both use this. */
+export function nextChange(rules: ScheduleRule[], from: Date, timeZone: string, horizonMs = NEXT_TRANSITION_HORIZON_MS): NextChange | null {
+  const at = nextTransition(rules, from, timeZone, horizonMs);
+  if (!at) return null;
+  const winner = resolveRule(rules, at, timeZone);
+  if (!winner) return { at: at.toISOString(), label: "Assigned content", kind: "assignment" };
+  return { at: at.toISOString(), label: winner.name, kind: "schedule" };
+}
+
 export function nextTransition(rules: ScheduleRule[], from: Date, timeZone: string, horizonMs = NEXT_TRANSITION_HORIZON_MS) {
   const until = new Date(from.getTime() + horizonMs);
   const current = resolveRule(rules, from, timeZone)?.id ?? null;
