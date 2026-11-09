@@ -6,6 +6,7 @@ import { readPlaybackSchedule } from "@/lib/server/playback";
 import { isMissingSchema } from "@/lib/server/schema";
 import { playerPollMs } from "@/lib/server/limits";
 import { expandPresentationRows } from "@/lib/server/presentation-groups";
+import { attachLayoutCompositions } from "@/lib/server/layout-player";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,12 @@ type PlaylistItem = {
   groupName?: string;
   groupIndex?: number;
   groupCount?: number;
+  /** Present only when LAYOUT_STUDIO is exactly "1" and the board has one video. */
+  composition?: {
+    layoutVersion: 1;
+    fallbackUrl: string;
+    video?: { mediaId: string; url: string; box: { x: number; y: number; w: number; h: number } };
+  };
 };
 type PlaylistPayload = { id: string; transition: "none" | "fade"; playbackMode: "auto" | "manual"; items: PlaylistItem[] };
 type PlaylistRow = {
@@ -319,6 +326,7 @@ async function signPlaylist(rows: PlaylistRow[]): Promise<PlaylistPayload | null
       item.groupCount = list.length;
     });
   }
+  await attachLayoutCompositions(items);
   return {
     id: expanded[0].playlistId,
     transition: expanded[0].transition === "fade" ? "fade" : "none",

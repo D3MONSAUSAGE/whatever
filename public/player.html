@@ -90,7 +90,7 @@
   var layers = [el('a'), el('b')];
   var active = 0, z = 1;
   var mode = '', gen = 0, timer = null;
-  var shownVersion = null, loadingVersion = null, preloadImg = null, hasImage = false;
+  var shownVersion = null, loadedVersion = null, loadingVersion = null, preloadImg = null, hasImage = false;
   // Proof of play: the version actually painted, and the last one the server accepted.
   var paintedVersion = null, confirmedVersion = null, confirmBusy = false;
   var memToken = null;
@@ -324,7 +324,7 @@
     stopPlaylist();
     clearCache(); // no offline replay of saved content while paused
     clearImages();
-    shownVersion = null; // repaint fully once playback is allowed again
+    shownVersion = null; loadedVersion = null; // repaint fully once playback is allowed again
     setStatus('');
     if (d && typeof d.title === 'string') el('paused-title').textContent = d.title;
     if (d && typeof d.message === 'string') el('paused-msg').textContent = d.message;
@@ -821,6 +821,7 @@
       return;
     }
     skipBurst = 0;
+    clearZoneVideo();
     if (item.kind === 'video') { presentVideo(index, versionOrNull); return; }
     src = resolveUrl(item);
     function commit() {
@@ -829,8 +830,9 @@
       swapTo(src, playlist.transition === 'fade');
       buryVideos(nextItem && nextItem.kind === 'video' && !badSkips[itemKey(nextItem)] ? (nextItem.mediaId || '') : '');
       slideIndex = index;
-      if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
-      if (typeof shownVersion === 'number') markPainted(shownVersion);
+      // A video zone is not "shown" until it plays, or until it fails and this still remains.
+      if (zoneVideo(item)) placeZoneVideo(item, versionOrNull, token);
+      else ackShown(versionOrNull);
       preloadIndex((index + 1) % playlist.items.length);
       clearSlideTimer();
       updateManualPos();
@@ -880,6 +882,10 @@
         playlist.items[i].url = items[i].url;
         playlist.items[i].durationMs = items[i].durationMs;
         if (items[i].kind === 'video' || items[i].kind === 'image') playlist.items[i].kind = items[i].kind;
+        if (playlist.items[i].composition && playlist.items[i].composition.video && items[i].composition && items[i].composition.video && items[i].composition.video.url) {
+          playlist.items[i].composition.video.url = items[i].composition.video.url;
+          playlist.items[i].composition.fallbackUrl = items[i].url;
+        }
       }
     }
     needRefresh = false;
@@ -891,6 +897,94 @@
     row.groupIndex = typeof it.groupIndex === 'number' ? it.groupIndex : 0;
     row.groupCount = typeof it.groupCount === 'number' ? it.groupCount : 0;
     return row;
+  }
+  function zoneVideo(item) {
+    var c, video, box;
+    c = item && item.composition;
+    if (!c || c.layoutVersion !== 1) return null;
+    video = c.video;
+    box = video && video.box;
+    if (!video || !video.url || !box) return null;
+    if (typeof box.x !== 'number' || typeof box.y !== 'number' || typeof box.w !== 'number' || typeof box.h !== 'number') return null;
+    if (box.w < 1 || box.h < 1) return null;
+    return video;
+  }
+  function copyComposition(row, it) {
+    var video = zoneVideo(it);
+    if (!video) return row;
+    row.composition = {
+      layoutVersion: 1,
+      fallbackUrl: (it.composition && it.composition.fallbackUrl) || row.url,
+      video: { mediaId: video.mediaId || '', url: video.url, box: { x: video.box.x, y: video.box.y, w: video.box.w, h: video.box.h } }
+    };
+    return row;
+  }
+  function ackShown(versionOrNull) {
+    if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
+    if (typeof shownVersion === 'number') markPainted(shownVersion);
+  }
+  function clearZoneVideo() {
+    var i, v;
+    for (i = 0; i < videos.length; i++) {
+      v = videos[i];
+      if (v.getAttribute('data-zone') !== '1') continue;
+      v.onplaying = null;
+      v.onerror = null;
+      try { v.pause(); } catch (e) {}
+      v.className = 'stage';
+      try { v.removeAttribute('data-zone'); } catch (e2) {}
+      try { v.removeAttribute('src'); v.load(); } catch (e3) {}
+    }
+  }
+  // One muted video inside the board. The other element stays the next-item preload.
+  function placeZoneVideo(item, versionOrNull, token) {
+    var video = zoneVideo(item);
+    var v = null, i, sw, sh, scale, box, play;
+    if (!video) { ackShown(versionOrNull); return; }
+    for (i = 0; i < videos.length; i++) {
+      if (videos[i].getAttribute('data-id')) continue;
+      v = videos[i];
+      break;
+    }
+    if (!v) v = videos[0];
+    sw = window.innerWidth || 1280;
+    sh = window.innerHeight || 720;
+    scale = Math.min(sw / 1920, sh / 1080);
+    box = video.box;
+    v.muted = true;
+    try { v.setAttribute('muted', 'muted'); } catch (e) {}
+    v.setAttribute('data-zone', '1');
+    v.style.left = Math.round((sw - 1920 * scale) / 2 + box.x * scale) + 'px';
+    v.style.top = Math.round((sh - 1080 * scale) / 2 + box.y * scale) + 'px';
+    v.style.width = Math.round(box.w * scale) + 'px';
+    v.style.height = Math.round(box.h * scale) + 'px';
+    var settled = false;
+    function settle(playing) {
+      if (settled || token !== slideToken) return;
+      settled = true;
+      if (!playing) {
+        try { v.pause(); } catch (e2) {}
+        v.className = 'stage';
+      }
+      ackShown(versionOrNull);
+    }
+    v.onplaying = function () {
+      if (token !== slideToken || settled) return;
+      v.className = 'stage on';
+      settle(true);
+    };
+    v.onerror = function () { settle(false); };
+    setTimeout(function () {
+      if (!settled) settle(false);
+    }, 8000);
+    if (v.getAttribute('data-src') !== video.url) {
+      v.setAttribute('data-src', video.url);
+      v.src = video.url;
+    }
+    try {
+      play = v.play();
+      if (play && typeof play.then === 'function') play.then(function () {}, function () { settle(false); });
+    } catch (err) { settle(false); }
   }
   function beginPlaylist(version, incoming) {
     var items = [], list = incoming.items || [], i, it, ms, startAt = 0, keepId = '', mode, row;
@@ -906,14 +1000,14 @@
       // Manual images may omit a usable duration; still show them.
       if (mode === 'manual') {
         row = { url: it.url, durationMs: typeof ms === 'number' && ms >= 1000 ? ms : 10000, mediaId: it.mediaId || '', kind: 'image' };
-        items.push(copyGroup(row, it));
+        items.push(copyComposition(copyGroup(row, it), it));
         continue;
       }
       if (typeof ms !== 'number' || ms < 1000) continue;
-      items.push(copyGroup({ url: it.url, durationMs: ms, mediaId: it.mediaId || '', kind: 'image' }, it));
+      items.push(copyComposition(copyGroup({ url: it.url, durationMs: ms, mediaId: it.mediaId || '', kind: 'image' }, it), it));
     }
     if (!items.length) return;
-    if (playlist && shownVersion === version && playlist.id === (incoming.id || '')) {
+    if (playlist && loadedVersion === version && playlist.id === (incoming.id || '')) {
       refreshPlaylistUrls(items);
       playlist.playbackMode = mode;
       if (mode === 'manual') showManualUi();
@@ -938,7 +1032,9 @@
       }
     }
     urlRefreshAt = new Date().getTime() + 1800000;
-    shownVersion = version;
+    loadedVersion = version;
+    // ?v= and playing.version wait until the opening frame is actually up.
+    if (!zoneVideo(items[startAt])) shownVersion = version;
     slideIndex = startAt;
     if (mode === 'manual') showManualUi();
     present(startAt, version);
@@ -953,7 +1049,7 @@
     badLevel = {};
     clearImages();
     setStatus('');
-    shownVersion = null; loadingVersion = null; preloadImg = null;
+    shownVersion = null; loadedVersion = null; loadingVersion = null; preloadImg = null;
     el('code').innerHTML = '&nbsp;';
     showScreen('pair');
     request('POST', '/api/player/pair', {}, null, function (status, data) {

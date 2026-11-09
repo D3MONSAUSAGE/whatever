@@ -129,6 +129,7 @@ function server(method, url, body, headers) {
     if (S.online && S.paused) return [402, { suspended: true, title: "This screen is paused", message: "Plan inactive.", pollMs: 60000 }];
     if (S.revoked || headers["X-Display-Token"] !== S.token) return [401, { error: "unauthorized" }];
     const v = new URL("http://x" + url).searchParams.get("v");
+    S.queried = (S.queried || []).concat([v]);
     const refresh = url.indexOf("refresh=1") !== -1;
     const cmds = Array.isArray(S.pendingCommands) ? S.pendingCommands.slice() : [];
     const mode = S.playlist && S.playlist.playbackMode === "manual" ? "manual" : "auto";
@@ -555,6 +556,45 @@ run(20000);
 check("automatic mode still advances by duration after manual", slideLog.map((url) => url.replace(/.*\/(\w+)\.jpg.*/, "$1")).slice(0, 3).join(",") === "a1,a2,a1" || slideLog.map((url) => url.replace(/.*\/(\w+)\.jpg.*/, "$1")).slice(0, 3).join(",") === "a2,a1,a2");
 slideLog = null;
 mediaLog = null;
+
+// A board with one video zone. The version is not shown until that video plays,
+// or until it fails and the full still is what remains.
+const box = { x: 1286, y: 0, w: 634, h: 1080 };
+S.version = 30;
+S.url = null;
+S.playlist = {
+  id: "board",
+  transition: "none",
+  playbackMode: "auto",
+  items: [{
+    mediaId: "board", url: "https://cdn/board.jpg", durationMs: 30000, kind: "image",
+    groupId: "deck", groupIndex: 2, groupCount: 4,
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/board.jpg", video: { mediaId: "promo", url: "https://cdn/promo.mp4?dur=3000", box: box } },
+  }],
+};
+S.playing = [];
+S.queried = [];
+run(1800);
+check("a video zone is not acknowledged before it is on screen", S.playing.length === 0 && S.queried.indexOf("30") === -1);
+run(8000);
+const zone = ["va", "vb"].filter((id) => els[id].getAttribute("data-zone") === "1" && els[id].className.indexOf("on") !== -1);
+check("one muted video plays in the board and the version is acknowledged", zone.length === 1 && els[zone[0]].muted === true && S.playing.indexOf(30) !== -1 && (shownUrl() || "").indexOf("board.jpg") !== -1);
+check("the other video element stays the preload, not a second zone", ["va", "vb"].filter((id) => els[id].getAttribute("data-zone") === "1").length === 1);
+
+S.version = 31;
+S.playlist = {
+  id: "board-fallback",
+  transition: "none",
+  playbackMode: "manual",
+  items: [{
+    mediaId: "board2", url: "https://cdn/board2.jpg", durationMs: 30000, kind: "image",
+    groupId: "deck", groupIndex: 2, groupCount: 4,
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/board2.jpg", video: { mediaId: "bad", url: "https://cdn/bad-promo.mp4", box: box } },
+  }],
+};
+run(8000);
+check("a failed video leaves the whole still and only then acknowledges", (shownUrl() || "").indexOf("board2.jpg") !== -1 && ["va", "vb"].every((id) => els[id].className.indexOf("on") === -1) && S.playing.indexOf(31) !== -1);
+check("slide counters stay on the presentation, not the video zone", els["manual-pos"].innerHTML === "3/4 · 1 / 1");
 
 // Restore a single still image so the paused/resume checks stay independent of manual tests.
 S.version = 22;
