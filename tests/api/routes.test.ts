@@ -277,6 +277,49 @@ describe("API", () => {
     expect(store.displays[0].status).toBe("active");
   });
 
+  it("disconnect revokes the token, drops only the group membership, and keeps content", async () => {
+    const created = await call(createPair, "http://localhost/api/player/pair", { method: "POST", body: "{}" });
+    const { code, secret, sessionId } = created.body as { code: string; secret: string; sessionId: string };
+    const claimed = await call(claimPair, "http://localhost/api/displays/pair", auth("token-a", {
+      method: "POST",
+      body: JSON.stringify({ code, name: "Counter" }),
+    }));
+    const displayId = claimed.body?.id as string;
+    const paired = await call(pairStatus, "http://localhost/api/player/pair/status", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, secret }),
+    });
+    const token = paired.body?.token as string;
+    const display = store.displays.find((row) => row.id === displayId);
+    const account = String(display?.account_id);
+    const otherId = "10000000-0000-4000-8000-000000000099";
+    const groupId = "10000000-0000-4000-8000-0000000000aa";
+    const playlistId = "10000000-0000-4000-8000-0000000000bb";
+    const scheduleId = "10000000-0000-4000-8000-0000000000cc";
+    store.displays.push({ id: otherId, account_id: account, name: "Patio", status: "active", token_hash: "other" });
+    store.screen_groups.push({ id: groupId, account_id: account, name: "Front" });
+    store.screen_group_members.push(
+      { id: "10000000-0000-4000-8000-0000000000d1", account_id: account, group_id: groupId, display_id: displayId },
+      { id: "10000000-0000-4000-8000-0000000000d2", account_id: account, group_id: groupId, display_id: otherId },
+    );
+    store.playlists.push({ id: playlistId, account_id: account, name: "Lunch" });
+    store.schedules.push({ id: scheduleId, account_id: account, name: "Morning", display_id: displayId, playlist_id: playlistId, group_id: null });
+
+    const gone = await call(disconnectDisplay, `http://localhost/api/displays/${displayId}`, auth("token-a", { method: "DELETE" }), displayId);
+    expect(gone.status).toBe(200);
+    expect(gone.body).toEqual({ ok: true });
+    expect(display).toMatchObject({ status: "revoked", token_hash: null });
+    expect(store.screen_group_members.map((row) => row.display_id)).toEqual([otherId]);
+    expect(store.screen_groups).toHaveLength(1);
+    expect(store.schedules).toHaveLength(1);
+    expect(store.playlists).toHaveLength(1);
+    expect(store.displays.find((row) => row.id === otherId)?.status).toBe("active");
+    const revoked = await call(playerState, "http://localhost/api/player/state", { headers: { "X-Display-Token": token } });
+    expect(revoked.status).toBe(401);
+    const list = await call(listDisplays, "http://localhost/api/displays", auth("token-a"));
+    expect(list.body?.map((row: { id: string }) => row.id)).toEqual([otherId]);
+  });
+
   it("expires pairing codes and rate-limits guesses", async () => {
     expect((await call(claimPair, "http://localhost/api/displays/pair", auth("token-a", {
       method: "POST",

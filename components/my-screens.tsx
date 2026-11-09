@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
+import { api, useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
 import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components/tv";
 import { syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
@@ -9,6 +9,8 @@ import { GroupPublish } from "@/components/group-publish";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { IconTv } from "@/components/icons";
 import { ScreenActions } from "@/components/screen-actions";
+import { useConfirm } from "@/components/confirm";
+import { useToast } from "@/components/toast";
 
 export function MyScreens() {
   const displays = useApi<DisplayItem[]>("/api/displays", 10_000);
@@ -62,9 +64,26 @@ export function MyScreens() {
 export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: DisplayItem }) {
   const displays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
   const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(fixture ? null : `/api/displays/${id}/timeline`, 10_000);
+  const confirm = useConfirm();
+  const toast = useToast();
   const display = fixture ?? displays.data?.find((item) => item.id === id);
   if (!fixture && !displays.data) return <LoadState error={displays.error} label="Loading this screen…" />;
   if (!display) return <EmptyState title="That screen is not in this account">It may have been disconnected. <Link href="/dashboard/screens" className="underline font-semibold">Back to My Screens</Link>.</EmptyState>;
+  async function removeScreen() {
+    const ok = await confirm.ask({
+      title: "Remove this screen?",
+      body: `Remove “${display!.name}”? The TV goes back to a pairing code. Playlists, media, and other screens stay.`,
+      confirmLabel: "Remove screen",
+      danger: true,
+    });
+    if (ok !== true) return;
+    try {
+      await api(`/api/displays/${display!.id}`, { method: "DELETE" });
+      location.assign("/dashboard/screens");
+    } catch (err) {
+      toast.show((err as Error).message, true);
+    }
+  }
   const preview = display.boardPreviewUrl || display.media?.url || display.playlist?.url;
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
   return (
@@ -72,6 +91,7 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
       <PageHeader title={display.name} eyebrow="Screen" lede={display.location ? `${display.location.name} · ${display.location.timezone}` : "No location yet"} icon={<IconTv />}>
         <Link href="/dashboard/screens" className="btn min-h-11">All screens</Link>
         <Link href="/dashboard/displays#add-screen" className="btn min-h-11">Add screen</Link>
+        {fixture ? null : <button type="button" className="btn btn-quiet text-danger min-h-11" onClick={() => { void removeScreen(); }}>Remove screen</button>}
       </PageHeader>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="card p-4 min-w-0">
@@ -93,6 +113,8 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
           ) : null}
           <ScreenActions display={display} preview={Boolean(fixture)} onChanged={() => displays.reload()} />
         </article>
+        {confirm.node}
+        {toast.node}
         <article className="card p-4 min-w-0">
           <h2 className="font-semibold">Preview</h2>
           <p className="text-sm text-muted mt-1">This is a preview of the assigned file, not a live picture of the TV.</p>

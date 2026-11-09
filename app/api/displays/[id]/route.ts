@@ -122,9 +122,18 @@ export async function DELETE(req: Request, { params }: Ctx) {
     .update({ status: "revoked", token_hash: null })
     .eq("id", id)
     .eq("account_id", admin.accountId)
+    .eq("status", "active")
     .select("id")
     .maybeSingle();
   if (error) return fail("Couldn't disconnect. Try again.", 500);
   if (!data) return fail("Display not found.", 404);
+
+  // The group stays. Only this screen's membership row goes. Schedules, playlists, and media stay.
+  const members = await db()
+    .from("screen_group_members")
+    .delete()
+    .eq("account_id", admin.accountId)
+    .eq("display_id", id);
+  if (members.error && !isMissingSchema(members.error)) return fail("Couldn't disconnect. Try again.", 500);
   return json({ ok: true });
 }

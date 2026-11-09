@@ -28,7 +28,7 @@ Pairing is two steps. The TV creates a code. The phone submits that code. The ph
 | `POST /api/displays/pair` | Body `{ code, name }`. Claims the code for this account. 429 after too many tries. When billing enforcement is on, the database can reject with `screen_limit` or `subscription_inactive` | `app/api/displays/pair/route.ts` |
 | `GET /api/displays` | Screens, assignment, online state, `playerError` | `app/api/displays/route.ts` |
 | `PATCH /api/displays/:id` | `{ name }`, `{ locationId }` (null clears), or `{ mediaId }` for one image. A video is not assigned here | `app/api/displays/[id]/route.ts` |
-| `DELETE /api/displays/:id` | Disconnect the screen | same |
+| `DELETE /api/displays/:id` | Remove the screen. No body. Bearer session. `{ ok: true }`. Revokes the device token, drops this screen's group membership, and leaves playlists, media, menus, and schedules | same |
 | `GET /api/remote/screens` | Screens that can be controlled. `playback.slide` and `playback.count` are playlist slides. `index` and `total` are the same slide position. They are never zones | `lib/server/remote.ts` |
 | `POST /api/remote/screens/:id/command` | `{ command: "next" \| "prev" }` | `app/api/remote/screens/[id]/command/route.ts` |
 | `POST /api/remote/screens/:id/playback-mode` | `{ playbackMode: "auto" \| "manual" }` | `app/api/remote/screens/[id]/playback-mode/route.ts` |
