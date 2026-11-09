@@ -333,7 +333,7 @@ export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): Layout
     "menu-banner": board(template, {
       split: 0.18, palette: "classic", primaryColor: null, accentColor: null, typeScale: "room",
       title: "Field & Vine", subtitle: "Groceries and lunch", footer: "Members save 10% after 4",
-      featureTitle: "", featureDetail: "",
+      featureTitle: "Today's counter", featureDetail: "Groceries until 7",
       sections: [
         { name: "Counter", items: [
           { name: "Soup and salad", price: "$11", description: "Rotates daily" },
@@ -642,7 +642,24 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const footerY = doc.template === "signature" ? BOARD_H - 78 : BOARD_H - 40;
     parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${family}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w))}</text>`);
   }
-  if (feature.h >= 280 && doc.template !== "triple-column") {
+  if (doc.template === "menu-banner") {
+    const head = doc.featureTitle || "Today";
+    const detail = doc.featureDetail || "";
+    const hx = 72;
+    const headSize = Math.max(28, Math.min(44, Math.round(feature.h * 0.28)));
+    const headY = feature.y + Math.round(feature.h * (detail ? 0.46 : 0.62));
+    if (!href) {
+      parts.push(`<rect x="${feature.x}" y="${feature.y}" width="10" height="${feature.h}" fill="${colors.featureInk}"/>`);
+      parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="${headSize}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120))}</text>`);
+      if (detail) parts.push(`<text x="${hx}" y="${Math.min(feature.y + feature.h - 24, headY + headSize)}" font-family="${family}" font-size="${Math.max(16, headSize - 12)}" fill="${colors.featureInk}">${esc(fitWidth(detail, headSize - 12, feature.w - 120))}</text>`);
+    } else {
+      const bandH = Math.min(84, Math.max(48, Math.round(feature.h * 0.42)));
+      const bandY = feature.y + feature.h - bandH;
+      parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${bandH}" fill="${colors.feature}"/>`);
+      parts.push(`<text x="${hx}" y="${bandY + Math.round(bandH * 0.42)}" font-family="${family}" font-size="${Math.min(32, headSize)}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120))}</text>`);
+      if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${family}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120))}</text>`);
+    }
+  } else if (feature.h >= 280 && doc.template !== "triple-column") {
     const head = doc.featureTitle || "Featured";
     const hx = feature.x + 48;
     if (!href) {

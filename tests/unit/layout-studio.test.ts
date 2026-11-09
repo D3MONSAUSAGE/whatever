@@ -369,9 +369,13 @@ describe("player composition contract", () => {
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
     const editor = readFileSync("components/layout-studio.tsx", "utf8");
     expect(editor).toContain("Each column is 20% to 60%");
-    expect(editor).toContain("TV output");
-    expect(editor).toContain("Upload video");
+    expect(editor).toContain("TV preview");
+    expect(editor).toContain("Upload new");
+    expect(editor).toContain("Edit feature zone");
+    expect(editor).toContain("position: sticky");
+    expect(editor).toContain("min-height: 44px");
     const banner = layoutSvg(sampleLayout("menu-banner"));
+    expect(banner).toContain("Today's counter");
     const flower = banner.indexOf("Flowers");
     const flowerY = Number(banner.slice(Math.max(0, flower - 160), flower).match(/y="([\d.]+)"/g)?.at(-1)?.match(/[\d.]+/)?.[0]);
     expect(flowerY).toBeGreaterThan(700);

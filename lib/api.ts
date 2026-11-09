@@ -99,7 +99,7 @@ export async function authToken() {
 }
 
 export function uploadForm(path: string, form: FormData, token: string, onProgress: (percent: number) => void) {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<{ id?: string; error?: string }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", path);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -107,8 +107,8 @@ export function uploadForm(path: string, form: FormData, token: string, onProgre
       if (event.lengthComputable && event.total > 0) onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
     };
     xhr.onload = () => {
-      let body: { error?: string } = {};
-      try { body = JSON.parse(xhr.responseText) as { error?: string }; } catch { body = {}; }
+      let body: { id?: string; error?: string } = {};
+      try { body = JSON.parse(xhr.responseText) as { id?: string; error?: string }; } catch { body = {}; }
       if (xhr.status === 401) {
         window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
         reject(new Error("Sign in to continue."));
@@ -123,7 +123,7 @@ export function uploadForm(path: string, form: FormData, token: string, onProgre
         return;
       }
       onProgress(100);
-      resolve();
+      resolve(body);
     };
     xhr.onerror = () => reject(new Error("Upload failed. Check your connection and try again."));
     xhr.send(form);
