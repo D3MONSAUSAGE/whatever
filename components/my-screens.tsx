@@ -56,11 +56,11 @@ export function MyScreens() {
   );
 }
 
-export function ScreenWorkspace({ id }: { id: string }) {
-  const displays = useApi<DisplayItem[]>("/api/displays", 10_000);
-  const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(`/api/displays/${id}/timeline`, 10_000);
-  const display = displays.data?.find((item) => item.id === id);
-  if (!displays.data) return <LoadState error={displays.error} label="Loading this screen…" />;
+export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: DisplayItem }) {
+  const displays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
+  const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(fixture ? null : `/api/displays/${id}/timeline`, 10_000);
+  const display = fixture ?? displays.data?.find((item) => item.id === id);
+  if (!fixture && !displays.data) return <LoadState error={displays.error} label="Loading this screen…" />;
   if (!display) return <EmptyState title="That screen is not in this account">It may have been disconnected. <Link href="/dashboard/screens" className="underline font-semibold">Back to My Screens</Link>.</EmptyState>;
   const preview = display.boardPreviewUrl || display.media?.url || display.playlist?.url;
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
@@ -88,7 +88,7 @@ export function ScreenWorkspace({ id }: { id: string }) {
           {!contentLabel(display) || contentLabel(display) === "No content assigned" ? (
             <p className="text-sm mt-3">Nothing is assigned. <Link href="/dashboard/media" className="underline font-semibold">Add media</Link> or <Link href={`/dashboard/media/layout-studio?screen=${display.id}`} className="underline font-semibold">open Layout Studio</Link>.</p>
           ) : null}
-          <ScreenActions display={display} onChanged={() => displays.reload()} />
+          <ScreenActions display={display} preview={Boolean(fixture)} onChanged={() => displays.reload()} />
         </article>
         <article className="card p-4 min-w-0">
           <h2 className="font-semibold">Preview</h2>

@@ -13,16 +13,16 @@ type MenuRow = { id: string; name: string; playlistId: string | null };
 
 const DEFAULT_SLIDE_MS = 10_000;
 
-export function ScreenActions({ display, onChanged }: { display: DisplayItem; onChanged: () => void }) {
+export function ScreenActions({ display, onChanged, preview = false }: { display: DisplayItem; onChanged: () => void; preview?: boolean }) {
   const [panel, setPanel] = useState<Panel>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const uploads = useUploads();
   const confirm = useConfirm();
-  const media = useApi<MediaItem[]>(panel === "change" || panel === "playlist" || panel === "upload" ? "/api/media" : null);
-  const playlists = useApi<PlaylistSummary[]>(panel === "change" || panel === "schedule" || panel === "playlist" ? "/api/playlists" : null);
-  const boards = useApi<{ boards: Board[] }>(panel === "change" || panel === "create" ? "/api/layout-studio/boards" : null);
-  const menus = useApi<{ menus: MenuRow[] }>(panel === "change" ? "/api/menus" : null);
+  const media = useApi<MediaItem[]>(!preview && (panel === "change" || panel === "playlist" || panel === "upload") ? "/api/media" : null);
+  const playlists = useApi<PlaylistSummary[]>(!preview && (panel === "change" || panel === "schedule" || panel === "playlist") ? "/api/playlists" : null);
+  const boards = useApi<{ boards: Board[] }>(!preview && (panel === "change" || panel === "create") ? "/api/layout-studio/boards" : null);
+  const menus = useApi<{ menus: MenuRow[] }>(!preview && panel === "change" ? "/api/menus" : null);
   const wasUploading = useRef(false);
   const reloadMedia = media.reload;
 

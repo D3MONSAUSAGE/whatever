@@ -5,6 +5,7 @@ import { OverviewScreen } from "@/components/overview-screen";
 import { MediaLibrary } from "@/components/media-library";
 import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
+import { ScreenWorkspace } from "@/components/my-screens";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 
@@ -95,6 +96,7 @@ export function PreviewApp() {
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
+      {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} /> : null}
     </DashboardShell>
   );
 }
