@@ -150,6 +150,7 @@ function server(method, url, body, headers) {
     if (body && body.playback) { S.playbackReports = (S.playbackReports || []).concat([body.playback]); return [200, { ok: true }]; }
     S.playerErrorPosts++;
     S.playerError = body && body.error ? String(body.error) : "";
+    if (body && body.error) S.errorLog = (S.errorLog || []).concat([S.playerError]);
     return [200, { ok: true }];
   }
   if (url.startsWith("/api/player/state")) {
@@ -404,7 +405,7 @@ S.playlist = {
   ],
 };
 run(15000);
-check("unsupported video is reported and the next image stays up", S.playerError.indexOf("can't play") !== -1 && (shownUrl() || "").indexOf("a.jpg") !== -1 && S.playerErrorPosts > 0);
+check("unsupported video is reported and the next image stays up", (S.errorLog || []).some((line) => line.indexOf("can't play") !== -1) && (shownUrl() || "").indexOf("a.jpg") !== -1 && S.playerErrorPosts > 0);
 
 S.version = 13;
 S.playerError = "";
@@ -417,7 +418,7 @@ S.playlist = {
   ],
 };
 run(15000);
-check("blocked autoplay skips to the next item", S.playerError.indexOf("autoplay") !== -1 && (shownUrl() || "").indexOf("c.jpg") !== -1);
+check("blocked autoplay skips to the next item", (S.errorLog || []).some((line) => line.indexOf("autoplay") !== -1) && (shownUrl() || "").indexOf("c.jpg") !== -1);
 
 S.version = 14;
 S.playerError = "";
@@ -430,7 +431,7 @@ S.playlist = {
   ],
 };
 run(40000);
-check("a video that never starts skips after the timeout", S.playerError.indexOf("did not start") !== -1 && (shownUrl() || "").indexOf("c.jpg") !== -1);
+check("a video that never starts skips after the timeout", (S.errorLog || []).some((line) => line.indexOf("did not start") !== -1) && (shownUrl() || "").indexOf("c.jpg") !== -1);
 
 S.version = 15;
 S.playerError = "";
@@ -444,7 +445,7 @@ S.playlist = {
 };
 mediaLog = [];
 run(35000);
-check("a stalled video skips to the next item", S.playerError.indexOf("stalled") !== -1 && mediaLog.map(clipName).join(",").indexOf("freeze,a") !== -1);
+check("a stalled video skips to the next item", (S.errorLog || []).some((line) => line.indexOf("stalled") !== -1) && mediaLog.map(clipName).join(",").indexOf("freeze,a") !== -1);
 
 S.version = 16;
 S.playlist = {
@@ -667,6 +668,45 @@ for (let step = 0; step < 40 && (shownUrl() || "").indexOf("cold.jpg") === -1; s
 check("a playing event without a frame does not acknowledge the version", (shownUrl() || "").indexOf("cold.jpg") !== -1 && S.playing.indexOf(34) === -1);
 run(1500);
 check("the version is acknowledged after the element has a frame", S.playing.indexOf(34) !== -1);
+
+S.version = 36;
+S.layoutStudio = true;
+S.playerError = "";
+S.playing = [];
+S.playlist = {
+  id: "then-image",
+  transition: "none",
+  playbackMode: "auto",
+  items: [{
+    mediaId: "mixstill", url: "https://cdn/mixstill.jpg", durationMs: 1500, kind: "image",
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/mixstill.jpg", video: { mediaId: "mixstall", url: "https://cdn/stall-mix.mp4", box: box } },
+  }, {
+    mediaId: "mixnext", url: "https://cdn/mixnext.jpg", durationMs: 30000, kind: "image",
+  }],
+};
+for (let step = 0; step < 40 && (shownUrl() || "").indexOf("mixstill.jpg") === -1; step++) run(500);
+for (let step = 0; step < 30 && (shownUrl() || "").indexOf("mixnext.jpg") === -1; step++) run(500);
+run(800);
+check("a later image with no version clears the zone fallback note", (shownUrl() || "").indexOf("mixnext.jpg") !== -1 && S.playerError === "" && (S.errorLog || []).some((line) => line.indexOf("still image is showing") !== -1));
+
+S.version = 37;
+S.playerError = "";
+S.playing = [];
+S.playlist = {
+  id: "then-video",
+  transition: "none",
+  playbackMode: "auto",
+  items: [{
+    mediaId: "mixstill2", url: "https://cdn/mixstill2.jpg", durationMs: 1500, kind: "image",
+    composition: { layoutVersion: 1, fallbackUrl: "https://cdn/mixstill2.jpg", video: { mediaId: "mixstall2", url: "https://cdn/stall-mix2.mp4", box: box } },
+  }, {
+    mediaId: "mixok", url: "https://cdn/mixok.mp4?dur=3000", durationMs: 4000, kind: "video",
+  }],
+};
+for (let step = 0; step < 40 && (shownUrl() || "").indexOf("mixstill2.jpg") === -1; step++) run(500);
+for (let step = 0; step < 30 && (shownVideo() || "").indexOf("mixok.mp4") === -1; step++) run(500);
+run(800);
+check("a later full-screen video with no version clears the zone fallback note", (shownVideo() || "").indexOf("mixok.mp4") !== -1 && S.playerError === "");
 
 S.version = 31;
 S.layoutStudio = true;

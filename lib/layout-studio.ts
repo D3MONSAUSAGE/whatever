@@ -131,6 +131,14 @@ export function boxesOverlap(a: ZoneBox, b: ZoneBox) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+/** The player's numeric guard. A 1919×1080 box at 0,0 passes. Menu overlap is not checked here. */
+export function clientAcceptsZoneBox(box: ZoneBox) {
+  if (box.w < 1 || box.h < 1 || box.x < 0 || box.y < 0) return false;
+  if (box.x + box.w > BOARD_W || box.y + box.h > BOARD_H) return false;
+  if (box.w >= BOARD_W && box.h >= BOARD_H) return false;
+  return true;
+}
+
 function text(value: unknown, max: number): string | null {
   if (value == null) return "";
   if (typeof value !== "string") return null;
@@ -478,6 +486,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${BOARD_H - 96}" fill="${colors.paper}"/>`);
   } else if (doc.template === "menu-banner") {
     parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
+    if (href) parts.push(`<image href="${esc(href)}" x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="xMidYMid slice"/>`);
   } else if (doc.template !== "triple-column") {
     parts.push(`<rect x="${frame.menu.x}" y="${frame.menu.y}" width="${frame.menu.w}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
   }

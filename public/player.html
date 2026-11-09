@@ -762,7 +762,8 @@
       pinUrl(item, url);
       showVideo(v);
       slideIndex = index;
-      if (typeof versionOrNull === 'number') { shownVersion = versionOrNull; clearReportedError(); }
+      if (typeof versionOrNull === 'number') shownVersion = versionOrNull;
+      clearReportedError();
       if (typeof shownVersion === 'number') markPainted(shownVersion);
       preloadIndex((index + 1) % playlist.items.length);
       watchPlayback();
@@ -855,7 +856,7 @@
         });
         return;
       }
-      ackShown(versionOrNull);
+      ackShown(versionOrNull, false);
       preloadIndex((index + 1) % playlist.items.length);
       scheduleAdvance(index, item);
     }
@@ -923,8 +924,8 @@
     if (!video || !video.url || !box) return null;
     if (typeof box.x !== 'number' || typeof box.y !== 'number' || typeof box.w !== 'number' || typeof box.h !== 'number') return null;
     if (box.w < 1 || box.h < 1) return null;
-    // Server geometry is the contract. This only rejects a box outside the board
-    // or a full-bleed box, which would cover menu text.
+    // Inside the 1920x1080 board, and not the entire board. 1919x1080 at 0,0 still passes.
+    // This does not know a template's menu rectangle. The server sends frame.video.
     if (box.x < 0 || box.y < 0) return null;
     if (box.x + box.w > 1920 || box.y + box.h > 1080) return null;
     if (box.w >= 1920 && box.h >= 1080) return null;

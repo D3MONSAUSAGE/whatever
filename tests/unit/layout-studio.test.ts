@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  BOARD_H, BOARD_W, boxesOverlap, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, MENU_LIMITS, paintAfterStill,
+  BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, MENU_LIMITS, paintAfterStill,
   paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, type LayoutTemplate, type ZoneBox,
 } from "@/lib/layout-studio";
 import { renderLayoutPng } from "@/lib/server/layout-render";
@@ -181,6 +181,19 @@ describe("player composition contract", () => {
     expect(player).toContain("placeZoneVideo(item, versionOrNull, token, function () {");
     expect(player).toContain("else if (degraded === false) clearReportedError();");
     expect(player).toContain("box.x + box.w > 1920");
+    expect(player).toContain("1919x1080 at 0,0 still passes");
+    expect(clientAcceptsZoneBox({ x: 0, y: 0, w: 1919, h: 1080 })).toBe(true);
+    expect(clientAcceptsZoneBox({ x: 0, y: 0, w: 1920, h: 1080 })).toBe(false);
+    for (const template of templates) {
+      const safe = frameFor(template, sampleLayout(template).split);
+      if (!safe.video) continue;
+      expect(clientAcceptsZoneBox(safe.video)).toBe(true);
+      expect(boxesOverlap(safe.menu, safe.video)).toBe(false);
+    }
+    const bannerPhoto = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const bannerBoard = layoutSvg(sampleLayout("menu-banner"), { imageHref: bannerPhoto });
+    expect(bannerBoard).toContain("<image ");
+    expect(bannerBoard.indexOf("<image ")).toBeGreaterThan(bannerBoard.indexOf(`height="${frameFor("menu-banner", 0.18).menu.h}"`));
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
     expect(player).toContain("layout-studio-published-v1");
     expect(player).toContain("if (!zoneVideo(items[startAt])) shownVersion = version;");
