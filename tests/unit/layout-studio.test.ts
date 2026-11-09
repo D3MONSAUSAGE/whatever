@@ -1,10 +1,63 @@
 import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
+import { Resvg } from "@resvg/resvg-js";
 import {
-  BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, MENU_LIMITS, paintAfterStill,
-  paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, type LayoutTemplate, type ZoneBox,
+  BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, containedBoard, fontFamily, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, MENU_LIMITS, paintAfterStill, zoneOnBoard,
+  paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, zoneVideoStyle, type LayoutTemplate, type ZoneBox,
 } from "@/lib/layout-studio";
 import { renderLayoutPng } from "@/lib/server/layout-render";
+
+function pngPixel(png: Buffer, x: number, y: number): [number, number, number] {
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let colorType = 2;
+  const idats: Buffer[] = [];
+  while (offset + 8 <= png.length) {
+    const len = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const data = png.subarray(offset + 8, offset + 8 + len);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      colorType = data[9];
+    } else if (type === "IDAT") idats.push(Buffer.from(data));
+    else if (type === "IEND") break;
+    offset += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idats));
+  const bpp = colorType === 6 ? 4 : 3;
+  const stride = width * bpp;
+  let cursor = 0;
+  let prev = Buffer.alloc(stride);
+  const rows: Buffer[] = [];
+  for (let row = 0; row < height; row++) {
+    const filter = raw[cursor];
+    cursor += 1;
+    const cur = Buffer.from(raw.subarray(cursor, cursor + stride));
+    cursor += stride;
+    const paeth = (left: number, up: number, ul: number) => {
+      const p = left + up - ul;
+      const pa = Math.abs(p - left);
+      const pb = Math.abs(p - up);
+      const pc = Math.abs(p - ul);
+      return pa <= pb && pa <= pc ? left : pb <= pc ? up : ul;
+    };
+    for (let c = 0; c < stride; c++) {
+      const left = c >= bpp ? cur[c - bpp] : 0;
+      const up = prev[c];
+      const ul = c >= bpp ? prev[c - bpp] : 0;
+      const pred = filter === 1 ? left : filter === 2 ? up : filter === 3 ? Math.floor((left + up) / 2) : filter === 4 ? paeth(left, up, ul) : 0;
+      cur[c] = (cur[c] + pred) & 255;
+    }
+    rows.push(cur);
+    prev = cur;
+  }
+  const sample = rows[y];
+  const at = x * bpp;
+  return [sample[at], sample[at + 1], sample[at + 2]];
+}
 
 const templates: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature"];
 
@@ -194,7 +247,76 @@ describe("player composition contract", () => {
     const bannerBoard = layoutSvg(sampleLayout("menu-banner"), { imageHref: bannerPhoto });
     expect(bannerBoard).toContain("<image ");
     expect(bannerBoard.indexOf("<image ")).toBeGreaterThan(bannerBoard.indexOf(`height="${frameFor("menu-banner", 0.18).menu.h}"`));
+    const colored = parseLayout({
+      ...sampleLayout("menu-promo-67"),
+      font: "noto-serif",
+      textColor: "#112233",
+      backgroundColor: "#f4efe4",
+    });
+    expect(colored.ok).toBe(true);
+    if (colored.ok) {
+      const board = layoutSvg(colored.value);
+      expect(board).toContain(`font-family="${fontFamily("noto-serif")}"`);
+      expect(board).toContain('fill="#112233"');
+      expect(board).toContain('fill="#f4efe4"');
+      const inter = renderLayoutPng({ ...colored.value, font: "inter" });
+      const serif = renderLayoutPng(colored.value);
+      expect(Buffer.compare(inter, serif)).not.toBe(0);
+      const feature = frameFor("menu-promo-67", colored.value.split).feature;
+      const image = layoutSvg(colored.value, { imageHref: bannerPhoto });
+      expect(image).toContain(`x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="xMidYMid slice"`);
+      const red = new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="20"><rect width="80" height="20" fill="#ff0000"/></svg>`).render().asPng();
+      const painted = renderLayoutPng(colored.value, { bytes: red, mime: "image/png" });
+      expect(painted.readUInt32BE(16)).toBe(1920);
+      expect(painted.readUInt32BE(20)).toBe(1080);
+      const menuPixel = pngPixel(painted, 120, 420);
+      const featurePixel = pngPixel(painted, feature.x + Math.floor(feature.w / 2), 420);
+      expect(menuPixel[1]).toBeGreaterThan(180);
+      expect(featurePixel[0]).toBeGreaterThan(200);
+      expect(featurePixel[1]).toBeLessThan(40);
+      const safe = zoneVideoStyle(frameFor("menu-promo-67", 0.67).video!);
+      expect(safe.objectFit).toBe("contain");
+      expect(safe.left.startsWith("66.")).toBe(true);
+      expect(Number(safe.width.replace("%", ""))).toBeLessThan(40);
+      const full = Array.from({ length: 4 }, (_, section) => ({
+        name: `Section ${section + 1}`,
+        items: Array.from({ length: 6 }, (_, item) => ({
+          name: `Item ${section + 1}-${item + 1}`,
+          price: "$4",
+          description: `Line ${section + 1}-${item + 1}`,
+        })),
+      }));
+      const fullDoc = parseLayout({ ...sampleLayout("menu-promo-67"), sections: full });
+      expect(fullDoc.ok).toBe(true);
+      if (fullDoc.ok) {
+        const drawn = layoutSvg(fullDoc.value);
+        for (const section of full) {
+          expect(drawn).toContain(section.name.toUpperCase());
+          for (const item of section.items) {
+            expect(drawn).toContain(item.name);
+            expect(drawn).toContain(item.description);
+          }
+        }
+        const ys = [...drawn.matchAll(/y="([\d.]+)"/g)].map((match) => Number(match[1]));
+        expect(Math.max(...ys)).toBeLessThanOrEqual(1080);
+      }
+    }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
+    expect(player).toContain("function boardFrame()");
+    expect(player).toContain("layer.style.backgroundSize");
+    const phone = containedBoard(400, 985);
+    expect(phone.left).toBe(0);
+    expect(phone.top).toBeGreaterThan(300);
+    expect(phone.width).toBeCloseTo(400);
+    const promo = frameFor("menu-promo-67", 0.67).video!;
+    const placed = zoneOnBoard(400, 985, promo);
+    expect(placed.left).toBeGreaterThanOrEqual(phone.left - 0.01);
+    expect(placed.left + placed.width).toBeLessThanOrEqual(phone.left + phone.width + 0.01);
+    expect(placed.top).toBeGreaterThanOrEqual(phone.top - 0.01);
+    expect(placed.top + placed.height).toBeLessThanOrEqual(phone.top + phone.height + 0.01);
+    const wide = containedBoard(1920, 800);
+    expect(wide.top).toBeCloseTo(0);
+    expect(wide.left).toBeGreaterThan(100);
     expect(player).toContain("layout-studio-published-v1");
     expect(player).toContain("if (!zoneVideo(items[startAt])) shownVersion = version;");
     expect(player).toContain("v.muted = true;");

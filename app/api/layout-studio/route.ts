@@ -1,10 +1,20 @@
 import { fail, json, readJson } from "@/lib/server/http";
 import { requireAdmin } from "@/lib/server/auth";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
-import { saveLayoutForAccount } from "@/lib/server/layout-boards";
+import { loadLayoutStudio, saveLayoutForAccount } from "@/lib/server/layout-boards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Account load. Refuses before any database call unless LAYOUT_STUDIO is exactly "1". */
+export async function GET(req: Request) {
+  if (!layoutStudioEnabled()) return fail("Not found", 404);
+  const admin = await requireAdmin(req);
+  if (admin instanceof Response) return admin;
+  const loaded = await loadLayoutStudio(admin.accountId);
+  if ("error" in loaded) return fail(loaded.error, loaded.status);
+  return json({ boards: loaded.boards, legacy: loaded.legacy, library: loaded.library });
+}
 
 /** Account save. Refuses before any database call unless LAYOUT_STUDIO is exactly "1". */
 export async function POST(req: Request) {

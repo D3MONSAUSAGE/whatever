@@ -1,7 +1,57 @@
-import { layoutStudioEnabled } from "@/lib/layout-studio";
+import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { applyLayoutSave, type LibraryFile } from "@/lib/layout-publish";
 import { imageDataUri } from "@/lib/server/brand";
-import { db } from "@/lib/server/supabase";
+import { BUCKET, db } from "@/lib/server/supabase";
+function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
+  if (kind === "video") return "video";
+  if (kind === "presentation") return null;
+  if (mime === "image/jpeg" || mime === "image/png") return "image";
+  return null;
+}
+
+/** Boards and library for the signed-in account. Flag off never reaches the database. */
+export async function loadLayoutStudio(accountId: string) {
+  if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
+  const menus = await db().from("menus").select("id, name, content, media_id, playlist_id").eq("account_id", accountId);
+  if (menus.error) return { status: 500 as const, error: "Couldn't load boards." };
+  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path").eq("account_id", accountId);
+  if (media.error) return { status: 500 as const, error: "Couldn't load your media library." };
+  const rows = (media.data ?? []).flatMap((row) => {
+    const mime = String(row.mime_type ?? "");
+    const kind = libraryKind(row.kind, mime);
+    if (!kind) return [];
+    return [{ id: String(row.id), name: String(row.file_name ?? "File"), kind, mime, path: String(row.storage_path ?? "") }];
+  });
+  const paths = rows.map((row) => row.path).filter((path) => path.startsWith(`${accountId}/`));
+  const signed = paths.length ? await db().storage.from(BUCKET).createSignedUrls(paths, 3600) : { data: [], error: null };
+  const urls = new Map<string, string>();
+  for (const row of signed.data ?? []) {
+    if (row.path && row.signedUrl) urls.set(row.path, row.signedUrl);
+  }
+  const boards = [];
+  const legacy = [];
+  for (const menu of menus.data ?? []) {
+    const parsed = parseLayout(menu.content);
+    if (!parsed.ok) {
+      legacy.push({ id: String(menu.id), name: String(menu.name) });
+      continue;
+    }
+    boards.push({
+      id: String(menu.id),
+      name: String(menu.name),
+      document: parsed.value,
+      mediaId: menu.media_id ? String(menu.media_id) : null,
+      playlistId: menu.playlist_id ? String(menu.playlist_id) : null,
+    });
+  }
+  return {
+    status: 200 as const,
+    boards,
+    legacy,
+    library: rows.map((row) => ({ id: row.id, name: row.name, kind: row.kind, mime: row.mime, url: urls.get(row.path) ?? null })),
+  };
+}
+
 export async function saveLayoutForAccount(accountId: string, body: {
   menuId?: string | null;
   name?: string;

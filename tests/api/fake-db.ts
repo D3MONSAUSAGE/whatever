@@ -18,6 +18,7 @@ export type Store = {
   promos: Row[];
   display_playback: Row[];
   display_commands: Row[];
+  menus: Row[];
   objects: Map<string, Uint8Array>;
   /** Missing key means "uploaded now". Null means the storage listing has no created_at. */
   objectTimes: Map<string, string | null>;
@@ -27,7 +28,7 @@ export type Store = {
 const TABLE_NAMES = [
   "accounts", "locations", "media", "displays", "playlists", "playlist_items",
   "pairing_sessions", "rate_limits", "screen_groups", "screen_group_members", "schedules", "promos",
-  "display_playback", "display_commands",
+  "display_playback", "display_commands", "menus",
 ] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
@@ -328,6 +329,49 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     display.assigned_media_id = args.p_media_id;
     display.assigned_playlist_id = null;
     display.content_version = Number(display.content_version) + 1;
+    return true;
+  }
+  if (name === "menu_create_playlist") {
+    const media = store.media.find((item) => item.id === args.p_media_id && item.account_id === args.p_account_id);
+    if (!media) return null;
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    store.playlists.push({
+      id, account_id: args.p_account_id, name: String(args.p_name ?? "Menu").slice(0, 80),
+      revision: 1, updated_at: now, default_duration_ms: 10000, transition: "none", playback_mode: "auto",
+    });
+    store.playlist_items.push({
+      id: crypto.randomUUID(), playlist_id: id, account_id: args.p_account_id, media_id: media.id,
+      kind: "published", position: 0, duration_ms: 10000, created_at: now,
+    });
+    return id;
+  }
+  if (name === "menu_swap_media") {
+    const next = store.media.find((item) => item.id === args.p_new_media_id && item.account_id === args.p_account_id);
+    if (!next) return false;
+    const previous = args.p_old_media_id;
+    if (previous == null) return true;
+    const touched = new Set<string>();
+    for (const item of store.playlist_items) {
+      if (item.account_id === args.p_account_id && item.media_id === previous) {
+        item.media_id = next.id;
+        touched.add(String(item.playlist_id));
+      }
+    }
+    for (const playlist of store.playlists) {
+      if (playlist.account_id === args.p_account_id && touched.has(String(playlist.id))) {
+        playlist.revision = Number(playlist.revision ?? 0) + 1;
+        playlist.updated_at = new Date().toISOString();
+      }
+    }
+    for (const display of store.displays) {
+      if (display.account_id !== args.p_account_id) continue;
+      if (touched.has(String(display.assigned_playlist_id))) display.content_version = Number(display.content_version) + 1;
+      if (display.assigned_media_id === previous) {
+        display.assigned_media_id = next.id;
+        display.content_version = Number(display.content_version) + 1;
+      }
+    }
     return true;
   }
   if (name === "delete_media") {
@@ -888,6 +932,7 @@ export function createFakeDb() {
     promos: [],
     display_playback: [],
     display_commands: [],
+    menus: [],
     objects: new Map(),
     objectTimes: new Map(),
     users: new Map(),

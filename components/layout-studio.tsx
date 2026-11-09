@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
-  frameFor, layoutSvg, MENU_LIMITS, parseLayout, sampleLayout, templateSpec,
+  accountSaveBody, applyLibraryFile, boardAfterReload, readAccountStudio,
+  type AccountStudio,
+} from "@/lib/layout-account";
+import {
+  containedBoard, frameFor, layoutSvg, MENU_LIMITS, parseLayout, sampleLayout, templateSpec,
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
+import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature"];
 const DRAFT_KEY = "layout-studio-draft-v1";
@@ -28,7 +33,10 @@ export function LayoutStudio() {
   const [imageHref, setImageHref] = useState<string | null>(null);
   const [videoOn, setVideoOn] = useState(true);
   const [published, setPublished] = useState<Snapshot | null>(null);
-  const [note, setNote] = useState("Nothing is saved to an account.");
+  const [account, setAccount] = useState<AccountStudio | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [note, setNote] = useState("This browser copy does not write an account.");
   const spec = templateSpec(template);
   const frame = frameFor(draft.template, draft.split);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
@@ -53,6 +61,31 @@ export function LayoutStudio() {
       }
       setNote("Restored the draft stored in this browser.");
     } catch { /* a bad draft is ignored */ }
+  }, []);
+
+  useEffect(() => {
+    if (!supabaseConfigured()) return;
+    let cancel = false;
+    getSupabase().auth.getSession().then(async ({ data }) => {
+      const token = data.session?.access_token;
+      if (!token || cancel) return;
+      const res = await fetch("/api/layout-studio", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok || cancel) return;
+      const loaded = readAccountStudio(await res.json().catch(() => null));
+      if (!loaded || cancel) return;
+      setSessionToken(token);
+      setAccount(loaded);
+      const board = boardAfterReload(loaded, null);
+      if (board) {
+        setMenuId(board.id);
+        setTemplate(board.document.template);
+        setDraft(board.document);
+        setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+        setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+      }
+      setNote(loaded.boards.length ? "Loaded the board saved on this account." : "Signed in. A draft will be stored on this account.");
+    }).catch(() => { /* no session: the browser preview stays local */ });
+    return () => { cancel = true; };
   }, []);
 
   function choose(next: LayoutTemplate) {
@@ -98,10 +131,60 @@ export function LayoutStudio() {
     setNote("Published preview is frozen in this browser. It was not sent to an account or a screen.");
   }
 
+  async function reloadAccount(token: string, preferId: string | null) {
+    const res = await fetch("/api/layout-studio", { headers: { Authorization: `Bearer ${token}` } });
+    const loaded = readAccountStudio(await res.json().catch(() => null));
+    if (!res.ok || !loaded) throw new Error("Couldn't reload the account.");
+    setAccount(loaded);
+    const board = boardAfterReload(loaded, preferId);
+    if (!board) return loaded;
+    setMenuId(board.id);
+    setTemplate(board.document.template);
+    setDraft(board.document);
+    setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+    return loaded;
+  }
+
+  async function saveAccount(mode: "draft" | "publish") {
+    const doc = checkedDraft();
+    if (!doc || !sessionToken) return;
+    const res = await fetch("/api/layout-studio", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${sessionToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(accountSaveBody({ mode, menuId, name: doc.title || "Menu", document: doc })),
+    });
+    const body = await res.json().catch(() => ({})) as { error?: string; menuId?: string };
+    if (!res.ok) { setNote(body.error || "Couldn't save the board."); return; }
+    const nextId = typeof body.menuId === "string" ? body.menuId : menuId;
+    await reloadAccount(sessionToken, nextId);
+    setNote(mode === "publish"
+      ? "Published to this account. The player uses the new image."
+      : "Draft reloaded from this account. Screens were not moved.");
+  }
+
   function onPhoto(file: File | undefined) {
     if (!file) { setImageHref(null); return; }
     if (file.type !== "image/jpeg" && file.type !== "image/png") { setNote("Use a JPEG or PNG."); return; }
-    if (file.size > 1_500_000) { setNote("Use a photo under 1.5 MB for this preview."); return; }
+    if (file.size > 1_500_000) { setNote("Use a photo under 1.5 MB."); return; }
+    if (sessionToken) {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("name", file.name);
+      fetch("/api/media", { method: "POST", headers: { Authorization: `Bearer ${sessionToken}` }, body: form })
+        .then(async (res) => {
+          const body = await res.json().catch(() => ({})) as { id?: string; error?: string };
+          if (!res.ok || !body.id) { setNote(body.error || "Couldn't upload that photo."); return; }
+          const loaded = await reloadAccount(sessionToken, menuId);
+          const entry = loaded.library.find((item) => item.id === body.id) ?? null;
+          if (entry) {
+            setDraft((current) => applyLibraryFile(current, entry, "photo"));
+            setImageHref(entry.url);
+          }
+          setNote("Photo is in this account's library.");
+        })
+        .catch(() => setNote("Couldn't upload that photo."));
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const href = typeof reader.result === "string" ? reader.result : null;
@@ -117,7 +200,7 @@ export function LayoutStudio() {
         <section>
           <p style={{ letterSpacing: "0.14em", textTransform: "uppercase", fontSize: 12, margin: 0 }}>Isolated preview</p>
           <h1 style={{ fontSize: 36, lineHeight: 1.1, margin: "8px 0" }}>Layout Studio</h1>
-          <p style={{ lineHeight: 1.5, marginTop: 0 }}>Edit the board, then open the real player check. This page does not sign in and does not write an account.</p>
+          <p style={{ lineHeight: 1.5, marginTop: 0 }}>{account ? "This session saves drafts and publishes through the account. A browser preview is separate and does not move screens." : "Edit the board, then open the player check. This page writes an account only when you are signed in and Layout Studio is on."}</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "16px 0" }}>
             {TEMPLATES.map((id) => (
               <button key={id} type="button" onClick={() => choose(id)} style={chip(id === template)}>{templateSpec(id).name}</button>
@@ -137,13 +220,19 @@ export function LayoutStudio() {
               <button key={palette} type="button" style={chip(draft.palette === palette)} onClick={() => update({ ...draft, palette })}>{palette}</button>
             ))}
           </div>
-          <label style={fieldLabel}>Primary color
+          <label style={fieldLabel}>Text color
+            <input type="color" aria-label="Text color" value={draft.textColor || "#0b1220"} onChange={(event) => update({ ...draft, textColor: event.target.value })} />
+          </label>
+          <label style={fieldLabel}>Menu background
+            <input type="color" aria-label="Menu background" value={draft.backgroundColor || "#f6f9fe"} onChange={(event) => update({ ...draft, backgroundColor: event.target.value })} />
+          </label>
+          <label style={fieldLabel}>Feature color
             <input type="color" aria-label="Primary color" value={draft.primaryColor || "#0066ff"} onChange={(event) => update({ ...draft, primaryColor: event.target.value })} />
           </label>
           <label style={fieldLabel}>Accent color
             <input type="color" aria-label="Accent color" value={draft.accentColor || "#ffd34d"} onChange={(event) => update({ ...draft, accentColor: event.target.value })} />
           </label>
-          <button type="button" style={chip(false)} onClick={() => update({ ...draft, primaryColor: null, accentColor: null })}>Use built-in colors</button>
+          <button type="button" style={chip(false)} onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
           <label style={fieldLabel}>Type size
             <select aria-label="Type size" value={draft.typeScale} onChange={(event) => update({ ...draft, typeScale: event.target.value === "counter" ? "counter" : "room" })}>
               <option value="room">Room — for a television</option>
@@ -156,7 +245,7 @@ export function LayoutStudio() {
               <option value="noto-serif">Noto Serif</option>
             </select>
           </label>
-          <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif are drawn into the published image. This preview uses the same face.</p>
+          <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif on this page are the same files drawn into the published image.</p>
           <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
             <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split}
               onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
@@ -182,6 +271,46 @@ export function LayoutStudio() {
             </fieldset>
           ))}
           <button type="button" style={chip(false)} onClick={() => update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] })}>Add section</button>
+          {account ? (
+            <>
+              <label style={fieldLabel}>Saved board
+                <select aria-label="Saved board" value={menuId ?? ""} onChange={(event) => {
+                  const id = event.target.value;
+                  const board = account.boards.find((item) => item.id === id);
+                  setMenuId(id || null);
+                  if (!board) return;
+                  setTemplate(board.document.template);
+                  setDraft(board.document);
+                  setImageHref(account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+                }}>
+                  <option value="">New board</option>
+                  {account.boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+                </select>
+              </label>
+              <label style={fieldLabel}>Library photo
+                <select aria-label="Library photo" value={draft.imageMediaId ?? ""} onChange={(event) => {
+                  const entry = account.library.find((item) => item.id === event.target.value) ?? null;
+                  update(applyLibraryFile(draft, entry && entry.kind === "image" ? entry : null, "photo"));
+                  setImageHref(entry?.url ?? null);
+                }}>
+                  <option value="">No photo</option>
+                  {account.library.filter((item) => item.kind === "image").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <label style={fieldLabel}>Library video
+                <select aria-label="Library video" value={draft.videoMediaId ?? ""} onChange={(event) => {
+                  const entry = account.library.find((item) => item.id === event.target.value) ?? null;
+                  const next = applyLibraryFile(draft, entry && entry.kind === "video" ? entry : null, "video");
+                  update(next);
+                  setVideoOn(Boolean(next.videoMediaId));
+                }}>
+                  <option value="">No video</option>
+                  {account.library.filter((item) => item.kind === "video").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              {account.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>Classic menus stay in the menu editor: {account.legacy.map((item) => item.name).join(", ")}.</p> : null}
+            </>
+          ) : null}
           <label style={{ ...fieldLabel, marginTop: 16 }}>Photo for the feature area
             <input type="file" accept="image/jpeg,image/png" onChange={(event) => onPhoto(event.target.files?.[0])} />
           </label>
@@ -193,6 +322,8 @@ export function LayoutStudio() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" style={chip(false)} onClick={saveDraft}>Save draft</button>
             <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={publish}>Publish preview</button>
+            {account ? <button type="button" style={chip(false)} onClick={() => saveAccount("draft").catch(() => setNote("Couldn't reload the account."))}>Save to account</button> : null}
+            {account ? <button type="button" style={chip(false)} onClick={() => saveAccount("publish").catch(() => setNote("Couldn't reload the account."))}>Publish to screens</button> : null}
             <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>
           </div>
           <p role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p>
@@ -204,8 +335,11 @@ export function LayoutStudio() {
       </div>
       <style>{`
         @media (max-width: 860px) { main > div { grid-template-columns: 1fr !important; } }
-        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif") format("truetype"); font-weight: 400; }
-        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif-bold") format("truetype"); font-weight: 700; }
+        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
+        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-bold") format("truetype"); font-weight: 700; font-style: normal; }
+        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-extrabold") format("truetype"); font-weight: 800; font-style: normal; }
+        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif") format("truetype"); font-weight: 400; font-style: normal; }
+        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif-bold") format("truetype"); font-weight: 700; font-style: normal; }
         figure svg { width: 100%; height: 100%; display: block; }
       `}</style>
     </main>
@@ -213,29 +347,37 @@ export function LayoutStudio() {
 }
 
 function Stage({ svg, video, label }: { svg: string; video: { x: number; y: number; w: number; h: number } | null; label: string }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [frame, setFrame] = useState({ scale: 1, left: 0, top: 0 });
+  useEffect(() => {
+    const node = frameRef.current;
+    if (!node) return;
+    const measure = () => {
+      const next = containedBoard(node.clientWidth, node.clientHeight);
+      setFrame({ scale: next.scale, left: next.left, top: next.top });
+    };
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(node);
+    return () => watch.disconnect();
+  }, []);
   return (
     <figure style={{ margin: "0 0 18px", background: "#000", borderRadius: 16, overflow: "hidden" }}>
       <figcaption style={{ color: "#f3ecdf", padding: "10px 14px", fontSize: 13 }}>{label}</figcaption>
-      <div style={{ position: "relative", aspectRatio: "16 / 9" }}>
-        <div style={{ position: "absolute", inset: 0 }} dangerouslySetInnerHTML={{ __html: svg }} />
-        {video ? (
-          <video
-            src="/layout-studio/media/promo"
-            muted
-            autoPlay
-            loop
-            playsInline
-            style={{
-              position: "absolute",
-              left: `${(video.x / 1920) * 100}%`,
-              top: `${(video.y / 1080) * 100}%`,
-              width: `${(video.w / 1920) * 100}%`,
-              height: `${(video.h / 1080) * 100}%`,
-              objectFit: "contain",
-              background: "transparent",
-            }}
-          />
-        ) : null}
+      <div ref={frameRef} style={{ position: "relative", aspectRatio: "16 / 9", overflow: "hidden" }}>
+        <div style={{ position: "absolute", width: 1920, height: 1080, left: frame.left, top: frame.top, transform: `scale(${frame.scale})`, transformOrigin: "top left" }}>
+          <div dangerouslySetInnerHTML={{ __html: svg }} />
+          {video ? (
+            <video
+              src="/layout-studio/media/promo"
+              muted
+              autoPlay
+              loop
+              playsInline
+              style={{ position: "absolute", left: video.x, top: video.y, width: video.w, height: video.h, objectFit: "contain", background: "transparent" }}
+            />
+          ) : null}
+        </div>
       </div>
     </figure>
   );

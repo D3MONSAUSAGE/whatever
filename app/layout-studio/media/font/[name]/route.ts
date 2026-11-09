@@ -11,6 +11,7 @@ const FILES: Record<string, string> = {
   "noto-serif-bold": "NotoSerif-Bold.ttf",
   inter: "Inter-Regular.ttf",
   "inter-bold": "Inter-Bold.ttf",
+  "inter-extrabold": "Inter-ExtraBold.ttf",
 };
 
 export async function GET(_req: Request, context: { params: Promise<{ name: string }> }) {

@@ -37,6 +37,10 @@ export type LayoutDocument = {
   typeScale: TypeScale;
   /** Bundled face used for both the preview and the published PNG. */
   font: BoardFont;
+  /** Menu item text. Null keeps the palette ink. A title on a color band stays light. */
+  textColor: string | null;
+  /** Menu paper. Null keeps the palette. The feature pane uses primaryColor. */
+  backgroundColor: string | null;
   /** Copy for the feature pane. Kept even when a video covers that pane. */
   featureTitle: string;
   featureDetail: string;
@@ -202,13 +206,18 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   if (font == null) return { ok: false, error: "Choose Inter or Noto Serif." };
   const primaryColor = hexColor(raw.primaryColor);
   const accentColor = hexColor(raw.accentColor);
+  const textColor = hexColor(raw.textColor);
+  const backgroundColor = hexColor(raw.backgroundColor);
   if (raw.primaryColor && !primaryColor) return { ok: false, error: "Use a color like #0066ff." };
   if (raw.accentColor && !accentColor) return { ok: false, error: "Use a color like #ffd34d." };
+  if (raw.textColor && !textColor) return { ok: false, error: "Use a color like #112233." };
+  if (raw.backgroundColor && !backgroundColor) return { ok: false, error: "Use a color like #f6f9fe." };
   return {
     ok: true,
     value: {
       layoutVersion: 1, template: raw.template, split, title: title ?? "", subtitle: subtitle ?? "", footer: footer ?? "",
       sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font,
+      textColor, backgroundColor,
       featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
     },
   };
@@ -220,8 +229,11 @@ function hexColor(value: unknown): string | null {
   return value.toLowerCase();
 }
 
-function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId" | "font">): LayoutDocument {
-  return { layoutVersion: 1, template, imageMediaId: null, videoMediaId: null, font: "inter", ...fields };
+function board(template: LayoutTemplate, fields: Omit<LayoutDocument, "layoutVersion" | "template" | "imageMediaId" | "videoMediaId" | "font" | "textColor" | "backgroundColor">): LayoutDocument {
+  return {
+    layoutVersion: 1, template, imageMediaId: null, videoMediaId: null, font: "inter",
+    textColor: null, backgroundColor: null, ...fields,
+  };
 }
 
 export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): LayoutDocument {
@@ -404,10 +416,63 @@ const PALETTES: Record<BoardPalette, BoardColors> = {
   bold: { paper: "#0066ff", ink: "#ffffff", muted: "#cfe0ff", section: "#ffd34d", price: "#0b1220", priceBg: "#ffd34d", feature: "#0047b3", featureInk: "#ffffff", band: null },
 };
 
+function mixHex(hex: string, toward: string, amount: number) {
+  const pick = (value: string) => [1, 3, 5].map((index) => Number.parseInt(value.slice(index, index + 2), 16));
+  const from = pick(hex);
+  const to = pick(toward);
+  return `#${from.map((channel, index) => Math.round(channel + (to[index] - channel) * amount).toString(16).padStart(2, "0")).join("")}`;
+}
+
 function colorsFor(doc: LayoutDocument): BoardColors {
   const base = PALETTES[doc.palette] ?? PALETTES.fresh;
-  if (!doc.primaryColor) return base;
-  return { ...base, section: doc.accentColor || doc.primaryColor, feature: doc.primaryColor, band: base.band ? doc.primaryColor : null };
+  const next = { ...base };
+  if (doc.primaryColor) {
+    next.section = doc.accentColor || doc.primaryColor;
+    next.feature = doc.primaryColor;
+    next.band = base.band ? doc.primaryColor : null;
+  } else if (doc.accentColor) {
+    next.section = doc.accentColor;
+  }
+  if (doc.backgroundColor) next.paper = doc.backgroundColor;
+  if (doc.textColor) {
+    next.ink = doc.textColor;
+    if (!next.priceBg) next.price = doc.textColor;
+  }
+  return next;
+}
+
+/** One 1920×1080 board, contained and centered in the screen. The still and the zone use this same frame. */
+export function containedBoard(screenW: number, screenH: number) {
+  const sw = screenW > 0 ? screenW : 1280;
+  const sh = screenH > 0 ? screenH : 720;
+  const scale = Math.min(sw / BOARD_W, sh / BOARD_H);
+  const width = BOARD_W * scale;
+  const height = BOARD_H * scale;
+  return { scale, left: (sw - width) / 2, top: (sh - height) / 2, width, height };
+}
+
+/** Zone box in screen pixels. It stays inside containedBoard and does not use the clip's own aspect. */
+export function zoneOnBoard(screenW: number, screenH: number, box: ZoneBox) {
+  const frame = containedBoard(screenW, screenH);
+  return {
+    left: frame.left + box.x * frame.scale,
+    top: frame.top + box.y * frame.scale,
+    width: box.w * frame.scale,
+    height: box.h * frame.scale,
+  };
+}
+
+/** CSS for the one video element. Contain letterboxes inside the server box. It does not cover the menu. */
+export function zoneVideoStyle(box: ZoneBox) {
+  return {
+    position: "absolute" as const,
+    left: `${(box.x / BOARD_W) * 100}%`,
+    top: `${(box.y / BOARD_H) * 100}%`,
+    width: `${(box.w / BOARD_W) * 100}%`,
+    height: `${(box.h / BOARD_H) * 100}%`,
+    objectFit: "contain" as const,
+    background: "transparent",
+  };
 }
 
 export function fontFamily(font: BoardFont | undefined) {
@@ -425,8 +490,8 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
   let unit = room / Math.max(units, 1);
   if (scale === "counter") unit *= 0.88;
   unit = Math.min(72, unit);
-  const nameSize = Math.round(Math.min(40, Math.max(22, unit * 0.5)));
-  const descSize = Math.max(16, Math.round(nameSize * 0.5));
+  const nameSize = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
+  const descSize = Math.max(10, Math.round(nameSize * 0.55));
   let y = top;
   for (const section of sections) {
     if (section.name) {
@@ -529,13 +594,27 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${family}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w))}</text>`);
   }
   if (feature.h >= 280 && doc.template !== "triple-column") {
-    const bandY = feature.y + feature.h - 170;
     const head = doc.featureTitle || "Featured";
-    const hx = feature.x + 40;
-    parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="170" fill="${colors.feature}"/>`);
-    parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, 40, feature.w - 80))}</text>`);
-    if (doc.featureDetail) {
-      parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80))}</text>`);
+    const hx = feature.x + 48;
+    if (!href) {
+      const cap = Math.min(240, Math.round(feature.h * 0.26));
+      const ink = colors.featureInk;
+      const shade = mixHex(colors.feature, "#061018", 0.42);
+      parts.push(`<rect x="${feature.x}" y="${feature.y}" width="8" height="${feature.h}" fill="${ink}"/>`);
+      parts.push(`<rect x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${cap}" fill="${shade}"/>`);
+      parts.push(`<rect x="${feature.x}" y="${feature.y + feature.h - cap}" width="${feature.w}" height="${cap}" fill="${shade}"/>`);
+      const headY = feature.y + Math.round(cap * 0.62);
+      parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="52" font-weight="800" fill="${ink}">${esc(fitWidth(head, 52, feature.w - 96))}</text>`);
+      if (doc.featureDetail) {
+        parts.push(`<text x="${hx}" y="${headY + 72}" font-family="${family}" font-size="24" fill="${ink}">${esc(fitWidth(doc.featureDetail, 24, feature.w - 96))}</text>`);
+      }
+    } else {
+      const bandY = feature.y + feature.h - 170;
+      parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="170" fill="${colors.feature}"/>`);
+      parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, 40, feature.w - 80))}</text>`);
+      if (doc.featureDetail) {
+        parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80))}</text>`);
+      }
     }
   }
   parts.push("</svg>");

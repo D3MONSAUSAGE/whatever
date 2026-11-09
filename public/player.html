@@ -100,7 +100,7 @@
   var playbackReportTimer = null;
   var loadedUrls = {}, needRefresh = false, urlRefreshAt = 0;
   var videos = [el('va'), el('vb')];
-  var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0;
+  var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0, zoneFit = null;
   // Polling: the server may send pollMs (older servers do not; then STATE_MS stays).
   var pollMs = STATE_MS, wakeAt = 0;
 
@@ -706,6 +706,7 @@
   }
 
   function presentVideo(index, versionOrNull) {
+    clearBoardStill();
     if (!playlist) return;
     var item = playlist.items[index];
     var token = slideToken;
@@ -850,12 +851,14 @@
       slideIndex = index;
       updateManualPos();
       if (zoneVideo(item)) {
+        fitBoardStill();
         placeZoneVideo(item, versionOrNull, token, function () {
           preloadIndex((index + 1) % playlist.items.length);
           scheduleAdvance(index, item);
         });
         return;
       }
+      clearBoardStill();
       ackShown(versionOrNull, false);
       preloadIndex((index + 1) % playlist.items.length);
       scheduleAdvance(index, item);
@@ -970,8 +973,50 @@
     for (i = 0; i < playlist.items.length; i++) delete playlist.items[i].composition;
     if (shownVersion === null && hasImage) ackShown(null, false);
   }
+  function boardFrame() {
+    var sw = window.innerWidth || 1280, sh = window.innerHeight || 720, scale, w, h;
+    if (!sw) sw = 1280;
+    if (!sh) sh = 720;
+    scale = Math.min(sw / 1920, sh / 1080);
+    w = 1920 * scale;
+    h = 1080 * scale;
+    return { scale: scale, left: (sw - w) / 2, top: (sh - h) / 2, width: w, height: h };
+  }
+  // The still and the zone share this frame. Keyword contain leaves an SVG tile at the
+  // upper left, so a board sets an explicit size and position instead.
+  function fitBoardStill() {
+    var frame = boardFrame(), i, layer;
+    for (i = 0; i < layers.length; i++) {
+      layer = layers[i];
+      if (layer.className.indexOf('on') === -1) continue;
+      layer.style.backgroundSize = Math.round(frame.width) + 'px ' + Math.round(frame.height) + 'px';
+      layer.style.backgroundPosition = Math.round(frame.left) + 'px ' + Math.round(frame.top) + 'px';
+    }
+  }
+  function clearBoardStill() {
+    var i;
+    zoneFit = null;
+    for (i = 0; i < layers.length; i++) {
+      layers[i].style.backgroundSize = '';
+      layers[i].style.backgroundPosition = '';
+    }
+  }
+  function applyZoneFit() {
+    var frame, box, v;
+    if (!zoneFit) return;
+    frame = boardFrame();
+    box = zoneFit.box;
+    v = zoneFit.el;
+    fitBoardStill();
+    v.style.left = Math.round(frame.left + box.x * frame.scale) + 'px';
+    v.style.top = Math.round(frame.top + box.y * frame.scale) + 'px';
+    v.style.width = Math.round(box.w * frame.scale) + 'px';
+    v.style.height = Math.round(box.h * frame.scale) + 'px';
+    v.style.objectFit = 'contain';
+  }
   function clearZoneVideo() {
     var i, v;
+    zoneFit = null;
     for (i = 0; i < videos.length; i++) {
       v = videos[i];
       if (v.getAttribute('data-zone') !== '1') continue;
@@ -989,7 +1034,7 @@
   // ZONE_SETTLE_MS: if no frame arrives within 8 seconds, hide the video and acknowledge the still.
   function placeZoneVideo(item, versionOrNull, token, done) {
     var video = zoneVideo(item);
-    var v = null, i, sw, sh, scale, box, play;
+    var v = null, i, box, play;
     var ZONE_SETTLE_MS = 8000;
     if (!video) { ackShown(versionOrNull, false); if (done) done(); return; }
     for (i = 0; i < videos.length; i++) {
@@ -998,18 +1043,12 @@
       break;
     }
     if (!v) v = videos[0];
-    sw = window.innerWidth || 1280;
-    sh = window.innerHeight || 720;
-    scale = Math.min(sw / 1920, sh / 1080);
     box = video.box;
     v.muted = true;
     try { v.setAttribute('muted', 'muted'); } catch (e) {}
     v.setAttribute('data-zone', '1');
-    v.style.left = Math.round((sw - 1920 * scale) / 2 + box.x * scale) + 'px';
-    v.style.top = Math.round((sh - 1080 * scale) / 2 + box.y * scale) + 'px';
-    v.style.width = Math.round(box.w * scale) + 'px';
-    v.style.height = Math.round(box.h * scale) + 'px';
-    v.style.objectFit = 'contain';
+    zoneFit = { el: v, box: box };
+    applyZoneFit();
     var settled = false;
     function frameReady() { return v.videoWidth > 0 && v.currentTime > 0; }
     function showFrame() {
@@ -1266,6 +1305,7 @@
 
   // Check right away when the network comes back.
   window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });
+  window.addEventListener('resize', function () { if (zoneFit) applyZoneFit(); });
 
   function publishedBoard() {
     var raw, data, svg, box, url;
