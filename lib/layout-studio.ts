@@ -479,17 +479,27 @@ export function fontFamily(font: BoardFont | undefined) {
   return font === "noto-serif" ? "Noto Serif" : "Inter";
 }
 
-function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string) {
+function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false) {
   let units = 0;
+  let travel = 0;
   for (const section of sections) {
     units += section.name ? 1.35 : 0;
-    for (const item of section.items) units += item.description ? 1.85 : 1.2;
+    travel += section.name ? 1 : 0;
+    for (const item of section.items) {
+      units += item.description ? 1.85 : 1.2;
+      travel += item.description ? 1.26 : 0.78;
+    }
     units += 0.3;
+    travel += 0.2;
   }
   const room = Math.max(80, bottom - top);
   let unit = room / Math.max(units, 1);
   if (scale === "counter") unit *= 0.88;
   unit = Math.min(72, unit);
+  if (spread && travel > 0) {
+    const used = travel * unit;
+    if (used < room * 0.72) unit = Math.min(72, unit * Math.min(1.8, (room * 0.88) / used));
+  }
   const nameSize = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
   const descSize = Math.max(10, Math.round(nameSize * 0.55));
   let y = top;
@@ -586,7 +596,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       paintItems(parts, [section], column.x + 36, 176, column.w - 72, bottom, colors, doc.typeScale, family);
     });
   } else {
-    paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family);
+    paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
   }
   if (doc.footer && doc.template === "menu-banner") {
     parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${family}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144))}</text>`);

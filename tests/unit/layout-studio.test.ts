@@ -203,6 +203,19 @@ describe("layout studio frames", () => {
     const composition = playerComposition(doc, "https://png", "https://mp4");
     expect(composition?.video?.box).toEqual({ x: 1286, y: 0, w: 634, h: 1080 });
     expect(composition).not.toHaveProperty("groupIndex");
+    const dashboard = readFileSync("app/dashboard/media/layout-studio/page.tsx", "utf8");
+    const dashboardPage = dashboard.slice(dashboard.indexOf("export default"));
+    expect(dashboardPage.indexOf("layoutStudioEnabled")).toBeLessThan(dashboardPage.indexOf("<LayoutStudio"));
+    expect(dashboard).toContain('mode="account"');
+    expect(dashboard).toContain("notFound");
+    const menusPage = readFileSync("app/dashboard/media/menus/page.tsx", "utf8");
+    expect(menusPage).toContain('"/dashboard/media/layout-studio"');
+    expect(menusPage).toContain("layoutStudioEnabled()");
+    const publicPage = readFileSync("app/layout-studio/page.tsx", "utf8");
+    expect(publicPage).toContain("layoutStudioPreviewOpen");
+    expect(publicPage).toContain("notFound");
+    const fonts = readFileSync("app/layout-studio/media/font/[name]/route.ts", "utf8");
+    expect(fonts).toContain("layoutStudioEnabled()");
     expect(layoutStudioPreviewOpen({ VERCEL_ENV: "production" })).toBe(false);
     expect(layoutStudioPreviewOpen({ VERCEL_ENV: "preview" })).toBe(true);
     expect(layoutStudioPreviewOpen({})).toBe(true);
@@ -354,6 +367,14 @@ describe("player composition contract", () => {
       }
     }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
+    const editor = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(editor).toContain("Columns 2 and 3 share the rest equally");
+    expect(editor).not.toContain("each column width");
+    const banner = layoutSvg(sampleLayout("menu-banner"));
+    const flower = banner.indexOf("Flowers");
+    const flowerY = Number(banner.slice(Math.max(0, flower - 160), flower).match(/y="([\d.]+)"/g)?.at(-1)?.match(/[\d.]+/)?.[0]);
+    expect(flowerY).toBeGreaterThan(700);
+    expect(flowerY).toBeLessThan(frameFor("menu-banner", 0.18).menu.h);
     expect(player).toContain("function boardFrame()");
     expect(player).toContain("layer.style.backgroundSize");
     const phone = containedBoard(400, 985);

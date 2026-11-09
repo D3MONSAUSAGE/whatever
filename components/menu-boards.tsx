@@ -24,7 +24,7 @@ type Draft = { id: string | null; name: string; template: MenuTemplate; content:
 
 const blankItem = () => ({ name: "", price: "", description: "" });
 
-export function MenuBoards() {
+export function MenuBoards({ studioHref = null }: { studioHref?: string | null }) {
   const menus = useApi<{ menus: MenuBoard[]; available: boolean }>("/api/menus");
   const displays = useApi<DisplayItem[]>("/api/displays");
   const media = useApi<MediaItem[]>("/api/media");
@@ -62,6 +62,7 @@ export function MenuBoards() {
         lede="Pick a template, type your items and prices, and Pekko makes a full-screen slide. Edit it any time and every screen showing it updates."
       >
         {!draft ? <button className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button> : null}
+        {studioHref ? <Link href={studioHref} className="btn btn-quiet">Layout Studio</Link> : null}
         <Link href="/dashboard/media" className="btn btn-quiet">Back to media</Link>
         <Link href="/dashboard/schedule#day-parts" className="btn btn-quiet">Breakfast, lunch &amp; dinner times</Link>
         <Link href="/dashboard/media/promos" className="btn btn-quiet">Promos &amp; specials</Link>

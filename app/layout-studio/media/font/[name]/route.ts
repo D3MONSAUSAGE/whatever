@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
-import { layoutStudioPreviewOpen } from "@/lib/layout-studio";
+import { layoutStudioEnabled, layoutStudioPreviewOpen } from "@/lib/layout-studio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ const FILES: Record<string, string> = {
 };
 
 export async function GET(_req: Request, context: { params: Promise<{ name: string }> }) {
-  if (!layoutStudioPreviewOpen()) return new NextResponse("Not found", { status: 404 });
+  if (!layoutStudioPreviewOpen() && !layoutStudioEnabled()) return new NextResponse("Not found", { status: 404 });
   const { name } = await context.params;
   const file = FILES[name];
   if (!file) return new NextResponse("Not found", { status: 404 });

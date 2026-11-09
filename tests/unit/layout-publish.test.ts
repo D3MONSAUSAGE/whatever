@@ -21,11 +21,10 @@ describe("layout save", () => {
     expect(boardSaveEffect("publish").swapMedia).toBe(true);
     const doc = { ...sampleLayout("menu-promo-67"), imageMediaId: photo, videoMediaId: video };
     const calls: string[] = [];
-    let stored = null as unknown;
     const draft = await applyLayoutSave({
       enabled: true, accountId: account, mode: "draft", document: doc, files: files(), previousMediaId: null,
     }, {
-      writeContent: async (next, template) => { stored = { next, template }; calls.push("write"); },
+      writeContent: async () => { calls.push("write"); },
       render: async () => { calls.push("render"); return "new"; },
       swap: async () => { calls.push("swap"); },
     });
