@@ -13,7 +13,7 @@ The screen is the workspace. Open Pekko, pick a screen or a group, see what is a
 
 ## Screen workspace
 
-`/dashboard/screens/[id]` will show the name, location, online or offline, last contact, what is assigned, and the next change. The picture is a preview of the assigned file, not a live camera of the TV. Sync is `reportedState`: assigned, acknowledged, playing, pending, or unknown. A player that does not report a version stays unknown. Offline copy tells the owner to check power and Wi-Fi.
+`/dashboard/screens/[id]` shows the name, location, online or offline, last contact, what is assigned, and the next change. The picture is a preview of the assigned file, not a live camera of the TV. From that page the owner uploads into the existing library, changes the picture, video, document, menu, playlist, or layout, opens Layout Studio with `?screen=`, edits the playlist, saves a schedule, and publishes after a confirmation. Sync is `reportedState`: assigned, acknowledged, playing, pending, or unknown. A player that does not report a version stays unknown. Offline copy tells the owner to check power and Wi-Fi.
 
 ## Precedence
 

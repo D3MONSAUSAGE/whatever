@@ -5,6 +5,7 @@ import { useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
 import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components/tv";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { IconTv } from "@/components/icons";
+import { ScreenActions } from "@/components/screen-actions";
 
 export function MyScreens() {
   const displays = useApi<DisplayItem[]>("/api/displays", 10_000);
@@ -87,13 +88,7 @@ export function ScreenWorkspace({ id }: { id: string }) {
           {!contentLabel(display) || contentLabel(display) === "No content assigned" ? (
             <p className="text-sm mt-3">Nothing is assigned. <Link href="/dashboard/media" className="underline font-semibold">Add media</Link> or <Link href={`/dashboard/media/layout-studio?screen=${display.id}`} className="underline font-semibold">open Layout Studio</Link>.</p>
           ) : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/dashboard/media" className="btn min-h-11">Add media</Link>
-            <Link href="/dashboard/displays" className="btn min-h-11">Change content</Link>
-            <Link href={`/dashboard/media/layout-studio?screen=${display.id}`} className="btn min-h-11">Edit layout</Link>
-            <Link href="/dashboard/playlists" className="btn min-h-11">Playlists</Link>
-            <Link href="/dashboard/schedule" className="btn min-h-11">Schedule</Link>
-          </div>
+          <ScreenActions display={display} onChanged={() => displays.reload()} />
         </article>
         <article className="card p-4 min-w-0">
           <h2 className="font-semibold">Preview</h2>
