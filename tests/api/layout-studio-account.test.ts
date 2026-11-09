@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as me } from "@/app/api/me/route";
 import { GET, POST } from "@/app/api/layout-studio/route";
-import { accountSaveBody, applyLibraryFile, boardAfterReload, readAccountStudio } from "@/lib/layout-account";
+import { POST as assignBoard } from "@/app/api/layout-studio/assign/route";
+import { accountSaveBody, applyLibraryFile, boardAfterReload, freshBoard, readAccountStudio } from "@/lib/layout-account";
 import { boxesOverlap, frameFor, mediaVideoBox, sampleLayout } from "@/lib/layout-studio";
 import { attachLayoutCompositions } from "@/lib/server/layout-player";
 import { setTestDb } from "@/lib/server/supabase";
@@ -173,6 +174,63 @@ describe("layout studio account route", () => {
     expect(closed.status).toBe(404);
     expect((await GET(bearer("token-a"))).status).toBe(404);
     expect(store.menus.find((item) => item.id === menu)?.content).toMatchObject({ title: "Casa Mesa Cantina" });
+  });
+
+  it("creates a playlist when a saved draft has no playlist yet", async () => {
+    const account = await accountId("token-a");
+    const draftMedia = "10000000-0000-4000-8000-0000000000a1";
+    const photo = "10000000-0000-4000-8000-0000000000a2";
+    const menu = "10000000-0000-4000-8000-0000000000a4";
+    const screen = "10000000-0000-4000-8000-0000000000a5";
+    store.media.push(
+      { id: draftMedia, account_id: account, file_name: "draft.png", storage_path: `${account}/draft.png`, mime_type: "image/png", size_bytes: png.length, kind: "image" },
+      { id: photo, account_id: account, file_name: "lunch.png", storage_path: `${account}/lunch.png`, mime_type: "image/png", size_bytes: png.length, kind: "image" },
+    );
+    store.objects.set(`${account}/lunch.png`, new Uint8Array(png));
+    store.menus.push({
+      id: menu, account_id: account, name: "Polish QA Board", template: "fresh",
+      content: sampleLayout("menu-promo-67"), media_id: draftMedia, playlist_id: null,
+    });
+    store.displays.push({
+      id: screen, account_id: account, name: "New TV", content_version: 2, assigned_playlist_id: null, status: "active",
+    });
+    const doc = applyLibraryFile(sampleLayout("menu-promo-67"), { id: photo, name: "lunch.png", kind: "image", mime: "image/png", url: null }, "photo");
+    const published = await POST(bearer("token-a", {
+      method: "POST",
+      body: JSON.stringify(accountSaveBody({ mode: "publish", menuId: menu, name: "Polish QA Board", document: doc })),
+    }));
+    expect(published.status).toBe(200);
+    const saved = store.menus.find((item) => item.id === menu);
+    expect(saved?.playlist_id).toBeTruthy();
+    expect(store.playlist_items.some((item) => item.playlist_id === saved?.playlist_id && item.media_id !== draftMedia)).toBe(true);
+    expect(store.displays.find((item) => item.id === screen)?.content_version).toBe(2);
+    const assigned = await assignBoard(bearer("token-a", {
+      method: "POST",
+      body: JSON.stringify({ menuId: menu, displayId: screen }),
+    }));
+    expect(assigned.status).toBe(200);
+    const body = await assigned.json() as { ok?: boolean; playlistId?: string };
+    expect(body.ok).toBe(true);
+    expect(body.playlistId).toBe(String(saved?.playlist_id));
+    const display = store.displays.find((item) => item.id === screen);
+    expect(display?.assigned_playlist_id).toBe(saved?.playlist_id);
+    expect(display?.content_version).toBe(3);
+  });
+
+  it("keeps an unsaved draft off the first saved board and starts a new board empty", () => {
+    const document = sampleLayout("menu-promo-67");
+    const studio = {
+      boards: [{ id: "board-harbor", name: "Harbor Bean Café", document, mediaId: null, playlistId: "playlist-1" }],
+      legacy: [],
+      library: [],
+    };
+    expect(boardAfterReload(studio, null)?.id).toBe("board-harbor");
+    expect(boardAfterReload(studio, null, { keepUnsaved: true })).toBeNull();
+    const created = freshBoard(1, "  ");
+    expect(created.name).toBe("Untitled board 2");
+    expect(created.document.imageMediaId).toBeNull();
+    expect(created.document.videoMediaId).toBeNull();
+    expect(freshBoard(0, "Polish QA Board").name).toBe("Polish QA Board");
   });
 
   it("asks for a session when the flag is on and hides the route when it is off", async () => {

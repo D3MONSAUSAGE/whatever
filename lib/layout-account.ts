@@ -1,4 +1,4 @@
-import { parseLayout, type LayoutDocument } from "@/lib/layout-studio";
+import { parseLayout, sampleLayout, type LayoutDocument } from "@/lib/layout-studio";
 
 /** A library file the account editor may attach. The server still checks ownership on save. */
 export type AccountLibraryFile = {
@@ -15,6 +15,8 @@ export type AccountBoard = {
   document: LayoutDocument;
   mediaId: string | null;
   playlistId: string | null;
+  /** When the board was last saved. Missing on older responses. */
+  updatedAt?: string | null;
 };
 
 export type AccountStudio = {
@@ -53,9 +55,25 @@ function file(value: unknown): AccountLibraryFile | null {
   };
 }
 
-/** The board the editor shows after a reload. A missing id falls back to the first saved board. */
-export function boardAfterReload(studio: AccountStudio, menuId: string | null): AccountBoard | null {
-  return studio.boards.find((board) => board.id === menuId) ?? studio.boards[0] ?? null;
+/**
+ * The board the editor shows after a reload.
+ * A missing id falls back to the first saved board, unless the editor is holding an unsaved draft.
+ */
+export function boardAfterReload(studio: AccountStudio, menuId: string | null, options?: { keepUnsaved?: boolean }): AccountBoard | null {
+  const found = menuId ? studio.boards.find((board) => board.id === menuId) ?? null : null;
+  if (found) return found;
+  if (options?.keepUnsaved) return null;
+  return studio.boards[0] ?? null;
+}
+
+/** A new board starts empty. The name is separate from the sample menu title. */
+export function freshBoard(existingCount: number, requested?: string | null): { name: string; document: LayoutDocument } {
+  const fallback = `Untitled board ${Math.max(0, existingCount) + 1}`;
+  const name = (requested ?? fallback).trim().slice(0, 80) || fallback;
+  return {
+    name,
+    document: { ...sampleLayout("menu-promo-67"), imageMediaId: null, videoMediaId: null },
+  };
 }
 
 export function readAccountStudio(body: unknown): AccountStudio | null {
@@ -75,6 +93,7 @@ export function readAccountStudio(body: unknown): AccountStudio | null {
       document: parsed.value,
       mediaId: typeof row.mediaId === "string" ? row.mediaId : null,
       playlistId: typeof row.playlistId === "string" ? row.playlistId : null,
+      updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : null,
     });
   }
   const legacy: { id: string; name: string }[] = [];

@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
-  accountSaveBody, applyLibraryFile, boardAfterReload, placeZoneMedia, readAccountStudio,
-  type AccountLibraryFile, type AccountStudio,
+  accountSaveBody, applyLibraryFile, boardAfterReload, freshBoard, placeZoneMedia, readAccountStudio,
+  type AccountBoard, type AccountLibraryFile, type AccountStudio,
 } from "@/lib/layout-account";
 import {
   containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, templateSpec, zoneCapabilities,
@@ -40,6 +40,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   const [published, setPublished] = useState<Snapshot | null>(null);
   const [account, setAccount] = useState<AccountStudio | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [boardName, setBoardName] = useState("");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [note, setNote] = useState(accountMode || fixture ? "" : "This browser copy does not write an account.");
   const spec = templateSpec(template);
@@ -85,6 +86,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       setAccount(fixture);
       setMenuId(board?.id ?? null);
       if (board) {
+        setBoardName(board.name);
         setTemplate(board.document.template);
         setDraft(board.document);
         setImageHref(fixture.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
@@ -103,6 +105,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         const board = boardAfterReload(loaded, null);
         if (board) {
           setMenuId(board.id);
+          setBoardName(board.name);
           setTemplate(board.document.template);
           setDraft(board.document);
           setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
@@ -126,6 +129,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       const board = boardAfterReload(loaded, null);
       if (board) {
         setMenuId(board.id);
+        setBoardName(board.name);
         setTemplate(board.document.template);
         setDraft(board.document);
         setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
@@ -142,6 +146,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     const board = account.boards.find((item) => item.id === id);
     if (!board) return;
     setMenuId(board.id);
+    setBoardName(board.name);
     setTemplate(board.document.template);
     setDraft(board.document);
     setImageHref(account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
@@ -153,10 +158,11 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   }
 
   function newBoard() {
-    const sample = sampleLayout("menu-promo-67");
+    const created = freshBoard(account?.boards.length ?? 0, window.prompt("Name this board", freshBoard(account?.boards.length ?? 0).name));
+    setBoardName(created.name);
     setMenuId(null);
-    setTemplate(sample.template);
-    setDraft(sample);
+    setTemplate(created.document.template);
+    setDraft(created.document);
     setImageHref(null);
     setClipUrl(null);
     setVideoOn(false);
@@ -178,7 +184,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setClipUrl(null);
     setZone(next === "triple-column" ? "column-0" : "menu");
     setSectionIndex(0);
-    setVideoOn(frameFor(next, sample.split).video !== null);
+    setVideoOn(accountMode ? false : frameFor(next, sample.split).video !== null);
   }
 
   function update(next: LayoutDocument) {
@@ -217,16 +223,19 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setNote("Published preview is frozen in this browser. It was not sent to an account or a screen.");
   }
 
-  async function reloadAccount(preferId: string | null) {
+  async function reloadAccount(preferId: string | null, keepUnsaved = false) {
     const loaded = readAccountStudio(await api<unknown>("/api/layout-studio"));
     if (!loaded) throw new Error("Couldn't reload the account.");
     setAccount(loaded);
-    const board = boardAfterReload(loaded, preferId);
+    const board = boardAfterReload(loaded, preferId, { keepUnsaved });
     if (!board) return loaded;
     setMenuId(board.id);
+    setBoardName(board.name);
     setTemplate(board.document.template);
     setDraft(board.document);
     setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+    setClipUrl(null);
+    setVideoOn(Boolean(board.document.videoMediaId));
     return loaded;
   }
 
@@ -238,24 +247,28 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setSaving(saveMode);
     setNote(saveMode === "publish" ? "Publishing…" : "Saving draft…");
     try {
-      const body = await api<{ menuId?: string }>("/api/layout-studio", {
+      const body = await api<{ menuId?: string; swapped?: boolean }>("/api/layout-studio", {
         method: "POST",
-        body: JSON.stringify(accountSaveBody({ mode: saveMode, menuId, name: doc.title || "Menu", document: doc })),
+        body: JSON.stringify(accountSaveBody({ mode: saveMode, menuId, name: boardName.trim() || doc.title || "Menu", document: doc })),
       });
       const nextId = typeof body.menuId === "string" ? body.menuId : menuId;
       const loaded = await reloadAccount(nextId);
       const boardId = typeof body.menuId === "string" ? body.menuId : nextId;
       const board = loaded.boards.find((item) => item.id === boardId);
-      let assigned = false;
-      if (saveMode === "publish" && screenId && board?.playlistId) {
-        await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: board.id, displayId: screenId }) });
-        assigned = true;
+      if (saveMode !== "publish") {
+        setNote("Draft saved on this account. Screens were not moved.");
+      } else if (screenId) {
+        if (!board?.playlistId) {
+          setNote("The board was saved, but it has no playlist, so this screen was not changed.");
+        } else {
+          await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: board.id, displayId: screenId }) });
+          setNote("Published and assigned to this screen. TV updates within ~30 s, then it shows as playing.");
+        }
+      } else if (board?.playlistId) {
+        setNote("Published to this account. TV updates within ~30 s, then it shows as playing.");
+      } else {
+        setNote("The board was saved, but publishing did not create a playlist.");
       }
-      setNote(saveMode === "publish"
-        ? assigned
-          ? "Published and assigned to this screen. TV updates within ~30 s, then it shows as playing."
-          : "Published to this account. TV updates within ~30 s, then it shows as playing."
-        : "Draft saved on this account. Screens were not moved.");
     } catch (err) {
       setNote((err as Error).message || (saveMode === "publish" ? "Couldn't publish that board." : "Couldn't save that draft."));
     } finally {
@@ -299,15 +312,15 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       setNote(replacedVideo ? "Image replaces the video in this zone." : "Photo is in the preview only. It was not uploaded to the library.");
       return;
     }
-    setProgress("Uploading photo… 0%");
+    setProgress("Uploading…");
     const form = new FormData();
     form.set("file", file);
     form.set("name", file.name);
     const send = sessionToken
-      ? uploadForm("/api/media", form, sessionToken, (percent) => setProgress(`Uploading photo… ${percent}%`))
-      : authToken().then((token) => uploadForm("/api/media", form, token, (percent) => setProgress(`Uploading photo… ${percent}%`)));
+      ? uploadForm("/api/media", form, sessionToken, (percent) => setProgress(percent >= 99 ? "Processing…" : "Uploading…"))
+      : authToken().then((token) => uploadForm("/api/media", form, token, (percent) => setProgress(percent >= 99 ? "Processing…" : "Uploading…")));
     send.then(async (body) => {
-      const loaded = await reloadAccount(menuId);
+      const loaded = await reloadAccount(menuId, true);
       const entry = loaded.library.find((item) => item.id === body.id) ?? null;
       const exclusive = zone === "feature" && template !== "signature";
       setDraft((current) => {
@@ -317,7 +330,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       if (exclusive) { setClipUrl(null); setVideoOn(false); }
       setImageHref(entry?.url || local);
       setProgress(null);
-      setNote(replacedVideo ? "Image replaces the video in this zone." : "Photo is in this account's library and on the preview.");
+      setNote(replacedVideo ? "Image replaces the video in this zone." : "Upload complete.");
     }).catch((err: Error) => {
       setProgress(null);
       setNote(err.message || "Couldn't upload that photo.");
@@ -349,7 +362,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       setNote(replacedImage ? "Video replaces the image in this zone. Sign in to save it to the library." : "Video is in the preview. Sign in to add it to your library.");
       return;
     }
-    setProgress(draft.videoMediaId ? "Replacing video… 0%" : "Uploading video… 0%");
+    setProgress("Uploading…");
     try {
       const prepared = await prepareVideo(file);
       const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/upload", {
@@ -357,9 +370,9 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
       });
       await uploadToSignedUrl(signed.signedUrl, file, (percent) => {
-        setProgress(`${draft.videoMediaId ? "Replacing" : "Uploading"} video… ${percent}%`);
+        setProgress(percent >= 99 ? "Processing…" : "Uploading…");
       }, file.name);
-      setProgress("Saving video…");
+      setProgress("Processing…");
       await api("/api/media/upload/complete", {
         method: "POST",
         body: JSON.stringify({
@@ -371,7 +384,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           thumbnailBase64: await blobToBase64(prepared.thumbnail),
         }),
       });
-      const loaded = await reloadAccount(menuId);
+      const loaded = await reloadAccount(menuId, true);
       const entry = loaded.library.find((item) => item.id === signed.mediaId) ?? null;
       setDraft((current) => {
         const applied = entry ? applyLibraryFile(current, entry, "video") : { ...current, videoMediaId: signed.mediaId };
@@ -380,7 +393,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       if (exclusive) setImageHref(null);
       if (entry?.url) setClipUrl(null);
       setProgress(null);
-      setNote(replacedImage ? "Video replaces the image in this zone." : "Video is selected. The preview plays it in the zone, and publish sends that one file.");
+      setNote(replacedImage ? "Video replaces the image in this zone." : "Upload complete.");
     } catch (err) {
       setProgress(null);
       setNote((err as Error).message || "Couldn't upload that video.");
@@ -414,9 +427,10 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
             <div className="board-bar">
               <label className="board-field">
                 <span className="studio-kicker">Board</span>
+                <input aria-label="Board name" className="field" value={boardName} maxLength={80} onChange={(event) => setBoardName(event.target.value)} />
                 <select aria-label="Board" className="field" value={menuId ?? ""} onChange={(event) => selectBoard(event.target.value)}>
                   <option value="">New board</option>
-                  {account.boards.map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+                  {account.boards.map((board) => <option key={board.id} value={board.id}>{boardChoice(board)}</option>)}
                 </select>
               </label>
               <button type="button" className="btn btn-quiet" onClick={newBoard}>New board</button>
@@ -522,8 +536,8 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
                 account={account}
                 progress={progress}
                 previewImage={imageHref}
-                previewVideo={clipUrl || (!accountMode && videoOn ? "/layout-studio/media/promo" : null)}
-                videoAttached={Boolean(videoOn && videoBox)}
+                previewVideo={clipUrl || libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId) || null}
+                videoAttached={Boolean(clipUrl || draft.videoMediaId)}
                 onPhoto={onPhoto}
                 onVideo={onVideo}
                 removePhoto={removePhoto}
@@ -667,14 +681,17 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         </section>
       </div>
       <div className="studio-savebar">
-        {accountMode || account ? <button type="button" className="btn min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button> : <button type="button" className="btn min-h-11" onClick={saveDraft}>Save draft</button>}
-        {accountMode || account ? <button type="button" className="btn btn-primary min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : <button type="button" className="btn btn-primary min-h-11" onClick={publish}>Publish preview</button>}
+        {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
+        <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
+          {(["template", "section", "content", "style", "publish"] as const).map((id) => (
+            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12 }} onClick={() => setStep(id)}>{stepLabel(id)}</button>
+          ))}
+        </nav>
+        <div className="studio-save-actions">
+          {accountMode || account ? <button type="button" className="btn min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button> : <button type="button" className="btn min-h-11" onClick={saveDraft}>Save draft</button>}
+          {accountMode || account ? <button type="button" className="btn btn-primary min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : <button type="button" className="btn btn-primary min-h-11" onClick={publish}>Publish preview</button>}
+        </div>
       </div>
-      <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
-        {(["template", "section", "content", "style", "publish"] as const).map((id) => (
-          <button key={id} type="button" role="tab" aria-selected={step === id} style={chip(step === id)} onClick={() => setStep(id)}>{stepLabel(id)}</button>
-        ))}
-      </nav>
       <style>{`
         .studio-app { overflow-x: clip; }
         .studio-grid { max-width: 1180px; margin: 0 auto; padding: 28px 20px 72px; display: grid; gap: 28px; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); grid-template-areas: "head preview" "controls preview"; align-items: start; }
@@ -720,16 +737,18 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
           .studio-title { font-size: 22px; line-height: 1.2; margin: 0; }
           .studio-lead { display: none; }
           .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: clip; max-width: 100%; padding: 0 !important; gap: 0 !important; }
-          .studio-controls { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+          .studio-controls { padding-bottom: calc(168px + env(safe-area-inset-bottom)); }
           .studio-heading, .studio-controls, .studio-preview { width: 100%; max-width: 100%; min-width: 0; }
           .studio-controls { overflow-x: hidden; }
           .studio-preview { position: static; z-index: 1; background: #efe8dc; padding: 0 16px 12px; }
           .studio-unpublished { display: none; }
           .studio-pane.on .studio-sheet-note { display: block; }
-          .studio-savebar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 36; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #fffdf8; border-top: 1px solid #ddd4c6; }
-          .studio-savebar .btn { flex: 1 1 0; min-height: 44px; }
+          .studio-savebar { display: flex; flex-direction: column; align-items: stretch; position: fixed; left: 0; right: 0; bottom: 0; z-index: 36; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: #fffdf8; border-top: 1px solid #ddd4c6; }
+          .studio-save-actions { display: flex; gap: 8px; }
+          .studio-save-actions .btn { flex: 1 1 0; min-height: 44px; }
+          .studio-status { margin: 0; font-size: 13px; line-height: 1.4; color: #1a1614; }
           .studio-save-inline { display: none !important; }
-          .studio-tabs { display: flex; position: static; overflow-x: auto; background: transparent; border: 0; padding: 8px 16px 0; gap: 4px; }
+          .studio-tabs { display: flex; position: static; overflow-x: auto; background: transparent; border: 0; padding: 0; gap: 4px; }
           .studio-tabs button { flex: 0 0 auto; min-height: 44px; }
           .studio-pane, .section-block, .zone-panel { display: none; }
           .studio-pane.on { display: block; padding: 0 16px 16px; }
@@ -820,7 +839,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
               cursor: "pointer", padding: 0, color: "#fff",
             }}
           >
-            <span style={{ position: "absolute", left: 6, bottom: 6, maxWidth: "calc(100% - 12px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: active === hit.id ? "#0066ff" : "rgba(0,0,0,0.72)", borderRadius: 8, padding: "4px 8px", fontSize: 12, fontWeight: 700, lineHeight: "16px" }}>{hit.label.replace(/^Edit /, "")}</span>
+            <span style={{ position: "absolute", left: 4, top: hit.id === "menu" || hit.id.startsWith("column-") ? undefined : 4, bottom: hit.id === "menu" || hit.id.startsWith("column-") ? 4 : undefined, maxWidth: "calc(100% - 8px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: active === hit.id ? "#0066ff" : "rgba(0,0,0,0.45)", borderRadius: 6, padding: "2px 6px", fontSize: 11, fontWeight: 700, lineHeight: "14px" }}>{hit.label.replace(/^Edit /, "")}</span>
           </button>
         ))}
       </div>
@@ -861,6 +880,12 @@ function ZoneHead({ zone, template, onClose }: { zone: string; template: LayoutT
       <button type="button" className="btn btn-quiet" onClick={onClose} aria-label="Close section">Close</button>
     </header>
   );
+}
+
+function boardChoice(board: AccountBoard) {
+  const layout = templateSpec(board.document.template).name;
+  const when = board.updatedAt ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(board.updatedAt)) : "";
+  return [board.name, layout, when].filter(Boolean).join(" · ");
 }
 
 function zoneLabel(zone: string, template: LayoutTemplate) {
@@ -926,7 +951,7 @@ function ZoneMedia({
         <p className="zone-help">{photoLabel}. {allowImage && allowVideo ? "Image or one video." : allowVideo ? "One video." : "Image only."}</p>
         {hasVideo && allowVideo ? (
           <div className="media-card">
-            {thumbVideo ? <video className="media-thumb" muted autoPlay loop playsInline src={thumbVideo} /> : <div className="media-thumb" />}
+            {thumbVideo ? <video className="media-thumb" muted playsInline preload="auto" src={thumbVideo.includes("#") || thumbVideo.startsWith("blob:") ? thumbVideo : `${thumbVideo}#t=0.1`} onLoadedData={(event) => { const node = event.currentTarget; if (node.currentTime < 0.05) node.currentTime = 0.1; }} /> : <div className="media-thumb" />}
             <div className="media-meta">
               <p className="media-name">{videoFile?.name || "Video"}</p>
               <p className="zone-help">Video</p>

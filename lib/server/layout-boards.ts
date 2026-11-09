@@ -12,7 +12,7 @@ function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
 /** Boards and library for the signed-in account. Flag off never reaches the database. */
 export async function loadLayoutStudio(accountId: string) {
   if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
-  const menus = await db().from("menus").select("id, name, content, media_id, playlist_id").eq("account_id", accountId);
+  const menus = await db().from("menus").select("id, name, content, media_id, playlist_id, updated_at").eq("account_id", accountId);
   if (menus.error) return { status: 500 as const, error: "Couldn't load boards." };
   const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path").eq("account_id", accountId);
   if (media.error) return { status: 500 as const, error: "Couldn't load your media library." };
@@ -42,6 +42,7 @@ export async function loadLayoutStudio(accountId: string) {
       document: parsed.value,
       mediaId: menu.media_id ? String(menu.media_id) : null,
       playlistId: menu.playlist_id ? String(menu.playlist_id) : null,
+      updatedAt: menu.updated_at ? String(menu.updated_at) : null,
     });
   }
   return {
@@ -128,22 +129,24 @@ export async function saveLayoutForAccount(accountId: string, body: {
     },
     swap: async (previous, next) => {
       if (!menuId) throw new Error("Couldn't save the board.");
-      let from = previous;
-      if (playlistId) {
-        const item = await db().from("playlist_items").select("media_id").eq("playlist_id", playlistId).eq("account_id", accountId).limit(1);
-        const onScreen = item.data?.[0]?.media_id ? String(item.data[0].media_id) : "";
-        if (onScreen) from = onScreen;
-      }
-      if (from) {
-        const swapped = await db().rpc("menu_swap_media", { p_account_id: accountId, p_old_media_id: from, p_new_media_id: next });
-        if (swapped.error || !swapped.data) throw new Error("Couldn't update the screens.");
-        await db().from("menus").update({ media_id: next }).eq("id", menuId).eq("account_id", accountId);
+      // A draft still writes menus.media_id for the preview still. That id is not on a
+      // playlist, so swapping it updates nothing and leaves the screen empty.
+      if (!playlistId) {
+        const created = await db().rpc("menu_create_playlist", { p_account_id: accountId, p_name: (body.name || "Menu").slice(0, 80), p_media_id: next });
+        if (created.error || !created.data) throw new Error("Couldn't update the screens.");
+        playlistId = String(created.data);
+        const linked = await db().from("menus").update({ media_id: next, playlist_id: playlistId }).eq("id", menuId).eq("account_id", accountId);
+        if (linked.error) throw new Error("Couldn't update the screens.");
         return;
       }
-      const created = await db().rpc("menu_create_playlist", { p_account_id: accountId, p_name: (body.name || "Menu").slice(0, 80), p_media_id: next });
-      if (created.error || !created.data) throw new Error("Couldn't update the screens.");
-      playlistId = String(created.data);
-      await db().from("menus").update({ media_id: next, playlist_id: playlistId }).eq("id", menuId).eq("account_id", accountId);
+      let from = previous;
+      const item = await db().from("playlist_items").select("media_id").eq("playlist_id", playlistId).eq("account_id", accountId).limit(1);
+      const onScreen = item.data?.[0]?.media_id ? String(item.data[0].media_id) : "";
+      if (onScreen) from = onScreen;
+      if (!from) throw new Error("Couldn't update the screens.");
+      const swapped = await db().rpc("menu_swap_media", { p_account_id: accountId, p_old_media_id: from, p_new_media_id: next });
+      if (swapped.error || !swapped.data) throw new Error("Couldn't update the screens.");
+      await db().from("menus").update({ media_id: next }).eq("id", menuId).eq("account_id", accountId);
     },
   });
   if (!saved.ok) return { status: 400 as const, error: saved.error };

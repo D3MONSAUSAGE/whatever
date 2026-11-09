@@ -438,6 +438,9 @@ describe("player composition contract", () => {
     expect(editor).toContain("Upload new");
     expect(editor).toContain("Edit promotion");
     expect(editor).toContain("Replaces the current video.");
+    expect(editor).toContain("studio-status");
+    expect(editor).toContain("Uploading…");
+    expect(editor).not.toContain("Uploading photo…");
     expect(editor).toContain("position: sticky");
     expect(editor).toContain("min-height: 44px");
     const banner = layoutSvg(sampleLayout("menu-banner"));
