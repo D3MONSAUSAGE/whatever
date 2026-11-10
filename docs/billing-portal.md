@@ -32,3 +32,9 @@ When Francisco approves billing, repeat the same features on the live Customer P
 - Subscriptions: customers can switch prices, proration on, limited to the three live Pekko prices (`STRIPE_LIVE_PRICE_STARTER`, `STRIPE_LIVE_PRICE_BUSINESS`, `STRIPE_LIVE_PRICE_MULTI`).
 
 No other products. Do not change those prices. Do not set `BILLING_ENFORCE`.
+
+## Return URLs and cancellation display
+
+- Portal `return_url` and Checkout `success_url`/`cancel_url` use the request's own origin when it is pekkotv.com or www.pekkotv.com, or (outside production only) pantalla-chi.vercel.app or a `pantalla-*-teamtegrate.vercel.app` preview. Anything else falls back to the site URL, so production always returns to pekkotv.com.
+- A portal "cancel at period end" is stored by the webhook as `accounts.cancel_at_period_end = true` plus `current_period_end` (the subscription is re-fetched on the acacia API, which reports period-end cancels this way). No new column is needed. Plan & billing shows "Cancels on <date>, you keep <plan> until then" with Keep my plan / Manage billing. A custom-date cancel (`cancel_at` before the period end, set only from the Stripe dashboard) is not shown separately.
+- Plan changes on an existing subscription prorate. The difference for the rest of the period is added to the next invoice together with the new monthly price (for example Starter → Business on day one: $39 + $20 = $59).

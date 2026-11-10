@@ -2,6 +2,7 @@
 import { BillingDisclosure } from "@/components/billing-disclosure";
 import { ManageBilling } from "@/components/manage-billing";
 import { PLANS } from "@/lib/plans";
+import { availabilityOf, checkoutNote, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
 import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem } from "@/lib/api";
 import { BillingEmailSelfTest } from "@/components/billing-email-selftest";
@@ -33,12 +34,18 @@ export default function Billing() {
   const [busy, setBusy] = useState(false);
   const checkout = useApi<{ available: boolean }>("/api/billing/checkout");
   const selfTest = useApi<{ enabled: boolean }>("/api/billing/notifications/test");
-  const canBuy = !!checkout.data?.available;
   const [buying, setBuying] = useState<string | null>(null);
+  // Neutral until both the plan and the checkout check have answered: never flash "Coming soon".
+  const availability = ent.data || ent.error ? availabilityOf(checkout.data, checkout.error) : "loading";
+  const mode = planChangeMode(ent.data?.subscription ?? null);
 
   async function buy(plan: string) {
     setBuying(plan);
     try {
+      if (mode === "portal") {
+        const p = await api<{ url?: string }>("/api/billing/portal", { method: "POST", body: "{}" });
+        if (p.url) { window.location.assign(p.url); return; }
+      }
       const r = await api<{ url?: string; updated?: boolean }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan }) });
       if (r.url) {
         window.location.assign(r.url);
@@ -83,14 +90,30 @@ export default function Billing() {
       {ent.error && <div className="card p-5 text-danger">{ent.error}</div>}
       {e && (
         <section className="card p-5 space-y-2" aria-labelledby="plan-heading" data-testid="plan-status">
-          <h2 id="plan-heading" className="text-lg font-semibold">{e.plan_name}</h2>
+          {(() => {
+            const st = planStatus({ state: e.state, planName: e.plan_name, subscription: e.subscription });
+            return (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 id="plan-heading" className="text-lg font-semibold">{e.plan_name}</h2>
+                  <span data-testid="plan-status-label" className={`rounded-full px-2.5 py-0.5 text-sm font-medium ${st.tone === "ok" ? "bg-live/15 text-live-ink" : st.tone === "warn" ? "bg-amber-50 text-amber-900" : "bg-line text-muted"}`}>{st.label}</span>
+                </div>
+                {st.note && <p className="font-medium" role="status" data-testid="plan-status-note">{st.note}</p>}
+              </>
+            );
+          })()}
           <p>Screens on: <strong>{e.active_screens}</strong> of <strong>{allowed}</strong> included.</p>
           {e.trial && e.state === "trial" && (
             <p data-testid="trial-countdown">{e.trial.days_left} day{e.trial.days_left === 1 ? "" : "s"} left in your free trial (ends {local(e.trial.ends_at)}).</p>
           )}
           {e.suspend_at && <p>Screens keep playing until {local(e.suspend_at)}.</p>}
           {e.warning && <p className="font-medium" role="status" data-testid="plan-warning">{e.warning.message}</p>}
-          <ManageBilling className="btn-quiet mt-2" />
+          <div className="flex flex-wrap gap-2 mt-2">
+            {e.subscription?.cancel_at_period_end && e.state === "active" && (
+              <ManageBilling className="btn-primary" label="Keep my plan" testId="keep-plan" />
+            )}
+            <ManageBilling className="btn-quiet" />
+          </div>
         </section>
       )}
 
@@ -102,19 +125,18 @@ export default function Billing() {
               <div className="font-semibold">{p.name}</div>
               <div className="text-2xl font-bold">${p.price}<span className="text-sm font-normal text-muted">/month</span></div>
               <div className="text-muted">{p.screens} screen{p.screens === 1 ? "" : "s"}</div>
-              {canBuy ? (
-                <button className="btn btn-primary mt-3 w-full" data-testid={`buy-${p.id}`} disabled={!!buying || e?.plan === p.id} onClick={() => buy(p.id)}>
-                  {e?.plan === p.id ? "Current plan" : buying === p.id ? "Opening checkout…" : `Choose ${p.name}`}
-                </button>
-              ) : (
-                <button className="btn btn-quiet mt-3 w-full" data-testid={`buy-${p.id}`} disabled>Coming soon</button>
-              )}
+              {(() => {
+                const b = planButton({ planId: p.id, planName: p.name, currentPlan: e && e.state !== "canceled" && e.state !== "expired" ? e.plan : null, availability, mode, busyPlan: buying });
+                return (
+                  <button className={`btn ${b.variant === "primary" ? "btn-primary" : "btn-quiet"} mt-3 w-full`} data-testid={`buy-${p.id}`} aria-busy={b.loading || undefined} disabled={b.disabled} onClick={() => buy(p.id)}>
+                    {b.label}
+                  </button>
+                );
+              })()}
             </li>
           ))}
         </ul>
-        <p className="text-muted mt-3 text-sm" data-testid="checkout-note">{canBuy
-          ? "You'll finish payment on Stripe's secure checkout. Nothing is charged until you confirm there."
-          : "Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed."}</p>
+        <p className="text-muted mt-3 text-sm min-h-5" data-testid="checkout-note">{checkoutNote(availability, mode)}</p>
         <BillingDisclosure className="mt-4" />
       </section>
 

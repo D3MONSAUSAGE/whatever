@@ -48,6 +48,27 @@ describe("billing env diagnostics", () => {
   });
 });
 
+describe("billing return origin", () => {
+  const preview = { VERCEL_ENV: "preview" } as unknown as NodeJS.ProcessEnv;
+  const prod = { VERCEL_ENV: "production", NEXT_PUBLIC_APP_URL: "https://pekkotv.com" } as unknown as NodeJS.ProcessEnv;
+  it("keeps a preview on its own origin", () => {
+    expect(portalReturnUrl("https://pantalla-git-billing-safety-teamtegrate.vercel.app", preview)).toBe("https://pantalla-git-billing-safety-teamtegrate.vercel.app/dashboard/account");
+    expect(billingReturnOrigin("https://pantalla-ierg3rdh0-teamtegrate.vercel.app", preview)).toBe("https://pantalla-ierg3rdh0-teamtegrate.vercel.app");
+    expect(billingReturnOrigin("https://pantalla-chi.vercel.app", preview)).toBe("https://pantalla-chi.vercel.app");
+  });
+  it("always lands production customers on pekkotv.com", () => {
+    expect(portalReturnUrl("https://pekkotv.com", prod)).toBe("https://pekkotv.com/dashboard/account");
+    expect(billingReturnOrigin("https://www.pekkotv.com", prod)).toBe("https://www.pekkotv.com");
+    expect(billingReturnOrigin("https://pantalla-chi.vercel.app", prod)).toBe("https://pekkotv.com");
+    expect(billingReturnOrigin("https://pantalla-git-main-teamtegrate.vercel.app", prod)).toBe("https://pekkotv.com");
+  });
+  it("falls back to the site URL for hosts off the allowlist", () => {
+    for (const bad of ["https://evil.example", "https://pekkotv.com.evil.example", "https://other-teamtegrate.vercel.app", "http://pantalla-x-teamtegrate.vercel.app", "https://pekkotv.com:8443", "not a url"]) {
+      expect(billingReturnOrigin(bad, preview)).toBe("https://pekkotv.com");
+    }
+  });
+});
+
 describe("billing portal and plan changes", () => {
   it("sends the portal back to the account page and never a vercel.app host", () => {
     expect(portalReturnUrl("https://pekkotv.com/dashboard/billing")).toBe("https://pekkotv.com/dashboard/account");

@@ -366,13 +366,25 @@ export function subscriptionPriceChange(input: {
   return params;
 }
 
-/** Account page on a customer origin. A vercel.app host is never used. */
+/** Customer origins billing may send people back to. Previews are honored only outside production. */
+const BILLING_ORIGIN_HOSTS = new Set(["pekkotv.com", "www.pekkotv.com"]);
+const BILLING_NONPROD_HOSTS = new Set(["pantalla-chi.vercel.app"]);
+const BILLING_PREVIEW_HOST = /^pantalla-[a-z0-9-]+-teamtegrate\.vercel\.app$/;
+
+/**
+ * Origin for Stripe return, success and cancel URLs, taken from the request's own origin
+ * when it is allowlisted: pekkotv.com, and (not in production) pantalla-chi and this
+ * project's *-teamtegrate.vercel.app previews. Anything else falls back to the site URL,
+ * so production customers always land on pekkotv.com.
+ */
 export function billingReturnOrigin(requestOrigin: string, env: NodeJS.ProcessEnv = process.env): string {
   try {
     const url = new URL(requestOrigin);
-    if (!url.hostname.endsWith(".vercel.app")) {
-      if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return url.origin;
-      if (url.protocol === "https:") return url.origin;
+    const host = url.hostname.toLowerCase();
+    if ((host === "localhost" || host === "127.0.0.1") && env.VERCEL_ENV !== "production") return url.origin;
+    if (url.protocol === "https:" && !url.port) {
+      if (BILLING_ORIGIN_HOSTS.has(host)) return url.origin;
+      if (env.VERCEL_ENV !== "production" && (BILLING_NONPROD_HOSTS.has(host) || BILLING_PREVIEW_HOST.test(host))) return url.origin;
     }
   } catch {
     /* fall through to the public origin */
