@@ -239,6 +239,26 @@ describe("stripe billing events", () => {
     expect(db.accounts.get("acct_1")?.subscription_status).toBe("canceled");
   });
 
+  it("switches the plan on the same subscription and does not add a second account row", async () => {
+    setTestDb(db as never);
+    process.env.STRIPE_PRICE_STARTER = "price_start";
+    process.env.STRIPE_PRICE_BUSINESS = "price_biz";
+    db.seed({ id: "acct_1", plan: "starter", stripe_subscription_id: "sub_1", subscription_status: "active", billing_event_created: 1 });
+    await applyEvent(event("customer.subscription.updated", 6, { id: "sub_1" }, "evt_upgrade"), {
+      now: NOW,
+      fetchSubscription: async () => sub({
+        status: "active",
+        items: { data: [{ price: { id: "price_biz" }, current_period_end: Math.floor(NOW / 1000) + 30 * 86400 }] },
+      }),
+    });
+    expect(db.accounts.size).toBe(1);
+    expect(db.accounts.get("acct_1")).toMatchObject({
+      plan: "business",
+      stripe_subscription_id: "sub_1",
+      subscription_status: "active",
+    });
+  });
+
   it("lets subscription.deleted win when it shares a second with trial_will_end", async () => {
     setTestDb(db as never);
     const created = 1_700_000_000;

@@ -1,5 +1,6 @@
 "use client";
 import { BillingDisclosure } from "@/components/billing-disclosure";
+import { ManageBilling } from "@/components/manage-billing";
 import { PLANS } from "@/lib/plans";
 import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem } from "@/lib/api";
@@ -38,8 +39,14 @@ export default function Billing() {
   async function buy(plan: string) {
     setBuying(plan);
     try {
-      const r = await api<{ url: string }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan }) });
-      window.location.assign(r.url);
+      const r = await api<{ url?: string; updated?: boolean }>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan }) });
+      if (r.url) {
+        window.location.assign(r.url);
+        return;
+      }
+      toast.show(r.updated ? "Plan updated. Stripe confirms it in a moment." : "That is already your plan.");
+      await ent.reload();
+      setBuying(null);
     } catch (err) {
       toast.show((err as Error).message, true);
       setBuying(null);
@@ -83,10 +90,11 @@ export default function Billing() {
           )}
           {e.suspend_at && <p>Screens keep playing until {local(e.suspend_at)}.</p>}
           {e.warning && <p className="font-medium" role="status" data-testid="plan-warning">{e.warning.message}</p>}
+          <ManageBilling className="btn-quiet mt-2" />
         </section>
       )}
 
-      <section className="card p-5" aria-labelledby="plans-heading">
+      <section id="plans" className="card p-5" aria-labelledby="plans-heading">
         <h2 id="plans-heading" className="text-lg font-semibold mb-3">Plans</h2>
         <ul className="grid gap-3 sm:grid-cols-3">
           {PLANS.map((p) => (

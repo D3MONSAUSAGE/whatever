@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
-import { checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, priceFor, stripeKey, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
+import { billingReturnOrigin, checkoutAction, checkoutBlocked, checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, portalAccess, portalReturnUrl, portalSessionParams, priceFor, stripeKey, subscriptionPriceChange, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
 
 describe("stripe test mode guard", () => {
   it("refuses live and missing keys", () => {
@@ -45,6 +45,41 @@ describe("billing env diagnostics", () => {
     const quoted = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "\"sk_test_abc\"", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
     expect(quoted.available).toBe(true);
     expect(quoted.missing).toEqual([]);
+  });
+});
+
+describe("billing portal and plan changes", () => {
+  it("sends the portal back to the account page and never a vercel.app host", () => {
+    expect(portalReturnUrl("https://pekkotv.com/dashboard/billing")).toBe("https://pekkotv.com/dashboard/account");
+    expect(billingReturnOrigin("https://pantalla-abc.vercel.app")).toBe("https://pekkotv.com");
+    expect(portalReturnUrl("https://pantalla-abc.vercel.app")).not.toContain("vercel.app");
+    expect(portalSessionParams("cus_1", "https://pekkotv.com/dashboard/account")).toEqual({
+      customer: "cus_1",
+      return_url: "https://pekkotv.com/dashboard/account",
+    });
+  });
+  it("updates the existing item and keeps the trial end", () => {
+    expect(checkoutBlocked("active")).toBe(true);
+    expect(checkoutBlocked("trialing")).toBe(true);
+    expect(checkoutBlocked("past_due")).toBe(true);
+    expect(checkoutBlocked("canceled")).toBe(false);
+    expect(checkoutBlocked(null)).toBe(false);
+    expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("update");
+    expect(checkoutAction({ status: "trialing", subscriptionId: "sub_1", currentPriceId: "price_biz", nextPriceId: "price_start" })).toBe("update");
+    expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: "price_biz", nextPriceId: "price_biz" })).toBe("same");
+    expect(checkoutAction({ status: "past_due", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: null, nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "canceled", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("checkout");
+    expect(checkoutAction({ status: null, subscriptionId: null, currentPriceId: null, nextPriceId: "price_biz" })).toBe("checkout");
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: 1_700_000_000 })).toEqual({
+      items: [{ id: "si_1", price: "price_biz" }],
+      proration_behavior: "create_prorations",
+      trial_end: 1_700_000_000,
+    });
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: null }).trial_end).toBeUndefined();
+    expect(portalAccess({ userId: "user-b", ownerUserId: "user-a", customerId: "cus_a" })).toEqual({ ok: false, status: 403, code: "not_owner" });
+    expect(portalAccess({ userId: "user-a", ownerUserId: "user-a", customerId: null })).toEqual({ ok: false, status: 200, code: "plans" });
+    expect(portalAccess({ userId: "user-a", ownerUserId: "user-a", customerId: "cus_a" })).toEqual({ ok: true, customerId: "cus_a" });
   });
 });
 

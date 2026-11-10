@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { publicAppOrigin } from "@/lib/public-url";
 import { db } from "./supabase";
 
 /** Stripe billing. Live charges stay off unless STRIPE_LIVE_ENABLED is exactly "1". */
@@ -326,6 +327,75 @@ async function graceEndsAt(accountId: string | null, subscriptionId: string, sta
 async function must(p: PromiseLike<{ error: { message: string } | null }>) {
   const r = await p;
   if (r.error) throw new Error(r.error.message);
+}
+
+/** Checkout must not open a second subscription while one of these is on the account. */
+export const BLOCKING_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"] as const;
+
+export function checkoutBlocked(status: string | null | undefined): boolean {
+  return BLOCKING_SUBSCRIPTION_STATUSES.includes(status as typeof BLOCKING_SUBSCRIPTION_STATUSES[number]);
+}
+
+/** What Checkout does for an org that already may have a subscription. "checkout" is the only path that creates one. */
+export function checkoutAction(input: {
+  status: string | null | undefined;
+  subscriptionId: string | null | undefined;
+  currentPriceId: string | null;
+  nextPriceId: string;
+}): "checkout" | "portal" | "same" | "update" {
+  if (!checkoutBlocked(input.status)) return "checkout";
+  if (input.status === "past_due" || !input.subscriptionId || !input.currentPriceId) return "portal";
+  if (input.currentPriceId === input.nextPriceId) return "same";
+  return "update";
+}
+
+/**
+ * Change the existing subscription item. trial_end is sent only when Stripe already has one,
+ * so a trial is not ended or extended by the price change.
+ */
+export function subscriptionPriceChange(input: {
+  subscriptionItemId: string;
+  price: string;
+  trialEnd: number | null;
+}): Stripe.SubscriptionUpdateParams {
+  const params: Stripe.SubscriptionUpdateParams = {
+    items: [{ id: input.subscriptionItemId, price: input.price }],
+    proration_behavior: "create_prorations",
+  };
+  if (typeof input.trialEnd === "number") params.trial_end = input.trialEnd;
+  return params;
+}
+
+/** Account page on a customer origin. A vercel.app host is never used. */
+export function billingReturnOrigin(requestOrigin: string, env: NodeJS.ProcessEnv = process.env): string {
+  try {
+    const url = new URL(requestOrigin);
+    if (!url.hostname.endsWith(".vercel.app")) {
+      if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return url.origin;
+      if (url.protocol === "https:") return url.origin;
+    }
+  } catch {
+    /* fall through to the public origin */
+  }
+  return publicAppOrigin(env);
+}
+
+export function portalReturnUrl(requestOrigin: string, env: NodeJS.ProcessEnv = process.env): string {
+  return `${billingReturnOrigin(requestOrigin, env)}/dashboard/account`;
+}
+
+/** Owner-only. No customer means show the plan picker. A customer id from the request is not accepted. */
+export function portalAccess(input: { userId: string; ownerUserId: string; customerId: string | null }):
+  | { ok: true; customerId: string }
+  | { ok: false; status: 403 | 200; code: "not_owner" | "plans" } {
+  if (input.userId !== input.ownerUserId) return { ok: false, status: 403, code: "not_owner" };
+  if (!input.customerId) return { ok: false, status: 200, code: "plans" };
+  return { ok: true, customerId: input.customerId };
+}
+
+/** Portal sessions use the customer stored for this org. The request body never names a customer. */
+export function portalSessionParams(customerId: string, returnUrl: string): Stripe.BillingPortal.SessionCreateParams {
+  return { customer: customerId, return_url: returnUrl };
 }
 
 /** True only when a test key and all three price ids are configured. Webhook secret is separate. */
