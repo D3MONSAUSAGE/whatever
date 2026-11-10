@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { publicAppOrigin } from "@/lib/public-url";
 import { db } from "./supabase";
 
 /** Stripe billing. Live charges stay off unless STRIPE_LIVE_ENABLED is exactly "1". */
@@ -326,6 +327,101 @@ async function graceEndsAt(accountId: string | null, subscriptionId: string, sta
 async function must(p: PromiseLike<{ error: { message: string } | null }>) {
   const r = await p;
   if (r.error) throw new Error(r.error.message);
+}
+
+/** Checkout must not open a second subscription while one of these is on the account. */
+export const BLOCKING_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"] as const;
+
+export function checkoutBlocked(status: string | null | undefined): boolean {
+  return BLOCKING_SUBSCRIPTION_STATUSES.includes(status as typeof BLOCKING_SUBSCRIPTION_STATUSES[number]);
+}
+
+/** What Checkout does for an org that already may have a subscription. "checkout" is the only path that creates one. */
+export function checkoutAction(input: {
+  status: string | null | undefined;
+  subscriptionId: string | null | undefined;
+  currentPriceId: string | null;
+  nextPriceId: string;
+}): "checkout" | "portal" | "same" | "update" {
+  if (!checkoutBlocked(input.status)) return "checkout";
+  if (input.status === "past_due" || !input.subscriptionId || !input.currentPriceId) return "portal";
+  if (input.currentPriceId === input.nextPriceId) return "same";
+  return "update";
+}
+
+/**
+ * Same proration as the live Customer Portal: always_invoice, so the difference is
+ * invoiced and charged right away. error_if_incomplete means a declined or 3DS-blocked
+ * payment returns a 402 and the plan does not change. trial_end is sent only while
+ * Stripe's trial is still in the future, so a trial is neither ended nor extended.
+ */
+export const PLAN_CHANGE_PRORATION = "always_invoice" as const;
+
+export function subscriptionPriceChange(input: {
+  subscriptionItemId: string;
+  price: string;
+  trialEnd: number | null;
+  nowSeconds?: number;
+}): Stripe.SubscriptionUpdateParams {
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const params: Stripe.SubscriptionUpdateParams = {
+    items: [{ id: input.subscriptionItemId, price: input.price }],
+    proration_behavior: PLAN_CHANGE_PRORATION,
+    payment_behavior: "error_if_incomplete",
+  };
+  if (typeof input.trialEnd === "number" && input.trialEnd > now) params.trial_end = input.trialEnd;
+  return params;
+}
+
+/** A plan change whose immediate invoice could not be paid. The subscription is unchanged. */
+export function planChangePaymentFailed(err: unknown): boolean {
+  const e = err as { type?: string; statusCode?: number; code?: string } | null;
+  if (!e) return false;
+  return e.type === "StripeCardError" || e.statusCode === 402;
+}
+
+/** Customer origins billing may send people back to. Previews are honored only outside production. */
+const BILLING_ORIGIN_HOSTS = new Set(["pekkotv.com", "www.pekkotv.com"]);
+const BILLING_NONPROD_HOSTS = new Set(["pantalla-chi.vercel.app"]);
+const BILLING_PREVIEW_HOST = /^pantalla-[a-z0-9-]+-teamtegrate\.vercel\.app$/;
+
+/**
+ * Origin for Stripe return, success and cancel URLs, taken from the request's own origin
+ * when it is allowlisted: pekkotv.com, and (not in production) pantalla-chi and this
+ * project's *-teamtegrate.vercel.app previews. Anything else falls back to the site URL,
+ * so production customers always land on pekkotv.com.
+ */
+export function billingReturnOrigin(requestOrigin: string, env: NodeJS.ProcessEnv = process.env): string {
+  try {
+    const url = new URL(requestOrigin);
+    const host = url.hostname.toLowerCase();
+    if ((host === "localhost" || host === "127.0.0.1") && env.VERCEL_ENV !== "production") return url.origin;
+    if (url.protocol === "https:" && !url.port) {
+      if (BILLING_ORIGIN_HOSTS.has(host)) return url.origin;
+      if (env.VERCEL_ENV !== "production" && (BILLING_NONPROD_HOSTS.has(host) || BILLING_PREVIEW_HOST.test(host))) return url.origin;
+    }
+  } catch {
+    /* fall through to the public origin */
+  }
+  return publicAppOrigin(env);
+}
+
+export function portalReturnUrl(requestOrigin: string, env: NodeJS.ProcessEnv = process.env): string {
+  return `${billingReturnOrigin(requestOrigin, env)}/dashboard/account`;
+}
+
+/** Owner-only. No customer means show the plan picker. A customer id from the request is not accepted. */
+export function portalAccess(input: { userId: string; ownerUserId: string; customerId: string | null }):
+  | { ok: true; customerId: string }
+  | { ok: false; status: 403 | 200; code: "not_owner" | "plans" } {
+  if (input.userId !== input.ownerUserId) return { ok: false, status: 403, code: "not_owner" };
+  if (!input.customerId) return { ok: false, status: 200, code: "plans" };
+  return { ok: true, customerId: input.customerId };
+}
+
+/** Portal sessions use the customer stored for this org. The request body never names a customer. */
+export function portalSessionParams(customerId: string, returnUrl: string): Stripe.BillingPortal.SessionCreateParams {
+  return { customer: customerId, return_url: returnUrl };
 }
 
 /** True only when a test key and all three price ids are configured. Webhook secret is separate. */

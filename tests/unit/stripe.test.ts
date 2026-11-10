@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
-import { checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, priceFor, stripeKey, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
+import { planChangePaymentFailed, PLAN_CHANGE_PRORATION, billingReturnOrigin, checkoutAction, checkoutBlocked, checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, portalAccess, portalReturnUrl, portalSessionParams, priceFor, stripeKey, subscriptionPriceChange, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
 
 describe("stripe test mode guard", () => {
   it("refuses live and missing keys", () => {
@@ -45,6 +45,65 @@ describe("billing env diagnostics", () => {
     const quoted = billingDiagnostics({ STRIPE_TEST_SECRET_KEY: "\"sk_test_abc\"", STRIPE_WEBHOOK_SECRET: "whsec_ok", ...prices });
     expect(quoted.available).toBe(true);
     expect(quoted.missing).toEqual([]);
+  });
+});
+
+describe("billing return origin", () => {
+  const preview = { VERCEL_ENV: "preview" } as unknown as NodeJS.ProcessEnv;
+  const prod = { VERCEL_ENV: "production", NEXT_PUBLIC_APP_URL: "https://pekkotv.com" } as unknown as NodeJS.ProcessEnv;
+  it("keeps a preview on its own origin", () => {
+    expect(portalReturnUrl("https://pantalla-git-billing-safety-teamtegrate.vercel.app", preview)).toBe("https://pantalla-git-billing-safety-teamtegrate.vercel.app/dashboard/account");
+    expect(billingReturnOrigin("https://pantalla-ierg3rdh0-teamtegrate.vercel.app", preview)).toBe("https://pantalla-ierg3rdh0-teamtegrate.vercel.app");
+    expect(billingReturnOrigin("https://pantalla-chi.vercel.app", preview)).toBe("https://pantalla-chi.vercel.app");
+  });
+  it("always lands production customers on pekkotv.com", () => {
+    expect(portalReturnUrl("https://pekkotv.com", prod)).toBe("https://pekkotv.com/dashboard/account");
+    expect(billingReturnOrigin("https://www.pekkotv.com", prod)).toBe("https://www.pekkotv.com");
+    expect(billingReturnOrigin("https://pantalla-chi.vercel.app", prod)).toBe("https://pekkotv.com");
+    expect(billingReturnOrigin("https://pantalla-git-main-teamtegrate.vercel.app", prod)).toBe("https://pekkotv.com");
+  });
+  it("falls back to the site URL for hosts off the allowlist", () => {
+    for (const bad of ["https://evil.example", "https://pekkotv.com.evil.example", "https://other-teamtegrate.vercel.app", "http://pantalla-x-teamtegrate.vercel.app", "https://pekkotv.com:8443", "not a url"]) {
+      expect(billingReturnOrigin(bad, preview)).toBe("https://pekkotv.com");
+    }
+  });
+});
+
+describe("billing portal and plan changes", () => {
+  it("sends the portal back to the account page and never a vercel.app host", () => {
+    expect(portalReturnUrl("https://pekkotv.com/dashboard/billing")).toBe("https://pekkotv.com/dashboard/account");
+    expect(billingReturnOrigin("https://pantalla-abc.vercel.app")).toBe("https://pekkotv.com");
+    expect(portalReturnUrl("https://pantalla-abc.vercel.app")).not.toContain("vercel.app");
+    expect(portalSessionParams("cus_1", "https://pekkotv.com/dashboard/account")).toEqual({
+      customer: "cus_1",
+      return_url: "https://pekkotv.com/dashboard/account",
+    });
+  });
+  it("updates the existing item and keeps the trial end", () => {
+    expect(checkoutBlocked("active")).toBe(true);
+    expect(checkoutBlocked("trialing")).toBe(true);
+    expect(checkoutBlocked("past_due")).toBe(true);
+    expect(checkoutBlocked("canceled")).toBe(false);
+    expect(checkoutBlocked(null)).toBe(false);
+    expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("update");
+    expect(checkoutAction({ status: "trialing", subscriptionId: "sub_1", currentPriceId: "price_biz", nextPriceId: "price_start" })).toBe("update");
+    expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: "price_biz", nextPriceId: "price_biz" })).toBe("same");
+    expect(checkoutAction({ status: "past_due", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: null, nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "canceled", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("checkout");
+    expect(checkoutAction({ status: null, subscriptionId: null, currentPriceId: null, nextPriceId: "price_biz" })).toBe("checkout");
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: 1_700_000_000, nowSeconds: 1_600_000_000 })).toEqual({
+      items: [{ id: "si_1", price: "price_biz" }],
+      proration_behavior: "always_invoice",
+      payment_behavior: "error_if_incomplete",
+      trial_end: 1_700_000_000,
+    });
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: null }).trial_end).toBeUndefined();
+    // A trial that already ended is never sent back (Stripe rejects a past trial_end).
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: 1_600_000_000, nowSeconds: 1_700_000_000 }).trial_end).toBeUndefined();
+    expect(portalAccess({ userId: "user-b", ownerUserId: "user-a", customerId: "cus_a" })).toEqual({ ok: false, status: 403, code: "not_owner" });
+    expect(portalAccess({ userId: "user-a", ownerUserId: "user-a", customerId: null })).toEqual({ ok: false, status: 200, code: "plans" });
+    expect(portalAccess({ userId: "user-a", ownerUserId: "user-a", customerId: "cus_a" })).toEqual({ ok: true, customerId: "cus_a" });
   });
 });
 
@@ -136,5 +195,15 @@ describe("checkout availability", () => {
     expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_live_x", ...prices })).toBe(false);
     expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_test_x", STRIPE_PRICE_STARTER: "a" })).toBe(false);
     expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_test_x", ...prices })).toBe(true);
+  });
+});
+
+describe("plan change proration matches the live portal", () => {
+  it("invoices immediately and refuses an unpaid change", () => {
+    expect(PLAN_CHANGE_PRORATION).toBe("always_invoice");
+    expect(planChangePaymentFailed({ type: "StripeCardError", statusCode: 402 })).toBe(true);
+    expect(planChangePaymentFailed({ type: "StripeInvalidRequestError", statusCode: 402 })).toBe(true);
+    expect(planChangePaymentFailed({ type: "StripeInvalidRequestError", statusCode: 400 })).toBe(false);
+    expect(planChangePaymentFailed(null)).toBe(false);
   });
 });

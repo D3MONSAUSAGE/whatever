@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ManageBilling } from "@/components/manage-billing";
 import { useApi } from "@/lib/api";
 
 type Entitlements = {
@@ -16,9 +17,12 @@ export function BillingBanner() {
   return (
     <div role="status" data-testid="billing-banner" className="card mb-5 p-3 md:p-4 border-l-4 border-l-primary">
       <p>{message}</p>
-      <Link href={select ? "/dashboard/billing#screens" : "/dashboard/billing"} className="btn btn-quiet mt-2">
-        {select ? "Choose screens" : "Review plan"}
-      </Link>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Link href={select ? "/dashboard/billing#screens" : "/dashboard/billing"} className="btn btn-quiet">
+          {select ? "Choose screens" : "Review plan"}
+        </Link>
+        <ManageBilling className="btn-quiet" />
+      </div>
     </div>
   );
 }

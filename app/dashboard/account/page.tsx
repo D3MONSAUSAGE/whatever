@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ContactBlock } from "@/components/contact-block";
+import { ManageBilling } from "@/components/manage-billing";
 import { IconGear } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 
@@ -17,8 +18,11 @@ export default function AccountHub() {
         </li>
         <li className="card p-4">
           <h2 className="font-semibold">Billing</h2>
-          <p className="text-sm text-muted mt-1">The plan page and Stripe checkout. Nothing new is charged from here.</p>
-          <Link href="/dashboard/billing" className="btn min-h-11 mt-3">Open billing</Link>
+          <p className="text-sm text-muted mt-1">Your plan, invoices, and payment method.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/dashboard/billing" className="btn min-h-11">Open billing</Link>
+            <ManageBilling className="btn-quiet" />
+          </div>
         </li>
         <li className="card p-4">
           <h2 className="font-semibold">Support</h2>

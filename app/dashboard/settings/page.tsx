@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertSettings } from "@/components/alerts";
+import { ManageBilling } from "@/components/manage-billing";
 import { api, useApi } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase-browser";
 import { IconGear } from "@/components/icons";
@@ -120,7 +121,10 @@ export default function Settings() {
 
         <AlertSettings />
 
-        <Link href="/dashboard/billing" className="card p-5 block font-semibold" data-testid="billing-link">Plan &amp; billing →</Link>
+        <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
+          <Link href="/dashboard/billing" className="font-semibold" data-testid="billing-link">Plan &amp; billing →</Link>
+          <ManageBilling className="btn-quiet" />
+        </div>
         <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">Help &amp; support →</Link>
         <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">Delete account →</Link>
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
