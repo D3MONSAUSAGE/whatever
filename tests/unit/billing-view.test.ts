@@ -50,8 +50,8 @@ describe("plan buttons", () => {
     expect(planChangeMode({ ...active, status: "past_due" })).toBe("portal");
     expect(planChangeMode({ ...active, status: "canceled" })).toBe("checkout");
   });
-  it("explains that a switch is billed on the next invoice", () => {
-    expect(checkoutNote("available", "update")).toMatch(/next invoice/);
+  it("explains that a switch is charged right away", () => {
+    expect(checkoutNote("available", "update")).toMatch(/immediately/);
     expect(checkoutNote("available", "update")).toMatch(/no second subscription/);
   });
 });

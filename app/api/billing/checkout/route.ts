@@ -1,7 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
-import { billingDiagnostics, billingReturnOrigin, checkoutAction, checkoutAvailable, checkoutBlocked, checkoutSessionRequest, PAID_PLANS, priceFor, stripe, stripeKey, subscriptionPriceChange, type PaidPlan } from "@/lib/server/stripe";
+import { billingDiagnostics, billingReturnOrigin, checkoutAction, checkoutAvailable, checkoutBlocked, checkoutSessionRequest, PAID_PLANS, planChangePaymentFailed, priceFor, stripe, stripeKey, subscriptionPriceChange, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,11 +38,18 @@ export async function POST(req: Request) {
     if (action !== "update" || !item) {
       return json({ error: "Use Manage billing to change this plan.", code: "subscription_exists", action: "portal" }, 409);
     }
-    await s.subscriptions.update(current.id, subscriptionPriceChange({
-      subscriptionItemId: item.id,
-      price,
-      trialEnd: typeof current.trial_end === "number" ? current.trial_end : null,
-    }));
+    try {
+      await s.subscriptions.update(current.id, subscriptionPriceChange({
+        subscriptionItemId: item.id,
+        price,
+        trialEnd: current.status === "trialing" && typeof current.trial_end === "number" ? current.trial_end : null,
+      }));
+    } catch (err) {
+      if (planChangePaymentFailed(err)) {
+        return json({ error: "Your card was declined for this plan change, so your plan didn't change. Update your card in Manage billing, then try again.", code: "payment_failed", action: "portal" }, 402);
+      }
+      throw err;
+    }
     return json({ updated: true, plan });
   }
   const origin = billingReturnOrigin(new URL(req.url).origin);

@@ -38,7 +38,8 @@ const features = {
   subscription_update: {
     enabled: true,
     default_allowed_updates: ["price"],
-    proration_behavior: "create_prorations",
+    // Matches the live portal (Francisco, Nov 9) and the in-app plan change: invoice the difference now.
+    proration_behavior: "always_invoice",
     products,
   },
 };

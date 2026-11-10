@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
-import { billingReturnOrigin, checkoutAction, checkoutBlocked, checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, portalAccess, portalReturnUrl, portalSessionParams, priceFor, stripeKey, subscriptionPriceChange, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
+import { planChangePaymentFailed, PLAN_CHANGE_PRORATION, billingReturnOrigin, checkoutAction, checkoutBlocked, checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, portalAccess, portalReturnUrl, portalSessionParams, priceFor, stripeKey, subscriptionPriceChange, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
 
 describe("stripe test mode guard", () => {
   it("refuses live and missing keys", () => {
@@ -92,12 +92,15 @@ describe("billing portal and plan changes", () => {
     expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: null, nextPriceId: "price_biz" })).toBe("portal");
     expect(checkoutAction({ status: "canceled", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("checkout");
     expect(checkoutAction({ status: null, subscriptionId: null, currentPriceId: null, nextPriceId: "price_biz" })).toBe("checkout");
-    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: 1_700_000_000 })).toEqual({
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: 1_700_000_000, nowSeconds: 1_600_000_000 })).toEqual({
       items: [{ id: "si_1", price: "price_biz" }],
-      proration_behavior: "create_prorations",
+      proration_behavior: "always_invoice",
+      payment_behavior: "error_if_incomplete",
       trial_end: 1_700_000_000,
     });
     expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: null }).trial_end).toBeUndefined();
+    // A trial that already ended is never sent back (Stripe rejects a past trial_end).
+    expect(subscriptionPriceChange({ subscriptionItemId: "si_1", price: "price_biz", trialEnd: 1_600_000_000, nowSeconds: 1_700_000_000 }).trial_end).toBeUndefined();
     expect(portalAccess({ userId: "user-b", ownerUserId: "user-a", customerId: "cus_a" })).toEqual({ ok: false, status: 403, code: "not_owner" });
     expect(portalAccess({ userId: "user-a", ownerUserId: "user-a", customerId: null })).toEqual({ ok: false, status: 200, code: "plans" });
     expect(portalAccess({ userId: "user-a", ownerUserId: "user-a", customerId: "cus_a" })).toEqual({ ok: true, customerId: "cus_a" });
@@ -192,5 +195,15 @@ describe("checkout availability", () => {
     expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_live_x", ...prices })).toBe(false);
     expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_test_x", STRIPE_PRICE_STARTER: "a" })).toBe(false);
     expect(checkoutAvailable({ STRIPE_TEST_SECRET_KEY: "sk_test_x", ...prices })).toBe(true);
+  });
+});
+
+describe("plan change proration matches the live portal", () => {
+  it("invoices immediately and refuses an unpaid change", () => {
+    expect(PLAN_CHANGE_PRORATION).toBe("always_invoice");
+    expect(planChangePaymentFailed({ type: "StripeCardError", statusCode: 402 })).toBe(true);
+    expect(planChangePaymentFailed({ type: "StripeInvalidRequestError", statusCode: 402 })).toBe(true);
+    expect(planChangePaymentFailed({ type: "StripeInvalidRequestError", statusCode: 400 })).toBe(false);
+    expect(planChangePaymentFailed(null)).toBe(false);
   });
 });

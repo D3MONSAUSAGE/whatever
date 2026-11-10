@@ -350,20 +350,34 @@ export function checkoutAction(input: {
 }
 
 /**
- * Change the existing subscription item. trial_end is sent only when Stripe already has one,
- * so a trial is not ended or extended by the price change.
+ * Same proration as the live Customer Portal: always_invoice, so the difference is
+ * invoiced and charged right away. error_if_incomplete means a declined or 3DS-blocked
+ * payment returns a 402 and the plan does not change. trial_end is sent only while
+ * Stripe's trial is still in the future, so a trial is neither ended nor extended.
  */
+export const PLAN_CHANGE_PRORATION = "always_invoice" as const;
+
 export function subscriptionPriceChange(input: {
   subscriptionItemId: string;
   price: string;
   trialEnd: number | null;
+  nowSeconds?: number;
 }): Stripe.SubscriptionUpdateParams {
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
   const params: Stripe.SubscriptionUpdateParams = {
     items: [{ id: input.subscriptionItemId, price: input.price }],
-    proration_behavior: "create_prorations",
+    proration_behavior: PLAN_CHANGE_PRORATION,
+    payment_behavior: "error_if_incomplete",
   };
-  if (typeof input.trialEnd === "number") params.trial_end = input.trialEnd;
+  if (typeof input.trialEnd === "number" && input.trialEnd > now) params.trial_end = input.trialEnd;
   return params;
+}
+
+/** A plan change whose immediate invoice could not be paid. The subscription is unchanged. */
+export function planChangePaymentFailed(err: unknown): boolean {
+  const e = err as { type?: string; statusCode?: number; code?: string } | null;
+  if (!e) return false;
+  return e.type === "StripeCardError" || e.statusCode === 402;
 }
 
 /** Customer origins billing may send people back to. Previews are honored only outside production. */

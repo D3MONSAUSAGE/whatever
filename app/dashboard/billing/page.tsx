@@ -51,7 +51,7 @@ export default function Billing() {
         window.location.assign(r.url);
         return;
       }
-      toast.show(r.updated ? "Plan updated. Stripe confirms it in a moment." : "That is already your plan.");
+      toast.show(r.updated ? "Plan updated. The price difference was charged to your card; Stripe confirms it in a moment." : "That is already your plan.");
       await ent.reload();
       setBuying(null);
     } catch (err) {

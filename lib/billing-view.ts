@@ -63,7 +63,7 @@ export function planButton(input: {
 export function checkoutNote(availability: "loading" | "available" | "unavailable", mode: "checkout" | "update" | "portal"): string {
   if (availability === "loading") return "";
   if (availability === "unavailable") return "Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed.";
-  if (mode === "update") return "Switching plans changes your current subscription right away; no second subscription is created. The price difference for the rest of this billing period is added to your next invoice, together with the new monthly price.";
+  if (mode === "update") return "Switching plans changes your current subscription right away; no second subscription is created. Stripe charges the price difference for the rest of this billing period immediately (a downgrade becomes a credit on your next invoice).";
   if (mode === "portal") return "Your last payment didn't go through. Use Manage billing to update your card or change plans.";
   return "You'll finish payment on Stripe's secure checkout. Nothing is charged until you confirm there.";
 }
