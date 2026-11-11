@@ -55,3 +55,46 @@ describe("billing reminders at commercial launch", () => {
     expect(planOrgReminders({ ...acct, state: "grandfathered" }, "2026-11-12T15:00:00.000Z").map((p) => p.kind)).toContain("transition_14");
   });
 });
+
+import { formatWhen, remainingPhrase, reminderZone } from "@/lib/server/billing-notices";
+
+describe("reminder wording reflects the real remaining time and a labeled zone", () => {
+  const trial = (ends: string, now: string): EntitlementRow => ({ ...base, trial_started_at: "2026-11-11T16:52:16.000Z", trial_ends_at: ends, playback_ends_at: ends, server_time: now });
+  it("never says '1 day' on the expiry morning", () => {
+    // vanessayt98 case: 7:00 AM PST run, trial ends 8:52 AM PST the same day.
+    const [n] = billingNotices(trial("2026-11-25T16:52:16.000Z", "2026-11-25T15:00:00.000Z"));
+    expect(n.kind).toBe("trial_ending_1");
+    expect(n.subject).toBe("Your Pekko trial ends in 1 hour");
+    expect(n.text).toContain("Nov 25, 2026 at 8:52 AM PST");
+    const [h] = billingNotices(trial("2026-11-23T03:07:51.000Z", "2026-11-22T15:00:00.000Z"));
+    expect(h.subject).toBe("Your Pekko trial ends in 12 hours");
+    expect(h.text).toContain("Nov 22, 2026 at 7:07 PM PST");
+  });
+  it("the first notice says 2 days when less than 3 days remain", () => {
+    const [n] = billingNotices(trial("2026-11-25T16:52:16.000Z", "2026-11-23T15:00:00.000Z"));
+    expect(n.kind).toBe("trial_ending_3");
+    expect(n.subject).toBe("Your Pekko trial ends in 2 days");
+  });
+  it("rounds down and handles the boundaries", () => {
+    const now = "2026-11-20T00:00:00.000Z";
+    expect(remainingPhrase("2026-11-23T00:00:00.000Z", now)).toBe("in 3 days");
+    expect(remainingPhrase("2026-11-22T23:59:00.000Z", now)).toBe("in 2 days");
+    expect(remainingPhrase("2026-11-21T00:00:00.000Z", now)).toBe("in 1 day");
+    expect(remainingPhrase("2026-11-20T23:59:00.000Z", now)).toBe("in 23 hours");
+    expect(remainingPhrase("2026-11-20T00:30:00.000Z", now)).toBe("in less than an hour");
+  });
+  it("uses the location timezone when set, else Pacific time, always labeled", () => {
+    expect(reminderZone(null)).toBe("America/Los_Angeles");
+    expect(reminderZone("UTC")).toBe("America/Los_Angeles");
+    expect(reminderZone("Not/AZone")).toBe("America/Los_Angeles");
+    expect(reminderZone("America/New_York")).toBe("America/New_York");
+    expect(formatWhen("2026-11-23T03:07:51.000Z", null)).toBe("Nov 22, 2026 at 7:07 PM PST");
+    expect(formatWhen("2026-11-23T03:07:51.000Z", "America/New_York")).toBe("Nov 22, 2026 at 10:07 PM EST");
+  });
+  it("keeps the same send days and keys (no skipped or doubled reminder)", () => {
+    const ends = "2026-11-25T16:52:16.000Z";
+    const kinds: string[] = [];
+    for (let d = 11; d <= 26; d++) for (const n of billingNotices(trial(ends, `2026-11-${d}T15:00:00.000Z`))) kinds.push(`${d}:${n.kind}:${n.deadline}`);
+    expect(kinds).toEqual([`23:trial_ending_3:${ends}`, `25:trial_ending_1:${ends}`]);
+  });
+});

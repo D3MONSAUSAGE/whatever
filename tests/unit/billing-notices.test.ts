@@ -51,10 +51,12 @@ describe("billing notices", () => {
   it("names the trial end date at 3 days and at 1 day, and not a receipt", () => {
     const three = billingNotices({ ...base, server_time: "2026-11-12T08:00:00.000Z" });
     expect(three.map((n) => n.kind)).toEqual(["trial_ending_3"]);
-    expect(three[0].text).toContain("Nov 15, 2026 (UTC)");
+    expect(three[0].text).toContain("Nov 15, 2026 at 12:00 AM PST");
+    expect(three[0].subject).toBe("Your Pekko trial ends in 3 days");
     const one = billingNotices({ ...base, server_time: "2026-11-14T08:00:00.000Z" });
     expect(one.map((n) => n.kind)).toEqual(["trial_ending_1"]);
-    expect(one[0].text).toContain("Nov 15, 2026 (UTC)");
+    expect(one[0].text).toContain("Nov 15, 2026 at 12:00 AM PST");
+    expect(one[0].subject).toBe("Your Pekko trial ends in 1 day");
     expect(billingNotices({ ...base, server_time: "2026-11-11T08:00:00.000Z" })).toEqual([]);
     expect(RECEIPT_CHANNEL).toBe("stripe");
   });
@@ -63,13 +65,14 @@ describe("billing notices", () => {
       ...base, state: "past_due", plan: "business", grace_ends_at: "2026-12-01T00:00:00.000Z", server_time: "2026-11-20T00:00:00.000Z",
     });
     expect(failed.map((n) => n.kind)).toEqual(["payment_failed"]);
-    expect(failed[0].text).toContain("Dec 1, 2026 (UTC)");
+    expect(failed[0].text).toContain("Nov 30, 2026 at 4:00 PM PST");
     expect(failed[0].text).toMatch(/not deleted/i);
     const two = billingNotices({
       ...base, state: "past_due", plan: "business", grace_ends_at: "2026-12-01T00:00:00.000Z", server_time: "2026-11-29T00:00:00.000Z",
     });
     expect(two.map((n) => n.kind)).toEqual(["payment_failed", "grace_ending_2"]);
-    expect(two[1].text).toContain("Dec 1, 2026 (UTC)");
+    expect(two[1].text).toContain("Nov 30, 2026 at 4:00 PM PST");
+    expect(two[1].subject).toBe("Your Pekko payment grace ends in 2 days");
     const one = billingNotices({
       ...base, state: "past_due", plan: "business", grace_ends_at: "2026-12-01T00:00:00.000Z", server_time: "2026-11-30T00:00:00.000Z",
     });
@@ -83,7 +86,7 @@ describe("billing notices", () => {
     expect(billingNotices(row, { enforced: false, transitionEndsAt: ends })).toEqual([]);
     const live = billingNotices(row, { enforced: true, transitionEndsAt: ends });
     expect(live.map((n) => n.kind)).toEqual(["transition_14"]);
-    expect(live[0].text).toContain("Nov 22, 2026 (UTC)");
+    expect(live[0].text).toContain("Nov 22, 2026 at 4:00 AM PST");
     expect(live[0].text).toMatch(/full access/i);
   });
   it("does not send email unless the provider flag is configured", async () => {
