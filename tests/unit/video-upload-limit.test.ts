@@ -19,7 +19,7 @@ describe("500 MB video limit", () => {
 
   it("builds the TUS endpoint and object path from a signed upload URL", () => {
     const signed = "https://iybmjtkjfxcqupvhoddh.supabase.co/storage/v1/object/upload/sign/media/acct/clip-id.mp4?token=abc";
-    expect(tusEndpoint(signed)).toBe("https://iybmjtkjfxcqupvhoddh.storage.supabase.co/storage/v1/upload/resumable");
+    expect(tusEndpoint(signed)).toBe("https://iybmjtkjfxcqupvhoddh.storage.supabase.co/storage/v1/upload/resumable/sign");
     expect(signedUploadTarget(signed)).toEqual({ bucket: "media", path: "acct/clip-id.mp4" });
     expect(signedUploadTarget("https://example.com/not-a-signed-url")).toBeNull();
   });

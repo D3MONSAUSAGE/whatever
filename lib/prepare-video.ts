@@ -89,11 +89,11 @@ function probeVideo(file: File): Promise<{ durationMs: number; width: number; he
   });
 }
 
-/** Direct storage TUS endpoint. The `.storage.` hostname is what Supabase recommends for large uploads. */
+/** Signed TUS endpoint (`/resumable/sign`). The `.storage.` hostname is recommended for large uploads. */
 export function tusEndpoint(signedUrl: string): string {
   const url = new URL(signedUrl);
   const host = url.hostname.replace(/\.supabase\.co$/i, ".storage.supabase.co");
-  return `${url.protocol}//${host}/storage/v1/upload/resumable`;
+  return `${url.protocol}//${host}/storage/v1/upload/resumable/sign`;
 }
 
 /** Bucket and object path encoded in a signed upload URL from createSignedUploadUrl. */
