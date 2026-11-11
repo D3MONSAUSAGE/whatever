@@ -2,7 +2,7 @@ import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
-import { loadEntitlement, toResponse } from "@/lib/server/entitlements";
+import { loadEffectiveEntitlement, toResponse } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (error) return fail("Couldn't save your choice. Try again.", 500);
   if (data === "too_many") return json({ error: "That's more screens than your plan includes.", code: "too_many" }, 400);
   if (data === "not_found") return json({ error: "One of those screens wasn't found.", code: "not_found" }, 403);
-  const e = await loadEntitlement(admin.accountId);
+  const e = await loadEffectiveEntitlement(admin.accountId);
   if (e === "error" || !e) return fail("Saved, but couldn't reload your plan. Refresh to see it.", 503);
   return json(toResponse(admin.accountId, e, process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin));
 }

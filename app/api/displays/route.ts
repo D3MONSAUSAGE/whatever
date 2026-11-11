@@ -5,7 +5,7 @@ import { ONLINE_MS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json } from "@/lib/server/http";
 import { loadLocations } from "@/lib/server/locations";
-import { billingEnforced, entitledDisplayIds } from "@/lib/server/entitlements";
+import { billingEnforced, entitledDisplayIds, loadEffectiveEntitlement } from "@/lib/server/entitlements";
 import { loadDisplaySchedules } from "@/lib/server/display-schedules";
 import { parseLayout } from "@/lib/layout-studio";
 import { playbackReport } from "@/lib/server/playback-report";
@@ -51,12 +51,14 @@ export async function GET(req: Request) {
   const paths = [...new Set(list.map((d) => mediaOf(d.media)?.storage_path).filter(Boolean))] as string[];
 
   // Independent reads run together (each is a network round trip to the database).
-  const [playlistInfo, locations, urls, entitled] = await Promise.all([
+  const [playlistInfo, locations, urls, entitled, effective] = await Promise.all([
     playlistColumn ? loadPlaylists(admin.accountId, list) : Promise.resolve(new Map<string, { name: string; url: string | null }>()),
     loadLocations(admin.accountId),
     signAll(paths),
     entitledDisplayIds(admin.accountId),
+    billingEnforced() ? loadEffectiveEntitlement(admin.accountId) : Promise.resolve(null),
   ]);
+  const accountPlays = !billingEnforced() || effective === "error" || (effective !== null && effective.playback_allowed);
   if (playlistInfo === null) return fail("Couldn't load displays.", 500);
   if (locations === "error") return fail("Couldn't load displays.", 500);
   const locationById = new Map(locations.map((location) => [location.id, location]));
@@ -79,7 +81,7 @@ export async function GET(req: Request) {
         lastSeenAt: d.last_seen_at,
         // M17: false = paused by the plan's screen limit or an inactive plan. Before 0013 (or on a
         // read error) every screen reports true, matching what the player is allowed to do.
-        entitled: !billingEnforced() || entitled === "error" ? true : entitled.has(d.id),
+        entitled: !billingEnforced() || entitled === "error" ? true : accountPlays && entitled.has(d.id),
         playerError: d.player_error ?? null,
         location: d.location_id ? locationById.get(d.location_id) ?? null : null,
         media: media

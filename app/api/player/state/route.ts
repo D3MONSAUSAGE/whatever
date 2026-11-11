@@ -1,4 +1,4 @@
-import { billingEnforced, displayEntitled, SUSPENDED_PAYLOAD } from "@/lib/server/entitlements";
+import { billingEnforced, OVER_LIMIT_PAYLOAD, playerGate, SUSPENDED_PAYLOAD } from "@/lib/server/entitlements";
 import { BUCKET, db } from "@/lib/server/supabase";
 import { sha256 } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
@@ -97,8 +97,10 @@ export async function GET(req: Request) {
   if (!row) return fail("unauthorized", 401);
   // Billing gate (BILLING_ENFORCE=1). 402 keeps the token, so the screen resumes on its own
   // once the plan is active again; it never unpairs or deletes anything.
-  if (billingEnforced() && !(await displayEntitled(String(row.display_id)))) {
-    return json({ ...SUSPENDED_PAYLOAD, pollMs: 60_000 }, 402);
+  if (billingEnforced()) {
+    const gate = await playerGate(String(row.display_id));
+    if (gate === "account") return json({ ...SUSPENDED_PAYLOAD, pollMs: 60_000 }, 402);
+    if (gate === "screen") return json({ ...OVER_LIMIT_PAYLOAD, pollMs: 60_000 }, 402);
   }
 
   const schedule = await readPlaybackSchedule(String(row.display_id), Number(row.content_version));

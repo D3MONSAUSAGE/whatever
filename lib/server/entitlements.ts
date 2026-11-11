@@ -141,6 +141,96 @@ export function warningFor(e: EntitlementRow): Warning {
   return null;
 }
 
+/** Plans that are sold today. Anything else (grandfathered, comp, unknown) grants nothing once enforced. */
+export const COMMERCIAL_PLANS: readonly PlanId[] = ["trial", "starter", "business", "multi"];
+
+const RESTRICTED = (e: EntitlementRow, state: "expired" | "canceled", playbackEndsAt: string | null = null): EntitlementRow => ({
+  ...e, state, screen_limit: 0, playback_allowed: false, can_add_screen: false, playback_ends_at: playbackEndsAt,
+});
+
+/**
+ * The commercial rules applied on top of account_entitlement (the SQL function is shared with
+ * production, so it is not changed). Only used when BILLING_ENFORCE=1; with enforcement off the
+ * SQL row is returned unchanged, so production behaves exactly as before.
+ *
+ * - grandfathered, comp or any unknown plan: no free access (treated as an ended trial).
+ * - trial: at most TRIAL_DAYS from its start, even if trial_ends_at was set later.
+ * - paid plans: active/trialing play; past_due plays only until a recorded grace end;
+ *   a canceled subscription plays until the paid-through date only if no payment failure was
+ *   recorded (grace_ends_at null), otherwise until the grace end at most;
+ *   unpaid, incomplete, incomplete_expired, paused or missing status play nothing.
+ */
+export function commercialEntitlement(e: EntitlementRow, enforced = billingEnforced()): EntitlementRow {
+  if (!enforced) return e;
+  const now = Date.parse(e.server_time);
+  if (!COMMERCIAL_PLANS.includes(e.plan)) return RESTRICTED(e, "expired");
+  if (e.plan === "trial") {
+    if (e.state !== "trial" && e.state !== "trial_grace" && e.state !== "expired") return RESTRICTED(e, "expired");
+    const start = e.trial_started_at ? Date.parse(e.trial_started_at) : NaN;
+    if (!Number.isFinite(start)) return e.state === "expired" ? RESTRICTED(e, "expired") : e;
+    const cap = start + TRIAL_DAYS * DAY;
+    const end = e.trial_ends_at ? Math.min(Date.parse(e.trial_ends_at), cap) : cap;
+    const playbackEnd = end + PLAYBACK_GRACE_DAYS * DAY;
+    if (now < end) return { ...e, trial_ends_at: new Date(end).toISOString(), playback_ends_at: new Date(playbackEnd).toISOString() };
+    if (now < playbackEnd) {
+      return { ...e, state: "trial_grace", trial_ends_at: new Date(end).toISOString(), playback_ends_at: new Date(playbackEnd).toISOString(), can_add_screen: false, playback_allowed: true };
+    }
+    return { ...RESTRICTED(e, "expired"), trial_ends_at: new Date(end).toISOString() };
+  }
+  const status = e.subscription_status;
+  const grace = e.grace_ends_at ? Date.parse(e.grace_ends_at) : null;
+  const periodEnd = e.current_period_end ? Date.parse(e.current_period_end) : null;
+  if (status === "active" || status === "trialing") return e;
+  if (status === "past_due") {
+    if (grace === null || now >= grace) return RESTRICTED(e, "canceled");
+    return { ...e, state: "past_due", playback_allowed: true, can_add_screen: false, playback_ends_at: e.grace_ends_at };
+  }
+  if (status === "canceled") {
+    const until = grace === null ? periodEnd : (periodEnd === null ? grace : Math.min(grace, periodEnd));
+    if (until !== null && now < until) {
+      const iso = new Date(until).toISOString();
+      return { ...e, state: "active", playback_ends_at: iso, playback_allowed: true };
+    }
+    return RESTRICTED(e, "canceled");
+  }
+  return RESTRICTED(e, "canceled");
+}
+
+/** Entitlement used by every server gate: the SQL row, tightened by the commercial rules when enforced. */
+export async function loadEffectiveEntitlement(accountId: string): Promise<EntitlementRow | null | "error"> {
+  const e = await loadEntitlement(accountId);
+  if (e === "error" || e === null) return e;
+  return commercialEntitlement(e);
+}
+
+/** Owning account of a display (null if none). */
+export async function displayAccountId(displayId: string): Promise<string | null | "error"> {
+  const { data, error } = await db().from("displays").select("account_id").eq("id", displayId).maybeSingle();
+  if (error) return "error";
+  return data?.account_id ? String(data.account_id) : null;
+}
+
+/**
+ * Player decision when enforced. "account" = the plan doesn't allow playback; "screen" = the plan
+ * plays but this screen is paused (over the screen allowance). A database error fails open.
+ */
+export async function playerGate(displayId: string): Promise<"ok" | "account" | "screen"> {
+  const accountId = await displayAccountId(displayId);
+  if (accountId === "error") return "ok";
+  if (!accountId) return "account";
+  const e = await loadEffectiveEntitlement(accountId);
+  if (e === "error") return "ok";
+  if (!e || !e.playback_allowed) return "account";
+  return (await displayEntitled(displayId)) ? "ok" : "screen";
+}
+
+export const OVER_LIMIT_PAYLOAD = {
+  suspended: true,
+  reason: "over_limit",
+  title: "This screen is paused",
+  message: "Your Pekko plan's screen allowance is full. Your content is saved. The account owner can choose which screens stay on, or pick a plan with more screens, from the Pekko dashboard.",
+};
+
 export function toResponse(accountId: string, e: EntitlementRow, appUrl: string, extra?: { transitionEndsAt?: string | null }) {
   const enforced = billingEnforced();
   const transitionEndsAt = enforced ? (extra?.transitionEndsAt ?? null) : null;
@@ -206,6 +296,7 @@ export async function entitledDisplayIds(accountId: string): Promise<Set<string>
 
 export const SUSPENDED_PAYLOAD = {
   suspended: true,
+  reason: "plan_inactive",
   title: "This screen is paused",
   message: "The Pekko plan for this screen isn't active. Your content is saved. The account owner can turn it back on from the Pekko dashboard.",
 };
