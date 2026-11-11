@@ -64,9 +64,9 @@ describe("billing email self-test", () => {
     expect(notices.map((n) => n.kind)).toEqual([...SELF_TEST_KINDS]);
     expect(notices.every((n) => n.subject.startsWith("[TEST] "))).toBe(true);
     expect(notices.find((n) => n.kind === "trial_ending_3")?.deadline).toBe("2026-11-15T00:00:00.000Z");
-    expect(notices.find((n) => n.kind === "trial_ending_3")?.text).toContain("Nov 15, 2026 (UTC)");
+    expect(notices.find((n) => n.kind === "trial_ending_3")?.text).toContain("Nov 14, 2026 at 4:00 PM PST");
     expect(notices.find((n) => n.kind === "payment_failed")?.deadline).toBe("2026-12-01T00:00:00.000Z");
-    expect(notices.find((n) => n.kind === "grace_ending_1")?.text).toContain("Dec 1, 2026 (UTC)");
+    expect(notices.find((n) => n.kind === "grace_ending_1")?.text).toContain("Nov 30, 2026 at 4:00 PM PST");
     expect(notices.find((n) => n.kind === "transition_14")?.deadline).toBe("2026-11-22T00:00:00.000Z");
     for (const notice of notices) {
       const key = selfTestClaimKey(org, "run-1", notice.kind);

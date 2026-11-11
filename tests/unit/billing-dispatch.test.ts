@@ -63,7 +63,7 @@ describe("billing reminder dispatcher", () => {
     const planned = planOrgReminders(inactive, now);
     const notice = planned.find((item) => item.kind === "transition_14");
     expect(notice?.deadline).toBe("2026-11-22T00:00:00.000Z");
-    expect(notice?.text).toContain("Nov 22, 2026 (UTC)");
+    expect(notice?.text).toContain("Nov 21, 2026 at 4:00 PM PST");
     expect(notice?.text).toMatch(/full access/i);
     expect(notice?.claimKey).toBe(transitionNoticeKey(inactive.id));
     expect(notice?.transitionStart).toBe(now);

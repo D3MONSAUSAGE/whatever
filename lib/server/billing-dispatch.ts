@@ -26,6 +26,8 @@ export type ReminderAccount = {
   subscription_status: string | null;
   current_period_end: string | null;
   transition_started_at: string | null;
+  /** First location timezone (IANA). Unset or "UTC" means Pacific time in emails. */
+  timezone?: string | null;
 };
 
 export type PlannedReminder = BillingNotice & {
@@ -83,7 +85,7 @@ export function planOrgReminders(account: ReminderAccount, now: string): Planned
     can_add_screen: true,
     server_time: now,
   };
-  const planned: PlannedReminder[] = billingNotices(row, { enforced: false }).map((notice) => ({
+  const planned: PlannedReminder[] = billingNotices(row, { enforced: false, tz: account.timezone ?? null }).map((notice) => ({
     ...notice,
     claimKey: billingNoticeKey(account.id, notice),
     transitionStart: null,
@@ -92,7 +94,7 @@ export function planOrgReminders(account: ReminderAccount, now: string): Planned
   if (account.plan === "grandfathered" && !account.transition_started_at && !billingEnforced()) {
     const end = transitionEndsAt(now);
     if (end) {
-      const notice = billingTemplate("transition_14", end);
+      const notice = billingTemplate("transition_14", end, { now, tz: account.timezone ?? null });
       planned.push({ ...notice, claimKey: transitionNoticeKey(account.id), transitionStart: now });
     }
   }
@@ -214,6 +216,7 @@ async function listReminderAccounts(): Promise<ReminderAccount[]> {
     const ent = await loadEffectiveEntitlement(String(account.id));
     if (ent === "error" || !ent) continue;
     const owner = await db().auth.admin.getUserById(String(account.owner_user_id));
+    const loc = await db().from("locations").select("timezone").eq("account_id", String(account.id)).order("created_at", { ascending: true }).limit(1);
     out.push({
       id: String(account.id),
       email: owner.data.user?.email ?? null,
@@ -226,6 +229,7 @@ async function listReminderAccounts(): Promise<ReminderAccount[]> {
       subscription_status: ent.subscription_status,
       current_period_end: ent.current_period_end,
       transition_started_at: account.billing_transition_started_at ? String(account.billing_transition_started_at) : null,
+      timezone: ((loc.data ?? [])[0] as { timezone?: string } | undefined)?.timezone ?? null,
     });
   }
   return out;

@@ -1,4 +1,5 @@
 import { daysLeft, paymentGraceEndsAt, transitionEndsAt, trialEndsAt, type EntitlementRow } from "./entitlements";
+import { isValidTimeZone } from "./schedule";
 import { sendTransactionalEmail, supabaseNoticeLedger, type NoticeLedger, type SendResult } from "./transactional-email";
 
 export type BillingNoticeKind =
@@ -19,8 +20,35 @@ export type BillingNotice = {
   text: string;
 };
 
-function utcDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) + " (UTC)";
+/** Billing emails use the account's first location timezone when one was set, else Pacific time. */
+export const REMINDER_DEFAULT_TZ = "America/Los_Angeles";
+
+/** "UTC" is the column default (not a customer choice), so it falls back to Pacific time. */
+export function reminderZone(tz?: string | null): string {
+  return tz && tz !== "UTC" && isValidTimeZone(tz) ? tz : REMINDER_DEFAULT_TZ;
+}
+
+/** "Nov 22, 2026 at 7:07 PM PST": date and time with an explicit zone label. */
+export function formatWhen(iso: string, tz?: string | null): string {
+  const timeZone = reminderZone(tz);
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone, timeZoneName: "short" });
+  return `${date} at ${time}`;
+}
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+
+/** Remaining time, rounded down so the email never claims more time than is left. */
+export function remainingPhrase(deadline: string, now: string): string {
+  const ms = Date.parse(deadline) - Date.parse(now);
+  if (ms >= 2 * DAY) return `in ${Math.floor(ms / DAY)} days`;
+  if (ms >= DAY) return "in 1 day";
+  const hours = Math.floor(ms / HOUR);
+  if (hours >= 2) return `in ${hours} hours`;
+  if (hours === 1) return "in 1 hour";
+  return "in less than an hour";
 }
 
 function notice(kind: BillingNoticeKind, deadline: string, subject: string, text: string): BillingNotice {
@@ -28,19 +56,24 @@ function notice(kind: BillingNoticeKind, deadline: string, subject: string, text
 }
 
 /** Shared copy for the six reminders. Self-test and live reminders both use this. */
-export function billingTemplate(kind: "trial_ending_3" | "trial_ending_1" | "payment_failed" | "grace_ending_2" | "grace_ending_1" | "transition_14", deadline: string): BillingNotice {
-  const when = utcDate(deadline);
+export function billingTemplate(
+  kind: "trial_ending_3" | "trial_ending_1" | "payment_failed" | "grace_ending_2" | "grace_ending_1" | "transition_14",
+  deadline: string,
+  opts?: { now?: string; tz?: string | null },
+): BillingNotice {
+  const when = formatWhen(deadline, opts?.tz);
+  const left = remainingPhrase(deadline, opts?.now ?? new Date().toISOString());
   switch (kind) {
     case "trial_ending_3":
-      return notice(kind, deadline, "Your Pekko trial ends in 3 days", `Your free trial ends on ${when}. Choose a plan to keep your screens on. Your content stays either way.`);
+      return notice(kind, deadline, `Your Pekko trial ends ${left}`, `Your free trial ends on ${when}. Choose a plan to keep your screens on. Your content stays either way.`);
     case "trial_ending_1":
-      return notice(kind, deadline, "Your Pekko trial ends in 1 day", `Your free trial ends on ${when}. Choose a plan to keep your screens on. Your content stays either way.`);
+      return notice(kind, deadline, `Your Pekko trial ends ${left}`, `Your free trial ends on ${when}. Choose a plan to keep your screens on. Your content stays either way.`);
     case "payment_failed":
       return notice(kind, deadline, "Pekko couldn't take your payment", `We couldn't take your last payment. Update your payment method before ${when} to keep your screens playing. Your content is not deleted.`);
     case "grace_ending_2":
-      return notice(kind, deadline, "Your Pekko payment grace ends in 2 days", `Your payment grace ends on ${when}. Update your payment method before then. Your content is not deleted.`);
+      return notice(kind, deadline, `Your Pekko payment grace ends ${left}`, `Your payment grace ends on ${when}. Update your payment method before then. Your content is not deleted.`);
     case "grace_ending_1":
-      return notice(kind, deadline, "Your Pekko payment grace ends in 1 day", `Your payment grace ends on ${when}. Update your payment method before then. Your content is not deleted.`);
+      return notice(kind, deadline, `Your Pekko payment grace ends ${left}`, `Your payment grace ends on ${when}. Update your payment method before then. Your content is not deleted.`);
     case "transition_14":
       return notice(kind, deadline, "Your Pekko access continues for 14 days", `You're an early Pekko customer. You keep full access through ${when}. Your content stays; nothing is deleted.`);
   }
@@ -50,11 +83,12 @@ export function billingTemplate(kind: "trial_ending_3" | "trial_ending_1" | "pay
  * Reminders derived only from server timestamps on the entitlement row.
  * Receipts are not included: Stripe sends those from its own email setting.
  */
-export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: string | null; enforced?: boolean }): BillingNotice[] {
+export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: string | null; enforced?: boolean; tz?: string | null }): BillingNotice[] {
   const notices: BillingNotice[] = [];
+  const at = { now: e.server_time, tz: opts?.tz ?? null };
   const trialLeft = daysLeft(e.trial_ends_at, e.server_time);
-  if (e.state === "trial" && e.trial_ends_at && trialLeft === 3) notices.push(billingTemplate("trial_ending_3", e.trial_ends_at));
-  if (e.state === "trial" && e.trial_ends_at && trialLeft === 1) notices.push(billingTemplate("trial_ending_1", e.trial_ends_at));
+  if (e.state === "trial" && e.trial_ends_at && trialLeft === 3) notices.push(billingTemplate("trial_ending_3", e.trial_ends_at, at));
+  if (e.state === "trial" && e.trial_ends_at && trialLeft === 1) notices.push(billingTemplate("trial_ending_1", e.trial_ends_at, at));
   if (e.state === "trial_grace" || e.state === "expired") {
     // Stable fallback: a moving server_time would make a new key (and a new email) on every run.
     const deadline = e.playback_ends_at || e.trial_ends_at || "none";
@@ -63,15 +97,15 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
       deadline,
       "Your Pekko trial has ended",
       e.state === "trial_grace" && e.playback_ends_at
-        ? `Your free trial has ended. Screens keep playing until ${utcDate(e.playback_ends_at)}. Your content is still saved.`
+        ? `Your free trial has ended. Screens keep playing until ${formatWhen(e.playback_ends_at, opts?.tz)}. Your content is still saved.`
         : "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on.",
     ));
   }
   if (e.state === "past_due" && e.grace_ends_at) {
-    notices.push(billingTemplate("payment_failed", e.grace_ends_at));
+    notices.push(billingTemplate("payment_failed", e.grace_ends_at, at));
     const graceLeft = daysLeft(e.grace_ends_at, e.server_time);
-    if (graceLeft === 2) notices.push(billingTemplate("grace_ending_2", e.grace_ends_at));
-    if (graceLeft === 1) notices.push(billingTemplate("grace_ending_1", e.grace_ends_at));
+    if (graceLeft === 2) notices.push(billingTemplate("grace_ending_2", e.grace_ends_at, at));
+    if (graceLeft === 1) notices.push(billingTemplate("grace_ending_1", e.grace_ends_at, at));
   }
   if (e.state === "canceled") {
     notices.push(notice(
@@ -85,7 +119,7 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
   }
   const transitionEnd = opts?.transitionEndsAt ?? null;
   if (opts?.enforced && e.state === "grandfathered" && transitionEnd && (daysLeft(transitionEnd, e.server_time) ?? 0) > 0) {
-    notices.push(billingTemplate("transition_14", transitionEnd));
+    notices.push(billingTemplate("transition_14", transitionEnd, at));
   }
   return notices;
 }
@@ -128,7 +162,7 @@ export function selfTestNotices(e: EntitlementRow, transitionStartedAt: string |
     transition_14: transitionEnd,
   };
   return SELF_TEST_KINDS.map((kind) => {
-    const item = billingTemplate(kind, deadline[kind]);
+    const item = billingTemplate(kind, deadline[kind], { now: e.server_time });
     return { ...item, subject: `[TEST] ${item.subject}` };
   });
 }
