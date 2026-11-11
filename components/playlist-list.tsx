@@ -6,9 +6,10 @@ import { api, useApi, type PlaylistDetail, type PlaylistSummary } from "@/lib/ap
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconList } from "@/components/icons";
+import { ContentNav } from "@/components/content-nav";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 
-export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
+export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary[]; pathOverride?: string }) {
   const live = useApi<PlaylistSummary[]>(fixture ? null : "/api/playlists");
   const data = fixture ?? live.data;
   const error = fixture ? null : live.error;
@@ -88,6 +89,7 @@ export function Playlists({ fixture }: { fixture?: PlaylistSummary[] }) {
   return (
     <section>
       <PageHeader title="Playlists" icon={<IconList />} lede="A playlist loops images and video on one or more screens. Saving a draft does not change a screen." />
+      <ContentNav pathOverride={pathOverride} />
       <form onSubmit={create} className="card p-4 md:p-5 mb-8">
         <h2 className="font-semibold">New playlist</h2>
         <p className="text-sm text-muted mb-4">Name it, add slides, then publish when you want the TVs to change.</p>

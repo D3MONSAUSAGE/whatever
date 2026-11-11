@@ -1,16 +1,22 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { DashboardShell } from "@/components/shell";
 import { OverviewScreen } from "@/components/overview-screen";
 import { MediaLibrary } from "@/components/media-library";
 import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
-import { ScreenWorkspace } from "@/components/my-screens";
+import { ScreenGroups, ScreenWorkspace } from "@/components/my-screens";
 import { LayoutStudio } from "@/components/layout-studio";
 import type { AccountStudio } from "@/lib/layout-account";
 import { sampleLayout } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
+import { ContentHub } from "@/components/content-hub";
+import { UploadProgress, type UploadJob } from "@/components/uploads";
+import { useToast } from "@/components/toast";
+import { UPLOAD_SUCCESS_TOAST_MS } from "@/lib/upload-notice";
+import type { ScreenLibrary } from "@/components/screen-actions";
 
 const lunch = poster("Lunch menu", "#1c3d32");
 const dinner = poster("Dinner menu", "#3d2a1c");
@@ -22,7 +28,7 @@ const displays: DisplayItem[] = [
     name: "Front counter",
     connected: true,
     online: true,
-    lastSeenAt: new Date().toISOString(),
+    lastSeenAt: "2026-11-01T12:00:00.000Z",
     media: null,
     playlist: { id: "pl-lunch", name: "Lunch loop", url: lunch },
     playerError: null,
@@ -32,7 +38,7 @@ const displays: DisplayItem[] = [
     name: "Bar TV",
     connected: true,
     online: false,
-    lastSeenAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+    lastSeenAt: "2026-11-01T11:00:00.000Z",
     media: { id: "media-dinner", fileName: "dinner-menu.png", url: dinner },
     playlist: null,
     playerError: null,
@@ -48,11 +54,14 @@ const displays: DisplayItem[] = [
   },
 ];
 
+const deck = poster("Demo Café", "#5a2a2a");
 const media: MediaItem[] = [
-  { id: "media-lunch", fileName: "lunch-menu.png", sizeBytes: 240_000, createdAt: "2026-10-28T15:00:00.000Z", url: lunch, kind: "image", usedIn: [{ id: "pl-lunch", name: "Lunch loop" }] },
-  { id: "media-dinner", fileName: "dinner-menu.png", sizeBytes: 1_800_000, createdAt: "2026-10-28T12:00:00.000Z", url: dinner, kind: "image", usedIn: [] },
-  { id: "media-clip", fileName: "specials.mp4", sizeBytes: 18_400_000, createdAt: "2026-10-27T18:00:00.000Z", url: null, thumbnailUrl: video, kind: "video", durationMs: 42_000, width: 1920, height: 1080, usedIn: [{ id: "pl-lunch", name: "Lunch loop" }] },
-  { id: "media-breakfast", fileName: "breakfast.png", sizeBytes: 860_000, createdAt: "2026-10-26T09:00:00.000Z", url: poster("Breakfast", "#24301c"), kind: "image", usedIn: [] },
+  { id: "media-lunch", fileName: "demo-cafe-lunch.png", sizeBytes: 240_000, createdAt: "2026-10-28T15:00:00.000Z", url: lunch, kind: "image", usedIn: [{ id: "pl-lunch", name: "Lunch loop" }] },
+  { id: "media-dinner", fileName: "demo-cafe-dinner.png", sizeBytes: 1_800_000, createdAt: "2026-10-28T12:00:00.000Z", url: dinner, kind: "image", usedIn: [] },
+  { id: "media-clip", fileName: "demo-cafe-specials.mp4", sizeBytes: 18_400_000, createdAt: "2026-10-27T18:00:00.000Z", url: null, thumbnailUrl: video, kind: "video", durationMs: 42_000, width: 1920, height: 1080, usedIn: [{ id: "pl-lunch", name: "Lunch loop" }] },
+  { id: "media-silent", fileName: "demo-cafe-patio.mp4", sizeBytes: 9_100_000, createdAt: "2026-10-27T11:00:00.000Z", url: null, thumbnailUrl: null, kind: "video", durationMs: 18_000, usedIn: [] },
+  { id: "media-breakfast", fileName: "demo-cafe-breakfast.png", sizeBytes: 860_000, createdAt: "2026-10-26T09:00:00.000Z", url: poster("Breakfast", "#24301c"), kind: "image", usedIn: [] },
+  { id: "media-deck", fileName: "demo-cafe-menu.pptx", sizeBytes: 4_200_000, createdAt: "2026-10-25T09:00:00.000Z", url: null, thumbnailUrl: deck, coverUrl: deck, kind: "presentation", slideCount: 8, usedIn: [] },
 ];
 
 const playlists: PlaylistSummary[] = [
@@ -84,24 +93,81 @@ const playlists: PlaylistSummary[] = [
   },
 ];
 
+const workspaceLibrary: ScreenLibrary = {
+  media,
+  playlists,
+  boards: [{ id: "board-lunch", name: "Demo Café lunch board", template: "menu-promo-67", thumbnailUrl: lunch }],
+  menus: [{ id: "menu-dinner", name: "Demo Café dinner menu", playlistId: "pl-menu", imageUrl: dinner }],
+};
+
+const demoGroups = {
+  groups: [{ id: "group-front", name: "Demo Café front", displayIds: ["screen-front", "screen-bar"], updatedAt: "2026-10-28T18:00:00.000Z" }],
+  displays,
+};
+
+function previewPath(screen: string) {
+  if (screen === "studio") return "/dashboard/media/layout-studio";
+  if (screen === "content") return "/dashboard/content";
+  if (screen === "groups") return "/dashboard/screens/groups";
+  if (screen === "workspace") return "/dashboard/screens/screen-front";
+  if (screen === "presentations") return "/dashboard/media?kind=presentation";
+  if (screen === "media" || screen === "upload" || screen === "upload-error") return "/dashboard/media";
+  if (screen === "playlists") return "/dashboard/playlists";
+  if (screen === "overview") return "/dashboard";
+  return `/dashboard/${screen}`;
+}
+
 export function PreviewApp() {
   const params = useSearchParams();
   const screen = params.get("screen") || "overview";
   const empty = params.get("empty") === "1";
-  const path = screen === "studio" ? "/dashboard/media/layout-studio" : screen === "overview" ? "/dashboard" : `/dashboard/${screen}`;
+  const panelParam = params.get("panel");
+  const panel = panelParam === "change" || panelParam === "upload" || panelParam === "create" || panelParam === "playlist" || panelParam === "schedule" ? panelParam : null;
+  const path = previewPath(screen);
   const overview = empty
     ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
     : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
   return (
     <DashboardShell preview pathOverride={path}>
-      {screen === "media" ? <MediaLibrary fixture={media} /> : null}
-      {screen === "playlists" ? <Playlists fixture={playlists} /> : null}
+      {screen === "media" ? <MediaLibrary fixture={media} pathOverride="/dashboard/media" /> : null}
+      {screen === "presentations" ? <MediaLibrary fixture={media} pathOverride="/dashboard/media?kind=presentation" /> : null}
+      {screen === "playlists" ? <Playlists fixture={playlists} pathOverride="/dashboard/playlists" /> : null}
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
-      {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} /> : null}
-      {screen === "studio" ? <LayoutStudio mode="account" fixture={studioFixture} /> : null}
+      {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} library={workspaceLibrary} initialPanel={panel} /> : null}
+      {screen === "studio" ? <LayoutStudio mode="account" fixture={studioFixture} pathOverride="/dashboard/media/layout-studio" /> : null}
+      {screen === "content" ? <ContentHub pathOverride="/dashboard/content" /> : null}
+      {screen === "groups" ? <ScreenGroups fixture={empty ? { groups: [], displays } : demoGroups} startCreating={params.get("creating") === "1"} /> : null}
+      {screen === "upload" ? <UploadNoticeDemo mode="success" /> : null}
+      {screen === "upload-error" ? <UploadNoticeDemo mode="error" /> : null}
     </DashboardShell>
+  );
+}
+
+function UploadNoticeDemo({ mode }: { mode: "success" | "error" }) {
+  const toast = useToast();
+  const once = useRef(false);
+  useEffect(() => {
+    if (once.current || mode !== "success") return;
+    once.current = true;
+    toast.show("Uploaded", false, { durationMs: UPLOAD_SUCCESS_TOAST_MS });
+  }, [mode, toast]);
+  if (mode === "success") {
+    const done: UploadJob[] = [{ key: "done-1", name: "demo-cafe-lunch.png", progress: 100, state: "done", detail: "Uploaded" }];
+    return (
+      <section>
+        <h1 className="text-2xl font-semibold mb-3">Upload finished</h1>
+        <UploadProgress jobs={done} onDismiss={() => undefined} />
+      </section>
+    );
+  }
+  const failed: UploadJob[] = [{ key: "err-1", name: "demo-cafe-specials.mp4", progress: 42, state: "error", detail: "Choose an MP4 video." }];
+  return (
+    <section>
+      <h1 className="text-2xl font-semibold mb-3">Upload needs attention</h1>
+      <UploadProgress jobs={failed} onDismiss={() => undefined} />
+    </section>
   );
 }
 
