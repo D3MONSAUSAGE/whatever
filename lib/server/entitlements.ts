@@ -154,7 +154,7 @@ const RESTRICTED = (e: EntitlementRow, state: "expired" | "canceled", playbackEn
  * SQL row is returned unchanged, so production behaves exactly as before.
  *
  * - grandfathered, comp or any unknown plan: no free access (treated as an ended trial).
- * - trial: at most TRIAL_DAYS from its start, even if trial_ends_at was set later.
+ * - trial: exactly TRIAL_DAYS from its start (a later trial_ends_at is capped); no playback grace after it.
  * - paid plans: active/trialing play; past_due plays only until a recorded grace end;
  *   a canceled subscription plays until the paid-through date only if no payment failure was
  *   recorded (grace_ends_at null), otherwise until the grace end at most;
@@ -170,10 +170,9 @@ export function commercialEntitlement(e: EntitlementRow, enforced = billingEnfor
     if (!Number.isFinite(start)) return e.state === "expired" ? RESTRICTED(e, "expired") : e;
     const cap = start + TRIAL_DAYS * DAY;
     const end = e.trial_ends_at ? Math.min(Date.parse(e.trial_ends_at), cap) : cap;
-    const playbackEnd = end + PLAYBACK_GRACE_DAYS * DAY;
-    if (now < end) return { ...e, trial_ends_at: new Date(end).toISOString(), playback_ends_at: new Date(playbackEnd).toISOString() };
-    if (now < playbackEnd) {
-      return { ...e, state: "trial_grace", trial_ends_at: new Date(end).toISOString(), playback_ends_at: new Date(playbackEnd).toISOString(), can_add_screen: false, playback_allowed: true };
+    // Commercial rule: trial access ends exactly TRIAL_DAYS after the start. No post-trial playback grace.
+    if (now < end) {
+      return { ...e, state: "trial", trial_ends_at: new Date(end).toISOString(), playback_ends_at: new Date(end).toISOString(), playback_allowed: true };
     }
     return { ...RESTRICTED(e, "expired"), trial_ends_at: new Date(end).toISOString() };
   }

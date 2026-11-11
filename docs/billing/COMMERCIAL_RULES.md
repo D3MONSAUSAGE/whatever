@@ -4,7 +4,7 @@ Source of truth: `commercialEntitlement()` in `lib/server/entitlements.ts`, appl
 
 | Account | Access |
 |---|---|
-| Trial | 14 days from `trial_started_at` (a later `trial_ends_at` is capped), 5 active screens, no card. 3 more days of playback only (no new screens), then expired. |
+| Trial | Exactly 14 days from `trial_started_at` (a later `trial_ends_at` is capped), 5 active screens, no card. Then expired immediately (no playback grace). |
 | Starter / Business / Multi | 1 / 3 / 5 active screens while the Stripe subscription is active. |
 | Canceled at period end | Full access until the paid-through date, then restricted. |
 | Payment failed (past_due) | 7-day grace from the first failure (playback only), then restricted. If Stripe ends the subscription after a failure, the grace end is kept; the unpaid period is not given away. |

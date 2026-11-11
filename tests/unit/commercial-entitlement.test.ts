@@ -29,12 +29,14 @@ describe("commercialEntitlement", () => {
     expect(on(trial)).toMatchObject({ state: "trial", screen_limit: 5, playback_allowed: true, can_add_screen: true });
   });
   it("caps a trial end set beyond 14 days", () => {
-    const long = { ...trial, trial_ends_at: "2027-06-01T00:00:00Z", server_time: "2026-11-16T08:00:00Z" };
-    const e = on(long);
-    expect(e.state).toBe("trial_grace");
-    expect(e.trial_ends_at).toBe("2026-11-15T08:00:00.000Z");
-    expect(e.can_add_screen).toBe(false);
-    expect(on({ ...long, server_time: "2026-11-18T08:00:00Z" })).toMatchObject({ state: "expired", playback_allowed: false });
+    const long = { ...trial, trial_ends_at: "2027-06-01T00:00:00Z", server_time: "2026-11-15T07:59:59Z" };
+    expect(on(long)).toMatchObject({ state: "trial", playback_allowed: true, trial_ends_at: "2026-11-15T08:00:00.000Z" });
+    expect(on({ ...long, server_time: "2026-11-15T08:00:00Z" })).toMatchObject({ state: "expired", playback_allowed: false, can_add_screen: false });
+  });
+  it("ends trial access exactly at 14 days, with no playback grace", () => {
+    const sqlGrace = { ...trial, state: "trial_grace" as const, can_add_screen: false, server_time: "2026-11-15T08:00:00Z" };
+    expect(on(sqlGrace)).toMatchObject({ state: "expired", playback_allowed: false, screen_limit: 0 });
+    expect(on({ ...trial, server_time: "2026-11-15T07:59:59.999Z" })).toMatchObject({ state: "trial", playback_allowed: true });
   });
   it("expires a trial without an end 14 days after its start", () => {
     const e = on({ ...trial, trial_ends_at: null, server_time: "2026-12-01T00:00:00Z", state: "trial" });
