@@ -6,7 +6,7 @@ import {
   PAIR_CLAIM_MAX_PER_USER,
   PAIR_CLAIM_WINDOW_SECONDS,
 } from "@/lib/server/limits";
-import { billingEnforced } from "@/lib/server/entitlements";
+import { billingEnforced, loadEffectiveEntitlement } from "@/lib/server/entitlements";
 import { normalizeDisplayName, normalizePairingCode } from "@/lib/server/validate";
 import { screenNameWarning } from "@/lib/screen-names";
 import { allow, clientIp, fail, json, readJson } from "@/lib/server/http";
@@ -31,6 +31,24 @@ export async function POST(req: Request) {
   if (!okUser || !okIp) return fail("Too many attempts. Wait 15 minutes, then try again.", 429);
 
   const enforce = billingEnforced();
+  if (enforce) {
+    // Commercial rules (no legacy/free plans, capped trial, ended subscriptions) before the
+    // database's own serialized screen-limit check in claim_pairing.
+    const e = await loadEffectiveEntitlement(admin.accountId);
+    if (e === "error") return fail("Couldn't check your plan. Try again.", 503);
+    if (!e || !e.playback_allowed || e.state === "trial_grace" || e.state === "past_due") {
+      return json({
+        error: "Your plan isn't active, so new screens can't be added. Choose a plan to continue.",
+        code: "subscription_inactive",
+      }, 403);
+    }
+    if (!e.can_add_screen) {
+      return json({
+        error: "Your plan's screen limit is reached. Choose a plan with more screens, or pause another screen first.",
+        code: "screen_limit",
+      }, 403);
+    }
+  }
   const { data: displayId, error } = await db().rpc("claim_pairing", {
     p_code_hash: hashCode(code),
     p_account_id: admin.accountId,

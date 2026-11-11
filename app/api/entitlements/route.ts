@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
-import { loadEntitlement, readTransitionStart, toResponse, transitionEndsAt } from "@/lib/server/entitlements";
+import { loadEffectiveEntitlement, readTransitionStart, toResponse, transitionEndsAt } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
-  const e = await loadEntitlement(admin.accountId);
+  const e = await loadEffectiveEntitlement(admin.accountId);
   if (e === "error" || !e) return fail("Couldn't load your plan. Try again.", 503);
   // Read only. The reminder dispatcher stamps this after the notice email succeeds.
   const started = e.plan === "grandfathered" ? await readTransitionStart(admin.accountId) : null;

@@ -312,16 +312,34 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
   return true;
 }
 
-/** First transition into past_due starts a 7-day grace. Later past_due events keep that instant. */
+/**
+ * First transition into past_due starts a 7-day grace. Later past_due events keep that instant.
+ * When an unpaid subscription then ends (canceled, unpaid, incomplete_expired), the grace end is
+ * kept, so the unpaid period is not played for free until its period end. A paid status clears it.
+ */
 async function graceEndsAt(accountId: string | null, subscriptionId: string, status: string, now: number): Promise<string | null> {
-  if (status !== "past_due") return null;
+  if (status !== "past_due" && !UNPAID_END_STATUSES.includes(status)) return null;
   const q = db().from("accounts").select("subscription_status, grace_ends_at");
   const row = accountId
     ? await q.eq("id", accountId).maybeSingle()
     : await q.eq("stripe_subscription_id", subscriptionId).maybeSingle();
   if (row.error) throw new Error(row.error.message);
-  if (row.data?.subscription_status === "past_due" && row.data.grace_ends_at) return String(row.data.grace_ends_at);
-  return new Date(now + GRACE_MS).toISOString();
+  return nextGraceEnd({ status, previousStatus: row.data?.subscription_status ?? null, previousGrace: row.data?.grace_ends_at ? String(row.data.grace_ends_at) : null, now });
+}
+
+const UNPAID_END_STATUSES = ["canceled", "unpaid", "incomplete_expired"];
+
+/** Pure rule behind graceEndsAt (exported for tests). */
+export function nextGraceEnd(input: { status: string; previousStatus: string | null; previousGrace: string | null; now: number }): string | null {
+  if (input.status === "past_due") {
+    if (input.previousStatus === "past_due" && input.previousGrace) return input.previousGrace;
+    return new Date(input.now + GRACE_MS).toISOString();
+  }
+  if (UNPAID_END_STATUSES.includes(input.status) && input.previousGrace
+    && (input.previousStatus === "past_due" || UNPAID_END_STATUSES.includes(input.previousStatus ?? ""))) {
+    return input.previousGrace;
+  }
+  return null;
 }
 
 async function must(p: PromiseLike<{ error: { message: string } | null }>) {
