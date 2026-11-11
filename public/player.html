@@ -108,7 +108,7 @@
   // Files are kept by mediaId, which never changes for an upload, so each file is
   // downloaded once and reused across loops, restarts and short outages.
   var CACHE_NAME = 'seemple-media-v1', LAST_KEY = 'seemple_last_state', INDEX_KEY = 'seemple_media_index';
-  var CACHE_MAX_BYTES = 500 * 1024 * 1024, CACHE_KEEP_MS = 14 * 86400000;
+  var CACHE_MAX_BYTES = 500 * 1024 * 1024;
   var blobs = {}, cacheQueue = [], cacheQueued = {}, cacheBusy = false, blobVideoBad = false, triedOffline = false;
   // Read-only map of saved files (mediaId -> local URL), for support and automated checks.
   try { window.seempleSavedMedia = blobs; } catch (eSaved) {}
@@ -189,8 +189,11 @@
         for (var q = 0; q < cacheQueue.length; q++) if (cacheQueue[q].mediaId === list[i].mediaId) cacheQueue[q].url = list[i].url;
       }
     }
+    // Drop files that are no longer in the current playlist right away so a
+    // 500 MB library cannot accumulate on the TV. Current playlist items stay
+    // and are reused across loops, restarts and short outages.
     for (id in index) {
-      if (Object.prototype.hasOwnProperty.call(index, id) && !keep[id] && now - index[id] > CACHE_KEEP_MS) {
+      if (Object.prototype.hasOwnProperty.call(index, id) && !keep[id]) {
         delete index[id];
         dropBlob(id);
         (function (gone) {

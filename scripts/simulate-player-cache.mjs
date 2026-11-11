@@ -174,6 +174,8 @@ S.playlist = { id: "pl", transition: "none", items: [
 await run(60000);
 check("a changed playlist downloads only the new file", fetches.length === 4 && fetches[3].indexOf("/c.jpg") !== -1, fetches.slice(3));
 
+check("replaced media is evicted from the cache (key is mediaId, not the signed URL)", !cacheStore.has("/__seemple_media/b") && !cacheStore.has("/__seemple_media/v") && cacheStore.has("/__seemple_media/a") && cacheStore.has("/__seemple_media/c"), [...cacheStore.keys()]);
+
 check("TV confirms the new playlist once it is on screen", S.playing.filter((v) => v === 2).length === 1, S.playing);
 
 // Restart the TV while the internet is down: it plays the saved playlist.
