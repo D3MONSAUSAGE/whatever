@@ -2,7 +2,7 @@ import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { VIDEO_UNAVAILABLE, isMissingSchema } from "@/lib/server/schema";
-import { readStoredObject, removeStored, videoSchemaReady } from "@/lib/server/video";
+import { removeStored, storedObjectSize, storedObjectSource, videoSchemaReady } from "@/lib/server/video";
 import { normalizeFileName } from "@/lib/server/validate";
 import {
   MAX_THUMB_BYTES,
@@ -11,7 +11,6 @@ import {
   MAX_VIDEO_EDGE,
   enforceVideoLimits,
   inspectMp4,
-  memorySource,
   mp4ErrorMessage,
 } from "@/lib/mp4";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
@@ -20,7 +19,7 @@ import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Hobby Fluid Compute caps a function at 300s, which is also the platform default.
-// Re-downloading and checking a 50 MB object needs that ceiling, so a lower project default cannot shrink this route.
+// Inspection uses range reads, but a lower project default should not shrink this route.
 export const maxDuration = 300;
 
 // Confirms a direct-to-Storage upload: codec, duration, dimensions, then the library row.
@@ -47,22 +46,22 @@ export async function POST(req: Request) {
   if (already instanceof Response) return already;
   if (already) return json({ id: mediaId });
 
-  const bytes = await readStoredObject(path);
-  if (!bytes) {
+  const size = await storedObjectSize(path);
+  if (size == null) {
     const won = await ownMedia(admin.accountId, mediaId);
     if (won instanceof Response) return won;
     if (won) return json({ id: mediaId });
     return fail("Upload didn't arrive. Try again.", 400);
   }
-  if (bytes.length > MAX_VIDEO_BYTES) {
+  if (size > MAX_VIDEO_BYTES) {
     return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage("size"), 413);
   }
 
-  const inspected = await inspectMp4(memorySource(bytes));
+  const inspected = await inspectMp4(storedObjectSource(path, size));
   if (!inspected.ok) {
     return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage(inspected.reason), 415);
   }
-  const limited = enforceVideoLimits(inspected, bytes.length);
+  const limited = enforceVideoLimits(inspected, size);
   if (limited) {
     return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage(limited), limited === "size" ? 413 : 415);
   }
@@ -87,7 +86,7 @@ export async function POST(req: Request) {
     file_name: normalizeFileName(body.fileName),
     storage_path: path,
     mime_type: "video/mp4",
-    size_bytes: bytes.length,
+    size_bytes: size,
     kind: "video",
     duration_ms: inspected.durationMs,
     width: inspected.width,

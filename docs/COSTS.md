@@ -9,7 +9,7 @@ Prices checked October 2026. Usage figures are estimates from the code paths bel
 | Server calls (Vercel function invocations) | ~260,000 | ~88,000 (86,400 polls + ~1,400 URL refreshes) |
 | Database calls (`player_state` + schedule read) | ~260,000 | ~88,000 |
 | Media downloads (Supabase egress), 10 photos of 0.3 MB | ~4 GB (re-downloaded each time the signed URL changed, ~every 30 min) | ~3 MB plus whatever new content is published |
-| Media downloads, a 50 MB video loop | ~70 GB | 50 MB once, plus new content |
+| Media downloads, a 500 MB video loop | ~700 GB if re-downloaded every loop | 500 MB once (Cache API + stable src), plus new content |
 
 Four TVs on 10 s polling already made ~1.04M calls a month, the Hobby limit. Players that are already running pick up the new page the next time the TV reloads it; until then they keep polling every 10 s.
 
@@ -48,7 +48,7 @@ Media egress after B at 500 screens: ~25 GB/month, inside Supabase Pro's 250 GB.
 
 ## Video compression evaluation (no paid transcoding)
 
-Uploads are already limited in the browser (`lib/prepare-video.ts`, `lib/mp4.ts`): MP4 H.264, 50 MB, 3 minutes, 1920 px. With saved media each video is downloaded once per TV, so compression no longer multiplies cost. Recommendation: no server transcoding now. Option for later at no cost: in-browser re-encode with WebCodecs before upload (Chrome/Edge only), or guidance text "export at 1080p, ~5 Mbps". Revisit if storage passes 100 GB.
+Uploads are already limited in the browser (`lib/prepare-video.ts`, `lib/mp4.ts`): MP4 H.264, 500 MB, 3 minutes, 1920 px. With saved media each video is downloaded once per TV, so compression no longer multiplies cost. Recommendation: no server transcoding now. Option for later at no cost: in-browser re-encode with WebCodecs before upload (Chrome/Edge only), or guidance text "export at 1080p, ~5 Mbps". Revisit if storage passes 100 GB.
 
 ## Measuring usage
 

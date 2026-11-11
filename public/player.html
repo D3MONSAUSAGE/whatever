@@ -108,7 +108,7 @@
   // Files are kept by mediaId, which never changes for an upload, so each file is
   // downloaded once and reused across loops, restarts and short outages.
   var CACHE_NAME = 'seemple-media-v1', LAST_KEY = 'seemple_last_state', INDEX_KEY = 'seemple_media_index';
-  var CACHE_MAX_BYTES = 60 * 1024 * 1024, CACHE_KEEP_MS = 14 * 86400000;
+  var CACHE_MAX_BYTES = 500 * 1024 * 1024, CACHE_KEEP_MS = 14 * 86400000;
   var blobs = {}, cacheQueue = [], cacheQueued = {}, cacheBusy = false, blobVideoBad = false, triedOffline = false;
   // Read-only map of saved files (mediaId -> local URL), for support and automated checks.
   try { window.seempleSavedMedia = blobs; } catch (eSaved) {}
@@ -797,6 +797,18 @@
         return;
       }
       if (playlist.items.length === 1) {
+        // If the file was saved to Cache Storage after this clip started from
+        // the network, switch to the local URL so later loops do not re-download.
+        if (url.indexOf('blob:') !== 0 && blobFor(item)) {
+          url = armVideo(v, item);
+          try {
+            again = v.play();
+            if (again && typeof again.then === 'function') {
+              again.then(function () {}, function () { failOnce("This video can't play on this TV."); });
+            }
+          } catch (e2) { failOnce("This video can't play on this TV."); }
+          return;
+        }
         try {
           v.currentTime = 0;
           again = v.play();

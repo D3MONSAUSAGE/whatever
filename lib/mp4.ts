@@ -2,7 +2,8 @@
 
 export const MAX_VIDEO_EDGE = 1920;
 export const MAX_VIDEO_DURATION_MS = 180_000;
-export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+export const MAX_VIDEO_MB = MAX_VIDEO_BYTES / (1024 * 1024);
 export const MAX_THUMB_BYTES = 200_000;
 
 const MAX_MOOV_BYTES = 8 * 1024 * 1024;
@@ -39,7 +40,7 @@ export function memorySource(bytes: Uint8Array): ByteSource {
 }
 
 export function mp4ErrorMessage(reason: Mp4Failure): string {
-  if (reason === "size") return "Videos must be 50 MB or smaller.";
+  if (reason === "size") return `Videos must be ${MAX_VIDEO_MB} MB or smaller.`;
   if (reason === "duration") return "Videos must be 3 minutes or shorter.";
   if (reason === "dimensions") return "Videos must be 1920×1920 or smaller.";
   if (reason === "profile") {

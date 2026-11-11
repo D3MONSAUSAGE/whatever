@@ -171,11 +171,11 @@ async function uploadVideo(file: File, onProgress: (progress: number, detail: st
   onProgress(0, "Checking video…");
   const prepared = await prepareVideo(file);
   onProgress(5, "Uploading video…");
-  const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/upload", {
+  const signed = await api<{ mediaId: string; signedUrl: string; token: string }>("/api/media/upload", {
     method: "POST",
     body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
   });
-  await uploadToSignedUrl(signed.signedUrl, file, (progress) => onProgress(Math.max(5, Math.min(90, progress)), "Uploading video…"));
+  await uploadToSignedUrl(signed.signedUrl, file, (progress) => onProgress(Math.max(5, Math.min(90, progress)), "Uploading video…"), file.name, signed.token);
   onProgress(92, "Saving…");
   const thumbnailBase64 = await blobToBase64(prepared.thumbnail);
   await api("/api/media/upload/complete", {

@@ -978,6 +978,17 @@ export function createFakeDb() {
             if (!bytes) return { data: null, error: { message: "not found" } };
             return { data: new Blob([Uint8Array.from(bytes)]), error: null };
           },
+          async objectSize(path: string) {
+            const bytes = store.objects.get(path);
+            return bytes ? bytes.byteLength : null;
+          },
+          async downloadRange(path: string, offset: number, length: number) {
+            const bytes = store.objects.get(path);
+            if (!bytes) return null;
+            const start = Math.max(0, Math.min(bytes.length, offset));
+            const end = Math.max(start, Math.min(bytes.length, offset + length));
+            return bytes.slice(start, end);
+          },
           async createSignedUploadUrl(path: string) {
             const token = "upload-token";
             return {

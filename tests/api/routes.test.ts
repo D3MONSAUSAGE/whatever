@@ -626,7 +626,7 @@ describe("API", () => {
       body: JSON.stringify({ fileName: "huge.mp4", sizeBytes: MAX_VIDEO_BYTES + 1 }),
     }));
     expect(tooBig.status).toBe(413);
-    expect(tooBig.body?.error).toMatch(/50 MB/);
+    expect(tooBig.body?.error).toMatch(/500 MB/);
 
     const tooLong = await call(startVideoUpload, "http://localhost/api/media/upload", auth("token-a", {
       method: "POST",

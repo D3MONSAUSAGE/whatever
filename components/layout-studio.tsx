@@ -376,13 +376,13 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setProgress("Uploading…");
     try {
       const prepared = await prepareVideo(file);
-      const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/upload", {
+      const signed = await api<{ mediaId: string; signedUrl: string; token: string }>("/api/media/upload", {
         method: "POST",
         body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
       });
       await uploadToSignedUrl(signed.signedUrl, file, (percent) => {
         setProgress(percent >= 99 ? "Processing…" : "Uploading…");
-      }, file.name);
+      }, file.name, signed.token);
       setProgress("Processing…");
       await api("/api/media/upload/complete", {
         method: "POST",
