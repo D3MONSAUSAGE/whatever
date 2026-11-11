@@ -1,6 +1,6 @@
 import { billingNoticeKey, billingNotices, billingTemplate, type BillingNotice } from "./billing-notices";
 import {
-  loadEntitlement, transitionEndsAt, type EntitlementRow, type PlanId,
+  billingEnforced, loadEffectiveEntitlement, transitionEndsAt, type EntitlementRow, type PlanId,
 } from "./entitlements";
 import { db } from "./supabase";
 import { emailProvider } from "./email";
@@ -88,7 +88,8 @@ export function planOrgReminders(account: ReminderAccount, now: string): Planned
     claimKey: billingNoticeKey(account.id, notice),
     transitionStart: null,
   }));
-  if (account.plan === "grandfathered" && !account.transition_started_at) {
+  // Once billing is enforced, grandfathered grants no access, so this notice would be false.
+  if (account.plan === "grandfathered" && !account.transition_started_at && !billingEnforced()) {
     const end = transitionEndsAt(now);
     if (end) {
       const notice = billingTemplate("transition_14", end);
@@ -209,7 +210,8 @@ async function listReminderAccounts(): Promise<ReminderAccount[]> {
   if (listed.error || !listed.data) return [];
   const out: ReminderAccount[] = [];
   for (const account of listed.data) {
-    const ent = await loadEntitlement(String(account.id));
+    // Same entitlement the player and dashboard use (commercial rules when BILLING_ENFORCE=1).
+    const ent = await loadEffectiveEntitlement(String(account.id));
     if (ent === "error" || !ent) continue;
     const owner = await db().auth.admin.getUserById(String(account.owner_user_id));
     out.push({
