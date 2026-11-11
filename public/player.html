@@ -219,7 +219,19 @@
       }).then(function (r) {
         var size = Number(r && r.headers && r.headers.get ? r.headers.get('content-length') : 0) || 0;
         if (!r || !r.ok || size > CACHE_MAX_BYTES) return null;
-        return store.put(mediaKey(job.mediaId), r);
+        return r.blob().then(function (b) {
+          if (!b || b.size <= 0 || b.size > CACHE_MAX_BYTES) return null;
+          // Hold a local URL even if Cache Storage rejects the file, so loops
+          // in this session do not re-download. Chrome can throw
+          // QuotaExceededError for bodies around 400 MB+ while estimate()
+          // still shows many GB free; a TV restart then fetches once more.
+          if (!blobs[job.mediaId]) blobs[job.mediaId] = window.URL.createObjectURL(b);
+          return store.put(mediaKey(job.mediaId), new Response(b, {
+            headers: { 'Content-Type': b.type || 'video/mp4', 'Content-Length': String(b.size) }
+          })).then(function () { return true; }, function () {
+            return store['delete'](mediaKey(job.mediaId)).then(function () { return true; }, function () { return true; });
+          });
+        });
       }).then(function () {
         loadBlob(job.mediaId, function () { next(); });
       }, function () {
