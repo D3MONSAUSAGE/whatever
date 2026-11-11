@@ -56,7 +56,8 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
   if (e.state === "trial" && e.trial_ends_at && trialLeft === 3) notices.push(billingTemplate("trial_ending_3", e.trial_ends_at));
   if (e.state === "trial" && e.trial_ends_at && trialLeft === 1) notices.push(billingTemplate("trial_ending_1", e.trial_ends_at));
   if (e.state === "trial_grace" || e.state === "expired") {
-    const deadline = e.playback_ends_at || e.trial_ends_at || e.server_time;
+    // Stable fallback: a moving server_time would make a new key (and a new email) on every run.
+    const deadline = e.playback_ends_at || e.trial_ends_at || "none";
     notices.push(notice(
       "trial_ended",
       deadline,
@@ -75,9 +76,11 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
   if (e.state === "canceled") {
     notices.push(notice(
       "subscription_canceled",
-      e.current_period_end || e.server_time,
-      "Your Pekko subscription is canceled",
-      "Your subscription is canceled and screens are paused. Your content and settings are saved. Choose a plan whenever you want them back on.",
+      // Stable fallback (see trial_ended). This state also covers an unpaid subscription whose
+      // payment grace ended, so the copy says "not active" rather than claiming it was canceled.
+      e.current_period_end || e.grace_ends_at || "none",
+      "Your Pekko screens are paused",
+      "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on.",
     ));
   }
   const transitionEnd = opts?.transitionEndsAt ?? null;
