@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availabilityOf, billingDate, checkoutNote, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
+import { afterPortalResponse, availabilityOf, billingDate, checkoutNote, jumpToPlansPicker, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
 
 const active = { status: "active", current_period_end: "2026-12-10T03:42:41+00:00", cancel_at_period_end: false };
 
@@ -53,5 +53,46 @@ describe("plan buttons", () => {
   it("explains that a switch is charged right away", () => {
     expect(checkoutNote("available", "update")).toMatch(/immediately/);
     expect(checkoutNote("available", "update")).toMatch(/no second subscription/);
+  });
+});
+
+describe("Manage billing after the portal API", () => {
+  it("opens the Stripe portal URL for a paying customer and does not treat it as the plan picker", () => {
+    const url = "https://billing.stripe.com/p/session/test_paid";
+    expect(afterPortalResponse({ url })).toEqual({ kind: "portal", url });
+    expect(afterPortalResponse({ url, action: "plans" })).toEqual({ kind: "portal", url });
+  });
+  it("sends a trial (action plans, no url) to the plan picker", () => {
+    expect(afterPortalResponse({ action: "plans" })).toEqual({ kind: "plans" });
+    expect(afterPortalResponse({})).toEqual({ kind: "plans" });
+    expect(afterPortalResponse({ url: "  " })).toEqual({ kind: "plans" });
+  });
+  it("jumps to /dashboard/billing#plans from another page", () => {
+    const assigned: string[] = [];
+    const out = jumpToPlansPicker(
+      { pathname: "/dashboard/account", hash: "", assign: (href) => assigned.push(href) },
+      { getElementById: () => null },
+    );
+    expect(out).toEqual({ navigated: true, scrolled: false });
+    expect(assigned).toEqual(["/dashboard/billing#plans"]);
+  });
+  it("scrolls to #plans on a same-document hash change, including when already on #plans", () => {
+    const assigned: string[] = [];
+    let scrolled = 0;
+    const el = { scrollIntoView: () => { scrolled += 1; } };
+    const onHash = jumpToPlansPicker(
+      { pathname: "/dashboard/billing", hash: "#plans", assign: (href) => assigned.push(href) },
+      { getElementById: (id) => (id === "plans" ? el : null) },
+    );
+    expect(onHash).toEqual({ navigated: false, scrolled: true });
+    expect(assigned).toEqual([]);
+    expect(scrolled).toBe(1);
+    const noHash = jumpToPlansPicker(
+      { pathname: "/dashboard/billing", hash: "", assign: (href) => assigned.push(href) },
+      { getElementById: (id) => (id === "plans" ? el : null) },
+    );
+    expect(noHash).toEqual({ navigated: false, scrolled: true });
+    expect(assigned).toEqual(["/dashboard/billing#plans"]);
+    expect(scrolled).toBe(2);
   });
 });
