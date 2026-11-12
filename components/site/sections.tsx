@@ -56,7 +56,7 @@ export function PricingCards({ testPrefix = "plan", canBuy }: { testPrefix?: str
             <ul className="mt-4 text-sm grid gap-1.5 flex-1">
               <li>✓ Images, video and menu boards</li>
               <li>✓ Playlists and schedules</li>
-              <li>✓ Offline playback and screen alerts</li>
+              <li>✓ Screen status and alerts</li>
             </ul>
             <Link href={SIGNUP_HREF} className={`btn mt-5 ${featured ? "btn-primary" : "btn-quiet"}`}>Start free trial</Link>
             {canBuy === undefined ? null : canBuy ? (

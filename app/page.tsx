@@ -67,7 +67,7 @@ export default function Home() {
 
       <section className="px-5 py-16" aria-labelledby="features" id="features-section">
         <div className="mx-auto max-w-6xl">
-          <SectionHeading id="features" eyebrow="Features" title="Everything you need to run your screens" intro="Works on smart TVs, tablets, computers and TV sticks, anything with a web browser." />
+          <SectionHeading id="features" eyebrow="Features" title="Everything you need to run your screens" intro="Runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia." />
           <div className="mt-12 grid gap-14">
             {HIGHLIGHTS.map((h, i) => (
               <div key={h.title} className="grid gap-8 lg:grid-cols-2 lg:items-center">
