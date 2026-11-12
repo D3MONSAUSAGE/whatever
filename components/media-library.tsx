@@ -9,6 +9,7 @@ import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { MAX_VIDEO_MB } from "@/lib/mp4";
+import { FileUploadControl } from "@/components/file-upload";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
@@ -154,25 +155,11 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   return (
     <section>
       <PageHeader title="Media library" icon={<IconImage />} lede={`Images up to 15 MB. Video is MP4 H.264, ${MAX_VIDEO_MB} MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.`}
-        action={
-          <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
-            Upload image
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}
-              onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "image"); }} />
-          </label>
-        }
       />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
-          Upload video
-          <input type="file" accept="video/mp4,.mp4" multiple className="sr-only" disabled={uploads.busy}
-            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "video"); }} />
-        </label>
-        <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
-          Upload presentation
-          <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="sr-only" disabled={uploads.busy}
-            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "presentation"); }} />
-        </label>
+      <div className="mb-6 grid gap-4 sm:grid-cols-3" data-testid="media-uploads">
+        <FileUploadControl kind="image" multiple disabled={uploads.busy} buttonClass={`btn btn-primary cursor-pointer min-h-11 ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "image")} />
+        <FileUploadControl kind="video" multiple disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "video")} />
+        <FileUploadControl kind="document" label="Upload document" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "presentation")} />
       </div>
       {fixture || pathOverride ? null : (
         <Suspense fallback={null}>
@@ -206,7 +193,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
                 <option value="presentation">Presentations</option>
                 <option value="upload">My uploads</option>
                 <option value="menu">Menu boards</option>
-                <option value="promo">Promos</option>
+                <option value="promo">Promotions</option>
               </select>
             ) : null}
             <select className="field" aria-label="Sort media" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>

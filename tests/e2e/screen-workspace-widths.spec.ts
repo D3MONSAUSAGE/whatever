@@ -14,7 +14,7 @@ for (const width of widths) {
     await expect(nav.getByRole("link", { name: "Content" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Schedules" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Account" })).toBeVisible();
-    for (const name of ["Add media", "Change content", "Create", "Edit playlist", "Schedule"]) {
+    for (const name of ["Change content", "Schedule", "Edit playlist", "Upload media", "Create content"]) {
       await page.getByRole("button", { name, exact: true }).click();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
