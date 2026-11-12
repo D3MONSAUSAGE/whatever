@@ -61,13 +61,17 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}>
-        <a href="#add-screen" className="btn btn-primary" data-testid="add-screen"
-          onClick={(event) => { event.preventDefault(); const form = document.getElementById("add-screen"); form?.scrollIntoView({ behavior: "smooth", block: "start" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus({ preventScroll: true }); }}>
-          Add screen
-        </a>
-        <button type="button" className="btn" onClick={() => setAssigning([])}>Assign playlist</button>
-      </PageHeader>
+      <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}
+        action={
+          <a href="#add-screen" className="btn btn-primary" data-testid="add-screen"
+            onClick={(event) => { event.preventDefault(); const form = document.getElementById("add-screen"); form?.scrollIntoView({ behavior: "smooth", block: "start" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus({ preventScroll: true }); }}>
+            Add screen
+          </a>
+        }
+      />
+      <div className="mb-4">
+        <button type="button" className="btn btn-quiet" onClick={() => setAssigning([])}>Assign playlist</button>
+      </div>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
         onPaired={(warning) => { toast.show(warning || "Connected. The TV will switch over in a few seconds."); displays.reload(); }}

@@ -18,10 +18,10 @@ export function MyScreens() {
   const groups = useApi<ScreenGroupItem[]>("/api/screen-groups");
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title="My Screens" eyebrow="Workspace" lede="Pick a screen or a group. Change what it plays from there." icon={<IconTv />}>
-        <Link href="/dashboard/displays#add-screen" className="btn btn-primary min-h-11">Add screen</Link>
-        <Link href="/dashboard/screens/groups" className="btn min-h-11">Screen groups</Link>
-      </PageHeader>
+      <PageHeader title="My Screens" eyebrow="Workspace" lede="Pick a screen or a group. Change what it plays from there." icon={<IconTv />}
+        action={<Link href="/dashboard/displays#add-screen" className="btn btn-primary min-h-11">Add screen</Link>}
+      />
+      <p className="text-sm mb-4"><Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">Screen groups</Link></p>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       {!displays.data ? <LoadState error={displays.error} label="Loading screens…" /> : displays.data.length === 0 ? (
         <EmptyState title="No screens yet">
@@ -94,11 +94,13 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title={display.name} eyebrow="Screen" lede={display.location ? `${display.location.name} · ${display.location.timezone}` : "No location yet"} icon={<IconTv />}>
-        <Link href="/dashboard/screens" className="btn btn-quiet min-h-11">All screens</Link>
+      <PageHeader title={display.name} eyebrow="Screen" lede={display.location ? `${display.location.name} · ${display.location.timezone}` : "No location yet"} icon={<IconTv />}
+        action={<Link href="/dashboard/screens" className="btn btn-primary min-h-11">All screens</Link>}
+      />
+      <div className="mb-4 flex flex-wrap gap-2">
         <Link href="/dashboard/displays#add-screen" className="btn btn-quiet min-h-11">Add screen</Link>
         {fixture ? null : <button type="button" className="btn btn-quiet text-danger min-h-11" onClick={() => { void removeScreen(); }}>Remove screen</button>}
-      </PageHeader>
+      </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="card p-4 min-w-0">
           <h2 className="font-semibold">What's playing</h2>
@@ -172,10 +174,10 @@ export function ScreenGroups({ fixture, startCreating = false }: {
 
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title="Screen groups" eyebrow="My Screens" lede="A group shares schedules. A screen's own schedule still wins while it is on." icon={<IconTv />}>
-        <button type="button" className="btn btn-primary min-h-11" onClick={() => { setCreating(true); setError(null); }}>New group</button>
-        <Link href="/dashboard/screens" className="btn btn-quiet min-h-11">All screens</Link>
-      </PageHeader>
+      <PageHeader title="Screen groups" eyebrow="My Screens" lede="A group shares schedules. A screen's own schedule still wins while it is on." icon={<IconTv />}
+        action={<button type="button" className="btn btn-primary min-h-11" onClick={() => { setCreating(true); setError(null); }}>New group</button>}
+      />
+      <p className="text-sm mb-4"><Link href="/dashboard/screens" className="font-semibold text-primary underline underline-offset-4">All screens</Link></p>
       {creating ? (
         <form className="card p-4 grid gap-3 mb-4" onSubmit={(event) => { void createGroup(event); }}>
           <h2 className="font-semibold">New group</h2>
@@ -250,9 +252,9 @@ export function GroupWorkspace({ id }: { id: string }) {
   const offline = members.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title={group.name} eyebrow="Screen group" lede={`${online} online · ${offline} offline · ${members.length} screens`} icon={<IconTv />}>
-        <Link href="/dashboard/screens/groups" className="btn min-h-11">All groups</Link>
-      </PageHeader>
+      <PageHeader title={group.name} eyebrow="Screen group" lede={`${online} online · ${offline} offline · ${members.length} screens`} icon={<IconTv />}
+        action={<Link href="/dashboard/screens/groups" className="btn btn-primary min-h-11">All groups</Link>}
+      />
       <GroupPublish groupId={group.id} members={members} onChanged={() => displays.reload()} />
       <article className="card p-4 mb-4 text-sm">
         <h2 className="font-semibold">What wins</h2>

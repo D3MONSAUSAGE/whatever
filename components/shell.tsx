@@ -9,7 +9,9 @@ import { BrandLockup, PRODUCT_NAME } from "@/components/brand";
 import { AlertsBanner } from "@/components/alerts";
 import { BillingBanner } from "@/components/billing-banner";
 import { isRecoveryUrl } from "@/components/auth-frame";
+import { ContentNav } from "@/components/content-nav";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
+import { isContentPath } from "@/lib/content-nav";
 import { IconCalendar, IconGear, IconImage, IconList, IconTv } from "@/components/icons";
 
 const NAV = [
@@ -58,12 +60,14 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">Loading…</div>;
 
   const studio = path.startsWith("/dashboard/media/layout-studio") || path.startsWith("/layout-studio");
+  const showContentNav = isContentPath(path);
   const isActive = (href: string) => {
     if (href === "/dashboard/content") return path.startsWith("/dashboard/content") || path.startsWith("/dashboard/media");
     if (href === "/dashboard/account") return path.startsWith("/dashboard/account") || path.startsWith("/dashboard/settings") || path.startsWith("/dashboard/billing");
     return href === "/dashboard" ? path === href : path.startsWith(href);
   };
-  const current = NAV.find((item) => isActive(item.href))?.label ?? "Pekko";
+  const brandKit = path.startsWith("/dashboard/account/brand-kit");
+  const current = brandKit ? "Brand Kit" : (NAV.find((item) => isActive(item.href))?.label ?? "Pekko");
 
   return (
     <ToastProvider>
@@ -74,13 +78,20 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           <BrandLockup size="sm" />
         </Link>
         {NAV.map((item) => (
-          <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className="nav-link">
+          <Link key={item.href} href={item.href} aria-current={isActive(item.href) && !(item.href === "/dashboard/account" && brandKit) ? "page" : undefined} className="nav-link">
             <span className="icon-tile size-8">
               <item.icon />
             </span>
             {item.label}
           </Link>
         ))}
+        <Link
+          href="/dashboard/account/brand-kit"
+          aria-current={brandKit ? "page" : undefined}
+          className="nav-link md:pl-8 text-[13px]"
+        >
+          Brand Kit
+        </Link>
         <button type="button" onClick={signOut} className="nav-link mt-auto text-left">
           <span className="icon-tile size-8" aria-hidden="true">↩</span>
           Sign out
@@ -100,6 +111,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           <UploadProgress />
           {preview || studio ? null : <BillingBanner />}
           {preview || studio ? null : <AlertsBanner />}
+          {showContentNav ? <ContentNav pathOverride={pathOverride} /> : null}
           {children}
         </main>
       </div>

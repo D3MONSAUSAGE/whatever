@@ -9,12 +9,17 @@ import { PageHeader } from "@/components/ui";
 export default function AccountHub() {
   return (
     <section className="min-w-0">
-      <PageHeader title="Account" eyebrow="Pekko" lede="Settings, the plan you already have, and how to reach support." icon={<IconGear />} />
-      <ul className="grid gap-3 md:grid-cols-3">
+      <PageHeader title="Account" eyebrow="Pekko" lede="Settings, your brand, the plan you already have, and how to reach support." icon={<IconGear />} />
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <li className="card p-4">
           <h2 className="font-semibold">Settings</h2>
           <p className="text-sm text-muted mt-1">Name, password, alerts, and signing out.</p>
           <Link href="/dashboard/settings" className="btn min-h-11 mt-3">Open settings</Link>
+        </li>
+        <li className="card p-4">
+          <h2 className="font-semibold">Brand Kit</h2>
+          <p className="text-sm text-muted mt-1">Logo, main colour, and highlight colour for menus and promotions.</p>
+          <Link href="/dashboard/account/brand-kit" className="btn min-h-11 mt-3">Open Brand Kit</Link>
         </li>
         <li className="card p-4">
           <h2 className="font-semibold">Billing</h2>

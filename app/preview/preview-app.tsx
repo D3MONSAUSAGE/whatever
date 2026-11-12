@@ -13,6 +13,11 @@ import { sampleLayout } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 import { ContentHub } from "@/components/content-hub";
+import { MenuBoards, type MenuBoard } from "@/components/menu-boards";
+import { PromoSlides, type Promo } from "@/components/promo-slides";
+import { BrandKit, BrandSummary } from "@/components/brand-kit";
+import { sampleMenu } from "@/lib/menu-templates";
+import { samplePromo } from "@/lib/promo-templates";
 import { UploadProgress, type UploadJob } from "@/components/uploads";
 import { useToast } from "@/components/toast";
 import { UPLOAD_SUCCESS_TOAST_MS } from "@/lib/upload-notice";
@@ -56,6 +61,7 @@ const displays: DisplayItem[] = [
 
 const deck = poster("Demo Café", "#5a2a2a");
 const media: MediaItem[] = [
+  { id: "media-logo", fileName: "demo-cafe-logo.png", sizeBytes: 48_000, createdAt: "2026-10-28T10:00:00.000Z", url: poster("Logo", "#c8102e"), kind: "image", usedIn: [] },
   { id: "media-lunch", fileName: "demo-cafe-lunch.png", sizeBytes: 240_000, createdAt: "2026-10-28T15:00:00.000Z", url: lunch, kind: "image", usedIn: [{ id: "pl-lunch", name: "Lunch loop" }] },
   { id: "media-dinner", fileName: "demo-cafe-dinner.png", sizeBytes: 1_800_000, createdAt: "2026-10-28T12:00:00.000Z", url: dinner, kind: "image", usedIn: [] },
   { id: "media-clip", fileName: "demo-cafe-specials.mp4", sizeBytes: 18_400_000, createdAt: "2026-10-27T18:00:00.000Z", url: null, thumbnailUrl: video, kind: "video", durationMs: 42_000, width: 1920, height: 1080, usedIn: [{ id: "pl-lunch", name: "Lunch loop" }] },
@@ -114,6 +120,11 @@ function previewPath(screen: string) {
   if (screen === "media" || screen === "upload" || screen === "upload-error") return "/dashboard/media";
   if (screen === "playlists") return "/dashboard/playlists";
   if (screen === "overview") return "/dashboard";
+  if (screen === "menus" || screen === "menu-edit") return "/dashboard/media/menus";
+  if (screen === "promos" || screen === "promo-edit") return "/dashboard/media/promos";
+  if (screen === "brand-kit") return "/dashboard/account/brand-kit";
+  if (screen === "screens") return "/dashboard/screens";
+  if (screen === "account") return "/dashboard/account";
   return `/dashboard/${screen}`;
 }
 
@@ -138,6 +149,13 @@ export function PreviewApp() {
       {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} library={workspaceLibrary} initialPanel={panel} /> : null}
       {screen === "studio" ? <LayoutStudio mode="account" fixture={studioFixture} pathOverride="/dashboard/media/layout-studio" /> : null}
       {screen === "content" ? <ContentHub pathOverride="/dashboard/content" /> : null}
+      {screen === "menus" ? <MenuBoards fixture={menuFixture} /> : null}
+      {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
+      {screen === "promos" ? <PromoSlides fixture={promoFixture} /> : null}
+      {screen === "promo-edit" ? <PromoSlides fixture={{ ...promoFixture, startEditing: true }} /> : null}
+      {screen === "brand-kit" ? <BrandKit fixture={brandFixture} /> : null}
+      {screen === "account" ? <AccountPreview /> : null}
+      {screen === "screens" ? <MyScreensPreview /> : null}
       {screen === "groups" ? <ScreenGroups fixture={empty ? { groups: [], displays } : demoGroups} startCreating={params.get("creating") === "1"} /> : null}
       {screen === "upload" ? <UploadNoticeDemo mode="success" /> : null}
       {screen === "upload-error" ? <UploadNoticeDemo mode="error" /> : null}
@@ -239,6 +257,86 @@ const studioFixture: AccountStudio = {
     { id: studioVideoId, name: "promo.mp4", kind: "video", mime: "video/mp4", url: "/layout-studio/media/promo" },
   ],
 };
+
+
+const brandFixture = {
+  brand: { primaryColor: "#c8102e", accentColor: "#ffd34d", logoMediaId: "media-logo", available: true, custom: true },
+  images: media,
+};
+
+const menuFixture = {
+  menus: [
+    {
+      id: "menu-dinner",
+      name: "Demo Café dinner menu",
+      template: "classic" as const,
+      content: { ...sampleMenu(), title: "Dinner", subtitle: "From 5 PM", useBrand: true, photoMediaId: "media-dinner" },
+      mediaId: "media-dinner",
+      playlistId: "pl-menu",
+      imageUrl: dinner,
+      createdAt: "2026-10-28T15:00:00.000Z",
+      updatedAt: "2026-10-28T15:00:00.000Z",
+    },
+  ] satisfies MenuBoard[],
+  available: true,
+  images: media,
+  displays: displays.filter((item) => item.connected),
+  brand: brandFixture,
+  previewSrc: dinner,
+};
+
+const promoFixture = {
+  promos: [
+    {
+      id: "promo-happy",
+      name: "Happy hour",
+      template: "happy" as const,
+      content: samplePromo("happy"),
+      mediaId: "media-dinner",
+      imageUrl: dinner,
+      startsOn: "2026-11-11",
+      endsOn: "2026-11-30",
+      menuId: "menu-dinner",
+      placement: "added" as const,
+      expired: false,
+      updatedAt: "2026-10-28T17:00:00.000Z",
+      screens: [{ id: "screen-front", name: "Front counter" }],
+    },
+  ] satisfies Promo[],
+  available: true,
+  menus: menuFixture.menus,
+  images: media,
+  brand: brandFixture,
+  previewSrc: dinner,
+};
+
+function AccountPreview() {
+  return (
+    <section className="min-w-0">
+      <h1 className="text-2xl font-semibold mb-2">Account</h1>
+      <p className="text-sm text-muted mb-4">Settings, your brand, the plan you already have, and how to reach support.</p>
+      <BrandSummary fixture={brandFixture} />
+      <p className="text-sm"><a className="font-semibold text-primary underline underline-offset-4" href="/dashboard/account/brand-kit">Open Brand Kit</a></p>
+    </section>
+  );
+}
+
+function MyScreensPreview() {
+  return (
+    <section>
+      <h1 className="text-2xl font-semibold mb-1">My Screens</h1>
+      <p className="text-sm text-muted mb-4">Pick a screen or a group. Change what it plays from there.</p>
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {displays.map((display) => (
+          <li key={display.id} className="card p-4">
+            <p className="font-semibold">{display.name}</p>
+            <p className="text-sm text-muted">{display.online ? "Online" : display.connected ? "Offline" : "Not connected"}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function poster(label: string, color: string) {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><rect fill='${color}' width='100%' height='100%'/><text x='50%' y='54%' fill='white' font-family='sans-serif' font-size='36' text-anchor='middle'>${label}</text></svg>`;

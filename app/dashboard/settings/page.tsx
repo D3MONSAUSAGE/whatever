@@ -166,8 +166,8 @@ export default function Settings() {
 
         <div className="card p-5">
           <h2 className="font-semibold">Your brand</h2>
-          <p className="text-sm text-muted mt-1 mb-3">Add your logo and colours to your menu boards.</p>
-          <Link href="/dashboard/media/menus#brand" className="btn btn-quiet">Set up your brand</Link>
+          <p className="text-sm text-muted mt-1 mb-3">Add your logo and colours to your menu boards and promotions.</p>
+          <Link href="/dashboard/account/brand-kit" className="btn btn-quiet">Set up your brand</Link>
         </div>
 
         <div className="card p-5">
