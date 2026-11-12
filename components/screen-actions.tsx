@@ -1,29 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type MediaItem, type PlaylistDetail, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { browserTimeZone, formatClock12, shiftClock, shiftWeekdays, zoneLabel } from "@/lib/clock";
 import { useUploads } from "@/components/uploads";
 import { useConfirm } from "@/components/confirm";
+import { ContentPicker } from "@/components/content-picker";
+import { buildScreenPickerEntries, type PickerEntry } from "@/lib/content-picker";
+import { screenActionClass, screenActionLabel, type ScreenActionId } from "@/lib/screen-actions-ui";
 
 type Panel = "upload" | "change" | "create" | "playlist" | "schedule" | null;
 
 type Board = { id: string; name: string; template: string; thumbnailUrl: string | null };
-type MenuRow = { id: string; name: string; playlistId: string | null };
+type MenuRow = { id: string; name: string; playlistId: string | null; imageUrl?: string | null };
+
+export type ScreenLibrary = {
+  media: MediaItem[];
+  playlists: PlaylistSummary[];
+  boards: Board[];
+  menus: MenuRow[];
+};
 
 const DEFAULT_SLIDE_MS = 10_000;
+const NO_MEDIA: MediaItem[] = [];
+const NO_PLAYLISTS: PlaylistSummary[] = [];
+const NO_BOARDS: Board[] = [];
+const NO_MENUS: MenuRow[] = [];
 
-export function ScreenActions({ display, onChanged, preview = false }: { display: DisplayItem; onChanged: () => void; preview?: boolean }) {
-  const [panel, setPanel] = useState<Panel>(null);
+export function ScreenActions({ display, onChanged, preview = false, library, initialPanel = null }: {
+  display: DisplayItem;
+  onChanged: () => void;
+  preview?: boolean;
+  library?: ScreenLibrary;
+  initialPanel?: Panel;
+}) {
+  const [panel, setPanel] = useState<Panel>(initialPanel);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const uploads = useUploads();
   const confirm = useConfirm();
-  const media = useApi<MediaItem[]>(!preview && (panel === "change" || panel === "playlist" || panel === "upload") ? "/api/media" : null);
-  const playlists = useApi<PlaylistSummary[]>(!preview && (panel === "change" || panel === "schedule" || panel === "playlist") ? "/api/playlists" : null);
-  const boards = useApi<{ boards: Board[] }>(!preview && (panel === "change" || panel === "create") ? "/api/layout-studio/boards" : null);
-  const menus = useApi<{ menus: MenuRow[] }>(!preview && panel === "change" ? "/api/menus" : null);
+  const live = !preview && !library;
+  const media = useApi<MediaItem[]>(live && (panel === "change" || panel === "playlist" || panel === "upload") ? "/api/media" : null);
+  const playlists = useApi<PlaylistSummary[]>(live && (panel === "change" || panel === "schedule" || panel === "playlist") ? "/api/playlists" : null);
+  const boards = useApi<{ boards: Board[] }>(live && (panel === "change" || panel === "create") ? "/api/layout-studio/boards" : null);
+  const menus = useApi<{ menus: MenuRow[] }>(live && panel === "change" ? "/api/menus" : null);
+  const mediaItems = library?.media ?? media.data ?? NO_MEDIA;
+  const playlistItems = library?.playlists ?? playlists.data ?? NO_PLAYLISTS;
+  const boardItems = library?.boards ?? boards.data?.boards ?? NO_BOARDS;
+  const menuItems = library?.menus ?? menus.data?.menus ?? NO_MENUS;
+  const pickerEntries = useMemo(() => buildScreenPickerEntries({
+    media: mediaItems,
+    playlists: playlistItems,
+    menus: menuItems,
+    layouts: boardItems,
+  }), [mediaItems, playlistItems, menuItems, boardItems]);
   const wasUploading = useRef(false);
   const reloadMedia = media.reload;
 
@@ -123,6 +154,18 @@ export function ScreenActions({ display, onChanged, preview = false }: { display
     }
   }
 
+  function publishPickerEntry(entry: PickerEntry) {
+    if (entry.category === "video" || entry.category === "presentation") {
+      void publishFile({ id: entry.id, fileName: entry.fileName });
+      return;
+    }
+    if (entry.category === "playlist" || entry.category === "menu") {
+      void publishPlaylist(entry.id);
+      return;
+    }
+    if (entry.category === "layout") void assignBoard(entry.id);
+  }
+
   async function assignBoard(menuId: string) {
     const ok = await confirm.ask({
       title: "Publish this layout to the TV?",
@@ -145,9 +188,9 @@ export function ScreenActions({ display, onChanged, preview = false }: { display
   return (
     <div className="mt-4 min-w-0">
       <div className="flex flex-wrap gap-2">
-        {(["upload", "change", "create", "playlist", "schedule"] as const).map((id) => (
-          <button key={id} type="button" className="btn min-h-11" aria-pressed={panel === id} onClick={() => open(panel === id ? null : id)}>
-            {id === "upload" ? "Add media" : id === "change" ? "Change content" : id === "create" ? "Create" : id === "playlist" ? "Edit playlist" : "Schedule"}
+        {(["upload", "change", "create", "playlist", "schedule"] as const satisfies readonly ScreenActionId[]).map((id) => (
+          <button key={id} type="button" className={screenActionClass(id, panel === id)} aria-pressed={panel === id} onClick={() => open(panel === id ? null : id)}>
+            {screenActionLabel(id)}
           </button>
         ))}
       </div>
@@ -169,11 +212,13 @@ export function ScreenActions({ display, onChanged, preview = false }: { display
       ) : null}
       {panel === "change" ? (
         <div className="card p-4 mt-3 grid gap-4 min-w-0">
-          <PicturePicker busy={busy} items={(media.data ?? []).filter((item) => item.kind !== "video" && item.kind !== "presentation" && !item.sourceMediaId)} onPublish={(id) => assignImage(id)} />
-          <Picker title="Videos and documents" empty="No videos or documents yet. A single picture is the only file a screen can play on its own." disabled={busy} items={(media.data ?? []).filter((item) => (item.kind === "video" || item.kind === "presentation") && !item.sourceMediaId)} onPick={(item) => publishFile(item)} />
-          <Picker title="Playlists" empty="No playlists yet." disabled={busy} items={(playlists.data ?? []).map((item) => ({ id: item.id, fileName: item.name }))} onPick={(item) => publishPlaylist(item.id)} />
-          <Picker title="Menus" empty="No menus yet." disabled={busy} items={(menus.data?.menus ?? []).filter((item) => item.playlistId && !(boards.data?.boards ?? []).some((board) => board.id === item.id)).map((item) => ({ id: item.playlistId as string, fileName: item.name }))} onPick={(item) => publishPlaylist(item.id)} />
-          <Picker title="Layouts" empty={boards.error ? "Layouts are not available on this account." : "No layouts yet. Create one, then publish it from Layout Studio."} disabled={busy} items={(boards.data?.boards ?? []).map((item) => ({ id: item.id, fileName: item.name }))} onPick={(item) => assignBoard(item.id)} />
+          <ContentPicker
+            busy={busy}
+            entries={pickerEntries}
+            layoutsUnavailable={Boolean(boards.error)}
+            onPublishPicture={(id) => assignImage(id)}
+            onPublish={(entry) => publishPickerEntry(entry)}
+          />
         </div>
       ) : null}
       {confirm.node}
@@ -188,64 +233,16 @@ export function ScreenActions({ display, onChanged, preview = false }: { display
       {panel === "playlist" ? (
         <PlaylistEditor
           display={display}
-          library={media.data ?? []}
-          playlists={playlists.data ?? []}
+          library={mediaItems}
+          playlists={playlistItems}
           busy={busy}
           onPublish={publishPlaylist}
           onNote={setNote}
         />
       ) : null}
       {panel === "schedule" ? (
-        <ScheduleForm display={display} playlists={playlists.data ?? []} onDone={(message) => { setNote(message); onChanged(); }} />
+        <ScheduleForm display={display} playlists={playlistItems} onDone={(message) => { setNote(message); onChanged(); }} />
       ) : null}
-    </div>
-  );
-}
-
-function PicturePicker({ items, busy, onPublish }: {
-  items: { id: string; fileName: string }[];
-  busy: boolean;
-  onPublish: (id: string) => void;
-}) {
-  const [selected, setSelected] = useState("");
-  const chosen = items.find((item) => item.id === selected);
-  return (
-    <div className="min-w-0">
-      <h3 className="font-semibold text-sm">Pictures</h3>
-      <p className="text-sm text-muted mt-1">Select a picture, then publish it to this TV.</p>
-      {items.length === 0 ? <p className="text-sm text-muted mt-1">No pictures yet.</p> : (
-        <ul className="mt-2 grid gap-2">
-          {items.slice(0, 12).map((item) => (
-            <li key={item.id}>
-              <button type="button" className="btn min-h-11 w-full justify-start text-left" aria-pressed={selected === item.id} disabled={busy} onClick={() => setSelected(item.id)}>{item.fileName}</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button type="button" className="btn btn-primary min-h-11 mt-3" disabled={busy || !chosen} onClick={() => chosen && onPublish(chosen.id)}>Publish to TV</button>
-    </div>
-  );
-}
-
-function Picker({ title, empty, items, onPick, disabled }: {
-  title: string;
-  empty: string;
-  items: { id: string; fileName: string }[];
-  onPick: (item: { id: string; fileName: string }) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      <h3 className="font-semibold text-sm">{title}</h3>
-      {items.length === 0 ? <p className="text-sm text-muted mt-1">{empty}</p> : (
-        <ul className="mt-2 grid gap-2">
-          {items.slice(0, 12).map((item) => (
-            <li key={item.id}>
-              <button type="button" className="btn min-h-11 w-full justify-start text-left" disabled={disabled} onClick={() => onPick(item)}>{item.fileName}</button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatDuration, formatSize, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
+import { ContentNav } from "@/components/content-nav";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { MAX_VIDEO_MB } from "@/lib/mp4";
@@ -12,6 +14,11 @@ import { MAX_VIDEO_MB } from "@/lib/mp4";
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
 type KindKey = "" | "image" | "video" | "presentation" | "upload" | "menu" | "promo";
+
+function readKind(value: string | null): KindKey {
+  if (value === "image" || value === "video" || value === "presentation" || value === "upload" || value === "menu" || value === "promo") return value;
+  return "";
+}
 type MediaPage = { items: MediaItem[]; total: number; offset: number; limit: number; nextOffset: number | null };
 export const MEDIA_PAGE_SIZE = 48;
 
@@ -60,13 +67,16 @@ function usePagedMedia(enabled: boolean, query: string, sort: SortKey, kind: Kin
   return { page, error, reload, loadMore, loadingMore: more, filtering: debounced !== "" || kind !== "" || unused };
 }
 
-export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
+export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[]; pathOverride?: string }) {
   const uploads = useUploads();
+  const router = useRouter();
+  const pathname = usePathname();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [kind, setKind] = useState<KindKey>("");
+  const [kind, setKind] = useState<KindKey>(pathOverride?.includes("kind=presentation") ? "presentation" : "");
   const [unused, setUnused] = useState(false);
+  const applyKind = useCallback((next: KindKey) => setKind(next), []);
   const live = usePagedMedia(!fixture, query, sort, kind, unused);
   const data = fixture ?? live.page?.items ?? null;
   const error = fixture ? null : live.error;
@@ -85,8 +95,11 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
 
   const visible = useMemo(() => {
     const rows = fixture ? sortMedia(fixture, query, sort) : data ?? [];
-    return rows.filter((item) => !item.sourceMediaId);
-  }, [fixture, data, query, sort]);
+    const owned = rows.filter((item) => !item.sourceMediaId);
+    if (!fixture || !kind) return owned;
+    if (kind === "image") return owned.filter((item) => item.kind !== "video" && item.kind !== "presentation");
+    return owned.filter((item) => item.kind === kind);
+  }, [fixture, data, query, sort, kind]);
   const libraryEmpty = fixture ? fixture.length === 0 : live.page !== null && live.page.total === 0 && !live.filtering;
 
   async function remove(item: MediaItem) {
@@ -160,6 +173,12 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "video"); }} />
         </label>
       </PageHeader>
+      {fixture || pathOverride ? null : (
+        <Suspense fallback={null}>
+          <KindSync onKind={applyKind} />
+        </Suspense>
+      )}
+      <ContentNav pathOverride={pathOverride ?? (kind === "presentation" ? "/dashboard/media?kind=presentation" : undefined)} />
 
       {!data ? (
         <LoadState error={error} label="Loading…" />
@@ -172,7 +191,15 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
           <div className="grid gap-3 mb-4 lg:grid-cols-[minmax(0,1fr)_11rem_11rem_auto_auto] lg:items-center">
             <input className="field" type="search" aria-label="Search media" placeholder="Search files" value={query} onChange={(event) => setQuery(event.target.value)} />
             {!fixture ? (
-              <select className="field" aria-label="Show" value={kind} onChange={(event) => setKind(event.target.value as KindKey)}>
+              <select className="field" aria-label="Show" value={kind} onChange={(event) => {
+                const next = event.target.value as KindKey;
+                setKind(next);
+                const nextParams = new URLSearchParams(window.location.search);
+                if (next) nextParams.set("kind", next);
+                else nextParams.delete("kind");
+                const q = nextParams.toString();
+                router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+              }}>
                 <option value="">All files</option>
                 <option value="image">Images</option>
                 <option value="video">Videos</option>
@@ -246,6 +273,13 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
       {confirm.node}
     </section>
   );
+}
+
+function KindSync({ onKind }: { onKind: (kind: KindKey) => void }) {
+  const params = useSearchParams();
+  const kindQuery = params.get("kind");
+  useEffect(() => { onKind(readKind(kindQuery)); }, [kindQuery, onKind]);
+  return null;
 }
 
 export default function MediaPage() {

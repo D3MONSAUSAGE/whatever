@@ -5,6 +5,7 @@ import { api, authToken, timeAgo, useApi, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
+import { ContentNav } from "@/components/content-nav";
 import { IconImage } from "@/components/icons";
 import { artImages, type MenuBoard } from "@/components/menu-boards";
 import { PROMO_LIMITS, PROMO_TEMPLATES, samplePromo, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
@@ -99,6 +100,7 @@ export function PromoSlides() {
         {!draft ? <button className="btn btn-primary" onClick={() => startNew()} disabled={atLimit(promos.data?.promos.length, 100)}>New promo</button> : null}
         <Link href="/dashboard/media/menus" className="btn btn-quiet">Menu boards</Link>
       </PageHeader>
+      <ContentNav />
 
       {draft ? (
         <PromoEditor

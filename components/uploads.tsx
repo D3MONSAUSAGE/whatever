@@ -4,6 +4,7 @@ import { api, authToken, uploadForm } from "@/lib/api";
 import { prepareImage } from "@/lib/prepare-image";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { useToast } from "@/components/toast";
+import { UPLOAD_SUCCESS_TOAST_MS, bannerJobs, uploadSuccessCopy } from "@/lib/upload-notice";
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX = 15 * 1024 * 1024;
@@ -24,6 +25,7 @@ type UploadsApi = {
   jobs: UploadJob[];
   busy: boolean;
   enqueue: (files: File[], kind: UploadKind) => void;
+  dismiss: (key: string) => void;
 };
 
 const UploadsContext = createContext<UploadsApi | null>(null);
@@ -57,6 +59,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
     setBusy(true);
     let failed = 0;
     let firstError = "";
+    let playlistHref: string | undefined;
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
       const key = queue[index].key;
@@ -71,6 +74,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
         else {
           const result = await uploadPresentation(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
           patch(key, { playlistId: result.playlistId });
+          if (result.playlistId) playlistHref = `/dashboard/playlists/${result.playlistId}`;
         }
         patch(key, { state: "done", progress: 100, detail: "Uploaded" });
       } catch (err) {
@@ -81,17 +85,21 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       }
     }
     if (failed === 0) {
-      if (kind === "presentation") {
-        toast.show(files.length === 1 ? "Presentation uploaded" : `Uploaded ${files.length} presentations`);
-      } else {
-        toast.show(files.length === 1 ? "Uploaded" : `Uploaded ${files.length} files`);
-      }
-    } else if (files.length === 1) toast.show(firstError, true);
-    else toast.show(`${failed} of ${files.length} files could not be uploaded. ${firstError}`, true);
+      toast.show(uploadSuccessCopy(files.length, kind), false, {
+        durationMs: UPLOAD_SUCCESS_TOAST_MS,
+        href: playlistHref,
+        hrefLabel: playlistHref ? "Open playlist" : undefined,
+      });
+    } else if (files.length === 1) toast.show(firstError, true, { durationMs: null });
+    else toast.show(`${failed} of ${files.length} files could not be uploaded. ${firstError}`, true, { durationMs: null });
     setBusy(false);
   }, [patch, toast]);
 
   const recent = useRef(new Map<string, number>());
+  const dismiss = useCallback((key: string) => {
+    setJobs((current) => current.filter((job) => job.key !== key));
+  }, []);
+
   const enqueue = useCallback((files: File[], kind: UploadKind) => {
     const now = Date.now();
     const fresh = files.filter((file) => {
@@ -117,15 +125,17 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
   }, [inFlight]);
 
   return (
-    <UploadsContext.Provider value={{ jobs, busy, enqueue }}>
+    <UploadsContext.Provider value={{ jobs, busy, enqueue, dismiss }}>
       {children}
       {toast.node}
     </UploadsContext.Provider>
   );
 }
 
-export function UploadProgress() {
-  const { jobs } = useUploads();
+export function UploadProgress({ jobs: jobsOverride, onDismiss }: { jobs?: UploadJob[]; onDismiss?: (key: string) => void } = {}) {
+  const uploads = useUploads();
+  const jobs = bannerJobs(jobsOverride ?? uploads.jobs);
+  const dismiss = onDismiss ?? uploads.dismiss;
   if (!jobs.length) return null;
   const active = jobs.some((job) => job.state === "queued" || job.state === "active");
   return (
@@ -142,11 +152,11 @@ export function UploadProgress() {
           <div className="mt-2 h-2 rounded-full bg-line overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={job.progress} aria-label={job.name}>
             <div className={`h-full ${job.state === "error" ? "bg-danger" : "bg-primary"}`} style={{ width: `${job.progress}%` }} />
           </div>
-          {job.state === "error" ? <p className="text-sm text-danger mt-2">{job.detail}</p> : null}
-          {job.state === "done" && job.playlistId ? (
-            <p className="text-sm mt-2">
-              <a className="text-primary underline" href={`/dashboard/playlists/${job.playlistId}`}>Open playlist</a>
-            </p>
+          {job.state === "error" ? (
+            <>
+              <p role="alert" className="text-sm text-danger mt-2">{job.detail}</p>
+              <button type="button" className="btn btn-quiet min-h-11 mt-2" onClick={() => dismiss(job.key)}>Dismiss</button>
+            </>
           ) : null}
         </li>
       ))}

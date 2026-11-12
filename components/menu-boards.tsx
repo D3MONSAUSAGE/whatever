@@ -5,6 +5,7 @@ import { api, authToken, timeAgo, useApi, type DisplayItem, type MediaItem } fro
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
+import { ContentNav } from "@/components/content-nav";
 import { IconImage } from "@/components/icons";
 import { DEFAULT_BRAND, MENU_LIMITS, MENU_TEMPLATES, normalizeHex, sampleMenu, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 
@@ -67,6 +68,7 @@ export function MenuBoards({ studioHref = null }: { studioHref?: string | null }
         <Link href="/dashboard/schedule#day-parts" className="btn btn-quiet">Breakfast, lunch &amp; dinner times</Link>
         <Link href="/dashboard/media/promos" className="btn btn-quiet">Promos &amp; specials</Link>
       </PageHeader>
+      <ContentNav />
 
       {!draft && menus.data?.available ? <BrandCard images={artImages(media.data)} onChanged={() => menus.reload()} /> : null}
 

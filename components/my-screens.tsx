@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { api, useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
 import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components/tv";
 import { syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
 import { GroupPublish } from "@/components/group-publish";
-import { EmptyState, LoadState, PageHeader } from "@/components/ui";
+import { EmptyState, LimitNote, LoadState, PageHeader, atLimit } from "@/components/ui";
 import { IconTv } from "@/components/icons";
-import { ScreenActions } from "@/components/screen-actions";
+import { ScreenActions, type ScreenLibrary } from "@/components/screen-actions";
 import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
 
@@ -61,7 +62,12 @@ export function MyScreens() {
   );
 }
 
-export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: DisplayItem }) {
+export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
+  id: string;
+  fixture?: DisplayItem;
+  library?: ScreenLibrary;
+  initialPanel?: "upload" | "change" | "create" | "playlist" | "schedule" | null;
+}) {
   const displays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
   const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(fixture ? null : `/api/displays/${id}/timeline`, 10_000);
   const confirm = useConfirm();
@@ -89,8 +95,8 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
   return (
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader title={display.name} eyebrow="Screen" lede={display.location ? `${display.location.name} · ${display.location.timezone}` : "No location yet"} icon={<IconTv />}>
-        <Link href="/dashboard/screens" className="btn min-h-11">All screens</Link>
-        <Link href="/dashboard/displays#add-screen" className="btn min-h-11">Add screen</Link>
+        <Link href="/dashboard/screens" className="btn btn-quiet min-h-11">All screens</Link>
+        <Link href="/dashboard/displays#add-screen" className="btn btn-quiet min-h-11">Add screen</Link>
         {fixture ? null : <button type="button" className="btn btn-quiet text-danger min-h-11" onClick={() => { void removeScreen(); }}>Remove screen</button>}
       </PageHeader>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -111,7 +117,7 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
           {!contentLabel(display) || contentLabel(display) === "No content assigned" ? (
             <p className="text-sm mt-3">Nothing is assigned. <Link href="/dashboard/media" className="underline font-semibold">Add media</Link> or <Link href={`/dashboard/media/layout-studio?screen=${display.id}`} className="underline font-semibold">open Layout Studio</Link>.</p>
           ) : null}
-          <ScreenActions display={display} preview={Boolean(fixture)} onChanged={() => displays.reload()} />
+          <ScreenActions display={display} preview={Boolean(fixture)} library={library} initialPanel={initialPanel} onChanged={() => displays.reload()} />
         </article>
         {confirm.node}
         {toast.node}
@@ -127,16 +133,70 @@ export function ScreenWorkspace({ id, fixture }: { id: string; fixture?: Display
   );
 }
 
-export function ScreenGroups() {
-  const groups = useApi<ScreenGroupItem[]>("/api/screen-groups");
-  const displays = useApi<DisplayItem[]>("/api/displays");
+export function ScreenGroups({ fixture, startCreating = false }: {
+  fixture?: { groups: ScreenGroupItem[]; displays: DisplayItem[] };
+  startCreating?: boolean;
+}) {
+  const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
+  const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays");
+  const groups = fixture ? { data: fixture.groups, error: null as string | null, reload: async () => {} } : liveGroups;
+  const displays = fixture ? { data: fixture.displays, error: null as string | null, reload: async () => {} } : liveDisplays;
+  const toast = useToast();
+  const [creating, setCreating] = useState(startCreating);
+  const [name, setName] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function createGroup(event: React.FormEvent) {
+    event.preventDefault();
+    if (fixture) {
+      toast.show("This preview doesn't save.", true);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api("/api/screen-groups", { method: "POST", body: JSON.stringify({ name, displayIds: picked }) });
+      setName("");
+      setPicked([]);
+      setCreating(false);
+      await groups.reload();
+      toast.show("Group added");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader title="Screen groups" eyebrow="My Screens" lede="A group shares schedules. A screen's own schedule still wins while it is on." icon={<IconTv />}>
-        <Link href="/dashboard/screens" className="btn min-h-11">All screens</Link>
+        <button type="button" className="btn btn-primary min-h-11" onClick={() => { setCreating(true); setError(null); }}>New group</button>
+        <Link href="/dashboard/screens" className="btn btn-quiet min-h-11">All screens</Link>
       </PageHeader>
+      {creating ? (
+        <form className="card p-4 grid gap-3 mb-4" onSubmit={(event) => { void createGroup(event); }}>
+          <h2 className="font-semibold">New group</h2>
+          <p className="text-sm text-muted">Name the group and choose the screens that share its schedules. You can add screens later.</p>
+          <label className="text-sm font-semibold">Group name
+            <input className="field mt-1" aria-label="Group name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} placeholder="Demo Café front" />
+          </label>
+          {displays.data ? <GroupMembers displays={displays.data} picked={picked} onChange={setPicked} /> : <p className="text-sm text-muted">Loading screens…</p>}
+          <LimitNote count={groups.data?.length} max={100} noun="screen groups" />
+          {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className="btn btn-primary min-h-11" disabled={saving || atLimit(groups.data?.length, 100)}>{saving ? "Creating…" : "Create group"}</button>
+            <button type="button" className="btn btn-quiet min-h-11" onClick={() => { setCreating(false); setError(null); }}>Cancel</button>
+          </div>
+        </form>
+      ) : null}
       {!groups.data ? <LoadState error={groups.error} label="Loading groups…" /> : groups.data.length === 0 ? (
-        <EmptyState title="No groups yet">Groups are created from the schedule tools. A screen with no group just plays its own assignment.</EmptyState>
+        <EmptyState title="No groups yet">
+          <p>A group shares schedules across screens. A screen with no group just plays its own assignment.</p>
+          <button type="button" className="btn btn-primary min-h-11 mt-4" onClick={() => { setCreating(true); setError(null); }}>New group</button>
+        </EmptyState>
       ) : (
         <ul className="grid gap-3">
           {groups.data.map((group) => {
@@ -154,6 +214,28 @@ export function ScreenGroups() {
         </ul>
       )}
     </section>
+  );
+}
+
+function GroupMembers({ displays, picked, onChange }: { displays: DisplayItem[]; picked: string[]; onChange: (ids: string[]) => void }) {
+  if (!displays.length) return <p className="text-sm text-muted">Connect a screen before adding it to a group. You can still create the group and add screens later.</p>;
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="text-sm font-semibold">Screens in this group</legend>
+      {displays.map((display) => (
+        <label key={display.id} className="flex items-center gap-2 min-h-11 text-sm">
+          <input
+            type="checkbox"
+            checked={picked.includes(display.id)}
+            aria-label={`Include ${display.name}`}
+            onChange={(event) => {
+              onChange(event.target.checked ? [...picked, display.id] : picked.filter((id) => id !== display.id));
+            }}
+          />
+          {display.name}
+        </label>
+      ))}
+    </fieldset>
   );
 }
 
