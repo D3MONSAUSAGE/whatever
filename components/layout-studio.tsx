@@ -109,6 +109,12 @@ export function LayoutStudio({
   function studioIsDirty(): boolean {
     return cleanRef.current != null && hasUnsavedEdits(currentEdit(), cleanRef.current);
   }
+
+  /** Leave the editor (back, or the Menu boards link). Prompts only when there are unsaved changes. */
+  function requestLeave(after: () => void) {
+    if (!confirmDiscardUnsaved(studioIsDirty())) return;
+    after();
+  }
   const liveBrand = useApi<Brand>(accountMode && !fixture && !brand ? "/api/brand" : null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
@@ -292,7 +298,7 @@ export function LayoutStudio({
     if (!account) return;
     if (id === (menuId ?? "")) return;
     if (!confirmDiscardUnsaved(studioIsDirty())) return;
-    if (!id) { newBoard(); return; }
+    if (!id) { newBoard(true); return; }
     const board = account.boards.find((item) => item.id === id);
     if (!board) return;
     const nextImage = account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null;
@@ -324,7 +330,8 @@ export function LayoutStudio({
     });
   }
 
-  function newBoard() {
+  function newBoard(alreadyConfirmed = false) {
+    if (!alreadyConfirmed && !confirmDiscardUnsaved(studioIsDirty())) return;
     const created = freshBoard(account?.boards.length ?? 0, window.prompt("Name this board", freshBoard(account?.boards.length ?? 0).name));
     applyFresh(created, scopeRef.current);
     setNote("");
@@ -697,7 +704,7 @@ export function LayoutStudio({
             <p className="studio-kicker">{embedded ? "Menu boards" : accountMode ? "Media" : "Isolated preview"}</p>
             <h1 className="studio-title">{embedded ? (menuId ? "Edit menu board" : "New menu board") : "Layout Studio"}</h1>
             <p className="studio-lead">{accountMode ? "Choose a layout, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
-            {onClose ? <button type="button" className="btn btn-quiet" onClick={onClose}>Back to menu boards</button> : null}
+            {onClose ? <button type="button" className="btn btn-quiet" onClick={() => requestLeave(onClose)}>Back to menu boards</button> : null}
           </div>
           {account ? (
             <div className="board-bar">
@@ -714,7 +721,7 @@ export function LayoutStudio({
                 </select>
               )}
               <button type="button" className="btn btn-quiet board-rename" aria-label="Rename board" onClick={() => setRenaming(true)}>✎</button>
-              <button type="button" className="btn btn-quiet" onClick={newBoard}>New board</button>
+              <button type="button" className="btn btn-quiet" onClick={() => newBoard()}>New board</button>
             </div>
           ) : null}
         </div>
@@ -859,7 +866,10 @@ export function LayoutStudio({
               {accountMode ? null : <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={publish}>Publish preview</button>}
               {accountMode || account ? <button type="button" style={chip(false)} disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button> : null}
               {accountMode || account ? <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : null}
-              {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
+              {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }} onClick={(event) => {
+                event.preventDefault();
+                requestLeave(() => { if (onClose) onClose(); else window.location.assign("/dashboard/media/menus"); });
+              }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
             </div>
             {note ? <p className="studio-inline-note" role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p> : null}
           </div>

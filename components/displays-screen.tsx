@@ -9,6 +9,7 @@ import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 import { byName, SEARCH_FROM } from "@/components/playlist-list";
 import { screenNameWarning } from "@/lib/screen-names";
 import { syncLine } from "@/lib/sync-line";
+import { assignBusyFor } from "@/lib/assign-publish";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
@@ -322,7 +323,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
     const displayIds = Object.entries(chosen).filter(([, on]) => on).map(([id]) => id);
     if (!playlistId) return onError("Choose a playlist.");
     if (!displayIds.length) return onError("Choose at least one screen.");
-    setBusy("checking");
+    setBusy(assignBusyFor("preview"));
     let committing = false;
     try {
       const preview = await api<{
@@ -336,6 +337,8 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         signal: AbortSignal.timeout(20_000),
         body: JSON.stringify({ playlistId, displayIds, commit: false }),
       });
+      // Clear 'Checking…' before the confirm so it cannot stick while the dialog is open.
+      setBusy(assignBusyFor("confirm"));
       const assign = preview.affected.map((item) => item.name);
       const cleared = preview.willBeCleared.map((item) => item.name);
       const ok = await confirm.ask({
@@ -352,7 +355,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
       });
       if (ok !== true) return;
       committing = true;
-      setBusy("publishing");
+      setBusy(assignBusyFor("commit"));
       await api("/api/displays/publish", {
         method: "POST",
         signal: AbortSignal.timeout(20_000),

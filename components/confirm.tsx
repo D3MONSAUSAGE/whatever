@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type ConfirmRequest = {
   title: string;
@@ -67,8 +68,10 @@ function ConfirmDialog({ pending, onClose }: { pending: Pending; onClose: (value
     onClose(true);
   }
 
-  return (
-    <div className="fixed inset-0 z-[80] bg-ink/50 flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => onClose(null)}>
+  // Portal to document.body so a z-50 assign sheet (or any ancestor stacking context /
+  // overflow) cannot hide this dialog. Pending starts null, so this only mounts on the client.
+  const dialog = (
+    <div className="fixed inset-0 z-[80] bg-ink/50 flex items-end sm:items-center justify-center p-0 sm:p-6" data-testid="confirm-dialog" onClick={() => onClose(null)}>
       <div
         role="dialog"
         aria-modal="true"
@@ -110,4 +113,6 @@ function ConfirmDialog({ pending, onClose }: { pending: Pending; onClose: (value
       </div>
     </div>
   );
+  if (typeof document === "undefined") return dialog;
+  return createPortal(dialog, document.body);
 }

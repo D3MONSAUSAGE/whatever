@@ -228,3 +228,18 @@ describe("remaining in-app Layout Studio links and copy", () => {
     expect(picker).not.toContain("publish it from Layout Studio");
   });
 });
+
+describe("embedded editor leave paths", () => {
+  it("prompts before Back to menu boards, New board, and the Menu boards link, only when dirty", () => {
+    const studio = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(studio).toContain("function requestLeave(after: () => void)");
+    expect(studio).toContain("confirmDiscardUnsaved(studioIsDirty())");
+    expect(studio).toContain("onClick={() => requestLeave(onClose)}");
+    expect(studio).toContain("function newBoard(alreadyConfirmed = false)");
+    expect(studio).toContain("if (!alreadyConfirmed && !confirmDiscardUnsaved(studioIsDirty())) return");
+    // The Menu boards in-editor link also goes through requestLeave, not a raw navigation.
+    const leaveLink = studio.slice(studio.indexOf(">Menu boards</a>") - 400, studio.indexOf(">Menu boards</a>"));
+    expect(leaveLink).toContain("requestLeave");
+    expect(leaveLink).toContain("preventDefault");
+  });
+});
