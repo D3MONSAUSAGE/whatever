@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Assign confirm stack check</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f4f7fb; color: #0b1220; }
+    .shell { min-height: 100vh; display: flex; }
+    .sidebar { display: none; }
+    @media (min-width: 768px) {
+      .sidebar { display: block; width: 15rem; border-right: 1px solid #d5e2f2; background: #fff; }
+    }
+    .content { flex: 1; min-width: 0; }
+    .mobile-header {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; height: 56px; padding: 0 16px;
+      border-bottom: 1px solid #d5e2f2;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .main { max-width: 72rem; padding: 20px 16px 112px; }
+    .sheet {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(11, 18, 32, 0.5);
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    @media (min-width: 768px) {
+      .sheet { align-items: center; }
+    }
+    .sheet-panel {
+      background: #f6f9fe; width: 100%; max-width: 32rem; max-height: 85dvh;
+      overflow-y: auto; border-radius: 1rem; padding: 1.25rem;
+    }
+    .btn { min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid #d5e2f2; background: #fff; font-weight: 600; }
+    .btn-primary { background: #0066ff; color: #fff; border-color: #0066ff; width: 100%; }
+    .confirm {
+      position: fixed; inset: 0; z-index: 80;
+      background: rgba(11, 18, 32, 0.5);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 0;
+    }
+    @media (min-width: 640px) {
+      .confirm { align-items: center; padding: 1.5rem; }
+    }
+    .confirm-panel {
+      background: #fff; width: 100%; max-width: 28rem;
+      border-radius: 1rem; border: 1px solid #d5e2f2;
+      box-shadow: 0 12px 32px rgb(11 18 32 / 0.16);
+      padding: 1.25rem;
+    }
+    h1, h2 { margin: 0; }
+    p { margin: 0.5rem 0 1rem; color: #5c6470; }
+  </style>
+</head>
+<body>
+  <div class="shell" id="shell">
+    <aside class="sidebar"></aside>
+    <div class="content">
+      <header class="mobile-header">Displays</header>
+      <main class="main" id="main">
+        <h1>Displays</h1>
+        <!-- Assign sheet, same z-50 as components/displays-screen.tsx -->
+        <div class="sheet" id="assign-sheet" data-testid="assign-sheet">
+          <div class="sheet-panel" role="dialog" aria-label="Assign playlist" id="assign-panel">
+            <h2>Assign playlist</h2>
+            <p>Checked screens get this playlist.</p>
+            <button type="button" class="btn btn-primary" id="publish-btn">Publish to selected screens</button>
+          </div>
+        </div>
+        <!-- Old placement: sibling confirm, used only in the 'legacy' variant via JS -->
+        <div id="legacy-slot"></div>
+      </main>
+    </div>
+  </div>
+  <div id="portal-root"></div>
+  <script>
+    const confirmHTML = `
+      <div class="confirm" id="confirm-dialog" data-testid="confirm-dialog">
+        <div class="confirm-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title" id="confirm-panel">
+          <h2 id="confirm-title">Publish to these screens?</h2>
+          <p>Will play it: Front counter.</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" class="btn" id="confirm-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="confirm-ok" style="width:auto">Publish</button>
+          </div>
+        </div>
+      </div>`;
+    const params = new URLSearchParams(location.search);
+    const mode = params.get("mode") || "portal"; // portal | sibling | inside-panel
+    if (mode === "portal") {
+      document.getElementById("portal-root").innerHTML = confirmHTML;
+    } else if (mode === "sibling") {
+      document.getElementById("legacy-slot").innerHTML = confirmHTML;
+    } else if (mode === "inside-panel") {
+      document.getElementById("assign-panel").insertAdjacentHTML("beforeend", confirmHTML);
+    }
+    document.documentElement.dataset.mode = mode;
+  </script>
+</body>
+</html>
