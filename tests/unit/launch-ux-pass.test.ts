@@ -284,3 +284,13 @@ describe("isolated studio photo limit copy", () => {
     expect(studio).toContain("ISOLATED_STUDIO_PHOTO_LIMIT_LABEL");
   });
 });
+
+describe("playlist publish copy", () => {
+  it("uses neutral no-timing wording because the editor has no online status for its targets", () => {
+    const source = readFileSync("components/playlist-editor.tsx", "utf8");
+    expect(source).toContain("Published. Screens playing this playlist update when they're online.");
+    expect(source).not.toContain("Published. TVs update within about 10 seconds.");
+    expect(source).not.toMatch(/toast\.show\([^)]*within about 10 seconds/);
+  });
+});
+

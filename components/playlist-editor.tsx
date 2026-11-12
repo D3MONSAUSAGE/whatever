@@ -170,7 +170,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
     setBusy("Publishing…");
     try {
       await api(`/api/playlists/${id}/publish`, { method: "POST", body: JSON.stringify({ displayIds }) });
-      toast.show("Published. TVs update within about 10 seconds.");
+      toast.show("Published. Screens playing this playlist update when they're online.");
       await playlist.reload();
     } catch (err) {
       toast.show((err as Error).message, true);
