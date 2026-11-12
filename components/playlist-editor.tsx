@@ -170,7 +170,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
     setBusy("Publishing…");
     try {
       await api(`/api/playlists/${id}/publish`, { method: "POST", body: JSON.stringify({ displayIds }) });
-      toast.show("Published. TVs update within about 10 seconds.");
+      toast.show("Published. Screens playing this playlist update when they're online.");
       await playlist.reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -350,7 +350,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
 
           <div className="card p-4">
             <h2 className="font-semibold mb-1">Publish</h2>
-            <p className="text-sm text-muted mb-3">Choose one or more screens. They switch within about 10 seconds. A single image published later replaces this playlist on that screen.</p>
+            <p className="text-sm text-muted mb-3">Choose one or more screens. Online screens switch shortly after you publish; offline screens update when they reconnect. A single image published later replaces this playlist on that screen.</p>
             <p className="text-sm mb-4">
               {using.length
                 ? <>On {using.map((display) => display.name).join(", ")}.</>
