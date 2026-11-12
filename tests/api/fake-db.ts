@@ -107,6 +107,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     select?: string;
     filters: [string, unknown][];
     inFilters: [string, unknown[]][];
+    nullFilters: [string, unknown][];
     order?: { col: string; ascending: boolean };
     limit?: number;
     range?: { from: number; to: number };
@@ -119,7 +120,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
   private done: Promise<{ data: unknown; error: { message: string; code?: string } | null }> | null = null;
 
   constructor(private store: Store, private table: TableName) {
-    this.op = { type: "select", filters: [], inFilters: [], mode: "many" };
+    this.op = { type: "select", filters: [], inFilters: [], nullFilters: [], mode: "many" };
   }
 
   select(cols = "*", opts?: { count?: "exact"; head?: boolean }) {
@@ -144,6 +145,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
   }
   eq(key: string, value: unknown) {
     this.op.filters.push([key, value]);
+    return this;
+  }
+  is(key: string, value: unknown) {
+    this.op.nullFilters.push([key, value]);
     return this;
   }
   in(key: string, values: unknown[]) {
@@ -182,7 +187,8 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     const rows = this.store[this.table];
     const match = () => rows.filter((row) =>
       this.op.filters.every(([key, value]) => row[key] === value) &&
-      this.op.inFilters.every(([key, values]) => values.includes(row[key])));
+      this.op.inFilters.every(([key, values]) => values.includes(row[key])) &&
+      this.op.nullFilters.every(([key, value]) => (row[key] ?? null) === value));
 
     if (this.op.type === "insert") {
       const result = insertRow(this.store, this.table, { ...(this.op.insert ?? {}) });

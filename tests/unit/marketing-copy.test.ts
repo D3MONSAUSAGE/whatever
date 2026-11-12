@@ -56,3 +56,43 @@ describe("presentation site copy", () => {
     expect(home).not.toMatch(/STRIPE_LIVE_ENABLED|BILLING_ENFORCE|BILLING_REMINDERS/);
   });
 });
+
+describe("launch site copy", () => {
+  const support = readFileSync("app/support/page.tsx", "utf8");
+  const sections = readFileSync("components/site/sections.tsx", "utf8");
+  const marketing = readFileSync("lib/marketing.ts", "utf8");
+  const publicCopy = [home, features, pricing, support, sections, marketing].join("\n");
+
+  it("does not claim offline playback on public marketing pages", () => {
+    expect(publicCopy).not.toMatch(/offline playback/i);
+    expect(publicCopy).not.toMatch(/Keeps playing offline/);
+    expect(publicCopy).not.toMatch(/keeps playing saved content/i);
+    expect(publicCopy).not.toMatch(/keeps showing (content|saved)/i);
+    expect(publicCopy).not.toMatch(/if the internet drops/i);
+    expect(marketing).not.toContain('id: "offline"');
+    expect(sections).toContain("Screen status and alerts");
+    expect(FAQ.find((item) => item.q === "What if the internet goes down?")?.a).toBe(
+      "Your dashboard shows the screen as offline. Check the TV's Wi-Fi, power, and that the Pekko player is still open.",
+    );
+  });
+
+  it("points the TV at pekkotv.com/pair and matches the 10-minute code refresh", () => {
+    expect(support).toContain("pekkotv.com/pair");
+    expect(support).not.toMatch(/yourpekko\.site/);
+    expect(support).toContain("A new code appears every 10 minutes.");
+    expect(support).not.toMatch(/after a few minutes/);
+    expect(readFileSync("public/player.html", "utf8")).toContain("A new code appears every 10 minutes.");
+  });
+
+  it("uses the tested-brands device wording and does not say any modern browser", () => {
+    const device = "Runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia.";
+    expect(home).toContain(device);
+    expect(features).toContain("tested on major brands including LG, Samsung, Vizio and Insignia");
+    expect(FAQ.find((item) => item.q === "What devices does Pekko work on?")?.a).toContain(
+      "tested on major brands including LG, Samsung, Vizio and Insignia",
+    );
+    expect(publicCopy).not.toMatch(/any device with a modern web browser/i);
+    expect(publicCopy).not.toMatch(/anything with a web browser/i);
+    expect(publicCopy).not.toMatch(/turns any screen with a web browser/i);
+  });
+});

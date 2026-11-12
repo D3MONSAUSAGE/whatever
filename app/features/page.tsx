@@ -5,7 +5,7 @@ import { FeatureGrid, Screenshot, SectionHeading, TrialCta } from "@/components/
 
 export const metadata: Metadata = {
   title: "Features · Pekko",
-  description: "Digital signage for TVs, tablets and computers: images, videos, PowerPoint and PDF presentations, playlists, schedules, multiple screens, status alerts and offline playback.",
+  description: "Digital signage that runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia: images, videos, PowerPoint and PDF presentations, playlists, schedules, multiple screens and status alerts.",
   alternates: { canonical: "/features" },
 };
 
@@ -15,7 +15,7 @@ const ROWS = [
   { title: "Playlists", body: "Arrange slides, set how long each one shows, and publish to one screen or many.", shot: SHOTS.playlists },
   { title: "Schedules", body: "Run different playlists by weekday and time of day, per location and time zone, for single screens or groups.", shot: SHOTS.schedule },
   { title: "Screens and status", body: "Pair a screen with a 6-digit code, see what each one is playing, and get an alert when one goes offline.", shot: SHOTS.displays },
-  { title: "On the TV", body: "The player runs full screen in the browser and keeps playing saved content if the internet drops.", shot: SHOTS.tvPromo },
+  { title: "On the TV", body: "The player runs full screen in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia.", shot: SHOTS.tvPromo },
 ];
 
 export default function Features() {
@@ -24,7 +24,7 @@ export default function Features() {
       <section className="px-5 pt-14 pb-6">
         <div className="mx-auto max-w-6xl text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Features</h1>
-          <p className="mt-4 text-muted text-lg max-w-2xl mx-auto">Pekko turns any screen with a web browser into digital signage you control from anywhere.</p>
+          <p className="mt-4 text-muted text-lg max-w-2xl mx-auto">Pekko runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia, and you control it from anywhere.</p>
         </div>
       </section>
       <section className="px-5 py-10">

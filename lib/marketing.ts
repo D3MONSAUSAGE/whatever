@@ -2,14 +2,13 @@ import { TRIAL } from "@/lib/plans";
 
 /** Marketing copy. Every claim here maps to a feature that exists on main; don't add unbuilt ones. */
 export const FEATURES = [
-  { id: "devices", title: "Any screen with a web browser", body: "Smart TVs, tablets, computers and TV sticks run the Pekko player in their browser. Open the player, type the 6-digit code into your dashboard, and the screen is paired." },
+  { id: "devices", title: "Runs in your smart TV's web browser", body: "Tested on major brands including LG, Samsung, Vizio and Insignia. Open the player, type the 6-digit code into your dashboard, and the screen is paired." },
   { id: "media", title: "Turn presentations into screen content", body: "Upload a PowerPoint (.pptx) or PDF to share menus, promotions, or office announcements. Pekko converts each slide or page into a still image you can use in your playlists." },
   { id: "playlists", title: "Playlists", body: "Arrange slides, set how long each one shows, and preview the result before you publish it to your screens." },
   { id: "schedules", title: "Schedules", body: "Show breakfast in the morning and dinner at night. Schedule playlists by day and time for single screens or screen groups, per location and time zone." },
   { id: "screens", title: "Multiple screens and locations", body: "Manage every screen from one dashboard. Group screens and run different content in each location." },
   { id: "remote", title: "Remote management", body: "Change what's playing from your phone or computer. Screens pick up published changes on their own, usually within a minute." },
   { id: "status", title: "Screen status and alerts", body: "See which screens are online, what each one is showing, and get an alert in your dashboard when a screen goes offline or comes back." },
-  { id: "offline", title: "Keeps playing offline", body: "If the internet drops, the player keeps showing saved content and catches up when it reconnects." },
   { id: "analytics", title: "Uptime and activity", body: "Analytics show screen uptime, what's on each screen, and recent activity in your account." },
 ] as const;
 
@@ -28,9 +27,9 @@ export const FAQ: { q: string; a: string }[] = [
   { q: "What happens when the trial ends?", a: "Your screens keep playing for 3 more days. If you don't choose a plan, they pause. Your content and settings are never deleted when a trial ends, and choosing a plan turns your screens back on." },
   { q: "What counts as a screen?", a: "Each display paired to your account with the Pekko player counts as one screen, whether it's a TV, tablet or computer." },
   { q: "Which plans are there?", a: "Starter is $19 a month for 1 screen, Business is $39 a month for up to 3 screens, and Multi-screen is $59 a month for up to 5 screens. Prices are in US dollars, billed monthly; taxes may apply." },
-  { q: "What devices does Pekko work on?", a: "Any device with a modern web browser: smart TVs, TV sticks, tablets and computers. You manage everything from a browser on your phone or computer." },
-  { q: "Do I need special hardware?", a: "No. If your TV has a web browser, open the Pekko player on it. Otherwise, a computer or TV stick connected to the screen works." },
-  { q: "What if the internet goes down?", a: "The player keeps showing content it has already saved and updates when the connection comes back. Your dashboard shows the screen as offline in the meantime." },
+  { q: "What devices does Pekko work on?", a: "It runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia. You manage everything from a browser on your phone or computer." },
+  { q: "Do I need special hardware?", a: "No extra hardware is required on smart TVs where the player has been tested, including LG, Samsung, Vizio and Insignia. You can also connect a computer or TV stick to the screen." },
+  { q: "What if the internet goes down?", a: "Your dashboard shows the screen as offline. Check the TV's Wi-Fi, power, and that the Pekko player is still open." },
   { q: "Can I cancel or delete my account?", a: "There's no card on file during the trial, so there's nothing to cancel. You can delete your account at any time from Settings; deletion runs 7 days later and you can cancel it until then." },
   { q: "Can I upload PowerPoint presentations or PDFs?", a: "Yes. Upload a .pptx or PDF file, up to 50 MB and 40 slides or pages. Pekko converts slides and pages into still images for your playlists. Animations, transitions, and embedded videos won't play. Older .ppt and macro-enabled .pptm files aren't supported." },
 ];
