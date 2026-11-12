@@ -19,6 +19,7 @@ import { api, authToken, uploadForm, useApi } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
+import { confirmDiscardUnsaved, hasUnsavedEdits } from "@/lib/menu-board-unify";
 import type { Brand } from "@/lib/brand-kit";
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"];
@@ -91,6 +92,23 @@ export function LayoutStudio({
   const originRef = useRef<StudioScope | null>(null);
   scopeRef.current = scope;
   originRef.current = origin;
+  type CleanEdit = {
+    menuId: string | null;
+    boardName: string;
+    template: LayoutTemplate;
+    draft: LayoutDocument;
+    imageHref: string | null;
+    clipUrl: string | null;
+    videoOn: boolean;
+  };
+  const cleanRef = useRef<CleanEdit | null>(null);
+  function markClean(state: CleanEdit) { cleanRef.current = state; }
+  function currentEdit(): CleanEdit {
+    return { menuId, boardName, template, draft, imageHref, clipUrl, videoOn };
+  }
+  function studioIsDirty(): boolean {
+    return cleanRef.current != null && hasUnsavedEdits(currentEdit(), cleanRef.current);
+  }
   const liveBrand = useApi<Brand>(accountMode && !fixture && !brand ? "/api/brand" : null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
@@ -180,12 +198,23 @@ export function LayoutStudio({
       const board = preferred ?? ((initialTemplate && !initialBoardId) ? null : (fixture.boards[0] ?? null));
       setAccount(fixture);
       if (board) {
+        const nextImage = fixture.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null;
+        const nextVideoOn = Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null;
         setMenuId(board.id);
         setBoardName(board.name);
         setTemplate(board.document.template);
         setDraft(board.document);
-        setImageHref(fixture.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
-        setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+        setImageHref(nextImage);
+        setVideoOn(nextVideoOn);
+        markClean({
+          menuId: board.id,
+          boardName: board.name,
+          template: board.document.template,
+          draft: board.document,
+          imageHref: nextImage,
+          clipUrl: null,
+          videoOn: nextVideoOn,
+        });
       } else {
         const created = initialTemplate ? { name: freshBoard(fixture.boards.length).name, document: sampleLayout(initialTemplate) } : freshBoard(fixture.boards.length);
         setMenuId(null);
@@ -194,6 +223,15 @@ export function LayoutStudio({
         setDraft(created.document);
         setImageHref(null);
         setVideoOn(false);
+        markClean({
+          menuId: null,
+          boardName: created.name,
+          template: created.document.template,
+          draft: created.document,
+          imageHref: null,
+          clipUrl: null,
+          videoOn: false,
+        });
       }
       setNote("");
       return;
@@ -252,16 +290,20 @@ export function LayoutStudio({
 
   function selectBoard(id: string) {
     if (!account) return;
+    if (id === (menuId ?? "")) return;
+    if (!confirmDiscardUnsaved(studioIsDirty())) return;
     if (!id) { newBoard(); return; }
     const board = account.boards.find((item) => item.id === id);
     if (!board) return;
+    const nextImage = account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null;
+    const nextVideoOn = Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null;
     setMenuId(board.id);
     setBoardName(board.name);
     setTemplate(board.document.template);
     setDraft(board.document);
-    setImageHref(account.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+    setImageHref(nextImage);
     setClipUrl(null);
-    setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+    setVideoOn(nextVideoOn);
     setZone("");
     setStep("template");
     setNote("");
@@ -271,6 +313,15 @@ export function LayoutStudio({
       originRef.current = currentScope;
       setOrigin(currentScope);
     }
+    markClean({
+      menuId: board.id,
+      boardName: board.name,
+      template: board.document.template,
+      draft: board.document,
+      imageHref: nextImage,
+      clipUrl: null,
+      videoOn: nextVideoOn,
+    });
   }
 
   function newBoard() {
@@ -292,21 +343,41 @@ export function LayoutStudio({
     fromCurrentAccount.current = true;
     originRef.current = nextScope;
     setOrigin(nextScope);
+    markClean({
+      menuId: null,
+      boardName: created.name,
+      template: created.document.template,
+      draft: created.document,
+      imageHref: null,
+      clipUrl: null,
+      videoOn: false,
+    });
   }
 
   function adoptBoard(board: AccountBoard, studio: AccountStudio, allowVideo: boolean, nextScope: StudioScope | null = scopeRef.current) {
+    const nextImage = studio.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null;
+    const nextVideoOn = allowVideo && Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null;
     setMenuId(board.id);
     setBoardName(board.name);
     setTemplate(board.document.template);
     setDraft(board.document);
-    setImageHref(studio.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+    setImageHref(nextImage);
     setClipUrl(null);
-    setVideoOn(allowVideo && Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+    setVideoOn(nextVideoOn);
     fromCurrentAccount.current = true;
     if (nextScope) {
       originRef.current = nextScope;
       setOrigin(nextScope);
     }
+    markClean({
+      menuId: board.id,
+      boardName: board.name,
+      template: board.document.template,
+      draft: board.document,
+      imageHref: nextImage,
+      clipUrl: null,
+      videoOn: nextVideoOn,
+    });
   }
 
   function closeZone() {
@@ -349,6 +420,7 @@ export function LayoutStudio({
     setDraft(doc);
     setOrigin(scope);
     setNote("Draft kept in this browser. No account was written.");
+    markClean({ ...currentEdit(), draft: doc });
   }
 
   function publish() {
@@ -369,6 +441,7 @@ export function LayoutStudio({
     setPublished(snapshot);
     setOrigin(scope);
     setNote("Published preview is frozen in this browser. It was not sent to an account or a screen.");
+    markClean({ ...currentEdit(), draft: doc, videoOn: videoOn && !!box });
   }
 
   async function reloadAccount(preferId: string | null, keepUnsaved = false) {
@@ -377,17 +450,30 @@ export function LayoutStudio({
     setAccount(loaded);
     const board = boardAfterReload(loaded, preferId, { keepUnsaved });
     if (!board) return loaded;
+    const nextImage = loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null;
+    const nextVideoOn = Boolean(board.document.videoMediaId);
     setMenuId(board.id);
     setBoardName(board.name);
     setTemplate(board.document.template);
     setDraft(board.document);
-    setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
+    setImageHref(nextImage);
     setClipUrl(null);
-    setVideoOn(Boolean(board.document.videoMediaId));
+    setVideoOn(nextVideoOn);
     const currentScope = scopeRef.current;
     if (currentScope) {
       originRef.current = currentScope;
       setOrigin(currentScope);
+    }
+    if (!keepUnsaved) {
+      markClean({
+        menuId: board.id,
+        boardName: board.name,
+        template: board.document.template,
+        draft: board.document,
+        imageHref: nextImage,
+        clipUrl: null,
+        videoOn: nextVideoOn,
+      });
     }
     return loaded;
   }

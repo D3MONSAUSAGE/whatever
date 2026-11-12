@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   LAYOUT_OPTIONS, canSaveThrough, classicEditorForRegion, classicPreviewHits,
-  classifyBoardContent, CONTENT_TAB_MENUS_LABEL,
-  layoutStudioRedirect, parseUnifiedSearch, publishPathFor, unifiedEditorPath,
+  classifyBoardContent, CONTENT_TAB_MENUS_LABEL, confirmDiscardUnsaved, DISCARD_UNSAVED_MESSAGE,
+  hasUnsavedEdits, layoutStudioRedirect, parseUnifiedSearch, publishPathFor, unifiedEditorPath,
 } from "@/lib/menu-board-unify";
 import { parseLayout, layoutSvg, frameFor, sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
 import { parseMenuContent } from "@/lib/menu-templates";
@@ -197,5 +197,34 @@ describe("player and offline copy", () => {
       expect(src.toLowerCase()).not.toMatch(/offline.{0,40}video/);
     }
     // The cache name is only mentioned here as a test, not as a product claim.
+  });
+});
+
+describe("unsaved-edit confirmation", () => {
+  const clean = { name: "Lunch", title: "Today" };
+  it("does not prompt when there are no unsaved changes, and only proceeds after a confirm when there are", () => {
+    expect(hasUnsavedEdits(clean, clean)).toBe(false);
+    expect(hasUnsavedEdits({ ...clean, title: "Dinner" }, clean)).toBe(true);
+    let asked = 0;
+    expect(confirmDiscardUnsaved(false, () => { asked += 1; return false; })).toBe(true);
+    expect(asked).toBe(0);
+    expect(confirmDiscardUnsaved(true, () => { asked += 1; return false; })).toBe(false);
+    expect(asked).toBe(1);
+    expect(confirmDiscardUnsaved(true, () => { asked += 1; return true; })).toBe(true);
+    expect(asked).toBe(2);
+    expect(DISCARD_UNSAVED_MESSAGE).toMatch(/unsaved changes/);
+  });
+});
+
+describe("remaining in-app Layout Studio links and copy", () => {
+  it("points My Screens and the content picker at Menu boards, not Layout Studio", () => {
+    const screens = readFileSync("components/my-screens.tsx", "utf8");
+    expect(screens).toContain("unifiedEditorPath({ screen: display.id, isNew: true })");
+    expect(screens).toContain("open Menu boards");
+    expect(screens).not.toContain("/dashboard/media/layout-studio?screen=");
+    expect(screens).not.toContain("open Layout Studio");
+    const picker = readFileSync("components/content-picker.tsx", "utf8");
+    expect(picker).toContain("publish it from Menu boards.");
+    expect(picker).not.toContain("publish it from Layout Studio");
   });
 });

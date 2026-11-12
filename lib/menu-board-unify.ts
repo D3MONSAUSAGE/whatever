@@ -186,3 +186,22 @@ export function classicPreviewHits(hasPhoto: boolean): { id: "menu" | "photo"; l
 }
 
 export const CONTENT_TAB_MENUS_LABEL = "Menu boards";
+
+/** True when the current editor snapshot differs from the last clean (loaded or saved) snapshot. */
+export function hasUnsavedEdits(current: unknown, baseline: unknown): boolean {
+  return JSON.stringify(current) !== JSON.stringify(baseline);
+}
+
+export const DISCARD_UNSAVED_MESSAGE = "You have unsaved changes. If you leave this board, those edits will be lost.";
+
+/**
+ * A simple confirm before dropping unsaved edits. Returns true when it is safe to proceed.
+ * Does not prompt when there are no unsaved changes.
+ */
+export function confirmDiscardUnsaved(
+  unsaved: boolean,
+  ask: () => boolean = () => (typeof window !== "undefined" ? window.confirm(DISCARD_UNSAVED_MESSAGE) : false),
+): boolean {
+  if (!unsaved) return true;
+  return ask();
+}

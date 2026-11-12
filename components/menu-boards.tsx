@@ -19,6 +19,8 @@ import {
   layoutOptionById,
   layoutOptionForTemplate,
   parseUnifiedSearch,
+  confirmDiscardUnsaved,
+  hasUnsavedEdits,
   type LayoutOption,
 } from "@/lib/menu-board-unify";
 
@@ -315,6 +317,7 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
   const [region, setRegion] = useState<"menu" | "photo">("menu");
   const last = useRef<string | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const baseline = useRef({ name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds });
   const c = draft.content;
   const update = (content: MenuContent) => setDraft({ ...draft, content });
   const totalItems = c.sections.reduce((n, s) => n + s.items.length, 0);
@@ -356,6 +359,12 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches) {
       editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+  }
+
+  function requestClose() {
+    const current = { name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds };
+    if (!confirmDiscardUnsaved(hasUnsavedEdits(current, baseline.current))) return;
+    setDraft(null);
   }
 
   async function save() {
@@ -503,7 +512,7 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? "Saving…" : draft.id ? "Save changes" : "Create menu board"}</button>
-            <button className="btn btn-quiet" disabled={busy} onClick={() => setDraft(null)}>Cancel</button>
+            <button className="btn btn-quiet" disabled={busy} onClick={requestClose}>Cancel</button>
           </div>
         </div>
       </div>
