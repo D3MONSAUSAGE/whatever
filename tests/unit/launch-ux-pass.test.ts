@@ -291,6 +291,7 @@ describe("playlist publish copy", () => {
     expect(source).toContain("Published. Screens playing this playlist update when they're online.");
     expect(source).not.toContain("Published. TVs update within about 10 seconds.");
     expect(source).not.toMatch(/toast\.show\([^)]*within about 10 seconds/);
+    expect(source).not.toContain("They switch within about 10 seconds.");
   });
 });
 
