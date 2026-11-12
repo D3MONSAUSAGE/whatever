@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { IconImage } from "@/components/icons";
 import { LoadState, PageHeader } from "@/components/ui";
 import { useApi, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import {
@@ -30,9 +29,8 @@ export function ContentHub({ pathOverride, fixture }: { pathOverride?: string; f
     <section className="min-w-0" data-preview-path={pathOverride} data-testid="content-hub">
       <PageHeader
         title="Content"
-        eyebrow="Library"
         lede="Create something new, or open what you already have."
-        icon={<IconImage />}
+        compact
       />
       <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Content categories">
         {CONTENT_CATEGORIES.map((category) => (

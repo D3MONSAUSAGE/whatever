@@ -8,7 +8,6 @@ import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
-import { MAX_VIDEO_MB } from "@/lib/mp4";
 import { FileUploadControl } from "@/components/file-upload";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
@@ -154,12 +153,11 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
 
   return (
     <section>
-      <PageHeader title="Media library" icon={<IconImage />} lede={`Images up to 15 MB. Video is MP4 H.264, ${MAX_VIDEO_MB} MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.`}
-      />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3" data-testid="media-uploads">
-        <FileUploadControl kind="image" multiple disabled={uploads.busy} buttonClass={`btn btn-primary cursor-pointer min-h-11 ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "image")} />
-        <FileUploadControl kind="video" multiple disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "video")} />
-        <FileUploadControl kind="document" label="Upload document" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "presentation")} />
+      <PageHeader title="Media library" icon={<IconImage />} lede="Pictures, video, and documents in your library." />
+      <div className="mb-6 grid grid-cols-3 gap-3" data-testid="media-uploads">
+        <FileUploadControl kind="image" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "image")} />
+        <FileUploadControl kind="video" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "video")} />
+        <FileUploadControl kind="document" disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "presentation")} />
       </div>
       {fixture || pathOverride ? null : (
         <Suspense fallback={null}>

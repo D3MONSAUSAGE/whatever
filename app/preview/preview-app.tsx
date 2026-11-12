@@ -32,7 +32,8 @@ const displays: DisplayItem[] = [
     name: "Front counter",
     connected: true,
     online: true,
-    lastSeenAt: "2026-11-01T12:00:00.000Z",
+    // Within the 90 s server online window. Status uses display.online, not this timestamp.
+    lastSeenAt: new Date(Date.now() - 20_000).toISOString(),
     media: null,
     playlist: { id: "pl-lunch", name: "Lunch loop", url: lunch },
     playerError: null,
@@ -148,7 +149,9 @@ export function PreviewApp() {
   const empty = params.get("empty") === "1";
   const panelParam = params.get("panel");
   const panel = panelParam === "change" || panelParam === "upload" || panelParam === "create" || panelParam === "playlist" || panelParam === "schedule" ? panelParam : null;
-  const path = previewPath(screen);
+  const workspaceId = params.get("id") === "screen-bar" || params.get("id") === "screen-patio" ? params.get("id")! : "screen-front";
+  const workspaceDisplay = displays.find((item) => item.id === workspaceId) ?? displays[0];
+  const path = screen === "workspace" ? `/dashboard/screens/${workspaceId}` : previewPath(screen);
   const overview = empty
     ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
     : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
@@ -160,7 +163,7 @@ export function PreviewApp() {
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
-      {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} library={workspaceLibrary} initialPanel={panel} /> : null}
+      {screen === "workspace" ? <ScreenWorkspace id={workspaceId} fixture={workspaceDisplay} library={workspaceLibrary} initialPanel={panel} /> : null}
       {screen === "studio" ? <MenuBoards fixture={{ ...menuFixture, startBoardId: "board-lunch", startLayout: "menu-promo-67" }} /> : null}
       {screen === "content" ? <ContentHub pathOverride="/dashboard/content" fixture={contentFixture} /> : null}
       {screen === "menus" ? <MenuBoards fixture={menuFixture} /> : null}

@@ -15,6 +15,7 @@ import { MAX_VIDEO_MB, MAX_VIDEO_BYTES } from "@/lib/mp4";
 import { layoutThumbnailSvg, layoutThumbnailSrc } from "@/lib/layout-thumbnails";
 import { LAYOUT_OPTIONS, PROMO_AREA_HINT, layoutUsesPromoArea } from "@/lib/menu-board-unify";
 import { LayoutGallery } from "@/components/layout-gallery";
+import { Status } from "@/components/tv";
 import { ContentHub } from "@/components/content-hub";
 import {
   SCREEN_ACTION_ORDER,
@@ -78,6 +79,11 @@ describe("content landing categories", () => {
     expect(html).toContain("Happy hour");
     expect(html).toContain("aria-label=\"Recent Menu boards\"");
     expect(html).toContain("aria-label=\"Recent Promotions\"");
+    expect(html).toContain("page-header-compact");
+    expect(html).toContain("Create something new, or open what you already have.");
+    expect(html).not.toContain("hero-gradient");
+    expect(html).not.toContain("banner-dark");
+    expect(html).not.toContain("Library");
   });
 });
 
@@ -173,8 +179,57 @@ describe("upload picker UI", () => {
     expect(screen).not.toMatch(/className="block mt-1 w-full[^"]*" aria-label="Upload image" type="file"/);
     expect(media).toContain(">Promotions<");
     expect(media).not.toContain(">Promos<");
+    expect(media).toContain("Pictures, video, and documents in your library.");
+    expect(media).not.toContain("Images up to 15 MB");
+    expect(media).toContain('data-testid="media-uploads"');
+    expect(media).toContain("grid grid-cols-3");
+    expect(media).not.toMatch(/FileUploadControl kind="image"[^\n]*btn-primary/);
+    expect(media).toContain('kind="image"');
+    expect(media).toContain('kind="video"');
+    expect(media).toContain('kind="document"');
+    expect((media.match(/btn-quiet/g) ?? []).length).toBeGreaterThanOrEqual(3);
     const studioHelp = readFileSync("components/layout-studio.tsx", "utf8");
     expect(studioHelp).toContain("PROMO_AREA_HINT");
     expect(studioHelp).toContain('promoArea={template === "menu-promo-67" || template === "two-menu-promo"}');
+  });
+});
+
+describe("server-derived online status and preview fixtures", () => {
+  it("shows the Status badge from display.online, even if lastSeenAt would be stale", () => {
+    const source = readFileSync("components/tv.tsx", "utf8");
+    expect(source).toContain("if (display.online)");
+    expect(source).not.toMatch(/isOnline\(\s*display\.lastSeenAt/);
+    expect(source).not.toMatch(/online\s*=\s*.*lastSeenAt/);
+    const base = {
+      id: "s1",
+      name: "Front",
+      connected: true,
+      media: null,
+      playlist: null,
+      playerError: null,
+    };
+    const staleOnline = renderToStaticMarkup(createElement(Status, {
+      display: { ...base, online: true, lastSeenAt: "2026-11-01T12:00:00.000Z" },
+    }));
+    expect(staleOnline).toContain("Online");
+    expect(staleOnline).not.toContain("Offline");
+    const offline = renderToStaticMarkup(createElement(Status, {
+      display: { ...base, online: false, lastSeenAt: "2026-11-01T11:00:00.000Z" },
+    }));
+    expect(offline).toContain("Offline");
+    expect(offline).not.toMatch(/>Online</);
+  });
+
+  it("keeps the preview fixture consistent with the 90 s server window, and shows offline copy on My Screens and the detail page", () => {
+    const preview = readFileSync("app/preview/preview-app.tsx", "utf8");
+    expect(preview).toContain("new Date(Date.now() - 20_000).toISOString()");
+    expect(preview).toContain('id: "screen-bar"');
+    expect(preview).toContain("online: false");
+    const screens = readFileSync("components/my-screens.tsx", "utf8");
+    expect(screens).toContain("This screen is offline. You can still change content; the TV updates when it comes back online.");
+    expect(screens).toContain("This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.");
+    expect(screens).toContain("display.connected && !display.online");
+    expect(screens).toContain("heartbeatLabel(display.lastSeenAt)");
+    expect(screens).toContain("<Status display={display} />");
   });
 });

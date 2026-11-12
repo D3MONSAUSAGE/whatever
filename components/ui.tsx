@@ -6,7 +6,17 @@ import { LogoMark, WaveBackdrop } from "@/components/brand";
  * navigation: dark ink panel, eyebrow, title (h1), a short description, and
  * one optional primary action. Secondary actions belong in the page body.
  */
-export function PageHeader({ title, eyebrow, lede, icon, action, children }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }) {
+export function PageHeader({ title, eyebrow, lede, icon, action, children, compact }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="mb-6" data-testid="page-header-compact">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words">{title}</h1>
+        {lede ? <div className="text-muted mt-1 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
+        {action ? <div className="page-header-action mt-3">{action}</div> : null}
+        {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
+      </div>
+    );
+  }
   return (
     <div className="mb-6">
       <div className="banner-dark hero-gradient px-5 py-5 md:px-8 md:py-6">
