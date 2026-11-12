@@ -12,6 +12,7 @@ import {
   serializeStored,
   type Attribution,
 } from "@/lib/signup-attribution";
+import { startAttributionPersist } from "@/lib/signup-attribution-persist";
 
 const SENT_KEY = "pekko_ft_sent";
 
@@ -53,6 +54,17 @@ function writeStored(values: Attribution) {
   }
 }
 
+async function postAttribution(token: string, values: Attribution): Promise<boolean> {
+  const body = sanitizeAttribution(values);
+  if (!body) return false;
+  const res = await fetch("/api/me/attribution", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return res.ok;
+}
+
 /** Capture first-touch UTMs on any public landing, and persist them after signup. */
 export function SignupAttribution() {
   useEffect(() => {
@@ -64,31 +76,43 @@ export function SignupAttribution() {
     );
     if (next && !existing) writeStored(next);
     const values = next ?? existing;
-    if (!values || sessionStorage.getItem(SENT_KEY) === "1") return;
-    if (!supabaseConfigured()) return;
+    if (!values || !supabaseConfigured()) return;
 
-    let cancelled = false;
-    getSupabase()
-      .auth.getSession()
-      .then(async ({ data }) => {
-        const token = data.session?.access_token;
-        if (!token || cancelled) return;
-        const body = sanitizeAttribution(values);
-        if (!body) return;
-        const res = await fetch("/api/me/attribution", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+    return startAttributionPersist(values, {
+      getToken: () =>
+        getSupabase()
+          .auth.getSession()
+          .then(({ data }) => data.session?.access_token ?? null)
+          .catch(() => null),
+      onAuth: (cb) => {
+        const { data } = getSupabase().auth.onAuthStateChange((event, session) => {
+          cb(session?.access_token ?? null, event);
         });
-        if (cancelled) return;
-        if (res.ok) sessionStorage.setItem(SENT_KEY, "1");
-      })
-      .catch(() => {
-        /* signup page without a session is expected */
-      });
-    return () => {
-      cancelled = true;
-    };
+        return () => data.subscription.unsubscribe();
+      },
+      post: postAttribution,
+      isSent: () => {
+        try {
+          return sessionStorage.getItem(SENT_KEY) === "1";
+        } catch {
+          return false;
+        }
+      },
+      markSent: () => {
+        try {
+          sessionStorage.setItem(SENT_KEY, "1");
+        } catch {
+          /* private mode */
+        }
+      },
+      clearSent: () => {
+        try {
+          sessionStorage.removeItem(SENT_KEY);
+        } catch {
+          /* private mode */
+        }
+      },
+    });
   }, []);
 
   return null;
