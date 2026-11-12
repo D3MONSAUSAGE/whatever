@@ -34,7 +34,7 @@ export type PromoFixture = {
   previewSrc?: string;
 };
 
-export function PromoSlides({ fixture }: { fixture?: PromoFixture } = {}) {
+export function PromoSlides({ fixture, openNew = false, openPromoId = null }: { fixture?: PromoFixture; openNew?: boolean; openPromoId?: string | null } = {}) {
   const livePromos = useApi<{ promos: Promo[]; available: boolean }>(fixture ? null : "/api/promos");
   const liveMenus = useApi<{ menus: MenuBoard[]; available: boolean }>(fixture ? null : "/api/menus");
   const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
@@ -42,10 +42,19 @@ export function PromoSlides({ fixture }: { fixture?: PromoFixture } = {}) {
   const menus = fixture ? { data: { menus: fixture.menus ?? [], available: true } } : liveMenus;
   const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
   const [draft, setDraft] = useState<Draft | null>(() => (
-    fixture?.startEditing
+    fixture?.startEditing || openNew
       ? { id: null, name: "Happy hour", template: "happy", content: samplePromo("happy"), startsOn: "", endsOn: "" }
       : null
   ));
+  const openedPromo = useRef(false);
+  useEffect(() => {
+    if (openedPromo.current || fixture || !openPromoId || !promos.data?.promos) return;
+    const match = promos.data.promos.find((item) => item.id === openPromoId);
+    if (match?.content) {
+      openedPromo.current = true;
+      setDraft({ id: match.id, name: match.name, template: match.template, content: match.content, startsOn: match.startsOn ?? "", endsOn: match.endsOn ?? "" });
+    }
+  }, [fixture, openPromoId, promos.data]);
   const [busy, setBusy] = useState<string | null>(null);
   const [target, setTarget] = useState<Record<string, string>>({});
   const toast = useToast();

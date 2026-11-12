@@ -16,18 +16,21 @@ const EXISTING_LAYOUTS: LayoutTemplate[] = [
 ];
 
 describe("layout options", () => {
-  it("defines the four featured layouts and every other existing Layout Studio template", () => {
-    const featured = LAYOUT_OPTIONS.filter((item) => item.featured);
-    expect(featured.map((item) => item.id)).toEqual(["full-screen", "two-column", "menu-promo", "two-menu-promo"]);
-    expect(featured[0]).toMatchObject({ kind: "classic", name: "Full-screen menu" });
-    expect(featured[1]).toMatchObject({ kind: "layout", layoutTemplate: "two-column", name: "Two-column menu" });
-    expect(featured[2]).toMatchObject({ kind: "layout", layoutTemplate: "menu-promo-67" });
-    expect(featured[3]).toMatchObject({ kind: "layout", layoutTemplate: "two-menu-promo" });
-    expect(LAYOUT_OPTIONS.filter((item) => !item.featured).map((item) => item.layoutTemplate)).toEqual([
+  it("defines every existing layout: classic first, then every Layout Studio template", () => {
+    expect(LAYOUT_OPTIONS.map((item) => item.id)).toEqual([
+      "full-screen", "two-column", "menu-promo", "two-menu-promo",
       "triple-column", "split-50", "menu-banner", "signature",
+    ]);
+    expect(LAYOUT_OPTIONS[0]).toMatchObject({ kind: "classic", name: "Full-screen menu" });
+    expect(LAYOUT_OPTIONS[1]).toMatchObject({ kind: "layout", layoutTemplate: "two-column", name: "Two-column menu" });
+    expect(LAYOUT_OPTIONS[2]).toMatchObject({ kind: "layout", layoutTemplate: "menu-promo-67" });
+    expect(LAYOUT_OPTIONS[3]).toMatchObject({ kind: "layout", layoutTemplate: "two-menu-promo" });
+    expect(LAYOUT_OPTIONS.filter((item) => item.kind === "layout").map((item) => item.layoutTemplate)).toEqual([
+      "two-column", "menu-promo-67", "two-menu-promo", "triple-column", "split-50", "menu-banner", "signature",
     ]);
     for (const option of LAYOUT_OPTIONS) {
       expect(option.blurb.toLowerCase()).not.toMatch(/offline/);
+      expect(option).not.toHaveProperty("featured");
     }
   });
 

@@ -65,6 +65,7 @@ body {
 .btn-quiet:hover { background: color-mix(in srgb, var(--color-primary) 6%, white); }
 .btn-quiet.text-danger { color: var(--color-danger); }
 .btn-danger { background: var(--color-danger); color: #fff; }
+.btn-danger:hover { background: #b3261e; }
 .btn-pressed { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 .btn-pressed:hover { background: #0052d6; }
 .field { width: 100%; min-height: 48px; padding: 0 14px; border: 1px solid var(--color-line); border-radius: 12px; background: #fff; font-size: 16px; }

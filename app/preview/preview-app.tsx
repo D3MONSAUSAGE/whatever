@@ -6,7 +6,7 @@ import { OverviewScreen } from "@/components/overview-screen";
 import { MediaLibrary } from "@/components/media-library";
 import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
-import { ScreenGroups, ScreenWorkspace } from "@/components/my-screens";
+import { MyScreens, ScreenGroups, ScreenWorkspace } from "@/components/my-screens";
 import type { AccountStudio } from "@/lib/layout-account";
 import { sampleLayout } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
@@ -32,7 +32,8 @@ const displays: DisplayItem[] = [
     name: "Front counter",
     connected: true,
     online: true,
-    lastSeenAt: "2026-11-01T12:00:00.000Z",
+    // Within the 90 s server online window. Status uses display.online, not this timestamp.
+    lastSeenAt: new Date(Date.now() - 20_000).toISOString(),
     media: null,
     playlist: { id: "pl-lunch", name: "Lunch loop", url: lunch },
     playerError: null,
@@ -127,13 +128,30 @@ function previewPath(screen: string) {
   return `/dashboard/${screen}`;
 }
 
+
+const contentFixture = {
+  recent: [
+    { id: "media-lunch", name: "demo-cafe-lunch.png", href: "/dashboard/media", kind: "media" as const, kindLabel: "Media" },
+    { id: "media-clip", name: "demo-cafe-specials.mp4", href: "/dashboard/media", kind: "media" as const, kindLabel: "Media" },
+    { id: "board-lunch", name: "Demo Café lunch board", href: "/dashboard/media/menus?board=board-lunch", kind: "menus" as const, kindLabel: "Menu boards" },
+    { id: "menu-dinner", name: "Demo Café dinner menu", href: "/dashboard/media/menus?board=menu-dinner", kind: "menus" as const, kindLabel: "Menu boards" },
+    { id: "promo-happy", name: "Happy hour", href: "/dashboard/media/promos?promo=promo-happy", kind: "promotions" as const, kindLabel: "Promotions" },
+    { id: "promo-deal", name: "2 tacos + drink", href: "/dashboard/media/promos?promo=promo-deal", kind: "promotions" as const, kindLabel: "Promotions" },
+    { id: "pl-lunch", name: "Lunch loop", href: "/dashboard/playlists/pl-lunch", kind: "playlists" as const, kindLabel: "Playlists" },
+    { id: "pl-happy", name: "Happy hour", href: "/dashboard/playlists/pl-happy", kind: "playlists" as const, kindLabel: "Playlists" },
+    { id: "media-deck", name: "demo-cafe-menu.pptx", href: "/dashboard/media/presentations/media-deck", kind: "presentations" as const, kindLabel: "Presentations" },
+  ],
+};
+
 export function PreviewApp() {
   const params = useSearchParams();
   const screen = params.get("screen") || "overview";
   const empty = params.get("empty") === "1";
   const panelParam = params.get("panel");
   const panel = panelParam === "change" || panelParam === "upload" || panelParam === "create" || panelParam === "playlist" || panelParam === "schedule" ? panelParam : null;
-  const path = previewPath(screen);
+  const workspaceId = params.get("id") === "screen-bar" || params.get("id") === "screen-patio" ? params.get("id")! : "screen-front";
+  const workspaceDisplay = displays.find((item) => item.id === workspaceId) ?? displays[0];
+  const path = screen === "workspace" ? `/dashboard/screens/${workspaceId}` : previewPath(screen);
   const overview = empty
     ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
     : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
@@ -145,9 +163,9 @@ export function PreviewApp() {
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
-      {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} library={workspaceLibrary} initialPanel={panel} /> : null}
+      {screen === "workspace" ? <ScreenWorkspace id={workspaceId} fixture={workspaceDisplay} library={workspaceLibrary} initialPanel={panel} /> : null}
       {screen === "studio" ? <MenuBoards fixture={{ ...menuFixture, startBoardId: "board-lunch", startLayout: "menu-promo-67" }} /> : null}
-      {screen === "content" ? <ContentHub pathOverride="/dashboard/content" /> : null}
+      {screen === "content" ? <ContentHub pathOverride="/dashboard/content" fixture={contentFixture} /> : null}
       {screen === "menus" ? <MenuBoards fixture={menuFixture} /> : null}
       {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
       {screen === "unify-list" ? <MenuBoards fixture={menuFixture} /> : null}
@@ -377,20 +395,7 @@ function AccountPreview() {
 }
 
 function MyScreensPreview() {
-  return (
-    <section>
-      <h1 className="text-2xl font-semibold mb-1">My Screens</h1>
-      <p className="text-sm text-muted mb-4">Pick a screen or a group. Change what it plays from there.</p>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {displays.map((display) => (
-          <li key={display.id} className="card p-4">
-            <p className="font-semibold">{display.name}</p>
-            <p className="text-sm text-muted">{display.online ? "Online" : display.connected ? "Offline" : "Not connected"}</p>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
+  return <MyScreens fixture={{ displays, groups: demoGroups.groups }} />;
 }
 
 function poster(label: string, color: string) {

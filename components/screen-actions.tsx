@@ -8,7 +8,18 @@ import { useUploads } from "@/components/uploads";
 import { useConfirm } from "@/components/confirm";
 import { ContentPicker } from "@/components/content-picker";
 import { buildScreenPickerEntries, type PickerEntry } from "@/lib/content-picker";
-import { screenActionClass, screenActionLabel, type ScreenActionId } from "@/lib/screen-actions-ui";
+import { FileUploadControl } from "@/components/file-upload";
+import {
+  SCREEN_ACTION_ORDER,
+  publishSavedCopy,
+  publishTimingCopy,
+  screenActionClass,
+  screenActionGroup,
+  screenActionGroupLabel,
+  screenActionHelper,
+  screenActionLabel,
+  type ScreenActionGroup,
+} from "@/lib/screen-actions-ui";
 
 type Panel = "upload" | "change" | "create" | "playlist" | "schedule" | null;
 
@@ -71,14 +82,14 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
   async function assignImage(mediaId: string) {
     const ok = await confirm.ask({
       title: "Publish this to the TV?",
-      body: "This replaces the single picture on this screen. Other screens stay as they are. The TV updates within about 30 seconds.",
+      body: `This replaces the single picture on this screen. Other screens stay as they are. ${publishTimingCopy(display)}`,
       confirmLabel: "Publish to TV",
     });
     if (ok !== true) return;
     setBusy(true);
     try {
       await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ mediaId }) });
-      setNote("Assigned. TV updates within ~30 s, then this screen shows as playing.");
+      setNote(publishSavedCopy(display));
       onChanged();
     } catch (err) {
       setNote((err as Error).message);
@@ -94,7 +105,7 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
         method: "POST",
         body: JSON.stringify({ playlistId, displayIds: [display.id], commit: true, replace: false }),
       });
-      setNote("Assigned. TV updates within ~30 s, then this screen shows as playing.");
+      setNote(publishSavedCopy(display));
       onChanged();
     } catch (err) {
       setNote((err as Error).message);
@@ -118,7 +129,7 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
         preview.affected.length ? `This screen will play it.` : "This screen already plays it. The saved draft will be published.",
         preview.willBeCleared.length ? `These other screens keep it: ${preview.willBeCleared.map((item) => item.name).join(", ")}.` : "No other screen loses this playlist.",
         preview.overriddenBySchedule.length ? "A schedule on this screen still wins until it ends." : "",
-        "The TV updates within about 30 seconds.",
+        publishTimingCopy(display),
       ].filter(Boolean).join(" "),
       confirmLabel: "Publish to TV",
     });
@@ -129,7 +140,7 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
   async function publishFile(item: { id: string; fileName: string }) {
     const ok = await confirm.ask({
       title: "Publish this to the TV?",
-      body: "Video and documents play from a playlist. This creates one for this screen and leaves other screens as they are. The TV updates within about 30 seconds.",
+      body: `Video and documents play from a playlist. This creates one for this screen and leaves other screens as they are. ${publishTimingCopy(display)}`,
       confirmLabel: "Publish to TV",
     });
     if (ok !== true) return;
@@ -169,14 +180,14 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
   async function assignBoard(menuId: string) {
     const ok = await confirm.ask({
       title: "Publish this layout to the TV?",
-      body: "Only this screen changes. The TV updates within about 30 seconds.",
+      body: `Only this screen changes. ${publishTimingCopy(display)}`,
       confirmLabel: "Publish to TV",
     });
     if (ok !== true) return;
     setBusy(true);
     try {
       await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId, displayId: display.id }) });
-      setNote("Assigned. TV updates within ~30 s, then this screen shows as playing.");
+      setNote(publishSavedCopy(display));
       onChanged();
     } catch (err) {
       setNote((err as Error).message);
@@ -187,26 +198,31 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
 
   return (
     <div className="mt-4 min-w-0">
-      <div className="flex flex-wrap gap-2">
-        {(["upload", "change", "create", "playlist", "schedule"] as const satisfies readonly ScreenActionId[]).map((id) => (
-          <button key={id} type="button" className={screenActionClass(id, panel === id)} aria-pressed={panel === id} onClick={() => open(panel === id ? null : id)}>
-            {screenActionLabel(id)}
-          </button>
-        ))}
+      <div className="grid gap-4" data-testid="screen-actions">
+        {(["primary", "secondary", "supporting"] as const satisfies readonly ScreenActionGroup[]).map((group) => {
+          const ids = SCREEN_ACTION_ORDER.filter((id) => screenActionGroup(id) === group);
+          return (
+            <div key={group} className="min-w-0">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{screenActionGroupLabel(group)}</h3>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {ids.map((id) => (
+                  <button key={id} type="button" className={screenActionClass(id, panel === id)} aria-pressed={panel === id} onClick={() => open(panel === id ? null : id)}>
+                    {screenActionLabel(id)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-muted mt-1">{ids.map((id) => panel === id ? screenActionHelper(id) : null).find(Boolean) ?? (group === "primary" ? screenActionHelper("change") : null)}</p>
+            </div>
+          );
+        })}
       </div>
       {note ? <p role="status" className="text-sm mt-3">{note}</p> : null}
       {panel === "upload" ? (
-        <div className="card p-4 mt-3 grid gap-3">
-          <p className="text-sm text-muted">Files go into this account's library. Publish them from Change content.</p>
-          <label className="text-sm font-medium">Image
-            <input className="block mt-1 w-full max-w-full" aria-label="Upload image" type="file" accept="image/jpeg,image/png,image/webp" disabled={uploads.busy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) uploads.enqueue([file], "image"); }} />
-          </label>
-          <label className="text-sm font-medium">Video
-            <input className="block mt-1 w-full max-w-full" aria-label="Upload video" type="file" accept="video/mp4" disabled={uploads.busy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) uploads.enqueue([file], "video"); }} />
-          </label>
-          <label className="text-sm font-medium">PowerPoint or PDF
-            <input className="block mt-1 w-full max-w-full" aria-label="Upload document" type="file" accept=".pptx,.pdf,application/pdf" disabled={uploads.busy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) uploads.enqueue([file], "presentation"); }} />
-          </label>
+        <div className="card p-4 mt-3 grid gap-4">
+          <p className="text-sm text-muted">{screenActionHelper("upload")}</p>
+          <FileUploadControl kind="image" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "image")} />
+          <FileUploadControl kind="video" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "video")} />
+          <FileUploadControl kind="document" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "presentation")} />
           {uploads.busy ? <p className="text-sm">Uploading…</p> : null}
         </div>
       ) : null}
@@ -224,9 +240,10 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
       {confirm.node}
       {panel === "create" ? (
         <div className="card p-4 mt-3 flex flex-wrap gap-2">
-          <Link className="btn min-h-11" href={`/dashboard/media/menus?screen=${display.id}&new=1`}>New menu board</Link>
-          <Link className="btn min-h-11" href="/dashboard/media/promos">New promotion</Link>
-          <button type="button" className="btn min-h-11" onClick={() => open("playlist")}>New playlist</button>
+          <p className="text-sm text-muted w-full">{screenActionHelper("create")}</p>
+          <Link className="btn btn-quiet min-h-11" href={`/dashboard/media/menus?screen=${display.id}&new=1`}>New menu board</Link>
+          <Link className="btn btn-quiet min-h-11" href="/dashboard/media/promos?new=1" data-testid="create-promotion">New promotion</Link>
+          <button type="button" className="btn btn-quiet min-h-11" onClick={() => open("playlist")}>New playlist</button>
         </div>
       ) : null}
       {panel === "playlist" ? (
@@ -288,7 +305,7 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
     return (
       <div className="card p-4 mt-3">
         <p className="text-sm">This screen is not on a playlist. A single picture does not have slides.</p>
-        <button type="button" className="btn min-h-11 mt-3" onClick={() => createPlaylist().catch((err: Error) => onNote(err.message))}>Create a playlist for this screen</button>
+        <button type="button" className="btn btn-quiet min-h-11 mt-3" onClick={() => createPlaylist().catch((err: Error) => onNote(err.message))}>Create a playlist for this screen</button>
         {playlists.length ? <p className="text-sm text-muted mt-3">Or choose one under Change content.</p> : null}
       </div>
     );
@@ -308,13 +325,13 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
               }} />
           </label>
           <span className="flex gap-2">
-            <button type="button" className="btn min-h-11" aria-label={`Move ${item.fileName} up`} disabled={index === 0} onClick={() => {
+            <button type="button" className="btn btn-quiet min-h-11" aria-label={`Move ${item.fileName} up`} disabled={index === 0} onClick={() => {
               const next = items.slice();
               const [row] = next.splice(index, 1);
               next.splice(index - 1, 0, row);
               setRows(next);
             }}>Up</button>
-            <button type="button" className="btn min-h-11" aria-label={`Remove ${item.fileName}`} onClick={() => setRows(items.filter((_, i) => i !== index))}>Remove</button>
+            <button type="button" className="btn btn-quiet text-danger min-h-11" aria-label={`Remove ${item.fileName}`} onClick={() => setRows(items.filter((_, i) => i !== index))}>Remove</button>
           </span>
         </div>
       ))}
@@ -331,7 +348,7 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn min-h-11" disabled={busy || !items} onClick={() => save().catch((err: Error) => onNote(err.message))}>Save draft</button>
+        <button type="button" className="btn btn-quiet min-h-11" disabled={busy || !items} onClick={() => save().catch((err: Error) => onNote(err.message))}>Save draft</button>
         <button type="button" className="btn btn-primary min-h-11" disabled={busy} onClick={() => onPublish(playlistId)}>Publish to TV</button>
       </div>
     </div>

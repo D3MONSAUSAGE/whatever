@@ -34,7 +34,7 @@ describe("screen workspace widths", () => {
             <h1>Front counter</h1>
             <div class="preview"></div>
             <div class="row">
-              <button>Add media</button><button>Change content</button><button>Create</button><button>Edit playlist</button><button>Schedule</button>
+              <button>Change content</button><button>Schedule</button><button>Edit playlist</button><button>Upload media</button><button>Create content</button>
             </div>
           </main>
           <nav><a>My Screens</a><a>Content</a><a>Playlists</a><a>Schedules</a><a>Account</a></nav>`);

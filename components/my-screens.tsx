@@ -14,9 +14,11 @@ import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
 
-export function MyScreens() {
-  const displays = useApi<DisplayItem[]>("/api/displays", 10_000);
-  const groups = useApi<ScreenGroupItem[]>("/api/screen-groups");
+export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; groups?: ScreenGroupItem[] } } = {}) {
+  const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
+  const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
+  const displays = fixture ? { data: fixture.displays, error: null as string | null } : liveDisplays;
+  const groups = fixture ? { data: fixture.groups ?? [], error: null as string | null } : liveGroups;
   return (
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader title="My Screens" eyebrow="Workspace" lede="Pick a screen or a group. Change what it plays from there." icon={<IconTv />}
@@ -32,14 +34,24 @@ export function MyScreens() {
         <ul className="grid gap-3 sm:grid-cols-2">
           {displays.data.map((display) => (
             <li key={display.id} className="min-w-0">
-              <Link href={`/dashboard/screens/${display.id}`} className="card block p-4 min-h-11">
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-semibold truncate">{display.name}</h2>
-                  <Status display={display} />
+              <article className="card p-4 min-w-0">
+                <Link href={`/dashboard/screens/${display.id}`} className="block min-h-11">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-semibold truncate">{display.name}</h2>
+                    <Status display={display} />
+                  </div>
+                  <p className="text-sm mt-2 truncate">{contentLabel(display)}</p>
+                  <p className="text-xs text-muted mt-1">{display.location?.name ?? "No location"} · {heartbeatLabel(display.lastSeenAt)}</p>
+                </Link>
+                {display.connected && !display.online ? (
+                  <p className="text-sm mt-2">This screen is offline. You can still change content; the TV updates when it comes back online.</p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link className="btn btn-primary min-h-11" href={`/dashboard/screens/${display.id}?panel=change`}>Change content</Link>
+                  <Link className="btn btn-quiet min-h-11" href={`/dashboard/screens/${display.id}?panel=schedule`}>Schedule</Link>
+                  <Link className="btn btn-quiet min-h-11" href={`/dashboard/screens/${display.id}?panel=playlist`}>Edit playlist</Link>
                 </div>
-                <p className="text-sm mt-2 truncate">{contentLabel(display)}</p>
-                <p className="text-xs text-muted mt-1">{display.location?.name ?? "No location"} · {heartbeatLabel(display.lastSeenAt)}</p>
-              </Link>
+              </article>
             </li>
           ))}
         </ul>

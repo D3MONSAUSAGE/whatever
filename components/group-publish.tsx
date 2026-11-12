@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api, useApi, type DisplayItem, type PlaylistSummary } from "@/lib/api";
 import { groupPreviewCopy, groupPublishIds } from "@/lib/now-playing";
+import { publishSavedCopyForTargets } from "@/lib/screen-actions-ui";
 
 type Impact = {
   affected: { id: string; name: string }[];
@@ -68,7 +69,12 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
         body: JSON.stringify({ playlistId, displayIds: selected, groupId, commit, replace: false }),
       });
       if (commit) {
-        setMessage("Published to the screens you checked. TVs update within about 30 seconds.");
+        const offlineIds = new Set((body.offline ?? []).map((item) => item.id));
+        const targets = members.filter((item) => selected.includes(item.id)).map((item) => ({
+          online: item.online && !offlineIds.has(item.id),
+          connected: item.connected,
+        }));
+        setMessage(publishSavedCopyForTargets(targets));
         onChanged();
       } else {
         setPreview(body);

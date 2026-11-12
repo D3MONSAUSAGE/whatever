@@ -10,6 +10,7 @@ import { MENU_LIMITS, MENU_TEMPLATES, sampleMenu, type MenuContent, type MenuTem
 import { artImages, type Brand } from "@/lib/brand-kit";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { LayoutStudio } from "@/components/layout-studio";
+import { LayoutGallery } from "@/components/layout-gallery";
 import type { AccountStudio } from "@/lib/layout-account";
 import { type LayoutTemplate } from "@/lib/layout-studio";
 import {
@@ -127,6 +128,7 @@ export function MenuBoards({
   const started = initialView(fixture, initialSearch);
   const [view, setView] = useState<View>(started.view);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(started.pendingBoardId);
+  const [selectedLayout, setSelectedLayout] = useState<LayoutOption | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
   const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout";
@@ -141,7 +143,7 @@ export function MenuBoards({
   }, [menus.data, pendingBoardId, initialSearch]);
 
   function startNew() {
-    if (studioEnabled) setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId });
+    if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
     else setView({ mode: "classic", draft: newClassicDraft(), screenId: null });
   }
 
@@ -179,8 +181,6 @@ export function MenuBoards({
   }
 
   const pickerOptions = studioEnabled ? LAYOUT_OPTIONS : LAYOUT_OPTIONS.filter((item) => item.kind === "classic");
-  const featured = pickerOptions.filter((item) => item.featured);
-  const more = pickerOptions.filter((item) => !item.featured);
 
   return (
     <section>
@@ -200,44 +200,13 @@ export function MenuBoards({
       {!draftOpen && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
 
       {view.mode === "pick-layout" ? (
-        <div className="card p-4 md:p-6 mb-6" data-testid="layout-picker">
-          <h2 className="text-lg font-semibold">Choose a layout</h2>
-          <p className="text-sm text-muted mt-1">Your existing boards keep the layout they already have. This only sets the layout for a new board.</p>
-          <div className="grid gap-3 sm:grid-cols-2 mt-4">
-            {featured.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className="rounded-xl border border-line p-4 text-left hover:border-primary"
-                onClick={() => pickOption(option, view.screenId)}
-              >
-                <span className="font-medium block">{option.name}</span>
-                <span className="text-sm text-muted">{option.blurb}</span>
-              </button>
-            ))}
-          </div>
-          {more.length ? (
-            <details className="mt-4">
-              <summary className="cursor-pointer font-medium">More layouts</summary>
-              <div className="grid gap-3 sm:grid-cols-2 mt-3">
-                {more.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className="rounded-xl border border-line p-4 text-left hover:border-primary"
-                    onClick={() => pickOption(option, view.screenId)}
-                  >
-                    <span className="font-medium block">{option.name}</span>
-                    <span className="text-sm text-muted">{option.blurb}</span>
-                  </button>
-                ))}
-              </div>
-            </details>
-          ) : null}
-          <div className="mt-4">
-            <button type="button" className="btn btn-quiet" onClick={() => setView({ mode: "list" })}>Cancel</button>
-          </div>
-        </div>
+        <LayoutGallery
+          options={pickerOptions}
+          selectedId={selectedLayout?.id ?? null}
+          onSelect={setSelectedLayout}
+          onContinue={(option) => { setSelectedLayout(option); pickOption(option, view.screenId); }}
+          onCancel={() => { setSelectedLayout(null); setView({ mode: "list" }); }}
+        />
       ) : null}
 
       {view.mode === "classic" ? (
@@ -259,6 +228,8 @@ export function MenuBoards({
           mode="account"
           fixture={fixture?.studio ?? null}
           screenId={view.screenId}
+          screenOnline={(displays.data ?? []).find((item) => item.id === view.screenId)?.online}
+          screenConnected={(displays.data ?? []).find((item) => item.id === view.screenId)?.connected}
           initialBoardId={view.boardId}
           initialTemplate={view.boardId ? null : view.template}
           initialZone={view.zone}
