@@ -8,7 +8,7 @@ export const LAYOUT_VERSION = 1;
 export const BOARD_W = 1920;
 export const BOARD_H = 1080;
 
-export type LayoutTemplate = "menu-promo-67" | "triple-column" | "split-50" | "menu-banner" | "signature";
+export type LayoutTemplate = "menu-promo-67" | "triple-column" | "split-50" | "menu-banner" | "signature" | "two-menu-promo";
 export type ZoneBox = { x: number; y: number; w: number; h: number };
 export type LayoutItem = { name: string; price: string; description: string };
 export type LayoutSection = { name: string; items: LayoutItem[] };
@@ -71,6 +71,7 @@ const TEMPLATES: Record<LayoutTemplate, { min: number; max: number; def: number;
   "split-50": { min: 0.4, max: 0.6, def: 0.5, name: "Split showcase" },
   "menu-banner": { min: 0.12, max: 0.28, def: 0.15, name: "Menu and banner" },
   signature: { min: 0.4, max: 0.7, def: 0.55, name: "Signature" },
+  "two-menu-promo": { min: 0.28, max: 0.42, def: 0.35, name: "Two-column menu + promo" },
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -112,6 +113,13 @@ export function zoneCapabilities(template: LayoutTemplate): ZoneCapability[] {
   }
   if (template === "menu-banner") return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Banner", ...media }];
   if (template === "split-50") return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Right side", ...media }];
+  if (template === "two-menu-promo") {
+    return [
+      { id: "column-0", label: "Menu column 1", ...text },
+      { id: "column-1", label: "Menu column 2", ...text },
+      { id: "feature", label: "Promotion", ...media },
+    ];
+  }
   return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Promotion", ...media }];
 }
 
@@ -158,6 +166,17 @@ export function frameFor(template: LayoutTemplate, split: number, columnWidths?:
     const columns = [box(0, 0, first, BOARD_H), box(first, 0, second, BOARD_H), box(first + second, 0, third, BOARD_H)];
     return { template, split: ratio, menu: box(0, 0, BOARD_W, BOARD_H), feature: columns[2], video: null, columns };
   }
+  if (template === "two-menu-promo") {
+    // Additive template: two independently editable menu columns (~35/35) and a promo image/video (~30) on one 16:9 board.
+    const widths = normalizedColumns(columnWidths) ?? ([0.35, 0.35, 0.30] as [number, number, number]);
+    const first = Math.round(BOARD_W * widths[0]);
+    const second = Math.round(BOARD_W * widths[1]);
+    const third = BOARD_W - first - second;
+    const columns = [box(0, 0, first, BOARD_H), box(first, 0, second, BOARD_H), box(first + second, 0, third, BOARD_H)];
+    const menu = box(0, 0, first + second, BOARD_H);
+    const feature = columns[2];
+    return { template, split: ratio, menu, feature, video: feature, columns };
+  }
   const left = Math.round(BOARD_W * ratio);
   const menu = box(0, 0, left, BOARD_H);
   const feature = box(left, 0, BOARD_W - left, BOARD_H);
@@ -168,7 +187,7 @@ export function frameFor(template: LayoutTemplate, split: number, columnWidths?:
 export const PROMO_BAND = 170;
 
 export function promoBandHeight(doc: { template: LayoutTemplate; featureTitle?: string; featureDetail?: string }): number {
-  if (doc.template !== "menu-promo-67" && doc.template !== "split-50") return 0;
+  if (doc.template !== "menu-promo-67" && doc.template !== "split-50" && doc.template !== "two-menu-promo") return 0;
   if (!(doc.featureTitle || "").trim() && !(doc.featureDetail || "").trim()) return 0;
   return PROMO_BAND;
 }
@@ -411,6 +430,32 @@ export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): Layout
         ] },
       ],
     }),
+    "two-menu-promo": {
+      ...board(template, {
+        split: 0.35, palette: "fresh", primaryColor: null, accentColor: null, typeScale: "room",
+        title: "Casa Mesa", subtitle: "Lunch and dinner, one kitchen", footer: "Ask about the daily special",
+        featureTitle: "Tonight", featureDetail: "Chef's tasting, 5 to 9",
+        sections: [
+          { name: "Lunch", items: [
+            { name: "Chicken torta", price: "$14", description: "Citrus chicken, pickled onion" },
+            { name: "Market salad", price: "$12", description: "Greens, seeds, lime" },
+            { name: "Pozole", price: "$13", description: "Pork, radish, oregano" },
+            { name: "Fish tacos", price: "$15", description: "Two, cabbage, crema" },
+            { name: "Cubana", price: "$14", description: "Ham, cheese, black bean" },
+            { name: "Soup of the day", price: "$8", description: "Ask your server" },
+          ] },
+          { name: "Dinner", items: [
+            { name: "Carne asada", price: "$26", description: "Grilled steak, salsa roja" },
+            { name: "Chile relleno", price: "$22", description: "Cheese, walnut sauce" },
+            { name: "Catch of the day", price: "$28", description: "Citrus and herbs" },
+            { name: "Mushroom asado", price: "$21", description: "Roasted squash, mole" },
+            { name: "Short rib", price: "$29", description: "Slow cooked, plantain" },
+            { name: "Side of rice", price: "$6", description: "Garlic and cumin" },
+          ] },
+        ],
+      }),
+      columnWidths: [0.35, 0.35, 0.30],
+    },
   };
   return samples[template];
 }
@@ -682,6 +727,15 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       if (!section) return;
       paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
     });
+  } else if (doc.template === "two-menu-promo") {
+    const textBottom = BOARD_H - 64;
+    const menuColumns = frame.columns.slice(0, 2);
+    const shared = Math.min(...menuColumns.map((_, index) => itemUnit(doc.sections[index] ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
+    menuColumns.forEach((column, index) => {
+      const section = doc.sections[index];
+      if (!section) return;
+      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
+    });
   } else {
     paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
   }
@@ -708,7 +762,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       parts.push(`<text x="${hx}" y="${bandY + Math.round(bandH * 0.42)}" font-family="${family}" font-size="${Math.min(32, headSize)}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120))}</text>`);
       if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${family}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120))}</text>`);
     }
-  } else if ((doc.template === "menu-promo-67" || doc.template === "split-50") && promoBandHeight(doc) > 0) {
+  } else if ((doc.template === "menu-promo-67" || doc.template === "split-50" || doc.template === "two-menu-promo") && promoBandHeight(doc) > 0) {
     const band = promoBandHeight(doc);
     const bandY = feature.y + feature.h - band;
     const hx = feature.x + 48;

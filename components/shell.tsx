@@ -11,6 +11,7 @@ import { BillingBanner } from "@/components/billing-banner";
 import { isRecoveryUrl } from "@/components/auth-frame";
 import { ContentNav } from "@/components/content-nav";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
+import { clearLayoutStudioDraftsOnSignOut, shouldClearStudioDraftsOnAuthEvent } from "@/lib/layout-studio-draft";
 import { isContentPath } from "@/lib/content-nav";
 import { IconCalendar, IconGear, IconImage, IconList, IconTv } from "@/components/icons";
 
@@ -35,9 +36,19 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     try {
       // Return to the page after sign-in (e.g. /dashboard/billing opened from a phone browser).
       const back = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
-      getSupabase().auth.getSession().then(({ data }) => (data.session ? setReady(true) : router.replace(back)));
+      let lastUserId: string | null = null;
+      getSupabase().auth.getSession().then(({ data }) => {
+        lastUserId = data.session?.user?.id ?? null;
+        if (data.session) setReady(true);
+        else router.replace(back);
+      });
       sub = getSupabase().auth.onAuthStateChange((event, session) => {
         onDashboardAuthChange();
+        const nextUserId = session?.user?.id ?? null;
+        if (shouldClearStudioDraftsOnAuthEvent(event, lastUserId, nextUserId)) {
+          clearLayoutStudioDraftsOnSignOut();
+        }
+        lastUserId = nextUserId;
         if (event === "PASSWORD_RECOVERY") { router.replace("/reset-password"); return; }
         if (!session) router.replace("/login");
       }).data.subscription;
@@ -52,6 +63,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     // Don't wait on a stuck auth call. The first click on Layout Studio was
     // easy to miss while a fixed panel sat above the header.
     clearSlideSrcCache();
+    clearLayoutStudioDraftsOnSignOut();
     const done = getSupabase().auth.signOut({ scope: "local" }).catch(() => undefined);
     await Promise.race([done, new Promise((resolve) => setTimeout(resolve, 1200))]);
     location.assign("/login");

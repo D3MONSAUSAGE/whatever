@@ -244,13 +244,22 @@ const studioImageId = "00000000-0000-4000-8000-0000000000a1";
 const studioVideoId = "00000000-0000-4000-8000-0000000000b1";
 const studioPhoto = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAkCAIAAAC2bqvFAAAAU0lEQVR4nO3PUQkAIBTAwJfHPjY2mCH8OITBAtzm7PV1wwUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1owWMXc21bpt/FQuQAAAAASUVORK5CYII=";
 const studioFixture: AccountStudio = {
-  boards: [{
-    id: "board-lunch",
-    name: "Lunch board",
-    document: { ...sampleLayout("menu-promo-67"), imageMediaId: studioImageId, videoMediaId: null },
-    mediaId: null,
-    playlistId: null,
-  }],
+  boards: [
+    {
+      id: "board-lunch",
+      name: "Lunch board",
+      document: { ...sampleLayout("menu-promo-67"), imageMediaId: studioImageId, videoMediaId: null },
+      mediaId: null,
+      playlistId: null,
+    },
+    {
+      id: "board-two-menu",
+      name: "Lunch and dinner",
+      document: { ...sampleLayout("two-menu-promo"), imageMediaId: null, videoMediaId: studioVideoId },
+      mediaId: null,
+      playlistId: null,
+    },
+  ],
   legacy: [],
   library: [
     { id: studioImageId, name: "lunch-special.png", kind: "image", mime: "image/png", url: studioPhoto },

@@ -432,7 +432,7 @@ describe("player composition contract", () => {
       }
     }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
-    const editor = readFileSync("components/layout-studio.tsx", "utf8");
+    const editor = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("lib/layout-studio-editor.ts", "utf8");
     expect(editor).toContain("Each column is 20% to 60%");
     expect(editor).toContain("TV preview");
     expect(editor).toContain("Upload new");
@@ -441,7 +441,7 @@ describe("player composition contract", () => {
     expect(editor).toContain("studio-status");
     expect(editor).toContain("Uploading…");
     expect(editor).not.toContain("Uploading photo…");
-    expect(editor).toContain("position: sticky");
+    expect(editor).toContain("position: static"); // preview scrolls with the under-preview editor; sticky would cover it
     expect(editor).toContain("min-height: 44px");
     const banner = layoutSvg(sampleLayout("menu-banner"));
     expect(banner).toContain("Today's counter");
