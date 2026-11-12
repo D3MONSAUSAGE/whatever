@@ -10,16 +10,18 @@ import {
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import {
-  editorStateAfterScopeChange, loadBrowserStudioState, resolveStudioScope, sameStudioScope,
-  saveAccountGuard, signedInPreviewLoad, writeStudioDraft, writeStudioPublished,
+  editorStateAfterScopeChange, loadBrowserStudioState, originAfterScopeResolves, resolveStudioScope, sameStudioScope,
+  saveAccountGuard, saveShouldWaitForScope, signedInPreviewLoad, writeStudioDraft, writeStudioPublished,
   type StudioScope,
 } from "@/lib/layout-studio-draft";
 import { editorPanelForZone, keepDraftOnZoneChange, previewHits } from "@/lib/layout-studio-editor";
-import { api, authToken, uploadForm } from "@/lib/api";
+import { api, authToken, uploadForm, useApi } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
+import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
+import type { Brand } from "@/lib/brand-kit";
 
-const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo"];
+const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"];
 
 type StudioStep = "template" | "section" | "content" | "style" | "publish";
 
@@ -35,10 +37,33 @@ function blankItem(): LayoutItem {
   return { name: "", price: "", description: "" };
 }
 
-export function LayoutStudio({ mode = "preview", screenId = null, fixture = null, pathOverride: _pathOverride }: { mode?: "preview" | "account"; screenId?: string | null; fixture?: AccountStudio | null; pathOverride?: string } = {}) {
+export function LayoutStudio({
+  mode = "preview",
+  screenId = null,
+  fixture = null,
+  pathOverride: _pathOverride,
+  initialBoardId = null,
+  initialTemplate = null,
+  initialZone = null,
+  embedded = false,
+  brand = null,
+  onClose,
+}: {
+  mode?: "preview" | "account";
+  screenId?: string | null;
+  fixture?: AccountStudio | null;
+  pathOverride?: string;
+  initialBoardId?: string | null;
+  initialTemplate?: LayoutTemplate | null;
+  initialZone?: string | null;
+  embedded?: boolean;
+  brand?: BrandKitFixture | null;
+  onClose?: () => void;
+} = {}) {
   const accountMode = mode === "account";
-  const [template, setTemplate] = useState<LayoutTemplate>("menu-promo-67");
-  const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout("menu-promo-67"));
+  const startingTemplate = initialTemplate ?? "menu-promo-67";
+  const [template, setTemplate] = useState<LayoutTemplate>(startingTemplate);
+  const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout(startingTemplate));
   const [imageHref, setImageHref] = useState<string | null>(null);
   const [videoOn, setVideoOn] = useState(true);
   const [published, setPublished] = useState<Snapshot | null>(null);
@@ -52,7 +77,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   const spec = templateSpec(template);
   const frame = frameFor(draft.template, draft.split, draft.columnWidths);
   const [step, setStep] = useState<StudioStep>("template");
-  const [zone, setZone] = useState("menu");
+  const [zone, setZone] = useState(initialZone || (startingTemplate === "triple-column" || startingTemplate === "two-menu-promo" || startingTemplate === "two-column" ? "column-0" : "menu"));
   const [sectionIndex, setSectionIndex] = useState(0);
   const [progress, setProgress] = useState<string | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
@@ -62,6 +87,11 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   const [origin, setOrigin] = useState<StudioScope | null>(null);
   const previousScope = useRef<StudioScope | null>(null);
   const fromCurrentAccount = useRef(false);
+  const scopeRef = useRef<StudioScope | null>(null);
+  const originRef = useRef<StudioScope | null>(null);
+  scopeRef.current = scope;
+  originRef.current = origin;
+  const liveBrand = useApi<Brand>(accountMode && !fixture && !brand ? "/api/brand" : null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
   const videoBox = mediaVideoBox(draft);
@@ -146,15 +176,24 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
 
   useEffect(() => {
     if (fixture) {
-      const board = fixture.boards[0] ?? null;
+      const preferred = initialBoardId ? fixture.boards.find((item) => item.id === initialBoardId) : null;
+      const board = preferred ?? ((initialTemplate && !initialBoardId) ? null : (fixture.boards[0] ?? null));
       setAccount(fixture);
-      setMenuId(board?.id ?? null);
       if (board) {
+        setMenuId(board.id);
         setBoardName(board.name);
         setTemplate(board.document.template);
         setDraft(board.document);
         setImageHref(fixture.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
         setVideoOn(Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
+      } else {
+        const created = initialTemplate ? { name: freshBoard(fixture.boards.length).name, document: sampleLayout(initialTemplate) } : freshBoard(fixture.boards.length);
+        setMenuId(null);
+        setBoardName(created.name);
+        setTemplate(created.document.template);
+        setDraft(created.document);
+        setImageHref(null);
+        setVideoOn(false);
       }
       setNote("");
       return;
@@ -167,10 +206,17 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
         if (!loaded) { setNote("Couldn't read this account."); return; }
         setAccount(loaded);
         const result = signedInPreviewLoad(loaded, null);
-        if (result.kind === "board" && result.board) {
-          adoptBoard(result.board, loaded, false);
+        // Read scope from a ref so a slow resolveStudioScope cannot leave origin null.
+        const currentScope = scopeRef.current;
+        const preferred = initialBoardId ? loaded.boards.find((item) => item.id === initialBoardId) : null;
+        if (preferred) {
+          adoptBoard(preferred, loaded, false, currentScope);
+        } else if (initialTemplate && !initialBoardId) {
+          applyFresh({ name: freshBoard(loaded.boards.length).name, document: sampleLayout(initialTemplate) }, currentScope);
+        } else if (result.kind === "board" && result.board) {
+          adoptBoard(result.board, loaded, false, currentScope);
         } else {
-          applyFresh(result.fresh ?? freshBoard(0), scope);
+          applyFresh(result.fresh ?? freshBoard(0), currentScope);
         }
         setNote("");
       }).catch((err: Error) => { if (!cancel) setNote(err.message); });
@@ -220,12 +266,16 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setStep("template");
     setNote("");
     fromCurrentAccount.current = true;
-    if (scope) setOrigin(scope);
+    const currentScope = scopeRef.current;
+    if (currentScope) {
+      originRef.current = currentScope;
+      setOrigin(currentScope);
+    }
   }
 
   function newBoard() {
     const created = freshBoard(account?.boards.length ?? 0, window.prompt("Name this board", freshBoard(account?.boards.length ?? 0).name));
-    applyFresh(created, scope);
+    applyFresh(created, scopeRef.current);
     setNote("");
   }
 
@@ -240,10 +290,11 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setZone("");
     setStep("template");
     fromCurrentAccount.current = true;
+    originRef.current = nextScope;
     setOrigin(nextScope);
   }
 
-  function adoptBoard(board: AccountBoard, studio: AccountStudio, allowVideo: boolean) {
+  function adoptBoard(board: AccountBoard, studio: AccountStudio, allowVideo: boolean, nextScope: StudioScope | null = scopeRef.current) {
     setMenuId(board.id);
     setBoardName(board.name);
     setTemplate(board.document.template);
@@ -252,7 +303,10 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setClipUrl(null);
     setVideoOn(allowVideo && Boolean(board.document.videoMediaId) && frameFor(board.document.template, board.document.split).video !== null);
     fromCurrentAccount.current = true;
-    if (scope) setOrigin(scope);
+    if (nextScope) {
+      originRef.current = nextScope;
+      setOrigin(nextScope);
+    }
   }
 
   function closeZone() {
@@ -266,7 +320,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setDraft(sample);
     setImageHref(null);
     setClipUrl(null);
-    setZone(next === "triple-column" || next === "two-menu-promo" ? "column-0" : "menu");
+    setZone(next === "triple-column" || next === "two-menu-promo" || next === "two-column" ? "column-0" : "menu");
     setSectionIndex(0);
     setVideoOn(accountMode ? false : frameFor(next, sample.split).video !== null);
   }
@@ -330,7 +384,11 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     setImageHref(loaded.library.find((file) => file.id === board.document.imageMediaId)?.url ?? null);
     setClipUrl(null);
     setVideoOn(Boolean(board.document.videoMediaId));
-    if (scope) setOrigin(scope);
+    const currentScope = scopeRef.current;
+    if (currentScope) {
+      originRef.current = currentScope;
+      setOrigin(currentScope);
+    }
     return loaded;
   }
 
@@ -339,10 +397,32 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
       setNote(saveMode === "publish" ? "Preview only — nothing was published." : "Preview only — nothing was saved.");
       return;
     }
-    const guard = saveAccountGuard(origin, scope);
+    let currentScope = scopeRef.current;
+    let currentOrigin = originAfterScopeResolves(fromCurrentAccount.current, originRef.current, currentScope);
+    // Scope is often still null at mount. Resolve it now so a slow first resolve cannot refuse a legitimate save.
+    if (saveShouldWaitForScope(fromCurrentAccount.current, currentOrigin, currentScope) && supabaseConfigured()) {
+      try {
+        const { data } = await getSupabase().auth.getSession();
+        currentScope = await resolveStudioScope(data.session);
+        if (currentScope) {
+          scopeRef.current = currentScope;
+          setScope(currentScope);
+        }
+        currentOrigin = originAfterScopeResolves(fromCurrentAccount.current, originRef.current, currentScope);
+      } catch { /* still unresolved */ }
+    }
+    if (currentOrigin) {
+      originRef.current = currentOrigin;
+      setOrigin(currentOrigin);
+    }
+    if (saveShouldWaitForScope(fromCurrentAccount.current, currentOrigin, currentScope)) {
+      setNote("Confirming this account… try saving again in a moment.");
+      return;
+    }
+    const guard = saveAccountGuard(currentOrigin, currentScope);
     if (!guard.allow) {
       if (guard.resetToFresh) {
-        applyFresh(freshBoard(account?.boards.length ?? 0), scope);
+        applyFresh(freshBoard(account?.boards.length ?? 0), currentScope);
       }
       setNote(guard.message);
       return;
@@ -524,13 +604,14 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   const photoLabel = zone === "photo" || zone === "background" || template === "signature" ? "Background image" : "Feature photo";
 
   return (
-    <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: "100vh", background: "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
+    <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined}>
       <div className="studio-grid">
         <div className="studio-heading">
           <div className="studio-page-title">
-            <p className="studio-kicker">{accountMode ? "Media" : "Isolated preview"}</p>
-            <h1 className="studio-title">Layout Studio</h1>
-            <p className="studio-lead">{accountMode ? "Choose a template, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+            <p className="studio-kicker">{embedded ? "Menu boards" : accountMode ? "Media" : "Isolated preview"}</p>
+            <h1 className="studio-title">{embedded ? (menuId ? "Edit menu board" : "New menu board") : "Layout Studio"}</h1>
+            <p className="studio-lead">{accountMode ? "Choose a layout, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
+            {onClose ? <button type="button" className="btn btn-quiet" onClick={onClose}>Back to menu boards</button> : null}
           </div>
           {account ? (
             <div className="board-bar">
@@ -575,7 +656,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
             videoOn={videoOn}
             accountMode={accountMode}
             sectionIndex={activeSection}
-            setSectionIndex={(index) => { setSectionIndex(index); setZone(template === "triple-column" || template === "two-menu-promo" ? `column-${index}` : "menu"); }}
+            setSectionIndex={(index) => { setSectionIndex(index); setZone(template === "triple-column" || template === "two-menu-promo" || template === "two-column" ? `column-${index}` : "menu"); }}
             photoLabel={photoLabel}
             onPhoto={onPhoto}
             onVideo={onVideo}
@@ -632,6 +713,16 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
             <label style={fieldLabel}>Accent color
               <input type="color" aria-label="Accent color" value={draft.accentColor || "#ffd34d"} onChange={(event) => update({ ...draft, accentColor: event.target.value })} />
             </label>
+            <div style={{ margin: "12px 0" }}>
+              <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
+              <BrandSummary fixture={brand ?? undefined} />
+              <p style={{ fontSize: 13, margin: "8px 0" }}><a href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</a></p>
+              <button type="button" style={chip(false)} onClick={() => {
+                const colors = brand?.brand ?? liveBrand.data;
+                if (!colors?.primaryColor && !colors?.accentColor) return;
+                update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
+              }}>Use Brand Kit colors on this board</button>
+            </div>
             <button type="button" style={chip(false)} onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
             <label style={fieldLabel}>Type size
               <select aria-label="Type size" value={draft.typeScale} onChange={(event) => update({ ...draft, typeScale: event.target.value === "counter" ? "counter" : "room" })}>
@@ -795,7 +886,7 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
 
 
 function columnTemplate(template: LayoutTemplate) {
-  return template === "triple-column" || template === "two-menu-promo";
+  return template === "triple-column" || template === "two-menu-promo" || template === "two-column";
 }
 
 function SelectedZoneEditor({
@@ -1245,6 +1336,7 @@ function proportionLabel(template: LayoutTemplate) {
   if (template === "menu-banner") return "Banner height";
   if (template === "triple-column") return "First column width";
   if (template === "two-menu-promo") return "First menu column";
+  if (template === "two-column") return "First column width";
   if (template === "signature") return "Menu card width";
   if (template === "split-50") return "Left side";
   return "Menu width";
@@ -1253,6 +1345,7 @@ function proportionLabel(template: LayoutTemplate) {
 function proportionNote(template: LayoutTemplate) {
   if (template === "triple-column") return "Each column is 20% to 60% and the three widths add up to the full board. This layout has no video area.";
   if (template === "two-menu-promo") return "The two menu columns and the promotion add up to the full 16:9 board, about 35% / 35% / 30%. Both menus are edited separately. The right column holds a photo or one video.";
+  if (template === "two-column") return "The two menu columns add up to the full 16:9 board, about 50% / 50%. Each column is edited separately. A photo can sit behind both. A video is not added, because it would cover a column.";
   if (template === "menu-banner") return "Banner height is 12% to 28% of the board. The menu uses the space above it.";
   if (template === "menu-promo-67") return "Menu width is 55% to 75%. The promotion uses the rest.";
   if (template === "split-50") return "The left side is 40% to 60%. The right side uses the rest.";

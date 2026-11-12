@@ -19,10 +19,28 @@ export type StudioSnapshot = {
   videoBox?: { x: number; y: number; w: number; h: number } | null;
 };
 
+/** A scope id must be a real non-empty string. Empty, null, and the literal "undefined" are refused. */
+export function isUsableScopeId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value !== "undefined" && value !== "null";
+}
+
 export function isStudioScope(value: unknown): value is StudioScope {
   if (!value || typeof value !== "object") return false;
   const row = value as { userId?: unknown; orgId?: unknown };
-  return typeof row.userId === "string" && row.userId.length > 0 && typeof row.orgId === "string" && row.orgId.length > 0;
+  return isUsableScopeId(row.userId) && isUsableScopeId(row.orgId);
+}
+
+export class InvalidStudioScopeError extends Error {
+  constructor(message = "Layout Studio drafts require a user and an organization.") {
+    super(message);
+    this.name = "InvalidStudioScopeError";
+  }
+}
+
+function assertStudioScope(scope: { userId?: unknown; orgId?: unknown } | null | undefined): asserts scope is StudioScope {
+  if (!isStudioScope(scope)) {
+    throw new InvalidStudioScopeError();
+  }
 }
 
 export function sameStudioScope(a: StudioScope | null | undefined, b: StudioScope | null | undefined): boolean {
@@ -30,10 +48,12 @@ export function sameStudioScope(a: StudioScope | null | undefined, b: StudioScop
 }
 
 export function draftStorageKey(scope: StudioScope): string {
+  assertStudioScope(scope);
   return `${LEGACY_DRAFT_KEY}:${scope.userId}:${scope.orgId}`;
 }
 
 export function publishedStorageKey(scope: StudioScope): string {
+  assertStudioScope(scope);
   return `${LEGACY_PUBLISHED_KEY}:${scope.userId}:${scope.orgId}`;
 }
 
@@ -74,12 +94,12 @@ function snapshotFrom(value: unknown, scope: StudioScope): StudioSnapshot | null
 
 /** Restore a scoped snapshot. Mismatched org/user and unscoped legacy keys are ignored, never displayed, and not deleted. */
 export function readStudioDraft(storage: Pick<Storage, "getItem">, scope: StudioScope | null): StudioSnapshot | null {
-  if (!scope) return null;
+  if (!isStudioScope(scope)) return null;
   return snapshotFrom(readJson(storage, draftStorageKey(scope)), scope);
 }
 
 export function readStudioPublished(storage: Pick<Storage, "getItem">, scope: StudioScope | null): StudioSnapshot | null {
-  if (!scope) return null;
+  if (!isStudioScope(scope)) return null;
   return snapshotFrom(readJson(storage, publishedStorageKey(scope)), scope);
 }
 
@@ -88,6 +108,7 @@ export function writeStudioDraft(
   scope: StudioScope,
   snapshot: Omit<StudioSnapshot, "userId" | "orgId">,
 ): void {
+  assertStudioScope(scope);
   storage.setItem(draftStorageKey(scope), JSON.stringify({ ...snapshot, userId: scope.userId, orgId: scope.orgId }));
 }
 
@@ -96,6 +117,7 @@ export function writeStudioPublished(
   scope: StudioScope,
   snapshot: Omit<StudioSnapshot, "userId" | "orgId">,
 ): void {
+  assertStudioScope(scope);
   storage.setItem(publishedStorageKey(scope), JSON.stringify({ ...snapshot, userId: scope.userId, orgId: scope.orgId }));
 }
 
@@ -174,6 +196,25 @@ export function signedInPreviewLoad(studio: AccountStudio, menuId: string | null
 }
 
 export type SaveAccountGuard = { allow: true } | { allow: false; resetToFresh: boolean; message: string };
+
+/**
+ * The account-mode load often runs before resolveStudioScope finishes, so origin is still null.
+ * If the document came from this account, tag origin with the resolved scope instead of refusing a legitimate save.
+ */
+export function originAfterScopeResolves(
+  fromCurrentAccount: boolean,
+  origin: StudioScope | null,
+  scope: StudioScope | null,
+): StudioScope | null {
+  if (!fromCurrentAccount || !isStudioScope(scope)) return origin;
+  if (!origin || sameStudioScope(origin, scope)) return scope;
+  return origin;
+}
+
+/** A still-resolving scope must not be treated as a mismatch, and must not reset the editor. */
+export function saveShouldWaitForScope(fromCurrentAccount: boolean, origin: StudioScope | null, scope: StudioScope | null): boolean {
+  return fromCurrentAccount && !isStudioScope(scope) && !isStudioScope(origin);
+}
 
 /**
  * Refuse to POST a document that did not originate on the current user and org.

@@ -8,7 +8,7 @@ export const LAYOUT_VERSION = 1;
 export const BOARD_W = 1920;
 export const BOARD_H = 1080;
 
-export type LayoutTemplate = "menu-promo-67" | "triple-column" | "split-50" | "menu-banner" | "signature" | "two-menu-promo";
+export type LayoutTemplate = "menu-promo-67" | "triple-column" | "split-50" | "menu-banner" | "signature" | "two-menu-promo" | "two-column";
 export type ZoneBox = { x: number; y: number; w: number; h: number };
 export type LayoutItem = { name: string; price: string; description: string };
 export type LayoutSection = { name: string; items: LayoutItem[] };
@@ -72,6 +72,7 @@ const TEMPLATES: Record<LayoutTemplate, { min: number; max: number; def: number;
   "menu-banner": { min: 0.12, max: 0.28, def: 0.15, name: "Menu and banner" },
   signature: { min: 0.4, max: 0.7, def: 0.55, name: "Signature" },
   "two-menu-promo": { min: 0.28, max: 0.42, def: 0.35, name: "Two-column menu + promo" },
+  "two-column": { min: 0.4, max: 0.6, def: 0.5, name: "Two-column menu" },
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -118,6 +119,13 @@ export function zoneCapabilities(template: LayoutTemplate): ZoneCapability[] {
       { id: "column-0", label: "Menu column 1", ...text },
       { id: "column-1", label: "Menu column 2", ...text },
       { id: "feature", label: "Promotion", ...media },
+    ];
+  }
+  if (template === "two-column") {
+    return [
+      { id: "column-0", label: "Menu column 1", ...text },
+      { id: "column-1", label: "Menu column 2", ...text },
+      { id: "photo", label: "Board photo", ...photo },
     ];
   }
   return [{ id: "menu", label: "Menu", ...text }, { id: "feature", label: "Promotion", ...media }];
@@ -176,6 +184,14 @@ export function frameFor(template: LayoutTemplate, split: number, columnWidths?:
     const menu = box(0, 0, first + second, BOARD_H);
     const feature = columns[2];
     return { template, split: ratio, menu, feature, video: feature, columns };
+  }
+  if (template === "two-column") {
+    // Additive: two independently editable menu-text columns on one 16:9 board. No video region (it would cover a column).
+    const widths = normalizedColumns(columnWidths) ?? ([0.5, 0.5, 0] as [number, number, number]);
+    const first = Math.round(BOARD_W * (widths[0] / (widths[0] + widths[1] || 1)));
+    const second = BOARD_W - first;
+    const columns = [box(0, 0, first, BOARD_H), box(first, 0, second, BOARD_H)];
+    return { template, split: ratio, menu: box(0, 0, BOARD_W, BOARD_H), feature: columns[1], video: null, columns };
   }
   const left = Math.round(BOARD_W * ratio);
   const menu = box(0, 0, left, BOARD_H);
@@ -456,6 +472,27 @@ export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): Layout
       }),
       columnWidths: [0.35, 0.35, 0.30],
     },
+    "two-column": board(template, {
+      split: 0.5, palette: "fresh", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Casa Mesa", subtitle: "Open daily", footer: "Ask about the daily special",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Lunch", items: [
+          { name: "Chicken torta", price: "$14", description: "Citrus chicken, pickled onion" },
+          { name: "Market salad", price: "$12", description: "Greens, seeds, lime" },
+          { name: "Pozole", price: "$13", description: "Pork, radish, oregano" },
+          { name: "Fish tacos", price: "$15", description: "Two, cabbage, crema" },
+          { name: "Cubana", price: "$14", description: "Ham, cheese, black bean" },
+        ] },
+        { name: "Dinner", items: [
+          { name: "Carne asada", price: "$26", description: "Grilled steak, salsa roja" },
+          { name: "Chile relleno", price: "$22", description: "Cheese, walnut sauce" },
+          { name: "Catch of the day", price: "$28", description: "Citrus and herbs" },
+          { name: "Mushroom asado", price: "$21", description: "Roasted squash, mole" },
+          { name: "Short rib", price: "$29", description: "Slow cooked, plantain" },
+        ] },
+      ],
+    }),
   };
   return samples[template];
 }
@@ -675,7 +712,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   ];
   const feature = frame.video ?? frame.feature;
   const media = mediaVideoBox(doc) ?? feature;
-  if (doc.template === "triple-column") {
+  if (doc.template === "triple-column" || doc.template === "two-column") {
     if (href) {
       parts.push(`<image href="${esc(href)}" x="0" y="0" width="${BOARD_W}" height="${BOARD_H}" preserveAspectRatio="${imageAspect(doc)}"/>`);
       parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${BOARD_H}" fill="${colors.paper}" fill-opacity="0.9"/>`);
@@ -694,18 +731,18 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   } else if (doc.template === "menu-banner") {
     parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
     if (href) parts.push(`<image href="${esc(href)}" x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="${imageAspect(doc)}"/>`);
-  } else if (doc.template !== "triple-column") {
+  } else if (doc.template !== "triple-column" && doc.template !== "two-column") {
     parts.push(`<rect x="${frame.menu.x}" y="${frame.menu.y}" width="${frame.menu.w}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
   }
   if (colors.band && doc.template !== "signature") {
-    const bandW = doc.template === "menu-banner" || doc.template === "triple-column" ? BOARD_W : frame.menu.w;
+    const bandW = doc.template === "menu-banner" || doc.template === "triple-column" || doc.template === "two-column" ? BOARD_W : frame.menu.w;
     parts.push(`<rect x="0" y="0" width="${bandW}" height="132" fill="${colors.band}"/>`);
   }
   const menu = doc.template === "signature"
     ? { x: 88, y: 110, w: frame.menu.w - 176, bottom: BOARD_H - 110 }
     : doc.template === "menu-banner"
       ? { x: 72, y: colors.band ? 156 : 72, w: BOARD_W - 144, bottom: frame.menu.h - 72 }
-      : doc.template === "triple-column"
+      : doc.template === "triple-column" || doc.template === "two-column"
         ? { x: 48, y: colors.band ? 156 : 72, w: frame.columns[0].w - 80, bottom: BOARD_H - 64 }
         : { x: frame.menu.x + 48, y: colors.band ? 168 : 88, w: frame.menu.w - 96, bottom: BOARD_H - 72 };
   let titleSize = 64;
@@ -718,7 +755,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${family}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w))}</text>`);
   }
   const textTop = colors.band && doc.template !== "signature" ? 180 : menu.y + (doc.subtitle ? 72 : 36);
-  if (doc.template === "triple-column") {
+  if (doc.template === "triple-column" || doc.template === "two-column") {
     const textTop = 176;
     const textBottom = BOARD_H - 64;
     const shared = Math.min(...frame.columns.map((_, index) => itemUnit(doc.sections[index] ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
@@ -771,7 +808,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${band}" fill="${colors.feature}"/>`);
     if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(title, 40, feature.w - 80))}</text>`);
     if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80))}</text>`);
-  } else if (feature.h >= 280 && doc.template !== "triple-column" && ((doc.featureTitle || "").trim() || (doc.featureDetail || "").trim())) {
+  } else if (feature.h >= 280 && doc.template !== "triple-column" && doc.template !== "two-column" && ((doc.featureTitle || "").trim() || (doc.featureDetail || "").trim())) {
     const head = (doc.featureTitle || "").trim();
     const hx = feature.x + 48;
     if (!href) {

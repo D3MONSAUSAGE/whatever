@@ -26,9 +26,9 @@ const entries = buildScreenPickerEntries({
 });
 
 describe("content navigation", () => {
-  it("names the six library destinations", () => {
+  it("names the five library destinations", () => {
     expect(CONTENT_TABS.map((tab) => tab.label)).toEqual([
-      "Media", "Menus", "Promotions", "Layout Studio", "Playlists", "Presentations",
+      "Media", "Menu boards", "Promotions", "Playlists", "Presentations",
     ]);
   });
 
@@ -38,7 +38,7 @@ describe("content navigation", () => {
     expect(activeContentTab("/dashboard/media", "presentation")).toBe("presentations");
     expect(activeContentTab("/dashboard/media/menus", null)).toBe("menus");
     expect(activeContentTab("/dashboard/media/promos", null)).toBe("promotions");
-    expect(activeContentTab("/dashboard/media/layout-studio", null)).toBe("studio");
+    expect(activeContentTab("/dashboard/media/layout-studio", null)).toBe("menus");
     expect(activeContentTab("/dashboard/playlists/pl-1", null)).toBe("playlists");
     expect(activeContentTab("/dashboard/media/presentations/deck-1", null)).toBe("presentations");
   });

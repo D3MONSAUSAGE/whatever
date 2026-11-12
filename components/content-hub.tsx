@@ -10,7 +10,7 @@ const GROUPS = [
   },
   {
     title: "Menus and layouts",
-    lede: "Menu boards, promotions, and Layout Studio. They save into the same library.",
+    lede: "Menu boards and promotions. They save into the same library.",
   },
   {
     title: "Playlists and presentations",
@@ -22,7 +22,7 @@ export function ContentHub({ pathOverride }: { pathOverride?: string }) {
   return (
     <section className="min-w-0" data-preview-path={pathOverride}>
 
-      <PageHeader title="Content" eyebrow="Library" lede="One library. Use the tabs above to open media, menus, promotions, Layout Studio, playlists, and presentations." icon={<IconImage />} />
+      <PageHeader title="Content" eyebrow="Library" lede="One library. Use the tabs above to open media, menu boards, promotions, playlists, and presentations." icon={<IconImage />} />
       <ul className="grid gap-3 md:grid-cols-3">
         {GROUPS.map((group) => (
           <li key={group.title} className="card p-4 min-w-0">

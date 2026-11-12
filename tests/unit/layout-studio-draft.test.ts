@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { freshBoard } from "@/lib/layout-account";
 import { parseLayout, sampleLayout } from "@/lib/layout-studio";
 import {
-  LEGACY_DRAFT_KEY, LEGACY_PUBLISHED_KEY, clearLayoutStudioDraftsOnSignOut, draftStorageKey,
-  editorStateAfterScopeChange, loadBrowserStudioState, orgIdFromEntitlements, publishedStorageKey,
-  readStudioDraft, saveAccountGuard, shouldClearStudioDraftsOnAuthEvent, signedInPreviewLoad,
+  LEGACY_DRAFT_KEY, LEGACY_PUBLISHED_KEY, InvalidStudioScopeError, clearLayoutStudioDraftsOnSignOut, draftStorageKey,
+  editorStateAfterScopeChange, loadBrowserStudioState, orgIdFromEntitlements, originAfterScopeResolves, publishedStorageKey,
+  readStudioDraft, saveAccountGuard, saveShouldWaitForScope, shouldClearStudioDraftsOnAuthEvent, signedInPreviewLoad,
   writeStudioDraft, writeStudioPublished, type StudioScope, type StudioSnapshot,
 } from "@/lib/layout-studio-draft";
 
@@ -140,5 +140,51 @@ describe("layout studio draft scoping", () => {
   it("reads org id from the existing entitlements payload without an API change", () => {
     expect(orgIdFromEntitlements({ account_id: "org-from-entitlements", plan: "trial" })).toBe("org-from-entitlements");
     expect(orgIdFromEntitlements({ plan: "trial" })).toBeNull();
+  });
+
+  it("refuses to build or write a draft key when userId or orgId is empty, null, or 'undefined'", () => {
+    const storage = new MemoryStorage();
+    const snapshot = snap(orgA, "Should not be stored");
+    const bad: { userId: unknown; orgId: unknown }[] = [
+      { userId: "", orgId: "org-a" },
+      { userId: "user-a", orgId: "" },
+      { userId: "undefined", orgId: "org-a" },
+      { userId: "user-a", orgId: "undefined" },
+      { userId: "null", orgId: "org-a" },
+      { userId: "user-a", orgId: "null" },
+      { userId: null, orgId: "org-a" },
+      { userId: "user-a", orgId: null },
+      { userId: undefined, orgId: "org-a" },
+      { userId: "user-a", orgId: undefined },
+    ];
+    for (const scope of bad) {
+      expect(() => draftStorageKey(scope as StudioScope)).toThrow(InvalidStudioScopeError);
+      expect(() => publishedStorageKey(scope as StudioScope)).toThrow(InvalidStudioScopeError);
+      expect(() => writeStudioDraft(storage, scope as StudioScope, snapshot)).toThrow(InvalidStudioScopeError);
+      expect(() => writeStudioPublished(storage, scope as StudioScope, snapshot)).toThrow(InvalidStudioScopeError);
+    }
+    expect(storage.length).toBe(0);
+    // A well-formed scope still writes.
+    writeStudioDraft(storage, orgA, snapshot);
+    expect(readStudioDraft(storage, orgA)?.doc.title).toBe("Should not be stored");
+  });
+
+  it("does not refuse a legitimate account-mode save while scope is still resolving", () => {
+    // The account-mode load runs at mount, when scope is often still null.
+    expect(saveShouldWaitForScope(true, null, null)).toBe(true);
+    expect(originAfterScopeResolves(true, null, null)).toBeNull();
+    // Once resolveStudioScope finishes, origin is tagged with that scope — a save is allowed.
+    const resolved = originAfterScopeResolves(true, null, orgB);
+    expect(resolved).toEqual(orgB);
+    expect(saveShouldWaitForScope(true, resolved, orgB)).toBe(false);
+    expect(saveAccountGuard(resolved, orgB)).toEqual({ allow: true });
+    // A document that did not come from this account is still refused, even after scope arrives.
+    expect(originAfterScopeResolves(false, null, orgB)).toBeNull();
+    expect(saveAccountGuard(originAfterScopeResolves(false, null, orgB), orgB).allow).toBe(false);
+    // A real org switch is still a mismatch, not a wait.
+    const switched = originAfterScopeResolves(true, orgA, orgB);
+    expect(switched).toEqual(orgA);
+    expect(saveShouldWaitForScope(true, orgA, orgB)).toBe(false);
+    expect(saveAccountGuard(switched, orgB)).toMatchObject({ allow: false, resetToFresh: true });
   });
 });

@@ -1,0 +1,64 @@
+{
+  "layoutVersion": 1,
+  "template": "split-50",
+  "imageMediaId": null,
+  "videoMediaId": null,
+  "font": "inter",
+  "textColor": null,
+  "backgroundColor": null,
+  "columnWidths": null,
+  "imageFit": "cover",
+  "imageAnchor": "center",
+  "split": 0.5,
+  "palette": "bold",
+  "primaryColor": null,
+  "accentColor": null,
+  "typeScale": "room",
+  "title": "Harbor Gym",
+  "subtitle": "Today's floor",
+  "footer": "Towels at the desk",
+  "featureTitle": "Noon ride",
+  "featureDetail": "Studio B · bikes leave at 12:15",
+  "sections": [
+    {
+      "name": "Morning",
+      "items": [
+        {
+          "name": "Strength",
+          "price": "6:30",
+          "description": "Studio A"
+        },
+        {
+          "name": "Conditioning",
+          "price": "9:00",
+          "description": "Studio B"
+        },
+        {
+          "name": "Mobility",
+          "price": "10:30",
+          "description": "All levels"
+        }
+      ]
+    },
+    {
+      "name": "Evening",
+      "items": [
+        {
+          "name": "Lift",
+          "price": "5:30",
+          "description": "Studio A"
+        },
+        {
+          "name": "Row",
+          "price": "6:15",
+          "description": "Studio B"
+        },
+        {
+          "name": "Restore",
+          "price": "7:30",
+          "description": "Low impact"
+        }
+      ]
+    }
+  ]
+}

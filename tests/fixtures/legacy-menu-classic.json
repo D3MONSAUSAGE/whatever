@@ -1,0 +1,45 @@
+{
+  "template": "classic",
+  "content": {
+    "title": "Dinner",
+    "subtitle": "From 5 PM",
+    "footer": "Ask about our daily specials",
+    "sections": [
+      {
+        "name": "Tacos",
+        "items": [
+          {
+            "name": "Al pastor",
+            "price": "$3.50",
+            "description": "Pork, pineapple, onion, cilantro"
+          },
+          {
+            "name": "Carne asada",
+            "price": "$3.75",
+            "description": "Grilled steak, salsa verde"
+          },
+          {
+            "name": "Pollo",
+            "price": "$3.25",
+            "description": ""
+          }
+        ]
+      },
+      {
+        "name": "Drinks",
+        "items": [
+          {
+            "name": "Horchata",
+            "price": "$2.50",
+            "description": ""
+          },
+          {
+            "name": "Agua fresca",
+            "price": "$2.50",
+            "description": ""
+          }
+        ]
+      }
+    ]
+  }
+}

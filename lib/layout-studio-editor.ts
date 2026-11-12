@@ -29,7 +29,7 @@ export function previewHits(template: LayoutTemplate, frame: LayoutFrame): { id:
       { id: "feature", label: "Edit promotion", box: frame.video ?? frame.feature },
     ];
   }
-  if (template === "triple-column") {
+  if (template === "triple-column" || template === "two-column") {
     const columns = frame.columns.map((box, index) => ({ id: `column-${index}`, label: `Edit column ${index + 1}`, box }));
     return [...columns, { id: "photo", label: "Edit board photo", box: { x: 0, y: 980, w: 420, h: 100 } }];
   }

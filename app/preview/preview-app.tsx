@@ -7,13 +7,12 @@ import { MediaLibrary } from "@/components/media-library";
 import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
 import { ScreenGroups, ScreenWorkspace } from "@/components/my-screens";
-import { LayoutStudio } from "@/components/layout-studio";
 import type { AccountStudio } from "@/lib/layout-account";
 import { sampleLayout } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 import { ContentHub } from "@/components/content-hub";
-import { MenuBoards, type MenuBoard } from "@/components/menu-boards";
+import { MenuBoards, type MenuFixture } from "@/components/menu-boards";
 import { PromoSlides, type Promo } from "@/components/promo-slides";
 import { BrandKit, BrandSummary } from "@/components/brand-kit";
 import { sampleMenu } from "@/lib/menu-templates";
@@ -112,7 +111,7 @@ const demoGroups = {
 };
 
 function previewPath(screen: string) {
-  if (screen === "studio") return "/dashboard/media/layout-studio";
+  if (screen === "studio") return "/dashboard/media/menus";
   if (screen === "content") return "/dashboard/content";
   if (screen === "groups") return "/dashboard/screens/groups";
   if (screen === "workspace") return "/dashboard/screens/screen-front";
@@ -120,7 +119,7 @@ function previewPath(screen: string) {
   if (screen === "media" || screen === "upload" || screen === "upload-error") return "/dashboard/media";
   if (screen === "playlists") return "/dashboard/playlists";
   if (screen === "overview") return "/dashboard";
-  if (screen === "menus" || screen === "menu-edit") return "/dashboard/media/menus";
+  if (screen === "menus" || screen === "menu-edit" || screen.startsWith("unify-")) return "/dashboard/media/menus";
   if (screen === "promos" || screen === "promo-edit") return "/dashboard/media/promos";
   if (screen === "brand-kit") return "/dashboard/account/brand-kit";
   if (screen === "screens") return "/dashboard/screens";
@@ -147,10 +146,20 @@ export function PreviewApp() {
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
       {screen === "workspace" ? <ScreenWorkspace id="screen-front" fixture={displays[0]} library={workspaceLibrary} initialPanel={panel} /> : null}
-      {screen === "studio" ? <LayoutStudio mode="account" fixture={studioFixture} pathOverride="/dashboard/media/layout-studio" /> : null}
+      {screen === "studio" ? <MenuBoards fixture={{ ...menuFixture, startBoardId: "board-lunch", startLayout: "menu-promo-67" }} /> : null}
       {screen === "content" ? <ContentHub pathOverride="/dashboard/content" /> : null}
       {screen === "menus" ? <MenuBoards fixture={menuFixture} /> : null}
       {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
+      {screen === "unify-list" ? <MenuBoards fixture={menuFixture} /> : null}
+      {screen === "unify-picker" ? <MenuBoards fixture={{ ...menuFixture, startView: "pick-layout" }} /> : null}
+      {screen === "unify-full-screen" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
+      {screen === "unify-two-column" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-column", startBoardId: "board-two-column", startZone: "column-0" }} /> : null}
+      {screen === "unify-menu-promo" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "menu-promo-67", startBoardId: "board-lunch" }} /> : null}
+      {screen === "unify-two-menu-promo" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-menu-promo", startBoardId: "board-two-menu" }} /> : null}
+      {screen === "unify-menu-editor" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-menu-promo", startBoardId: "board-two-menu", startZone: "column-0" }} /> : null}
+      {screen === "unify-media-editor" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-menu-promo", startBoardId: "board-two-menu", startZone: "feature" }} /> : null}
+      {screen === "unify-mobile" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-menu-promo", startBoardId: "board-two-menu", startZone: "column-0" }} /> : null}
+      {screen === "unify-brand" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "menu-promo-67", startBoardId: "board-branded" }} /> : null}
       {screen === "promos" ? <PromoSlides fixture={promoFixture} /> : null}
       {screen === "promo-edit" ? <PromoSlides fixture={{ ...promoFixture, startEditing: true }} /> : null}
       {screen === "brand-kit" ? <BrandKit fixture={brandFixture} /> : null}
@@ -259,6 +268,20 @@ const studioFixture: AccountStudio = {
       mediaId: null,
       playlistId: null,
     },
+    {
+      id: "board-two-column",
+      name: "Two-column lunch and dinner",
+      document: sampleLayout("two-column"),
+      mediaId: null,
+      playlistId: null,
+    },
+    {
+      id: "board-branded",
+      name: "Branded lunch board",
+      document: { ...sampleLayout("menu-promo-67"), imageMediaId: studioImageId, primaryColor: "#c8102e", accentColor: "#ffd34d" },
+      mediaId: null,
+      playlistId: null,
+    },
   ],
   legacy: [],
   library: [
@@ -273,12 +296,12 @@ const brandFixture = {
   images: media,
 };
 
-const menuFixture = {
+const menuFixture: MenuFixture = {
   menus: [
     {
       id: "menu-dinner",
       name: "Demo Café dinner menu",
-      template: "classic" as const,
+      template: "classic",
       content: { ...sampleMenu(), title: "Dinner", subtitle: "From 5 PM", useBrand: true, photoMediaId: "media-dinner" },
       mediaId: "media-dinner",
       playlistId: "pl-menu",
@@ -286,12 +309,35 @@ const menuFixture = {
       createdAt: "2026-10-28T15:00:00.000Z",
       updatedAt: "2026-10-28T15:00:00.000Z",
     },
-  ] satisfies MenuBoard[],
+    {
+      id: "board-lunch",
+      name: "Demo Café lunch board",
+      template: "fresh",
+      content: { ...sampleLayout("menu-promo-67"), imageMediaId: studioImageId },
+      mediaId: "media-lunch",
+      playlistId: "pl-lunch",
+      imageUrl: lunch,
+      createdAt: "2026-10-28T15:00:00.000Z",
+      updatedAt: "2026-10-28T16:00:00.000Z",
+    },
+    {
+      id: "board-two-menu",
+      name: "Lunch and dinner",
+      template: "fresh",
+      content: { ...sampleLayout("two-menu-promo"), videoMediaId: studioVideoId },
+      mediaId: null,
+      playlistId: null,
+      imageUrl: lunch,
+      createdAt: "2026-10-28T15:00:00.000Z",
+      updatedAt: "2026-10-28T16:00:00.000Z",
+    },
+  ],
   available: true,
   images: media,
   displays: displays.filter((item) => item.connected),
   brand: brandFixture,
   previewSrc: dinner,
+  studio: studioFixture,
 };
 
 const promoFixture = {

@@ -1,0 +1,64 @@
+{
+  "layoutVersion": 1,
+  "template": "signature",
+  "imageMediaId": null,
+  "videoMediaId": null,
+  "font": "inter",
+  "textColor": null,
+  "backgroundColor": null,
+  "columnWidths": null,
+  "imageFit": "cover",
+  "imageAnchor": "center",
+  "split": 0.55,
+  "palette": "classic",
+  "primaryColor": null,
+  "accentColor": null,
+  "typeScale": "room",
+  "title": "Evening service",
+  "subtitle": "From 5 PM",
+  "footer": "Reserve the patio",
+  "featureTitle": "Patio",
+  "featureDetail": "Tables held until 5:30",
+  "sections": [
+    {
+      "name": "First",
+      "items": [
+        {
+          "name": "Beet salad",
+          "price": "$12",
+          "description": "Citrus, pistachio"
+        },
+        {
+          "name": "Broth",
+          "price": "$10",
+          "description": "Ginger and greens"
+        },
+        {
+          "name": "Crudo",
+          "price": "$16",
+          "description": "Citrus and olive oil"
+        }
+      ]
+    },
+    {
+      "name": "Mains",
+      "items": [
+        {
+          "name": "Roast chicken",
+          "price": "$24",
+          "description": "Pan juices, potatoes"
+        },
+        {
+          "name": "Pasta",
+          "price": "$21",
+          "description": "Brown butter and sage"
+        },
+        {
+          "name": "Market fish",
+          "price": "$28",
+          "description": "Charred lemon"
+        }
+      ]
+    }
+  ]
+}
