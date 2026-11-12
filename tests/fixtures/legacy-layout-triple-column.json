@@ -1,0 +1,114 @@
+{
+  "layoutVersion": 1,
+  "template": "triple-column",
+  "imageMediaId": null,
+  "videoMediaId": null,
+  "font": "inter",
+  "textColor": null,
+  "backgroundColor": null,
+  "columnWidths": null,
+  "imageFit": "cover",
+  "imageAnchor": "center",
+  "split": 0.3333333333333333,
+  "palette": "fresh",
+  "primaryColor": null,
+  "accentColor": null,
+  "typeScale": "room",
+  "title": "Northbeam Coffee",
+  "subtitle": "Open from 7",
+  "footer": "Oat and almond milk at no charge",
+  "featureTitle": "",
+  "featureDetail": "",
+  "sections": [
+    {
+      "name": "Coffee",
+      "items": [
+        {
+          "name": "Drip",
+          "price": "$3",
+          "description": "Rotating single origin"
+        },
+        {
+          "name": "Cortado",
+          "price": "$4",
+          "description": "Equal espresso and milk"
+        },
+        {
+          "name": "Cappuccino",
+          "price": "$4.50",
+          "description": "Dry or wet"
+        },
+        {
+          "name": "Cold brew",
+          "price": "$4.50",
+          "description": "Twelve hour steep"
+        },
+        {
+          "name": "Mocha",
+          "price": "$5",
+          "description": "Dark chocolate"
+        }
+      ]
+    },
+    {
+      "name": "Tea",
+      "items": [
+        {
+          "name": "Jasmine",
+          "price": "$3.50",
+          "description": "Loose leaf"
+        },
+        {
+          "name": "Chai",
+          "price": "$4.50",
+          "description": "Steamed milk"
+        },
+        {
+          "name": "Earl grey",
+          "price": "$3.50",
+          "description": "Bergamot"
+        },
+        {
+          "name": "Mint",
+          "price": "$3",
+          "description": "Fresh leaves"
+        },
+        {
+          "name": "London fog",
+          "price": "$5",
+          "description": "Vanilla and bergamot"
+        }
+      ]
+    },
+    {
+      "name": "Bakery",
+      "items": [
+        {
+          "name": "Morning bun",
+          "price": "$4",
+          "description": "Orange zest"
+        },
+        {
+          "name": "Quiche",
+          "price": "$7",
+          "description": "Seasonal vegetables"
+        },
+        {
+          "name": "Banana bread",
+          "price": "$4",
+          "description": "Toasted walnut"
+        },
+        {
+          "name": "Oat cookie",
+          "price": "$3",
+          "description": "Brown butter"
+        },
+        {
+          "name": "Fruit cup",
+          "price": "$5",
+          "description": "Citrus and mint"
+        }
+      ]
+    }
+  ]
+}

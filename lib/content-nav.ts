@@ -1,10 +1,9 @@
-export type ContentTabId = "media" | "menus" | "promotions" | "studio" | "playlists" | "presentations";
+export type ContentTabId = "media" | "menus" | "promotions" | "playlists" | "presentations";
 
 export const CONTENT_TABS: { id: ContentTabId; href: string; label: string }[] = [
   { id: "media", href: "/dashboard/media", label: "Media" },
-  { id: "menus", href: "/dashboard/media/menus", label: "Menus" },
+  { id: "menus", href: "/dashboard/media/menus", label: "Menu boards" },
   { id: "promotions", href: "/dashboard/media/promos", label: "Promotions" },
-  { id: "studio", href: "/dashboard/media/layout-studio", label: "Layout Studio" },
   { id: "playlists", href: "/dashboard/playlists", label: "Playlists" },
   { id: "presentations", href: "/dashboard/media?kind=presentation", label: "Presentations" },
 ];
@@ -19,7 +18,8 @@ export function activeContentTab(path: string, kind: string | null): ContentTabI
   const clean = cleanPath(path);
   if (clean.startsWith("/dashboard/media/menus")) return "menus";
   if (clean.startsWith("/dashboard/media/promos")) return "promotions";
-  if (clean.startsWith("/dashboard/media/layout-studio")) return "studio";
+  // Old Layout Studio route permanently redirects here; keep the Menu boards tab current if the URL is seen first.
+  if (clean.startsWith("/dashboard/media/layout-studio")) return "menus";
   if (clean.startsWith("/dashboard/media/presentations")) return "presentations";
   if (clean.startsWith("/dashboard/playlists")) return "playlists";
   if (clean === "/dashboard/media") return kind === "presentation" ? "presentations" : "media";

@@ -125,7 +125,7 @@ function emptyCopy(category: PickerCategory, searching: boolean, layoutsUnavaila
   if (category === "presentation") return "No presentations yet.";
   if (category === "playlist") return "No playlists yet.";
   if (category === "menu") return "No menus yet.";
-  if (category === "layout") return layoutsUnavailable ? "Layouts are not available on this account." : "No layouts yet. Create one, then publish it from Layout Studio.";
+  if (category === "layout") return layoutsUnavailable ? "Layouts are not available on this account." : "No layouts yet. Create one, then publish it from Menu boards.";
   return "Nothing to publish yet.";
 }
 

@@ -1,0 +1,74 @@
+{
+  "layoutVersion": 1,
+  "template": "menu-promo-67",
+  "imageMediaId": null,
+  "videoMediaId": null,
+  "font": "inter",
+  "textColor": null,
+  "backgroundColor": null,
+  "columnWidths": null,
+  "imageFit": "cover",
+  "imageAnchor": "center",
+  "split": 0.67,
+  "palette": "fresh",
+  "primaryColor": null,
+  "accentColor": null,
+  "typeScale": "room",
+  "title": "Casa Mesa",
+  "subtitle": "Lunch, served until 3",
+  "footer": "Ask about the daily special",
+  "featureTitle": "Today",
+  "featureDetail": "Lunch special",
+  "sections": [
+    {
+      "name": "Plates",
+      "items": [
+        {
+          "name": "Pollo asado",
+          "price": "$14",
+          "description": "Citrus chicken, rice, salsa"
+        },
+        {
+          "name": "Carne asada",
+          "price": "$16",
+          "description": "Grilled steak and beans"
+        },
+        {
+          "name": "Market fish",
+          "price": "$18",
+          "description": "Today's catch, lime butter"
+        },
+        {
+          "name": "Veggie bowl",
+          "price": "$13",
+          "description": "Squash, beans, crema"
+        }
+      ]
+    },
+    {
+      "name": "Sides",
+      "items": [
+        {
+          "name": "Street corn",
+          "price": "$5",
+          "description": "Chile, crema, cheese"
+        },
+        {
+          "name": "Greens",
+          "price": "$6",
+          "description": "Herb vinaigrette"
+        },
+        {
+          "name": "Rice and beans",
+          "price": "$4",
+          "description": "Garlic and cumin"
+        },
+        {
+          "name": "Plantains",
+          "price": "$5",
+          "description": "Lime and salt"
+        }
+      ]
+    }
+  ]
+}

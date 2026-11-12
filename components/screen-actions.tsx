@@ -224,8 +224,7 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
       {confirm.node}
       {panel === "create" ? (
         <div className="card p-4 mt-3 flex flex-wrap gap-2">
-          <Link className="btn min-h-11" href={`/dashboard/media/layout-studio?screen=${display.id}`}>New layout</Link>
-          <Link className="btn min-h-11" href="/dashboard/media/menus">New menu</Link>
+          <Link className="btn min-h-11" href={`/dashboard/media/menus?screen=${display.id}&new=1`}>New menu board</Link>
           <Link className="btn min-h-11" href="/dashboard/media/promos">New promotion</Link>
           <button type="button" className="btn min-h-11" onClick={() => open("playlist")}>New playlist</button>
         </div>

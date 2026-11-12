@@ -12,6 +12,7 @@ import { IconTv } from "@/components/icons";
 import { ScreenActions, type ScreenLibrary } from "@/components/screen-actions";
 import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
+import { unifiedEditorPath } from "@/lib/menu-board-unify";
 
 export function MyScreens() {
   const displays = useApi<DisplayItem[]>("/api/displays", 10_000);
@@ -117,7 +118,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
             <p className="text-sm mt-3">This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.</p>
           ) : null}
           {!contentLabel(display) || contentLabel(display) === "No content assigned" ? (
-            <p className="text-sm mt-3">Nothing is assigned. <Link href="/dashboard/media" className="underline font-semibold">Add media</Link> or <Link href={`/dashboard/media/layout-studio?screen=${display.id}`} className="underline font-semibold">open Layout Studio</Link>.</p>
+            <p className="text-sm mt-3">Nothing is assigned. <Link href="/dashboard/media" className="underline font-semibold">Add media</Link> or <Link href={unifiedEditorPath({ screen: display.id, isNew: true })} className="underline font-semibold">open Menu boards</Link>.</p>
           ) : null}
           <ScreenActions display={display} preview={Boolean(fixture)} library={library} initialPanel={initialPanel} onChanged={() => displays.reload()} />
         </article>

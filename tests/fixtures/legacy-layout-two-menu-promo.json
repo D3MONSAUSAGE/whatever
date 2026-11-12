@@ -1,0 +1,98 @@
+{
+  "layoutVersion": 1,
+  "template": "two-menu-promo",
+  "imageMediaId": null,
+  "videoMediaId": null,
+  "font": "inter",
+  "textColor": null,
+  "backgroundColor": null,
+  "columnWidths": [
+    0.35,
+    0.35,
+    0.3
+  ],
+  "imageFit": "cover",
+  "imageAnchor": "center",
+  "split": 0.35,
+  "palette": "fresh",
+  "primaryColor": null,
+  "accentColor": null,
+  "typeScale": "room",
+  "title": "Casa Mesa",
+  "subtitle": "Lunch and dinner, one kitchen",
+  "footer": "Ask about the daily special",
+  "featureTitle": "Tonight",
+  "featureDetail": "Chef's tasting, 5 to 9",
+  "sections": [
+    {
+      "name": "Lunch",
+      "items": [
+        {
+          "name": "Chicken torta",
+          "price": "$14",
+          "description": "Citrus chicken, pickled onion"
+        },
+        {
+          "name": "Market salad",
+          "price": "$12",
+          "description": "Greens, seeds, lime"
+        },
+        {
+          "name": "Pozole",
+          "price": "$13",
+          "description": "Pork, radish, oregano"
+        },
+        {
+          "name": "Fish tacos",
+          "price": "$15",
+          "description": "Two, cabbage, crema"
+        },
+        {
+          "name": "Cubana",
+          "price": "$14",
+          "description": "Ham, cheese, black bean"
+        },
+        {
+          "name": "Soup of the day",
+          "price": "$8",
+          "description": "Ask your server"
+        }
+      ]
+    },
+    {
+      "name": "Dinner",
+      "items": [
+        {
+          "name": "Carne asada",
+          "price": "$26",
+          "description": "Grilled steak, salsa roja"
+        },
+        {
+          "name": "Chile relleno",
+          "price": "$22",
+          "description": "Cheese, walnut sauce"
+        },
+        {
+          "name": "Catch of the day",
+          "price": "$28",
+          "description": "Citrus and herbs"
+        },
+        {
+          "name": "Mushroom asado",
+          "price": "$21",
+          "description": "Roasted squash, mole"
+        },
+        {
+          "name": "Short rib",
+          "price": "$29",
+          "description": "Slow cooked, plantain"
+        },
+        {
+          "name": "Side of rice",
+          "price": "$6",
+          "description": "Garlic and cumin"
+        }
+      ]
+    }
+  ]
+}

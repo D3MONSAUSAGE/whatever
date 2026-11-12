@@ -205,13 +205,14 @@ describe("layout studio frames", () => {
     expect(composition?.video?.box.h).toBe(1080 - PROMO_BAND);
     expect(composition).not.toHaveProperty("groupIndex");
     const dashboard = readFileSync("app/dashboard/media/layout-studio/page.tsx", "utf8");
-    const dashboardPage = dashboard.slice(dashboard.indexOf("export default"));
-    expect(dashboardPage.indexOf("layoutStudioEnabled")).toBeLessThan(dashboardPage.indexOf("<LayoutStudio"));
-    expect(dashboard).toContain('mode="account"');
-    expect(dashboard).toContain("notFound");
+    expect(dashboard).toContain("permanentRedirect");
+    expect(dashboard).toContain("layoutStudioRedirect");
+    expect(dashboard).not.toContain("<LayoutStudio");
+    expect(dashboard).not.toContain('mode="account"');
     const menusPage = readFileSync("app/dashboard/media/menus/page.tsx", "utf8");
-    expect(menusPage).toContain('"/dashboard/media/layout-studio"');
+    expect(menusPage).toContain("MenuBoards");
     expect(menusPage).toContain("layoutStudioEnabled()");
+    expect(menusPage).not.toContain('"/dashboard/media/layout-studio"');
     const publicPage = readFileSync("app/layout-studio/page.tsx", "utf8");
     expect(publicPage).toContain("layoutStudioPreviewOpen");
     expect(publicPage).toContain("notFound");
@@ -432,7 +433,7 @@ describe("player composition contract", () => {
       }
     }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
-    const editor = readFileSync("components/layout-studio.tsx", "utf8");
+    const editor = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("lib/layout-studio-editor.ts", "utf8");
     expect(editor).toContain("Each column is 20% to 60%");
     expect(editor).toContain("TV preview");
     expect(editor).toContain("Upload new");
@@ -441,7 +442,7 @@ describe("player composition contract", () => {
     expect(editor).toContain("studio-status");
     expect(editor).toContain("Uploading…");
     expect(editor).not.toContain("Uploading photo…");
-    expect(editor).toContain("position: sticky");
+    expect(editor).toContain("position: static"); // preview scrolls with the under-preview editor; sticky would cover it
     expect(editor).toContain("min-height: 44px");
     const banner = layoutSvg(sampleLayout("menu-banner"));
     expect(banner).toContain("Today's counter");

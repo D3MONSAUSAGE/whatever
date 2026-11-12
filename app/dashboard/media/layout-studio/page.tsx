@@ -1,12 +1,12 @@
-import { notFound } from "next/navigation";
-import { LayoutStudio } from "@/components/layout-studio";
-import { layoutStudioEnabled } from "@/lib/layout-studio";
-import { isUuid } from "@/lib/server/crypto";
+import { permanentRedirect } from "next/navigation";
+import { layoutStudioRedirect } from "@/lib/menu-board-unify";
 
-/** Signed-in studio. The public /layout-studio demo stays closed in production. */
-export default async function AccountLayoutStudioPage({ searchParams }: { searchParams: Promise<{ screen?: string }> }) {
-  if (!layoutStudioEnabled()) notFound();
-  const { screen } = await searchParams;
-  const screenId = typeof screen === "string" && isUuid(screen) ? screen : null;
-  return <LayoutStudio mode="account" screenId={screenId} />;
+/** The signed-in Layout Studio route permanently moves to the unified Menu Board Creator. Isolated /layout-studio stays. */
+export default async function AccountLayoutStudioPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  permanentRedirect(layoutStudioRedirect(params));
 }

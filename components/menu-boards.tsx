@@ -4,23 +4,48 @@ import { useEffect, useRef, useState } from "react";
 import { api, authToken, timeAgo, useApi, type DisplayItem, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
-import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader, LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
 import { MENU_LIMITS, MENU_TEMPLATES, sampleMenu, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import { artImages, type Brand } from "@/lib/brand-kit";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
+import { LayoutStudio } from "@/components/layout-studio";
+import type { AccountStudio } from "@/lib/layout-account";
+import { type LayoutTemplate } from "@/lib/layout-studio";
+import {
+  LAYOUT_OPTIONS,
+  classifyBoardContent,
+  classicPreviewHits,
+  layoutOptionById,
+  layoutOptionForTemplate,
+  parseUnifiedSearch,
+  confirmDiscardUnsaved,
+  hasUnsavedEdits,
+  type LayoutOption,
+} from "@/lib/menu-board-unify";
 
 export type { Brand };
 export { artImages };
 
 export type MenuBoard = {
-  id: string; name: string; template: MenuTemplate; content: MenuContent;
-  mediaId: string | null; playlistId: string | null; imageUrl: string | null; createdAt: string; updatedAt: string;
+  id: string;
+  name: string;
+  template: string;
+  content: unknown;
+  mediaId: string | null;
+  playlistId: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
-type Draft = { id: string | null; name: string; template: MenuTemplate; content: MenuContent; displayIds: string[] };
+type ClassicDraft = { id: string | null; name: string; template: MenuTemplate; content: MenuContent; displayIds: string[] };
 
-const blankItem = () => ({ name: "", price: "", description: "" });
+type View =
+  | { mode: "list" }
+  | { mode: "pick-layout"; screenId: string | null }
+  | { mode: "classic"; draft: ClassicDraft; screenId: string | null }
+  | { mode: "layout"; boardId: string | null; template: LayoutTemplate; screenId: string | null; zone?: string };
 
 export type MenuFixture = {
   menus: MenuBoard[];
@@ -29,26 +54,111 @@ export type MenuFixture = {
   displays?: DisplayItem[];
   brand?: BrandKitFixture;
   startEditing?: boolean;
+  startView?: "list" | "pick-layout";
+  startLayout?: LayoutTemplate;
+  startZone?: string;
+  startBoardId?: string | null;
   previewSrc?: string;
+  studio?: AccountStudio;
 };
 
-export function MenuBoards({ studioHref = null, fixture }: { studioHref?: string | null; fixture?: MenuFixture }) {
+function newClassicDraft(displayIds: string[] = []): ClassicDraft {
+  return { id: null, name: "Lunch menu", template: "classic", content: sampleMenu(), displayIds };
+}
+
+function boardKindLabel(menu: MenuBoard): string {
+  const classified = classifyBoardContent(menu.template, menu.content);
+  if (classified.kind === "layout") return layoutOptionForTemplate(classified.document.template).name;
+  if (classified.kind === "classic") {
+    return MENU_TEMPLATES.find((t) => t.id === classified.template)?.name ?? "Menu";
+  }
+  return "Menu board";
+}
+
+function openClassified(menu: MenuBoard, screenId: string | null): View | null {
+  const classified = classifyBoardContent(menu.template, menu.content);
+  if (classified.kind === "layout") {
+    return { mode: "layout", boardId: menu.id, template: classified.document.template, screenId };
+  }
+  if (classified.kind === "classic") {
+    return { mode: "classic", draft: { id: menu.id, name: menu.name, template: classified.template, content: classified.content, displayIds: [] }, screenId };
+  }
+  return null;
+}
+
+function initialView(fixture?: MenuFixture, search?: Record<string, string | string[] | undefined | null>): { view: View; pendingBoardId: string | null } {
+  if (fixture?.startEditing) return { view: { mode: "classic", draft: newClassicDraft(), screenId: null }, pendingBoardId: null };
+  if (fixture?.startLayout) {
+    return {
+      view: { mode: "layout", boardId: fixture.startBoardId ?? null, template: fixture.startLayout, screenId: null, zone: fixture.startZone },
+      pendingBoardId: null,
+    };
+  }
+  if (fixture?.startView === "pick-layout") return { view: { mode: "pick-layout", screenId: null }, pendingBoardId: null };
+  const parsed = parseUnifiedSearch(search ?? {});
+  const screenId = parsed.screenId;
+  if (parsed.boardId) {
+    return { view: { mode: "list" }, pendingBoardId: parsed.boardId };
+  }
+  if (parsed.layout) {
+    const option = layoutOptionById(parsed.layout);
+    if (option?.kind === "classic") return { view: { mode: "classic", draft: newClassicDraft(screenId ? [screenId] : []), screenId }, pendingBoardId: null };
+    if (option?.layoutTemplate) return { view: { mode: "layout", boardId: null, template: option.layoutTemplate, screenId }, pendingBoardId: null };
+  }
+  if (parsed.isNew) return { view: { mode: "pick-layout", screenId }, pendingBoardId: null };
+  return { view: { mode: "list" }, pendingBoardId: null };
+}
+
+export function MenuBoards({
+  fixture,
+  initialSearch,
+  studioEnabled = true,
+}: {
+  fixture?: MenuFixture;
+  initialSearch?: Record<string, string | string[] | undefined | null>;
+  studioEnabled?: boolean;
+}) {
   const liveMenus = useApi<{ menus: MenuBoard[]; available: boolean }>(fixture ? null : "/api/menus");
   const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays");
   const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
   const menus = fixture ? { data: { menus: fixture.menus, available: fixture.available !== false }, error: null, reload: async () => {} } : liveMenus;
   const displays = fixture ? { data: fixture.displays ?? [] } : liveDisplays;
   const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
-  const [draft, setDraft] = useState<Draft | null>(() => (
-    fixture?.startEditing
-      ? { id: null, name: "Lunch menu", template: "classic", content: sampleMenu(), displayIds: [] }
-      : null
-  ));
+  const started = initialView(fixture, initialSearch);
+  const [view, setView] = useState<View>(started.view);
+  const [pendingBoardId, setPendingBoardId] = useState<string | null>(started.pendingBoardId);
   const toast = useToast();
   const confirm = useConfirm();
+  const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout";
+
+  useEffect(() => {
+    if (!pendingBoardId || !menus.data?.menus) return;
+    const menu = menus.data.menus.find((item) => item.id === pendingBoardId);
+    if (!menu) return;
+    const next = openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
+    if (next) setView(next);
+    setPendingBoardId(null);
+  }, [menus.data, pendingBoardId, initialSearch]);
 
   function startNew() {
-    setDraft({ id: null, name: "Lunch menu", template: "classic", content: sampleMenu(), displayIds: [] });
+    if (studioEnabled) setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId });
+    else setView({ mode: "classic", draft: newClassicDraft(), screenId: null });
+  }
+
+  function pickOption(option: LayoutOption, screenId: string | null) {
+    if (option.kind === "classic") {
+      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : []), screenId });
+      return;
+    }
+    if (option.layoutTemplate) {
+      setView({ mode: "layout", boardId: null, template: option.layoutTemplate, screenId });
+    }
+  }
+
+  function editMenu(menu: MenuBoard) {
+    const next = openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
+    if (next) setView(next);
+    else toast.show("This board could not be opened.", true);
   }
 
   async function remove(menu: MenuBoard) {
@@ -68,32 +178,93 @@ export function MenuBoards({ studioHref = null, fixture }: { studioHref?: string
     }
   }
 
+  const pickerOptions = studioEnabled ? LAYOUT_OPTIONS : LAYOUT_OPTIONS.filter((item) => item.kind === "classic");
+  const featured = pickerOptions.filter((item) => item.featured);
+  const more = pickerOptions.filter((item) => !item.featured);
+
   return (
     <section>
       <PageHeader
         title="Menu boards"
         eyebrow="Media"
         icon={<IconImage />}
-        lede="Pick a template, type your items and prices, and Pekko makes a full-screen slide. Edit it any time and every screen showing it updates."
-        action={!draft ? <button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button> : undefined}
+        lede="Pick a layout, fill each area, and Pekko makes a full-screen slide. Every menu board you already have stays in this list, and you can edit it any time."
+        action={!draftOpen ? <button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button> : undefined}
       />
       <p className="text-sm text-muted mb-4">
         <Link href="/dashboard/schedule#day-parts" className="font-semibold text-primary underline underline-offset-4">Breakfast, lunch &amp; dinner times</Link>
-        {studioHref ? <> · <Link href={studioHref} className="font-semibold text-primary underline underline-offset-4">Layout Studio</Link></> : null}
+        {" · "}
+        <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</Link>
       </p>
 
-      {!draft && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
+      {!draftOpen && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
 
-      {draft ? (
+      {view.mode === "pick-layout" ? (
+        <div className="card p-4 md:p-6 mb-6" data-testid="layout-picker">
+          <h2 className="text-lg font-semibold">Choose a layout</h2>
+          <p className="text-sm text-muted mt-1">Your existing boards keep the layout they already have. This only sets the layout for a new board.</p>
+          <div className="grid gap-3 sm:grid-cols-2 mt-4">
+            {featured.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className="rounded-xl border border-line p-4 text-left hover:border-primary"
+                onClick={() => pickOption(option, view.screenId)}
+              >
+                <span className="font-medium block">{option.name}</span>
+                <span className="text-sm text-muted">{option.blurb}</span>
+              </button>
+            ))}
+          </div>
+          {more.length ? (
+            <details className="mt-4">
+              <summary className="cursor-pointer font-medium">More layouts</summary>
+              <div className="grid gap-3 sm:grid-cols-2 mt-3">
+                {more.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className="rounded-xl border border-line p-4 text-left hover:border-primary"
+                    onClick={() => pickOption(option, view.screenId)}
+                  >
+                    <span className="font-medium block">{option.name}</span>
+                    <span className="text-sm text-muted">{option.blurb}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          ) : null}
+          <div className="mt-4">
+            <button type="button" className="btn btn-quiet" onClick={() => setView({ mode: "list" })}>Cancel</button>
+          </div>
+        </div>
+      ) : null}
+
+      {view.mode === "classic" ? (
         <Editor
           images={artImages(media.data)}
-          draft={draft}
-          setDraft={setDraft}
+          draft={view.draft}
+          setDraft={(draft) => { if (!draft) setView({ mode: "list" }); else setView({ ...view, draft }); }}
           displays={(displays.data ?? []).filter((d) => d.connected)}
-          onSaved={async (message) => { setDraft(null); await menus.reload(); toast.show(message); }}
+          onSaved={async (message) => { setView({ mode: "list" }); await menus.reload(); toast.show(message); }}
           onError={(message) => toast.show(message, true)}
           previewSrc={fixture?.previewSrc}
           readOnly={Boolean(fixture)}
+        />
+      ) : null}
+
+      {view.mode === "layout" ? (
+        <LayoutStudio
+          key={view.boardId ?? `new-${view.template}`}
+          mode="account"
+          fixture={fixture?.studio ?? null}
+          screenId={view.screenId}
+          initialBoardId={view.boardId}
+          initialTemplate={view.boardId ? null : view.template}
+          initialZone={view.zone}
+          embedded
+          brand={fixture?.brand}
+          onClose={() => setView({ mode: "list" })}
         />
       ) : null}
 
@@ -103,11 +274,11 @@ export function MenuBoards({ studioHref = null, fixture }: { studioHref?: string
       {menus.data && !menus.data.available ? (
         <EmptyState title="Menu boards are on their way">They switch on with the next update. Your other media works as usual.</EmptyState>
       ) : null}
-      {menus.data?.available && menus.data.menus.length === 0 && !draft ? (
+      {menus.data?.available && menus.data.menus.length === 0 && !draftOpen ? (
         <EmptyState title="No menu boards yet">Choose “New menu board” to make your first one in about a minute.</EmptyState>
       ) : null}
-      {menus.data?.menus.length ? (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Menu boards">
+      {menus.data?.menus.length && view.mode === "list" ? (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Menu boards" data-testid="unify-list">
           {menus.data.menus.map((menu) => (
             <li key={menu.id} className="card overflow-hidden">
               <div className="relative aspect-video bg-ink">
@@ -115,9 +286,9 @@ export function MenuBoards({ studioHref = null, fixture }: { studioHref?: string
               </div>
               <div className="p-4">
                 <p className="font-semibold break-words">{menu.name}</p>
-                <p className="text-sm text-muted">{MENU_TEMPLATES.find((t) => t.id === menu.template)?.name ?? menu.template} · updated {timeAgo(menu.updatedAt)}</p>
+                <p className="text-sm text-muted">{boardKindLabel(menu)} · updated {timeAgo(menu.updatedAt)}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="btn btn-quiet" onClick={() => setDraft({ id: menu.id, name: menu.name, template: menu.template, content: menu.content, displayIds: [] })}>Edit</button>
+                  <button className="btn btn-quiet" onClick={() => editMenu(menu)}>Edit</button>
                   <button className="btn btn-quiet text-danger" onClick={() => remove(menu)}>Delete</button>
                 </div>
               </div>
@@ -131,9 +302,9 @@ export function MenuBoards({ studioHref = null, fixture }: { studioHref?: string
 }
 
 function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSrc, readOnly }: {
-  draft: Draft;
+  draft: ClassicDraft;
   images: MediaItem[];
-  setDraft: (d: Draft | null) => void;
+  setDraft: (d: ClassicDraft | null) => void;
   displays: DisplayItem[];
   onSaved: (message: string) => void;
   onError: (message: string) => void;
@@ -143,10 +314,15 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(previewSrc ?? null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [region, setRegion] = useState<"menu" | "photo">("menu");
   const last = useRef<string | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const baseline = useRef({ name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds });
   const c = draft.content;
   const update = (content: MenuContent) => setDraft({ ...draft, content });
   const totalItems = c.sections.reduce((n, s) => n + s.items.length, 0);
+  const hasPhoto = Boolean(c.photoMediaId);
+  const hits = classicPreviewHits(hasPhoto);
 
   useEffect(() => {
     if (readOnly) {
@@ -178,6 +354,19 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
     return () => window.clearTimeout(timer);
   }, [draft.template, draft.content, readOnly, previewSrc]);
 
+  function selectRegion(id: "menu" | "photo") {
+    setRegion(id);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches) {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function requestClose() {
+    const current = { name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds };
+    if (!confirmDiscardUnsaved(hasUnsavedEdits(current, baseline.current))) return;
+    setDraft(null);
+  }
+
   async function save() {
     if (readOnly) return;
     setBusy(true);
@@ -196,83 +385,118 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
     }
   }
 
+  const blankItem = () => ({ name: "", price: "", description: "" });
+
   return (
     <div className="card p-4 md:p-6 mb-6" data-testid="menu-editor">
       <h2 className="text-lg font-semibold">{draft.id ? "Edit menu board" : "New menu board"}</h2>
-      <fieldset className="mt-4">
-        <legend className="form-label">Template</legend>
-        <div className="grid gap-3 sm:grid-cols-3 mt-1">
-          {MENU_TEMPLATES.map((t) => (
-            <label key={t.id} className={`rounded-xl border p-3 cursor-pointer ${draft.template === t.id ? "border-primary ring-2 ring-primary/30" : "border-line"}`}>
-              <input type="radio" name="menu-template" className="sr-only" checked={draft.template === t.id} onChange={() => setDraft({ ...draft, template: t.id })} />
-              <span className="flex gap-1 mb-2" aria-hidden>
-                <span className="h-6 flex-1 rounded" style={{ background: t.swatch[0], border: "1px solid #d5e2f2" }} />
-                <span className="h-6 w-8 rounded" style={{ background: t.swatch[1] }} />
-              </span>
-              <span className="font-medium block">{t.name}</span>
-              <span className="text-xs text-muted">{t.blurb}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
 
       <div className="grid gap-6 lg:grid-cols-2 mt-5">
         <div className="grid gap-3 content-start">
+          <p className="form-label">Preview</p>
+          <div className="tv relative" style={{ aspectRatio: "16 / 9" }}>
+            {preview ? <img src={preview} alt="Menu board preview" data-testid="menu-preview" className="w-full h-full object-contain" /> : null}
+            {hits.map((hit) => (
+              <button
+                key={hit.id}
+                type="button"
+                aria-label={hit.label}
+                aria-pressed={region === hit.id}
+                className={`absolute border-2 ${region === hit.id ? "border-primary bg-primary/10" : "border-transparent hover:border-primary/50"}`}
+                style={{
+                  left: `${(hit.box.x / 1920) * 100}%`,
+                  top: `${(hit.box.y / 1080) * 100}%`,
+                  width: `${(hit.box.w / 1920) * 100}%`,
+                  height: `${(hit.box.h / 1080) * 100}%`,
+                }}
+                onClick={() => selectRegion(hit.id)}
+              />
+            ))}
+          </div>
+          {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
+          {region ? <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p> : null}
+
+          <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor">
+            {region === "menu" ? (
+              <div className="grid gap-3">
+                <label className="grid gap-1"><span className="form-label">Title on screen</span>
+                  <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
+                <label className="grid gap-1"><span className="form-label">Subtitle</span>
+                  <input className="field" value={c.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(e) => update({ ...c, subtitle: e.target.value })} /></label>
+                {c.sections.map((section, si) => (
+                  <fieldset key={si} className="rounded-xl border border-line p-3 grid gap-2">
+                    <legend className="px-1 text-sm font-semibold">Section {si + 1}</legend>
+                    <div className="flex gap-2">
+                      <input className="field flex-1" aria-label={`Section ${si + 1} name`} placeholder="e.g. Tacos" value={section.name} maxLength={MENU_LIMITS.sectionName}
+                        onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
+                      <button type="button" className="btn btn-quiet" onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove section</button>
+                    </div>
+                    {section.items.map((item, ii) => {
+                      const setItem = (patch: Partial<typeof item>) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.map((it, j) => j === ii ? { ...it, ...patch } : it) } : s) });
+                      return (
+                        <div key={ii} className="grid grid-cols-[1fr_6.5rem_auto] gap-2">
+                          <input className="field" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })} />
+                          <input className="field" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })} />
+                          <button type="button" className="btn btn-quiet" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
+                            onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>×</button>
+                          <input className="field col-span-2 text-sm" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })} />
+                        </div>
+                      );
+                    })}
+                    {section.items.length < MENU_LIMITS.itemsPerSection && totalItems < MENU_LIMITS.items ? (
+                      <button type="button" className="btn btn-quiet justify-self-start" onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
+                    ) : null}
+                  </fieldset>
+                ))}
+                {c.sections.length < MENU_LIMITS.sections ? (
+                  <button type="button" className="btn btn-quiet justify-self-start" onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>Add section</button>
+                ) : null}
+                <label className="grid gap-1"><span className="form-label">Footer</span>
+                  <input className="field" value={c.footer} maxLength={MENU_LIMITS.footer} onChange={(e) => update({ ...c, footer: e.target.value })} /></label>
+              </div>
+            ) : null}
+            {region === "photo" ? (
+              <label className="grid gap-1"><span className="form-label">Photo</span>
+                <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => update({ ...c, photoMediaId: e.target.value || null })}>
+                  <option value="">No photo</option>
+                  {images.map((m) => <option key={m.id} value={m.id}>{m.fileName}</option>)}
+                </select>
+                <span className="text-xs text-muted">{images.length ? "Shows on the right side of the menu. JPG or PNG from your media." : "Upload a JPG or PNG to your media to add a photo."}</span></label>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid gap-3 content-start">
+          <h3 className="text-base font-semibold">General settings</h3>
+          <fieldset>
+            <legend className="form-label">Theme</legend>
+            <div className="grid gap-3 sm:grid-cols-3 mt-1">
+              {MENU_TEMPLATES.map((t) => (
+                <label key={t.id} className={`rounded-xl border p-3 cursor-pointer ${draft.template === t.id ? "border-primary ring-2 ring-primary/30" : "border-line"}`}>
+                  <input type="radio" name="menu-template" className="sr-only" checked={draft.template === t.id} onChange={() => setDraft({ ...draft, template: t.id })} />
+                  <span className="flex gap-1 mb-2" aria-hidden>
+                    <span className="h-6 flex-1 rounded" style={{ background: t.swatch[0], border: "1px solid #d5e2f2" }} />
+                    <span className="h-6 w-8 rounded" style={{ background: t.swatch[1] }} />
+                  </span>
+                  <span className="font-medium block">{t.name}</span>
+                  <span className="text-xs text-muted">{t.blurb}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="grid gap-1"><span className="form-label">Menu name (only you see this)</span>
             <input className="field" value={draft.name} maxLength={MENU_LIMITS.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
-          <label className="grid gap-1"><span className="form-label">Title on screen</span>
-            <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
-          <label className="grid gap-1"><span className="form-label">Subtitle</span>
-            <input className="field" value={c.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(e) => update({ ...c, subtitle: e.target.value })} /></label>
-
-          {c.sections.map((section, si) => (
-            <fieldset key={si} className="rounded-xl border border-line p-3 grid gap-2">
-              <legend className="px-1 text-sm font-semibold">Section {si + 1}</legend>
-              <div className="flex gap-2">
-                <input className="field flex-1" aria-label={`Section ${si + 1} name`} placeholder="e.g. Tacos" value={section.name} maxLength={MENU_LIMITS.sectionName}
-                  onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
-                <button type="button" className="btn btn-quiet" onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove section</button>
-              </div>
-              {section.items.map((item, ii) => {
-                const setItem = (patch: Partial<typeof item>) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.map((it, j) => j === ii ? { ...it, ...patch } : it) } : s) });
-                return (
-                  <div key={ii} className="grid grid-cols-[1fr_6.5rem_auto] gap-2">
-                    <input className="field" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })} />
-                    <input className="field" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })} />
-                    <button type="button" className="btn btn-quiet" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
-                      onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>×</button>
-                    <input className="field col-span-2 text-sm" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })} />
-                  </div>
-                );
-              })}
-              {section.items.length < MENU_LIMITS.itemsPerSection && totalItems < MENU_LIMITS.items ? (
-                <button type="button" className="btn btn-quiet justify-self-start" onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
-              ) : null}
-            </fieldset>
-          ))}
-          {c.sections.length < MENU_LIMITS.sections ? (
-            <button type="button" className="btn btn-quiet justify-self-start" onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>Add section</button>
-          ) : null}
-          <label className="grid gap-1"><span className="form-label">Footer</span>
-            <input className="field" value={c.footer} maxLength={MENU_LIMITS.footer} onChange={(e) => update({ ...c, footer: e.target.value })} /></label>
           <label className="grid gap-1"><span className="form-label">Photo (optional)</span>
-            <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => update({ ...c, photoMediaId: e.target.value || null })}>
+            <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
               <option value="">No photo</option>
               {images.map((m) => <option key={m.id} value={m.id}>{m.fileName}</option>)}
             </select>
-            <span className="text-xs text-muted">{images.length ? "Shows on the right side of the menu. JPG or PNG from your media." : "Upload a JPG or PNG to your media to add a photo."}</span></label>
+          </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={c.useBrand !== false} onChange={(e) => update({ ...c, useBrand: e.target.checked })} />
             Use my brand (logo and colours)
           </label>
-        </div>
-
-        <div className="grid gap-3 content-start">
-          <p className="form-label">Preview</p>
-          <div className="tv">
-            {preview ? <img src={preview} alt="Menu board preview" data-testid="menu-preview" className="w-full h-full object-contain" /> : null}
-          </div>
-          {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
+          <p className="text-xs text-muted">Colours and the logo come from your <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</Link>. There is no separate brand form here.</p>
           {displays.length ? (
             <fieldset className="grid gap-1">
               <legend className="form-label">Show on these screens now (optional)</legend>
@@ -288,7 +512,7 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? "Saving…" : draft.id ? "Save changes" : "Create menu board"}</button>
-            <button className="btn btn-quiet" disabled={busy} onClick={() => setDraft(null)}>Cancel</button>
+            <button className="btn btn-quiet" disabled={busy} onClick={requestClose}>Cancel</button>
           </div>
         </div>
       </div>

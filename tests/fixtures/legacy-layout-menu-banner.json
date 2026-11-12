@@ -1,0 +1,74 @@
+{
+  "layoutVersion": 1,
+  "template": "menu-banner",
+  "imageMediaId": null,
+  "videoMediaId": null,
+  "font": "inter",
+  "textColor": null,
+  "backgroundColor": null,
+  "columnWidths": null,
+  "imageFit": "cover",
+  "imageAnchor": "center",
+  "split": 0.18,
+  "palette": "classic",
+  "primaryColor": null,
+  "accentColor": null,
+  "typeScale": "room",
+  "title": "Field & Vine",
+  "subtitle": "Groceries and lunch",
+  "footer": "Members save 10% after 4",
+  "featureTitle": "Today's counter",
+  "featureDetail": "Groceries until 7",
+  "sections": [
+    {
+      "name": "Counter",
+      "items": [
+        {
+          "name": "Soup and salad",
+          "price": "$11",
+          "description": "Rotates daily"
+        },
+        {
+          "name": "Grain bowl",
+          "price": "$13",
+          "description": "Greens, grains, tahini"
+        },
+        {
+          "name": "Half sandwich",
+          "price": "$9",
+          "description": "Chicken or veggie"
+        },
+        {
+          "name": "Chili",
+          "price": "$8",
+          "description": "Cup or bowl"
+        }
+      ]
+    },
+    {
+      "name": "Market",
+      "items": [
+        {
+          "name": "Citrus bag",
+          "price": "$6",
+          "description": "Picked this morning"
+        },
+        {
+          "name": "Sourdough",
+          "price": "$7",
+          "description": "Baked at dawn"
+        },
+        {
+          "name": "Olive oil",
+          "price": "$14",
+          "description": "House blend"
+        },
+        {
+          "name": "Flowers",
+          "price": "$12",
+          "description": "Mixed bunch"
+        }
+      ]
+    }
+  ]
+}

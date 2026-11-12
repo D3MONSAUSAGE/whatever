@@ -64,4 +64,15 @@ describe("layout save", () => {
     const handler = route.slice(route.indexOf("export async function POST"));
     expect(handler.indexOf("layoutStudioEnabled")).toBeLessThan(handler.indexOf("requireAdmin"));
   });
+
+  it("stores the palette as the row template, never a layout id, including two-menu-promo and two-column", () => {
+    for (const id of ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"] as const) {
+      const doc = sampleLayout(id);
+      const stored = storedMenuTemplate(doc);
+      expect(["classic", "fresh", "bold"]).toContain(stored);
+      expect(stored).not.toBe(id);
+      expect(doc.template).toBe(id);
+      expect(doc.palette).toBe(stored);
+    }
+  });
 });
