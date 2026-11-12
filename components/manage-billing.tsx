@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { afterPortalResponse, jumpToPlansPicker } from "@/lib/billing-view";
 
 /** Opens this org's Stripe Customer Portal, or the plan picker when there is no Stripe customer yet. */
 export function ManageBilling({ className = "", label = "Manage billing", testId = "manage-billing" }: { className?: string; label?: string; testId?: string }) {
@@ -13,11 +14,15 @@ export function ManageBilling({ className = "", label = "Manage billing", testId
     setError(null);
     try {
       const result = await api<{ url?: string; action?: string }>("/api/billing/portal", { method: "POST", body: "{}" });
-      if (result.url) {
-        window.location.assign(result.url);
+      const next = afterPortalResponse(result);
+      if (next.kind === "portal") {
+        window.location.assign(next.url);
         return;
       }
-      window.location.assign("/dashboard/billing#plans");
+      // Trial (or no Stripe customer): stay in the app. Clear busy so the button
+      // does not stick on "Opening…" when this is only a same-document hash change.
+      setBusy(false);
+      jumpToPlansPicker(window.location, document);
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);

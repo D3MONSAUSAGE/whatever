@@ -30,7 +30,7 @@ Vercel log drains and alerting rules need a paid Vercel plan, so they're not use
 - `pairing_sessions` and `rate_limits` have no policies, so only the server can reach them. Supabase's advisor flags this as INFO, and it is intended.
 - No anon or authenticated INSERT/UPDATE/DELETE policies exist. All writes go through server routes that check the account.
 - All 12 `public` functions are not executable by `anon` or `authenticated`.
-- The `media` bucket is private, with a 50 MB limit and no storage policies. Files are served only through signed URLs (1 h for the dashboard; the player 1 h too).
+- The `media` bucket is private, with a 500 MB limit and no storage policies. Files are served only through signed URLs (1 h for the dashboard; the player 1 h too).
 
 **Tests:**
 - `tests/rls/isolation.test.ts`: real Supabase, two users, tables, storage and functions.

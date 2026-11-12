@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
+import { MAX_VIDEO_MB } from "@/lib/mp4";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
@@ -140,7 +141,7 @@ export function MediaLibrary({ fixture }: { fixture?: MediaItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Media library" icon={<IconImage />} lede="Images up to 15 MB. Video is MP4 H.264, 50 MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.">
+      <PageHeader title="Media library" icon={<IconImage />} lede={`Images up to 15 MB. Video is MP4 H.264, ${MAX_VIDEO_MB} MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.`}>
         <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
           Upload image
           <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}

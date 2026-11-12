@@ -73,3 +73,44 @@ export function availabilityOf(data: { available: boolean } | null, error: strin
   if (data) return data.available ? "available" : "unavailable";
   return error ? "unavailable" : "loading";
 }
+
+
+/** Destination for a trial (or any account with no Stripe customer) after Manage billing. */
+export const BILLING_PLANS_HREF = "/dashboard/billing#plans";
+
+/**
+ * Where Manage billing should go after POST /api/billing/portal.
+ * A paying org gets a Stripe portal URL and leaves the page.
+ * A trial (action "plans", no url) stays in the app and must clear the busy state.
+ */
+export function afterPortalResponse(result: { url?: string; action?: string } | null | undefined):
+  | { kind: "portal"; url: string }
+  | { kind: "plans" } {
+  const url = result && typeof result.url === "string" ? result.url.trim() : "";
+  if (url) return { kind: "portal", url };
+  return { kind: "plans" };
+}
+
+export type PlansJumpLocation = {
+  pathname: string;
+  hash: string;
+  assign: (href: string) => void;
+};
+export type PlansJumpDocument = { getElementById: (id: string) => { scrollIntoView: (opts?: ScrollIntoViewOptions | boolean) => void } | null };
+
+/** Jump to the plan picker, including when the billing page is already open (hash-only). */
+export function jumpToPlansPicker(loc: PlansJumpLocation, doc: PlansJumpDocument): { navigated: boolean; scrolled: boolean } {
+  const onBilling = loc.pathname.replace(/\/+$/, "") === "/dashboard/billing";
+  if (!onBilling) {
+    loc.assign(BILLING_PLANS_HREF);
+    return { navigated: true, scrolled: false };
+  }
+  if (loc.hash !== "#plans") loc.assign(BILLING_PLANS_HREF);
+  const el = doc.getElementById("plans");
+  if (el && typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ block: "start" });
+    return { navigated: false, scrolled: true };
+  }
+  if (loc.hash !== "#plans") return { navigated: true, scrolled: false };
+  return { navigated: false, scrolled: false };
+}

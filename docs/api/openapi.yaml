@@ -810,7 +810,7 @@ paths:
                 fileName: { type: string, description: Ignored by this route. The complete route stores the name. }
                 sizeBytes:
                   type: number
-                  description: Finite byte length, 1 through 52428800.
+                  description: Finite byte length, 1 through 524288000.
       responses:
         "201":
           description: Signed upload
@@ -832,11 +832,11 @@ paths:
               example: { error: "That file isn't an H.264 MP4. Export it as MP4 with H.264 video and AAC audio, or with no audio." }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "413":
-          description: Over 50 MB
+          description: Over 500 MB
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "Videos must be 50 MB or smaller." }
+              example: { error: "Videos must be 500 MB or smaller." }
         "500":
           description: Could not mint the URL
           content:
@@ -865,7 +865,7 @@ paths:
         200 and does not delete. A thumbnail upload that fails for a reason
         other than "already exists" also deletes the MP4 and thumbnail when
         no row was saved. The route allows 300 seconds, which covers
-        downloading and checking a 50 MB object.
+        inspecting the stored object with range reads (the MP4 is not re-downloaded in full).
       operationId: completeVideoUpload
       requestBody:
         required: true
@@ -909,13 +909,13 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "413":
           description: |
-            Stored object is over 50 MB. The MP4 and a thumbnail at the same id
+            Stored object is over 500 MB. The MP4 and a thumbnail at the same id
             are deleted, unless a row for this account was saved while this
             call was running.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
-              example: { error: "Videos must be 50 MB or smaller." }
+              example: { error: "Videos must be 500 MB or smaller." }
         "415":
           description: |
             Codec, profile, duration, dimensions, metadata, or thumbnail rejected.

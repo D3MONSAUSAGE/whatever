@@ -63,7 +63,7 @@ function rows(mediaId: string) {
 }
 
 describe("POST /api/media/upload/complete", () => {
-  it("allows 300 seconds, the Hobby plan maximum, so a 50 MB object can be re-downloaded", () => {
+  it("allows 300 seconds, the Hobby plan maximum, so a slow storage read cannot be cut short", () => {
     expect(maxDuration).toBe(300);
   });
 

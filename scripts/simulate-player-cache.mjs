@@ -94,7 +94,15 @@ function boot() {
   const caches = {
     open: async () => ({
       match: async (key) => (cacheStore.has(key) ? { blob: async () => ({ size: cacheStore.get(key).size, key }) } : undefined),
-      put: async (key, res) => { cacheStore.set(key, { size: res._size }); },
+      put: async (key, res) => {
+        const size = (res && res._size) || (res && res.headers && typeof res.headers.get === "function" && Number(res.headers.get("content-length"))) || (res && res.headers && Number(res.headers["Content-Length"])) || 0;
+        if (S.failPut || size > 300 * 1024 * 1024) {
+          const err = new Error("Quota exceeded.");
+          err.name = "QuotaExceededError";
+          throw err;
+        }
+        cacheStore.set(key, { size });
+      },
       delete: async (key) => cacheStore.delete(key),
     }),
     delete: async () => { cacheStore.clear(); return true; },
@@ -103,7 +111,7 @@ function boot() {
     setTimeout_(() => {
       if (!S.online) { reject(new TypeError("offline")); return; }
       fetches.push(url);
-      resolve({ ok: true, _size: 1000, headers: { get: (h) => (h === "content-length" ? "1000" : null) } });
+      resolve({ ok: true, _size: 1000, headers: { get: (h) => (h === "content-length" ? "1000" : null) }, blob: async () => ({ size: 1000, key: url, type: "video/mp4" }) });
     }, 500);
   });
   const URL_ = { createObjectURL: (b) => `blob:${b.key}#${++blobCount}`, revokeObjectURL: () => {} };
@@ -174,6 +182,8 @@ S.playlist = { id: "pl", transition: "none", items: [
 await run(60000);
 check("a changed playlist downloads only the new file", fetches.length === 4 && fetches[3].indexOf("/c.jpg") !== -1, fetches.slice(3));
 
+check("replaced media is evicted from the cache (key is mediaId, not the signed URL)", !cacheStore.has("/__seemple_media/b") && !cacheStore.has("/__seemple_media/v") && cacheStore.has("/__seemple_media/a") && cacheStore.has("/__seemple_media/c"), [...cacheStore.keys()]);
+
 check("TV confirms the new playlist once it is on screen", S.playing.filter((v) => v === 2).length === 1, S.playing);
 
 // Restart the TV while the internet is down: it plays the saved playlist.
@@ -242,6 +252,32 @@ S.online = false;
 tv = boot();
 await run(15000);
 check("offline playback shows the cached still and does not restore the zone video", /blob:/.test(shown(tv.els)) && ["va", "vb"].every((id) => (tv.els[id].src || "").indexOf("promo.mp4") === -1), shown(tv.els));
+
+// Cache Storage rejects a large file (Chrome QuotaExceeded around 400 MB+):
+// the in-memory blob still lets later loops play without a second download.
+S.online = true; S.revoked = false; S.pollMs = 30000; S.failPut = true; S.playing = [];
+storage.pantalla_display_token = S.token;
+delete storage.seemple_last_state;
+delete storage.seemple_media_index;
+cacheStore.clear();
+const fetchesBeforeFail = fetches.length;
+S.version = 6;
+S.playlist = { id: "big", transition: "none", items: [
+  { mediaId: "bigv", url: "https://cdn/bigv.mp4", durationMs: 3000, kind: "video" },
+] };
+tv = boot();
+await run(8000);
+const afterFirstFailPut = fetches.length;
+const srcAfterFailPut = shown(tv.els);
+await run(8000);
+check("when Cache.put fails, the in-memory blob still prevents a re-download on loop",
+  fetches.length === fetchesBeforeFail + 1
+  && fetches[fetches.length - 1].indexOf("bigv.mp4") !== -1
+  && fetches.length === afterFirstFailPut
+  && /^blob:/.test(String(srcAfterFailPut).replace(/^url\("/, ""))
+  && cacheStore.size === 0,
+  { fetches: fetches.slice(fetchesBeforeFail), afterFirst: afterFirstFailPut, src: srcAfterFailPut, cache: [...cacheStore.keys()] });
+S.failPut = false;
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
