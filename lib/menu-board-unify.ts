@@ -22,19 +22,18 @@ export type LayoutOption = {
   kind: BoardKind;
   /** Layout Studio template id, when kind is "layout". */
   layoutTemplate?: LayoutTemplate;
-  featured: boolean;
 };
 
 /** The four named layouts plus every other existing Layout Studio template. */
 export const LAYOUT_OPTIONS: LayoutOption[] = [
-  { id: "full-screen", name: "Full-screen menu", blurb: "A full 16:9 menu. Sections, items, prices, and an optional photo. Uses your Brand Kit.", kind: "classic", featured: true },
-  { id: "two-column", name: "Two-column menu", blurb: "Two independently editable menu columns on one 16:9 board.", kind: "layout", layoutTemplate: "two-column", featured: true },
-  { id: "menu-promo", name: "Menu + promo image/video", blurb: "A menu beside a promo area.", kind: "layout", layoutTemplate: "menu-promo-67", featured: true },
-  { id: "two-menu-promo", name: "Two menus + promo", blurb: "Two menu columns and a promo area, about 35% / 35% / 30%.", kind: "layout", layoutTemplate: "two-menu-promo", featured: true },
-  { id: "triple-column", name: "Three columns", blurb: "Three menu-text columns. A photo can sit behind the board.", kind: "layout", layoutTemplate: "triple-column", featured: false },
-  { id: "split-50", name: "Split showcase", blurb: "Menu on the left, a photo or video on the right.", kind: "layout", layoutTemplate: "split-50", featured: false },
-  { id: "menu-banner", name: "Menu and banner", blurb: "A full-width menu with a banner along the bottom.", kind: "layout", layoutTemplate: "menu-banner", featured: false },
-  { id: "signature", name: "Signature", blurb: "A menu card over a full-board photo, with a video strip beside it.", kind: "layout", layoutTemplate: "signature", featured: false },
+  { id: "full-screen", name: "Full-screen menu", blurb: "A full 16:9 menu. Sections, items, prices, and an optional photo. Uses your Brand Kit.", kind: "classic" },
+  { id: "two-column", name: "Two-column menu", blurb: "Two independently editable menu columns on one 16:9 board.", kind: "layout", layoutTemplate: "two-column" },
+  { id: "menu-promo", name: "Menu + promo image/video", blurb: "A menu beside a promo area.", kind: "layout", layoutTemplate: "menu-promo-67" },
+  { id: "two-menu-promo", name: "Two menus + promo", blurb: "Two menu columns and a promo area, about 35% / 35% / 30%.", kind: "layout", layoutTemplate: "two-menu-promo" },
+  { id: "triple-column", name: "Three columns", blurb: "Three menu-text columns. A photo can sit behind the board.", kind: "layout", layoutTemplate: "triple-column" },
+  { id: "split-50", name: "Split showcase", blurb: "Menu on the left, a photo or video on the right.", kind: "layout", layoutTemplate: "split-50" },
+  { id: "menu-banner", name: "Menu and banner", blurb: "A full-width menu with a banner along the bottom.", kind: "layout", layoutTemplate: "menu-banner" },
+  { id: "signature", name: "Signature", blurb: "A menu card over a full-board photo, with a video strip beside it.", kind: "layout", layoutTemplate: "signature" },
 ];
 
 

@@ -20,6 +20,7 @@ import { ContentHub } from "@/components/content-hub";
 import {
   SCREEN_ACTION_ORDER,
   publishSavedCopy,
+  publishSavedCopyForTargets,
   publishTimingCopy,
   screenActionClass,
   screenActionGroup,
@@ -231,5 +232,55 @@ describe("server-derived online status and preview fixtures", () => {
     expect(screens).toContain("display.connected && !display.online");
     expect(screens).toContain("heartbeatLabel(display.lastSeenAt)");
     expect(screens).toContain("<Status display={display} />");
+  });
+});
+
+describe("publish copy for offline targets across every leftover toast", () => {
+  const offline = { online: false, connected: true };
+  const live = { online: true, connected: true };
+  const unpaired = { online: false, connected: false };
+
+  it("uses saved-until-back-online wording whenever any target is offline, and never promises 30 seconds for those screens", () => {
+    expect(publishSavedCopyForTargets([offline])).toBe(publishSavedCopy(offline));
+    expect(publishSavedCopyForTargets([offline])).toContain("offline");
+    expect(publishSavedCopyForTargets([offline])).not.toMatch(/within about 30 seconds/i);
+    expect(publishSavedCopyForTargets([offline, offline])).toContain("Offline screens are saved");
+    expect(publishSavedCopyForTargets([offline, offline])).not.toMatch(/within about 30 seconds/i);
+    const mixed = publishSavedCopyForTargets([live, offline]);
+    expect(mixed).toContain("The online TV updates within about 30 seconds");
+    expect(mixed).toContain("The offline screen is saved");
+    expect(mixed).toContain("when it comes back online");
+    expect(publishSavedCopyForTargets([live])).toBe(publishSavedCopy(live));
+    expect(publishSavedCopyForTargets([unpaired])).toContain("pairing");
+    expect(publishSavedCopyForTargets([unpaired])).not.toMatch(/within about 30 seconds/i);
+  });
+
+  it("routes displays, group, and layout-studio publish notes through the helper, with no raw 30-second promise to an offline TV", () => {
+    const displays = readFileSync("components/displays-screen.tsx", "utf8");
+    const group = readFileSync("components/group-publish.tsx", "utf8");
+    const studio = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(displays).toContain("publishSavedCopyForTargets(targets)");
+    expect(displays).toContain("publishTimingCopy(display)");
+    expect(displays).toContain("publishSavedCopy(display)");
+    expect(displays).not.toContain("TV updates within ~30 s");
+    expect(displays).not.toContain("The TV updates within about 10 seconds.");
+    expect(group).toContain("publishSavedCopyForTargets(targets)");
+    expect(group).not.toContain("TVs update within about 30 seconds.");
+    expect(studio).toContain("publishSavedCopy({");
+    expect(studio).not.toContain("TV updates within ~30 s");
+    expect(studio).toContain("Screens already playing this board will update when they are online.");
+  });
+});
+
+describe("isolated studio photo limit copy", () => {
+  it("shows the 1.5 MB isolated preview cap, not the 15 MB library limit, and does not change the cap", () => {
+    const studio = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(studio).toContain("export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000");
+    expect(studio).toContain('export const ISOLATED_STUDIO_PHOTO_LIMIT_LABEL = "1.5 MB or smaller"');
+    expect(studio).toContain("file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES");
+    expect(studio).toContain("Use a photo under 1.5 MB.");
+    expect(studio).toContain("isolatedPhotoLimit={!accountMode && !sessionToken}");
+    expect(studio).toContain("limitLabel={imageLimitLabel}");
+    expect(studio).toContain("ISOLATED_STUDIO_PHOTO_LIMIT_LABEL");
   });
 });

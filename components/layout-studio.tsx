@@ -21,7 +21,12 @@ import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-vid
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { confirmDiscardUnsaved, hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/menu-board-unify";
+import { publishSavedCopy } from "@/lib/screen-actions-ui";
 import type { Brand } from "@/lib/brand-kit";
+
+/** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
+export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000;
+export const ISOLATED_STUDIO_PHOTO_LIMIT_LABEL = "1.5 MB or smaller";
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"];
 
@@ -42,6 +47,8 @@ function blankItem(): LayoutItem {
 export function LayoutStudio({
   mode = "preview",
   screenId = null,
+  screenOnline,
+  screenConnected,
   fixture = null,
   pathOverride: _pathOverride,
   initialBoardId = null,
@@ -53,6 +60,8 @@ export function LayoutStudio({
 }: {
   mode?: "preview" | "account";
   screenId?: string | null;
+  screenOnline?: boolean;
+  screenConnected?: boolean;
   fixture?: AccountStudio | null;
   pathOverride?: string;
   initialBoardId?: string | null;
@@ -543,10 +552,13 @@ export function LayoutStudio({
           setNote("The board was saved, but it has no playlist, so this screen was not changed.");
         } else {
           await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: board.id, displayId: screenId }) });
-          setNote("Published and assigned to this screen. TV updates within ~30 s, then it shows as playing.");
+          setNote(publishSavedCopy({
+            online: screenOnline ?? false,
+            connected: screenConnected ?? true,
+          }));
         }
       } else if (board?.playlistId) {
-        setNote("Published to this account. TV updates within ~30 s, then it shows as playing.");
+        setNote("Published to this account. Screens already playing this board will update when they are online.");
       } else {
         setNote("The board was saved, but publishing did not create a playlist.");
       }
@@ -591,7 +603,7 @@ export function LayoutStudio({
       setDraft((current) => placeZoneMedia(current, "photo", current.imageMediaId, true));
     }
     if (!accountMode && !sessionToken) {
-      if (file.size > 1_500_000) { setNote("Use a photo under 1.5 MB."); setImageHref(null); return; }
+      if (file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES) { setNote("Use a photo under 1.5 MB."); setImageHref(null); return; }
       const reader = new FileReader();
       reader.onload = () => setImageHref(typeof reader.result === "string" ? reader.result : local);
       reader.readAsDataURL(file);
@@ -749,6 +761,7 @@ export function LayoutStudio({
             clipUrl={clipUrl}
             videoOn={videoOn}
             accountMode={accountMode}
+            isolatedPhotoLimit={!accountMode && !sessionToken}
             sectionIndex={activeSection}
             setSectionIndex={(index) => { setSectionIndex(index); setZone(template === "triple-column" || template === "two-menu-promo" || template === "two-column" ? `column-${index}` : "menu"); }}
             photoLabel={photoLabel}
@@ -988,6 +1001,7 @@ function columnTemplate(template: LayoutTemplate) {
 
 function SelectedZoneEditor({
   zone, template, draft, update, closeZone, account, progress, imageHref, clipUrl, videoOn, accountMode,
+  isolatedPhotoLimit = false,
   sectionIndex, setSectionIndex, photoLabel, onPhoto, onVideo, removePhoto, removeVideo, setImageHref, setClipUrl, setVideoOn, setNote,
 }: {
   zone: string;
@@ -1001,6 +1015,7 @@ function SelectedZoneEditor({
   clipUrl: string | null;
   videoOn: boolean;
   accountMode: boolean;
+  isolatedPhotoLimit?: boolean;
   sectionIndex: number;
   setSectionIndex: (index: number) => void;
   photoLabel: string;
@@ -1078,6 +1093,7 @@ function SelectedZoneEditor({
             allowImage={panel === "background" ? true : zoneAllows(template, zone, "image")}
             allowVideo={panel === "background" ? false : zoneAllows(template, zone, "video")}
             promoArea={template === "menu-promo-67" || template === "two-menu-promo"}
+            imageLimitLabel={isolatedPhotoLimit ? ISOLATED_STUDIO_PHOTO_LIMIT_LABEL : undefined}
             draft={draft}
             account={account}
             progress={progress}
@@ -1132,7 +1148,7 @@ function SelectedZoneEditor({
             </label>
           ) : null}
           {template === "triple-column" && zone === "photo" ? (
-            <FileUploadControl kind="image" accept="image/jpeg,image/png,image/webp" onFiles={(files) => onPhoto(files[0])} />
+            <FileUploadControl kind="image" accept="image/jpeg,image/png,image/webp" limitLabel={isolatedPhotoLimit ? ISOLATED_STUDIO_PHOTO_LIMIT_LABEL : undefined} onFiles={(files) => onPhoto(files[0])} />
           ) : null}
         </div>
       ) : null}
@@ -1270,12 +1286,13 @@ function zoneAllows(template: LayoutTemplate, zone: string, kind: "image" | "vid
 }
 
 function ZoneMedia({
-  photoLabel, allowImage, allowVideo, promoArea, draft, account, previewImage, previewVideo, videoAttached, onPhoto, onVideo, removePhoto, removeVideo, update, onLibraryPhoto, onLibraryVideo,
+  photoLabel, allowImage, allowVideo, promoArea, imageLimitLabel, draft, account, previewImage, previewVideo, videoAttached, onPhoto, onVideo, removePhoto, removeVideo, update, onLibraryPhoto, onLibraryVideo,
 }: {
   photoLabel: string;
   allowImage: boolean;
   allowVideo: boolean;
   promoArea?: boolean;
+  imageLimitLabel?: string;
   draft: LayoutDocument;
   account: AccountStudio | null;
   progress: string | null;
@@ -1331,6 +1348,7 @@ function ZoneMedia({
               kind="image"
               label={imageLabel}
               accept="image/jpeg,image/png,image/webp"
+              limitLabel={imageLimitLabel}
               buttonClass={`btn cursor-pointer min-h-11 ${imagePrimary ? "btn-primary" : "btn-quiet"}`}
               onFiles={(files) => onPhoto(files[0])}
             />

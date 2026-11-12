@@ -10,6 +10,7 @@ import { byName, SEARCH_FROM } from "@/components/playlist-list";
 import { screenNameWarning } from "@/lib/screen-names";
 import { syncLine } from "@/lib/sync-line";
 import { assignBusyFor } from "@/lib/assign-publish";
+import { publishSavedCopy, publishSavedCopyForTargets, publishTimingCopy } from "@/lib/screen-actions-ui";
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
@@ -246,7 +247,7 @@ function Picker({ display, onClose, onPublished, onError }: {
     setBusy(true);
     try {
       await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ mediaId }) });
-      onPublished(mediaId ? `Published to ${display.name}` : `Cleared ${display.name}`);
+      onPublished(mediaId ? publishSavedCopy(display) : `Cleared ${display.name}`);
     } catch (err) {
       onError((err as Error).message);
       setBusy(false);
@@ -263,7 +264,7 @@ function Picker({ display, onClose, onPublished, onError }: {
           <button type="button" className="btn btn-quiet px-3" onClick={onClose} aria-label="Close">Close</button>
         </div>
         <p className="text-sm text-muted mb-4">
-          Tap an image. The TV updates within about 10 seconds.
+          Tap an image. {publishTimingCopy(display)}
           {display.playlist ? " This replaces the playlist on this TV." : ""}
         </p>
         {!media.data ? <LoadState error={media.error} /> : images.length === 0 ? (
@@ -361,7 +362,12 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         signal: AbortSignal.timeout(20_000),
         body: JSON.stringify({ playlistId, displayIds, commit: true, replace }),
       });
-      onDone("Published. Assigned · TV updates within ~30 s, then it shows as playing.");
+      const offlineNames = new Set(preview.offline.map((item) => item.name));
+      const targets = displays.filter((item) => displayIds.includes(item.id)).map((item) => ({
+        online: item.online && !offlineNames.has(item.name),
+        connected: item.connected,
+      }));
+      onDone(publishSavedCopyForTargets(targets));
     } catch (err) {
       const timedOut = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
       if (timedOut && committing) onDone("Still publishing; check the screens in a moment.");

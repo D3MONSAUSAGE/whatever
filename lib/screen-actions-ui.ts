@@ -57,3 +57,38 @@ export function publishSavedCopy(display: { online: boolean; connected: boolean 
   if (!display.online) return "Assigned. This screen is offline, so the TV will update when it comes back online.";
   return "Assigned. The TV updates within about 30 seconds, then this screen shows as playing.";
 }
+
+/**
+ * Success copy after publishing to one or more screens.
+ * If any target is offline or unpaired, it uses the saved-until-back-online wording
+ * and never promises a 30-second update for those screens.
+ */
+export function publishSavedCopyForTargets(targets: { online: boolean; connected?: boolean }[]): string {
+  if (targets.length === 1) {
+    const target = targets[0];
+    return publishSavedCopy({ online: target.online, connected: target.connected ?? true });
+  }
+  const unpaired = targets.filter((item) => item.connected === false);
+  const offline = targets.filter((item) => (item.connected ?? true) && !item.online);
+  const live = targets.filter((item) => (item.connected ?? true) && item.online);
+  const parts = ["Assigned."];
+  if (live.length) {
+    parts.push(live.length === 1
+      ? "The online TV updates within about 30 seconds."
+      : "Online TVs update within about 30 seconds.");
+  }
+  if (offline.length) {
+    parts.push(offline.length === 1
+      ? "The offline screen is saved, and that TV will update when it comes back online."
+      : "Offline screens are saved, and those TVs will update when they come back online.");
+  }
+  if (unpaired.length) {
+    parts.push(unpaired.length === 1
+      ? "The unpaired screen will play once the TV finishes pairing."
+      : "Unpaired screens will play once those TVs finish pairing.");
+  }
+  if (parts.length === 1) {
+    return "Assigned. The TVs update within about 30 seconds, then they show as playing.";
+  }
+  return parts.join(" ");
+}

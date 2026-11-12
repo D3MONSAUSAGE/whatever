@@ -228,6 +228,8 @@ export function MenuBoards({
           mode="account"
           fixture={fixture?.studio ?? null}
           screenId={view.screenId}
+          screenOnline={(displays.data ?? []).find((item) => item.id === view.screenId)?.online}
+          screenConnected={(displays.data ?? []).find((item) => item.id === view.screenId)?.connected}
           initialBoardId={view.boardId}
           initialTemplate={view.boardId ? null : view.template}
           initialZone={view.zone}

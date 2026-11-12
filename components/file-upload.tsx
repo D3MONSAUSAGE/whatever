@@ -12,6 +12,7 @@ export function FileUploadControl({
   label,
   buttonClass,
   filename: filenameOverride,
+  limitLabel,
 }: {
   kind: FileUploadKind;
   onFiles: (files: File[]) => void;
@@ -21,6 +22,7 @@ export function FileUploadControl({
   label?: string;
   buttonClass?: string;
   filename?: string | null;
+  limitLabel?: string;
 }) {
   const meta = FILE_UPLOAD[kind];
   const inputId = useId();
@@ -50,7 +52,7 @@ export function FileUploadControl({
           }}
         />
       </label>
-      <p className="text-sm text-muted mt-1">{meta.acceptLabel}. {meta.limitLabel}.</p>
+      <p className="text-sm text-muted mt-1">{meta.acceptLabel}. {limitLabel ?? meta.limitLabel}.</p>
       <p className="text-sm mt-0.5" data-testid="upload-filename">
         {filename ? filename : "No file chosen yet."}
       </p>
