@@ -1,4 +1,4 @@
-import { layoutSvg, sampleLayout } from "@/lib/layout-studio";
+import { layoutSvg, sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
 import { layoutOptionById, type LayoutOptionId } from "@/lib/menu-board-unify";
 
 /** Reuse the existing layout SVG renderer (and a matching classic sketch) as gallery thumbnails. No new templates. */
@@ -36,4 +36,10 @@ function classicMenuThumbnail(): string {
 
 function escapeXml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+
+/** Scaled-down still of an existing Layout Studio template. No new templates. */
+export function studioTemplateThumbnailSrc(template: LayoutTemplate): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(layoutSvg(sampleLayout(template)))}`;
 }

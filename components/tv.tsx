@@ -111,25 +111,29 @@ export function OfflineAlert({ displays, linkToDisplays = false }: { displays: D
   }, [offline.length]);
   if (offline.length === 0) return null;
   const names = offline.slice(0, 4);
+  const headline = offline.length === 1 ? "1 screen is offline" : `${offline.length} screens are offline`;
   return (
-    <div role="status" data-testid="offline-alert" className="note-error mb-6 flex flex-col gap-1.5">
-      <p className="font-semibold">
-        {offline.length === 1 ? "1 screen is offline" : `${offline.length} screens are offline`}
-      </p>
-      <ul className="text-sm">
-        {names.map((d) => (
-          <li key={d.id}>
-            <a href={`/dashboard/displays#${d.id}`} className="underline">{d.name}</a>
-            {d.lastSeenAt ? ` — no heartbeat for ${offlineFor(d.lastSeenAt)}` : " — never sent a heartbeat"}
-          </li>
-        ))}
-        {offline.length > names.length ? <li>and {offline.length - names.length} more</li> : null}
-      </ul>
-      <p className="text-sm text-ink/80">
-        Check that the TV is on, connected to Wi-Fi, and showing the Pekko player.
-        {linkToDisplays ? <> <a href="/dashboard/displays" className="underline">Open Displays</a>.</> : null}
-        {" "}This page refreshes every 10 seconds.
-      </p>
-    </div>
+    <details role="status" data-testid="offline-alert" className="note-error mb-4" open>
+      <summary className="flex items-center justify-between gap-3 min-h-11 cursor-pointer list-none font-semibold [&::-webkit-details-marker]:hidden">
+        <span>{headline}</span>
+        <span className="text-sm font-medium underline underline-offset-4 shrink-0">View</span>
+      </summary>
+      <div className="flex flex-col gap-1.5 pt-2">
+        <ul className="text-sm">
+          {names.map((d) => (
+            <li key={d.id}>
+              <a href={`/dashboard/displays#${d.id}`} className="underline">{d.name}</a>
+              {d.lastSeenAt ? ` — no heartbeat for ${offlineFor(d.lastSeenAt)}` : " — never sent a heartbeat"}
+            </li>
+          ))}
+          {offline.length > names.length ? <li>and {offline.length - names.length} more</li> : null}
+        </ul>
+        <p className="text-sm text-ink/80">
+          Check that the TV is on, connected to Wi-Fi, and showing the Pekko player.
+          {linkToDisplays ? <> <a href="/dashboard/displays" className="underline">Open Displays</a>.</> : null}
+          {" "}This page refreshes every 10 seconds.
+        </p>
+      </div>
+    </details>
   );
 }

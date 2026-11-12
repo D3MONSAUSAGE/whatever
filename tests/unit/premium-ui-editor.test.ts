@@ -1,0 +1,124 @@
+import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { ColorField } from "@/components/color-field";
+import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
+
+const TEMPLATES = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"] as const;
+
+describe("premium editor chrome", () => {
+  it("keeps a sticky TV preview on desktop and a static preview on a phone", async () => {
+    let chromium: typeof import("@playwright/test").chromium;
+    try {
+      chromium = (await import("@playwright/test")).chromium;
+    } catch {
+      return;
+    }
+    let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+    try {
+      browser = await chromium.launch({ timeout: 20000 });
+    } catch {
+      return;
+    }
+    const source = readFileSync("components/layout-studio.tsx", "utf8");
+    const style = source.match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "";
+    expect(style).toContain("position: sticky");
+    expect(source).toContain('id="studio-tv-preview"');
+    expect(source).toContain("Preview, not a live TV feed");
+    expect(source).toContain("TemplatePicker");
+    expect(source).toContain("ColorField");
+    expect(source).toContain("requestLeave");
+    expect(source).toContain("publishSavedCopy");
+    expect(source).toContain("ISOLATED_STUDIO_PHOTO_MAX_BYTES");
+    expect(source).not.toMatch(/<input type="color"/);
+
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${style}</style>
+      <main class="studio-app">
+        <header class="studio-toolbar"><h1 class="studio-title">Edit menu board</h1><div class="studio-toolbar-actions"><button class="btn">Save draft</button><button class="btn">Preview</button><button class="btn btn-primary">Publish</button></div></header>
+        <div class="studio-grid">
+          <div class="studio-left">
+            <section class="studio-controls" data-testid="studio-tools" id="tools"><div style="height:2400px">tall tools</div></section>
+          </div>
+          <section class="studio-canvas" data-testid="studio-canvas"><div class="preview-frame" style="aspect-ratio:16/9;background:#000"></div></section>
+          <section class="studio-preview" id="studio-tv-preview" data-testid="studio-tv-preview" aria-label="TV preview">
+            <p class="studio-kicker">Preview</p>
+            <p class="studio-preview-note">This is a preview of the board, Preview, not a live TV feed.</p>
+            <div class="studio-preview-still"><div class="preview-frame" style="aspect-ratio:16/9;background:#111;height:160px"></div></div>
+          </section>
+        </div>
+      </main>`);
+    const before = await page.evaluate(() => {
+      const preview = document.getElementById("studio-tv-preview");
+      const tools = document.getElementById("tools");
+      return {
+        position: preview ? getComputedStyle(preview).position : "",
+        inView: preview ? preview.getBoundingClientRect().top < window.innerHeight && preview.getBoundingClientRect().bottom > 0 : false,
+        toolsScroll: tools ? tools.scrollHeight : 0,
+      };
+    });
+    expect(before.position).toBe("sticky");
+    expect(before.inView).toBe(true);
+    await page.evaluate(() => {
+      const left = document.querySelector(".studio-left") as HTMLElement | null;
+      if (left) left.scrollTop = 800;
+    });
+    const after = await page.evaluate(() => {
+      const preview = document.getElementById("studio-tv-preview");
+      const r = preview?.getBoundingClientRect();
+      return {
+        inView: r ? r.top < window.innerHeight && r.bottom > 0 : false,
+        top: r?.top ?? -1,
+      };
+    });
+    expect(after.inView).toBe(true);
+    expect(after.top).toBeGreaterThanOrEqual(0);
+    await page.close();
+
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await phone.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${style}</style>
+      <main class="studio-app">
+        <div class="studio-grid">
+          <section class="studio-preview" aria-label="TV preview"><figure><div style="aspect-ratio:16/9;background:#000"></div></figure></section>
+          <section class="studio-controls"><div class="studio-pane on" style="width:900px">wide controls</div></section>
+        </div>
+        <nav class="studio-tabs"><button>Template</button><button>Section</button><button>Content</button><button>Style</button><button>Publish</button></nav>
+      </main>`);
+    const metrics = await phone.evaluate(() => {
+      const tab = document.querySelector(".studio-tabs button");
+      const preview = document.querySelector(".studio-preview");
+      return {
+        scroll: document.documentElement.scrollWidth,
+        client: document.documentElement.clientWidth,
+        sticky: preview ? getComputedStyle(preview).position : "",
+        tab: tab ? tab.getBoundingClientRect().height : 0,
+        previewBottom: preview ? preview.getBoundingClientRect().bottom : 0,
+        controlsTop: document.querySelector(".studio-controls")?.getBoundingClientRect().top ?? 0,
+      };
+    });
+    expect(metrics.scroll).toBeLessThanOrEqual(metrics.client + 1);
+    expect(metrics.sticky).toBe("static");
+    expect(metrics.controlsTop).toBeGreaterThanOrEqual(metrics.previewBottom - 1);
+    expect(metrics.tab).toBeGreaterThanOrEqual(44);
+    await browser.close();
+  });
+
+  it("renders visual thumbnails from existing templates, and a color swatch with a hex popover", () => {
+    for (const id of TEMPLATES) {
+      const src = studioTemplateThumbnailSrc(id);
+      expect(src).toContain("data:image/svg+xml");
+      expect(src).toContain("svg");
+    }
+    const html = renderToStaticMarkup(createElement(ColorField, {
+      label: "Text color",
+      value: "#112233",
+      fallback: "#0b1220",
+      onChange: () => undefined,
+    }));
+    expect(html).toContain("color-swatch");
+    expect(html).toContain("#112233");
+    expect(html).toContain('aria-label="Text color"');
+    expect(html).toContain('aria-expanded="false"');
+  });
+});

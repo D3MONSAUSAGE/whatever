@@ -20,8 +20,10 @@ import { api, authToken, uploadForm, useApi } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
+import { ColorField } from "@/components/color-field";
 import { confirmDiscardUnsaved, hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/menu-board-unify";
 import { publishSavedCopy } from "@/lib/screen-actions-ui";
+import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import type { Brand } from "@/lib/brand-kit";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
@@ -30,7 +32,7 @@ export const ISOLATED_STUDIO_PHOTO_LIMIT_LABEL = "1.5 MB or smaller";
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"];
 
-type StudioStep = "template" | "section" | "content" | "style" | "publish";
+type StudioStep = "template" | "section" | "content" | "style" | "publish" | "preview";
 
 type Snapshot = {
   doc: LayoutDocument;
@@ -709,15 +711,76 @@ export function LayoutStudio({
   const activeSection = Math.min(sectionIndex, Math.max(0, draft.sections.length - 1));
   const photoLabel = zone === "photo" || zone === "background" || template === "signature" ? "Background image" : "Feature photo";
 
+  function renderStage(interactive: boolean) {
+    return (
+      <Stage
+        svg={previewMarkup}
+        video={showZone ? videoBox : null}
+        videoSrc={zoneSrc}
+        label=""
+        hits={interactive ? previewHits(template, frame) : []}
+        active={zone}
+        onHit={interactive ? openZone : () => undefined}
+      />
+    );
+  }
+  const zoneEditor = (
+    <SelectedZoneEditor
+      zone={zone}
+      template={template}
+      draft={draft}
+      update={update}
+      closeZone={closeZone}
+      account={account}
+      progress={progress}
+      imageHref={imageHref}
+      clipUrl={clipUrl}
+      videoOn={videoOn}
+      accountMode={accountMode}
+      isolatedPhotoLimit={!accountMode && !sessionToken}
+      sectionIndex={activeSection}
+      setSectionIndex={(index) => { setSectionIndex(index); setZone(template === "triple-column" || template === "two-menu-promo" || template === "two-column" ? `column-${index}` : "menu"); }}
+      photoLabel={photoLabel}
+      onPhoto={onPhoto}
+      onVideo={onVideo}
+      removePhoto={removePhoto}
+      removeVideo={removeVideo}
+      setImageHref={setImageHref}
+      setClipUrl={setClipUrl}
+      setVideoOn={setVideoOn}
+      setNote={setNote}
+    />
+  );
+  function renderSaveDraft() {
+    return accountMode || account
+      ? <button type="button" className="btn btn-quiet min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button>
+      : <button type="button" className="btn btn-quiet min-h-11" onClick={saveDraft}>Save draft</button>;
+  }
+  function renderPublish() {
+    return accountMode || account
+      ? <button type="button" className="btn btn-primary min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button>
+      : <button type="button" className="btn btn-primary min-h-11" onClick={publish}>Publish preview</button>;
+  }
+  function renderPreviewButton() {
+    return accountMode
+      ? (
+        <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
+          setStep("preview");
+          document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }}>Preview</button>
+      )
+      : <a href="/layout-studio/player" className="btn btn-quiet min-h-11" style={{ textDecoration: "none" }}>Preview</a>;
+  }
+
   return (
-    <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined}>
-      <div className="studio-grid">
-        <div className="studio-heading">
+    <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
+      <header className="studio-toolbar">
+        <div className="studio-toolbar-lead">
+          {onClose ? <button type="button" className="btn btn-quiet min-h-11" onClick={() => requestLeave(onClose)}>Back to menu boards</button> : null}
           <div className="studio-page-title">
             <p className="studio-kicker">{embedded ? "Menu boards" : accountMode ? "Media" : "Isolated preview"}</p>
             <h1 className="studio-title">{embedded ? (menuId ? "Edit menu board" : "New menu board") : "Layout Studio"}</h1>
             <p className="studio-lead">{accountMode ? "Choose a layout, fill each area, then publish. A draft stays off the screens." : "Edit the board, then open the player check. This page does not write an account."}</p>
-            {onClose ? <button type="button" className="btn btn-quiet" onClick={() => requestLeave(onClose)}>Back to menu boards</button> : null}
           </div>
           {account ? (
             <div className="board-bar">
@@ -738,181 +801,169 @@ export function LayoutStudio({
             </div>
           ) : null}
         </div>
-        <section className="studio-preview" aria-label="TV preview">
-          <p className="studio-kicker">Preview</p>
-          <Stage
-            svg={previewMarkup}
-            video={showZone ? videoBox : null}
-            videoSrc={zoneSrc}
-            label=""
-            hits={previewHits(template, frame)}
-            active={zone}
-            onHit={openZone}
-          />
-          <SelectedZoneEditor
-            zone={zone}
-            template={template}
-            draft={draft}
-            update={update}
-            closeZone={closeZone}
-            account={account}
-            progress={progress}
-            imageHref={imageHref}
-            clipUrl={clipUrl}
-            videoOn={videoOn}
-            accountMode={accountMode}
-            isolatedPhotoLimit={!accountMode && !sessionToken}
-            sectionIndex={activeSection}
-            setSectionIndex={(index) => { setSectionIndex(index); setZone(template === "triple-column" || template === "two-menu-promo" || template === "two-column" ? `column-${index}` : "menu"); }}
-            photoLabel={photoLabel}
-            onPhoto={onPhoto}
-            onVideo={onVideo}
-            removePhoto={removePhoto}
-            removeVideo={removeVideo}
-            setImageHref={setImageHref}
-            setClipUrl={setClipUrl}
-            setVideoOn={setVideoOn}
-            setNote={setNote}
-          />
-          {!accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
-          {!accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
-        </section>
-        <section className="studio-controls">
+        <div className="studio-toolbar-actions">
+          {renderSaveDraft()}
+          {renderPreviewButton()}
+          {renderPublish()}
+        </div>
+        {progress || note ? <p className="studio-toolbar-note" role="status">{progress || note}</p> : null}
+      </header>
+      <div className="studio-grid">
+        <div className="studio-left">
+        <section className="studio-controls" data-testid="studio-tools">
           {screenId ? <p style={{ fontSize: 14 }}>This edit is for one screen. Publish assigns the board to that screen and leaves the others as they are.</p> : null}
 
           <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
-            <div className="zone-groups">
-              <section className="zone-group">
-                <h3>Template</h3>
-                <div className="chip-row">
-                  {TEMPLATES.map((id) => (
-                    <button key={id} type="button" onClick={() => choose(id)} style={chip(id === template)}>{templateSpec(id).name}</button>
-                  ))}
-                </div>
-              </section>
+            <details className="studio-panel" open>
+              <summary className="studio-panel-summary">Layout &amp; Sections</summary>
+              <TemplatePicker template={template} onChoose={choose} />
+              <ZonePicker template={template} frame={frame} zone={zone} onSelect={openZone} />
               <BoardText draft={draft} update={update} />
-            </div>
+            </details>
           </div>
 
           <div className={step === "section" ? "studio-pane on" : "studio-pane"} data-step="section">
-            <p className="studio-zone-hint">Select a menu area in the preview. Its editor opens directly under the board.</p>
+            <p className="studio-zone-hint studio-mobile-hint">Select a menu area in the preview. Its editor opens under the board.</p>
           </div>
 
           <div className={step === "content" ? "studio-pane on" : "studio-pane"} data-step="content">
-            <p className="studio-zone-hint">Select a photo or video area in the preview. Choose, replace, or remove media under the board.</p>
+            <p className="studio-zone-hint studio-mobile-hint">Select a photo or video area in the preview. Choose, replace, or remove media under the board.</p>
           </div>
 
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0" }}>
-              {(["classic", "fresh", "bold"] as const).map((palette) => (
-                <button key={palette} type="button" style={chip(draft.palette === palette)} onClick={() => update({ ...draft, palette })}>{palette}</button>
-              ))}
-            </div>
-            <label style={fieldLabel}>Text color
-              <input type="color" aria-label="Text color" value={draft.textColor || "#0b1220"} onChange={(event) => update({ ...draft, textColor: event.target.value })} />
-            </label>
-            <label style={fieldLabel}>Menu background
-              <input type="color" aria-label="Menu background" value={draft.backgroundColor || "#f6f9fe"} onChange={(event) => update({ ...draft, backgroundColor: event.target.value })} />
-            </label>
-            <label style={fieldLabel}>Feature color
-              <input type="color" aria-label="Primary color" value={draft.primaryColor || "#0066ff"} onChange={(event) => update({ ...draft, primaryColor: event.target.value })} />
-            </label>
-            <label style={fieldLabel}>Accent color
-              <input type="color" aria-label="Accent color" value={draft.accentColor || "#ffd34d"} onChange={(event) => update({ ...draft, accentColor: event.target.value })} />
-            </label>
-            <div style={{ margin: "12px 0" }}>
-              <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
-              <BrandSummary fixture={brand ?? undefined} />
-              <p style={{ fontSize: 13, margin: "8px 0" }}><a href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</a></p>
-              <button type="button" style={chip(false)} onClick={() => {
-                const colors = brand?.brand ?? liveBrand.data;
-                if (!colors?.primaryColor && !colors?.accentColor) return;
-                update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
-              }}>Use Brand Kit colors on this board</button>
-            </div>
-            <button type="button" style={chip(false)} onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
-            <label style={fieldLabel}>Type size
-              <select aria-label="Type size" value={draft.typeScale} onChange={(event) => update({ ...draft, typeScale: event.target.value === "counter" ? "counter" : "room" })}>
-                <option value="room">Room — for a television</option>
-                <option value="counter">Counter — slightly denser</option>
-              </select>
-            </label>
-            <label style={fieldLabel}>Font
-              <select aria-label="Font" value={draft.font} onChange={(event) => update({ ...draft, font: event.target.value === "noto-serif" ? "noto-serif" : "inter" })}>
-                <option value="inter">Inter</option>
-                <option value="noto-serif">Noto Serif</option>
-              </select>
-            </label>
-            <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif on this page are the same files drawn into the published image.</p>
-            <label style={fieldLabel}>Photo fit
-              <select aria-label="Photo fit" value={draft.imageFit} onChange={(event) => update({ ...draft, imageFit: event.target.value === "contain" ? "contain" : "cover" })}>
-                <option value="cover">Fill the area</option>
-                <option value="contain">Fit inside the area</option>
-              </select>
-            </label>
-            <label style={fieldLabel}>Photo position
-              <select aria-label="Photo position" value={draft.imageAnchor} onChange={(event) => update({ ...draft, imageAnchor: anchorValue(event.target.value) })}>
-                <option value="center">Center</option>
-                <option value="top">Top</option>
-                <option value="bottom">Bottom</option>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-              </select>
-            </label>
-            <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
-              <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split} aria-describedby="proportion-note"
-                onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
-            </label>
-            <p id="proportion-note" style={{ fontSize: 13, color: "#5c534c", marginTop: 0 }}>{proportionNote(template)}</p>
-            {template === "triple-column" || template === "two-menu-promo" ? <ColumnWidths draft={draft} update={update} /> : null}
+            <details className="studio-panel" open>
+              <summary className="studio-panel-summary">Colors &amp; Styling</summary>
+              <div className="segment" role="group" aria-label="Palette">
+                {(["classic", "fresh", "bold"] as const).map((palette) => (
+                  <button key={palette} type="button" aria-pressed={draft.palette === palette} onClick={() => update({ ...draft, palette })}>{palette}</button>
+                ))}
+              </div>
+              <ColorField label="Text color" ariaLabel="Text color" value={draft.textColor} fallback="#0b1220" onChange={(next) => update({ ...draft, textColor: next })} />
+              <ColorField label="Menu background" ariaLabel="Menu background" value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
+              <ColorField label="Feature color" ariaLabel="Primary color" value={draft.primaryColor} fallback="#0066ff" onChange={(next) => update({ ...draft, primaryColor: next })} />
+              <ColorField label="Accent color" ariaLabel="Accent color" value={draft.accentColor} fallback="#ffd34d" onChange={(next) => update({ ...draft, accentColor: next })} />
+              <div style={{ margin: "12px 0" }}>
+                <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
+                <BrandSummary fixture={brand ?? undefined} />
+                <p style={{ fontSize: 13, margin: "8px 0" }}><a href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</a></p>
+                <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
+                  const colors = brand?.brand ?? liveBrand.data;
+                  if (!colors?.primaryColor && !colors?.accentColor) return;
+                  update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
+                }}>Use Brand Kit colors on this board</button>
+              </div>
+              <button type="button" className="btn btn-quiet min-h-11" onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
+              <label style={fieldLabel}>Type size
+                <div className="segment" role="group" aria-label="Type size">
+                  <button type="button" aria-pressed={draft.typeScale === "room"} onClick={() => update({ ...draft, typeScale: "room" })}>Room</button>
+                  <button type="button" aria-pressed={draft.typeScale === "counter"} onClick={() => update({ ...draft, typeScale: "counter" })}>Counter</button>
+                </div>
+              </label>
+              <p className="zone-help">Room is for a television. Counter is slightly denser.</p>
+              <label style={fieldLabel}>Font
+                <div className="segment" role="group" aria-label="Font">
+                  <button type="button" aria-pressed={draft.font === "inter"} onClick={() => update({ ...draft, font: "inter" })}>Inter</button>
+                  <button type="button" aria-pressed={draft.font === "noto-serif"} onClick={() => update({ ...draft, font: "noto-serif" })}>Noto Serif</button>
+                </div>
+              </label>
+              <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif on this page are the same files drawn into the published image.</p>
+              <label style={fieldLabel}>Photo fit
+                <div className="segment" role="group" aria-label="Photo fit">
+                  <button type="button" aria-pressed={draft.imageFit === "cover"} onClick={() => update({ ...draft, imageFit: "cover" })}>Fill</button>
+                  <button type="button" aria-pressed={draft.imageFit === "contain"} onClick={() => update({ ...draft, imageFit: "contain" })}>Fit</button>
+                </div>
+              </label>
+              <label style={fieldLabel}>Photo position
+                <select aria-label="Photo position" value={draft.imageAnchor} onChange={(event) => update({ ...draft, imageAnchor: anchorValue(event.target.value) })}>
+                  <option value="center">Center</option>
+                  <option value="top">Top</option>
+                  <option value="bottom">Bottom</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                </select>
+              </label>
+              <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
+                <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split} aria-describedby="proportion-note"
+                  onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
+              </label>
+              <p id="proportion-note" style={{ fontSize: 13, color: "#5c534c", marginTop: 0 }}>{proportionNote(template)}</p>
+              {template === "triple-column" || template === "two-menu-promo" ? <ColumnWidths draft={draft} update={update} /> : null}
+            </details>
           </div>
 
           <div className={step === "publish" ? "studio-pane on" : "studio-pane"} data-step="publish">
             {account?.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>Classic menus stay in the menu editor: {account.legacy.map((item) => item.name).join(", ")}.</p> : null}
             {accountMode ? null : (
-              <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0" }}>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0", minHeight: 44 }}>
                 <input type="checkbox" checked={videoOn && !!videoBox && !draft.videoMediaId} disabled={!videoBox || Boolean(draft.videoMediaId)} onChange={(event) => setVideoOn(event.target.checked)} />
                 Play the bundled demo in the safe area
               </label>
             )}
             <div className="studio-save-inline" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {accountMode ? null : <button type="button" style={chip(false)} onClick={saveDraft}>Save draft</button>}
-              {accountMode ? null : <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} onClick={publish}>Publish preview</button>}
-              {accountMode || account ? <button type="button" style={chip(false)} disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button> : null}
-              {accountMode || account ? <button type="button" style={{ ...chip(true), background: "#1a1614", color: "#f3ecdf" }} disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : null}
-              {accountMode ? <a href="/dashboard/media/menus" style={{ ...chip(false), textDecoration: "none" }} onClick={(event) => {
+              {accountMode ? <a href="/dashboard/media/menus" className="btn btn-quiet min-h-11" style={{ textDecoration: "none" }} onClick={(event) => {
                 event.preventDefault();
                 requestLeave(() => { if (onClose) onClose(); else window.location.assign("/dashboard/media/menus"); });
-              }}>Menu boards</a> : <a href="/layout-studio/player" style={{ ...chip(false), textDecoration: "none" }}>Open player check</a>}
+              }}>Menu boards</a> : null}
             </div>
             {note ? <p className="studio-inline-note" role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p> : null}
           </div>
+        </section>
+        <div className="studio-editor-slot">{zoneEditor}</div>
+        </div>
+
+        <section className="studio-canvas" data-testid="studio-canvas" aria-label="Editing canvas">
+          <p className="studio-kicker">Board</p>
+          {renderStage(true)}
+        </section>
+
+        <section className="studio-preview" aria-label="TV preview" id="studio-tv-preview" data-testid="studio-tv-preview">
+          <div className="studio-preview-head">
+            <p className="studio-kicker">Preview</p>
+            <p className="studio-preview-note">Preview, not a live TV feed.</p>
+          </div>
+          <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true)}</div>
+          <div className="studio-preview-still">{renderStage(false)}</div>
+          {!accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
+          {!accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
         </section>
       </div>
       <div className="studio-savebar">
         {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
         <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
-          {(["template", "section", "content", "style", "publish"] as const).map((id) => (
-            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12 }} onClick={() => setStep(id)}>{stepLabel(id)}</button>
+          {(["preview", "template", "section", "content", "style", "publish"] as const).map((id) => (
+            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12 }} onClick={() => {
+              setStep(id);
+              if (id === "preview") document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }}>{stepLabel(id)}</button>
           ))}
         </nav>
         <div className="studio-save-actions">
-          {accountMode || account ? <button type="button" className="btn min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button> : <button type="button" className="btn min-h-11" onClick={saveDraft}>Save draft</button>}
-          {accountMode || account ? <button type="button" className="btn btn-primary min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button> : <button type="button" className="btn btn-primary min-h-11" onClick={publish}>Publish preview</button>}
+          {renderSaveDraft()}
+          {renderPublish()}
         </div>
       </div>
       <style>{`
         .studio-app { overflow-x: clip; }
-        .studio-grid { max-width: 1180px; margin: 0 auto; padding: 28px 20px 72px; display: grid; gap: 28px; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); grid-template-areas: "head preview" "controls preview"; align-items: start; }
+        .studio-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; position: sticky; top: 0; z-index: 30; background: #fffdf8; border-bottom: 1px solid #ddd4c6; padding: 8px 16px; }
+        .studio-toolbar-lead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; flex: 1 1 280px; }
+        .studio-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .studio-toolbar-note { flex: 1 1 100%; margin: 0; font-size: 13px; color: #5c534c; }
+        .studio-grid { max-width: 1600px; margin: 0 auto; padding: 12px 16px 32px; display: grid; gap: 16px; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); grid-template-areas: "controls canvas"; align-items: start; }
+        .studio-left { grid-area: controls; display: flex; flex-direction: column; gap: 12px; min-width: 0; max-height: calc(100dvh - 11rem); overflow-y: auto; position: sticky; top: 5.5rem; padding-right: 4px; }
         .studio-heading { grid-area: head; }
-        .studio-controls { grid-area: controls; }
-        .studio-preview { grid-area: preview; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+        .studio-controls { min-width: 0; }
+        .studio-canvas { grid-area: canvas; display: none; min-width: 0; position: sticky; top: 5.5rem; }
+        .studio-preview { grid-area: preview; display: flex; flex-direction: column; gap: 8px; min-width: 0; position: sticky; top: 5.5rem; align-self: start; }
+        .studio-preview-head { display: grid; gap: 2px; }
+        .studio-preview-note { margin: 0; font-size: 12px; line-height: 1.4; color: #5c534c; }
+        .studio-preview-live { display: none; }
+        .studio-preview-still { display: block; }
         .studio-selected-editor { background: #fffdf8; border: 1px solid #ddd4c6; border-radius: 16px; padding: 16px; min-width: 0; }
         .studio-zone-hint { margin: 0; font-size: 14px; line-height: 1.45; color: #5c534c; }
         .zone-hit:focus-visible { outline: 3px solid #ffd34d; outline-offset: 2px; z-index: 2; }
         .studio-kicker { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #5c534c; }
-        .studio-title { font-size: 36px; line-height: 1.15; margin: 0 0 8px; }
-        .studio-lead { line-height: 1.5; margin: 0; }
+        .studio-title { font-size: 18px; line-height: 1.2; margin: 0; }
+        .studio-lead { display: none; line-height: 1.5; margin: 0; }
         .studio-sheet-note { display: none; margin: 0 0 8px; font-size: 14px; color: #5c534c; }
         .studio-tabs { display: none; }
         .studio-savebar { display: none; }
@@ -926,7 +977,7 @@ export function LayoutStudio({
         .zone-head h2 { margin: 0; font-size: 20px; line-height: 1.2; }
         .zone-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
         .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
-        .board-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; margin: 0 0 8px; }
+        .board-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; margin: 0; }
         .board-bar .studio-kicker { grid-column: 1 / -1; margin: 0; }
         .board-rename { width: 44px; padding: 0; }
         .media-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -937,27 +988,47 @@ export function LayoutStudio({
         .remove-btn { border: 0; background: transparent; color: #b8342a; font: inherit; font-size: 14px; font-weight: 650; min-height: 44px; padding: 0 4px; cursor: pointer; }
         .action-stack { display: grid; gap: 4px; flex: 1 1 140px; align-content: start; min-width: 0; }
         .action-stack .btn { width: 100%; flex: none; }
-        .zone-group h3 { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #5c534c; }
+        .zone-group h3, .zone-picker h3 { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #5c534c; }
         .zone-help { margin: 0; font-size: 13px; line-height: 1.4; color: #5c534c; }
         .media-card { display: flex; gap: 12px; align-items: center; min-width: 0; }
         .media-meta { min-width: 0; flex: 1; }
         .media-thumb { width: 112px; height: 63px; border-radius: 8px; object-fit: cover; background: #111; flex: 0 0 auto; }
         .media-name { margin: 0; font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .media-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-        .segment { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: #efe8dc; }
-        .segment button { min-height: 44px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 650; color: #1a1614; }
+        .segment { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: #efe8dc; margin: 8px 0; }
+        .segment:has(button:nth-child(3)) { grid-template-columns: 1fr 1fr 1fr; }
+        .segment button { min-height: 44px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 650; color: #1a1614; cursor: pointer; text-transform: capitalize; }
         .segment button[aria-pressed="true"] { background: #fff; color: #0066ff; box-shadow: 0 1px 2px rgba(11,18,32,.12); }
+        .segment button:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }
         .media-actions .btn { min-height: 44px; border-radius: 12px; flex: 1 1 140px; }
+        .studio-panel { background: #fff; border: 1px solid #ddd4c6; border-radius: 16px; padding: 4px 12px 12px; }
+        .studio-panel-summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: #1a1614; min-height: 44px; display: flex; align-items: center; }
+        .studio-panel-summary::-webkit-details-marker { display: none; }
+        .template-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+        .template-thumb { display: grid; gap: 6px; padding: 6px; border: 1px solid #ddd4c6; border-radius: 12px; background: #fff; cursor: pointer; font: inherit; color: inherit; text-align: left; min-height: 44px; }
+        .template-thumb:hover { border-color: #c8bdae; }
+        .template-thumb[aria-pressed="true"] { border-color: #0066ff; box-shadow: 0 0 0 3px rgba(0,102,255,.18); }
+        .template-thumb:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }
+        .template-thumb-frame { display: block; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #111; }
+        .template-thumb-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .template-thumb-name { font-size: 12px; font-weight: 650; line-height: 1.3; }
         @media (max-width: 860px) {
-          .studio-heading { position: static; padding: 0 16px 8px; }
-          .zone-open .studio-page-title { display: none; }
-          .studio-title { font-size: 22px; line-height: 1.2; margin: 0; }
+          .studio-toolbar { position: static; padding: 8px 16px 4px; }
+          .studio-toolbar-actions { display: none; }
+          .studio-toolbar-note { display: none; }
+          .zone-open .studio-page-title .studio-kicker { display: none; }
+          .studio-title { font-size: 20px; line-height: 1.2; margin: 0; }
           .studio-lead { display: none; }
+          .studio-left { display: contents; max-height: none; overflow: visible; position: static; }
           .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: clip; max-width: 100%; padding: 0 !important; gap: 0 !important; }
-          .studio-controls { padding-bottom: calc(168px + env(safe-area-inset-bottom)); }
-          .studio-heading, .studio-controls, .studio-preview { width: 100%; max-width: 100%; min-width: 0; }
+          .studio-controls { padding-bottom: calc(168px + env(safe-area-inset-bottom)); order: 3; }
+          .studio-heading, .studio-controls, .studio-preview, .studio-editor-slot { width: 100%; max-width: 100%; min-width: 0; }
           .studio-controls { overflow-x: hidden; }
-          .studio-preview { position: static; z-index: 1; background: #efe8dc; padding: 0 16px 12px; }
+          .studio-canvas { display: none !important; }
+          .studio-preview { position: static; z-index: 1; background: #efe8dc; padding: 0 16px 12px; order: 1; }
+          .studio-preview-live { display: block; }
+          .studio-preview-still { display: none; }
+          .studio-editor-slot { order: 2; padding: 0 16px 8px; }
           .studio-selected-editor { margin: 0; }
           .studio-preview .preview-frame { position: static; }
           .studio-unpublished { display: none; }
@@ -976,12 +1047,26 @@ export function LayoutStudio({
           .studio-controls input, .studio-controls select, .studio-controls button, .studio-controls a { min-height: 44px; max-width: 100%; }
         }
         @media (min-width: 861px) {
+          .studio-toolbar .studio-kicker { display: none; }
           .studio-tabs { display: none !important; }
           .studio-pane, .section-block { display: block; }
           .studio-pane[data-step="section"] .board-text { display: none; }
           .studio-pane[data-step="section"], .studio-pane[data-step="content"] { display: none; }
-          .studio-preview { position: static; align-self: start; }
+          .studio-mobile-hint { display: none; }
+          .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
+          .studio-preview { position: sticky; align-self: start; }
           .studio-preview .preview-frame { position: static; }
+        }
+        @media (min-width: 1180px) {
+          .studio-grid { grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) minmax(220px, 280px); grid-template-areas: "controls canvas preview"; }
+          .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
+          .studio-preview { display: flex; }
+        }
+        @media (min-width: 861px) and (max-width: 1179px) {
+          .studio-preview-still { display: none; }
+          .studio-preview { display: none; }
+          .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
+          .studio-canvas .studio-kicker::after { content: " · Preview, not a live TV feed"; font-weight: 500; letter-spacing: 0; text-transform: none; }
         }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-bold") format("truetype"); font-weight: 700; font-style: normal; }
@@ -995,9 +1080,59 @@ export function LayoutStudio({
 }
 
 
+
 function columnTemplate(template: LayoutTemplate) {
   return template === "triple-column" || template === "two-menu-promo" || template === "two-column";
 }
+
+
+function TemplatePicker({ template, onChoose }: { template: LayoutTemplate; onChoose: (id: LayoutTemplate) => void }) {
+  return (
+    <div className="template-thumbs" role="list">
+      {TEMPLATES.map((id) => {
+        const spec = templateSpec(id);
+        return (
+          <button
+            key={id}
+            type="button"
+            role="listitem"
+            className="template-thumb"
+            aria-pressed={id === template}
+            aria-label={spec.name}
+            onClick={() => onChoose(id)}
+          >
+            <span className="template-thumb-frame">
+              <img src={studioTemplateThumbnailSrc(id)} alt="" />
+            </span>
+            <span className="template-thumb-name">{spec.name}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ZonePicker({ template, frame, zone, onSelect }: {
+  template: LayoutTemplate;
+  frame: ReturnType<typeof frameFor>;
+  zone: string;
+  onSelect: (id: string) => void;
+}) {
+  const hits = previewHits(template, frame);
+  return (
+    <div className="zone-picker">
+      <h3>Sections</h3>
+      <div className="chip-row">
+        {hits.map((hit) => (
+          <button key={hit.id} type="button" style={chip(hit.id === zone)} onClick={() => onSelect(hit.id)}>
+            {hit.label.replace(/^Edit /, "")}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function SelectedZoneEditor({
   zone, template, draft, update, closeZone, account, progress, imageHref, clipUrl, videoOn, accountMode,
@@ -1143,9 +1278,7 @@ function SelectedZoneEditor({
             </section>
           ) : null}
           {panel === "background" ? (
-            <label style={fieldLabel}>Menu background
-              <input type="color" aria-label="Menu background" value={draft.backgroundColor || "#f6f9fe"} onChange={(event) => update({ ...draft, backgroundColor: event.target.value })} />
-            </label>
+            <ColorField label="Menu background" ariaLabel="Menu background" value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
           ) : null}
           {template === "triple-column" && zone === "photo" ? (
             <FileUploadControl kind="image" accept="image/jpeg,image/png,image/webp" limitLabel={isolatedPhotoLimit ? ISOLATED_STUDIO_PHOTO_LIMIT_LABEL : undefined} onFiles={(files) => onPhoto(files[0])} />
@@ -1416,11 +1549,12 @@ function setItem(draft: LayoutDocument, si: number, ii: number, patch: Partial<L
   });
 }
 
-function stepLabel(step: "template" | "section" | "content" | "style" | "publish") {
+function stepLabel(step: StudioStep) {
   if (step === "template") return "Template";
   if (step === "section") return "Section";
   if (step === "content") return "Content";
   if (step === "style") return "Style";
+  if (step === "preview") return "Preview";
   return "Publish";
 }
 

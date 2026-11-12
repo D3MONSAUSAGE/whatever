@@ -12,7 +12,7 @@ export function PageHeader({ title, eyebrow, lede, icon, action, children, compa
       <div className="mb-6" data-testid="page-header-compact">
         <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words">{title}</h1>
         {lede ? <div className="text-muted mt-1 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
-        {action ? <div className="page-header-action mt-3">{action}</div> : null}
+        {action ? <div className="mt-3">{action}</div> : null}
         {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
       </div>
     );

@@ -184,18 +184,22 @@ export function MenuBoards({
 
   return (
     <section>
-      <PageHeader
-        title="Menu boards"
-        eyebrow="Media"
-        icon={<IconImage />}
-        lede="Pick a layout, fill each area, and Pekko makes a full-screen slide. Every menu board you already have stays in this list, and you can edit it any time."
-        action={!draftOpen ? <button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button> : undefined}
-      />
-      <p className="text-sm text-muted mb-4">
-        <Link href="/dashboard/schedule#day-parts" className="font-semibold text-primary underline underline-offset-4">Breakfast, lunch &amp; dinner times</Link>
-        {" · "}
-        <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</Link>
-      </p>
+      {draftOpen ? null : (
+        <>
+          <PageHeader
+            title="Menu boards"
+            eyebrow="Media"
+            icon={<IconImage />}
+            lede="Pick a layout, fill each area, and Pekko makes a full-screen slide. Every menu board you already have stays in this list, and you can edit it any time."
+            action={<button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button>}
+          />
+          <p className="text-sm text-muted mb-4">
+            <Link href="/dashboard/schedule#day-parts" className="font-semibold text-primary underline underline-offset-4">Breakfast, lunch &amp; dinner times</Link>
+            {" · "}
+            <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</Link>
+          </p>
+        </>
+      )}
 
       {!draftOpen && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
 
@@ -360,12 +364,13 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
 
   return (
     <div className="card p-4 md:p-6 mb-6" data-testid="menu-editor">
-      <h2 className="text-lg font-semibold">{draft.id ? "Edit menu board" : "New menu board"}</h2>
+      <h1 className="text-lg font-semibold">{draft.id ? "Edit menu board" : "New menu board"}</h1>
 
-      <div className="grid gap-6 lg:grid-cols-2 mt-5">
-        <div className="grid gap-3 content-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,400px)] mt-5">
+        <div className="grid gap-3 content-start lg:order-2 lg:sticky lg:top-20 self-start">
           <p className="form-label">Preview</p>
-          <div className="tv relative" style={{ aspectRatio: "16 / 9" }}>
+          <p className="text-xs text-muted -mt-2">This is a preview of the board, not a live feed from the TV.</p>
+          <div className="tv relative" style={{ aspectRatio: "16 / 9" }} data-testid="classic-preview-sticky">
             {preview ? <img src={preview} alt="Menu board preview" data-testid="menu-preview" className="w-full h-full object-contain" /> : null}
             {hits.map((hit) => (
               <button
@@ -386,7 +391,9 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
           </div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
           {region ? <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p> : null}
+        </div>
 
+        <div className="grid gap-3 content-start lg:order-1">
           <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor">
             {region === "menu" ? (
               <div className="grid gap-3">
@@ -435,9 +442,6 @@ function Editor({ draft, setDraft, displays, images, onSaved, onError, previewSr
                 <span className="text-xs text-muted">{images.length ? "Shows on the right side of the menu. JPG or PNG from your media." : "Upload a JPG or PNG to your media to add a photo."}</span></label>
             ) : null}
           </div>
-        </div>
-
-        <div className="grid gap-3 content-start">
           <h3 className="text-base font-semibold">General settings</h3>
           <fieldset>
             <legend className="form-label">Theme</legend>
