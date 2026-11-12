@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { api, type PlaylistSummary, type PresentationDetail } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
-import { ContentNav } from "@/components/content-nav";
 import { LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { IconImage } from "@/components/icons";
 import { useRouter } from "next/navigation";
@@ -146,10 +145,9 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
   const stageSrc = current ? slideSrc(viewer, current.url, "full") : null;
   return (
     <section className="min-w-0 overflow-x-hidden" data-presentation-detail="">
-      <PageHeader title={data.fileName} icon={<IconImage />} lede={`${data.slideCount} slides · uploaded ${data.createdAt ? new Date(data.createdAt).toLocaleDateString() : ""} · ${statusLabel(data.processingStatus)}`}>
-        <Link href="/dashboard/media" className="btn btn-quiet">Back to library</Link>
-      </PageHeader>
-      <ContentNav pathOverride="/dashboard/media/presentations" />
+      <PageHeader title={data.fileName} icon={<IconImage />} lede={`${data.slideCount} slides · uploaded ${data.createdAt ? new Date(data.createdAt).toLocaleDateString() : ""} · ${statusLabel(data.processingStatus)}`}
+        action={<Link href="/dashboard/media" className="btn btn-primary">Back to library</Link>}
+      />
       {data.processingError ? <p className="mb-4 text-sm text-danger">{data.processingError}</p> : null}
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="min-w-0">

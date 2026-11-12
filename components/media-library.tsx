@@ -6,7 +6,6 @@ import { api, formatDuration, formatSize, type MediaItem, type PlaylistSummary }
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { useUploads } from "@/components/uploads";
-import { ContentNav } from "@/components/content-nav";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { MAX_VIDEO_MB } from "@/lib/mp4";
@@ -154,31 +153,32 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
 
   return (
     <section>
-      <PageHeader title="Media library" icon={<IconImage />} lede={`Images up to 15 MB. Video is MP4 H.264, ${MAX_VIDEO_MB} MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.`}>
-        <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
-          Upload image
-          <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}
-            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "image"); }} />
+      <PageHeader title="Media library" icon={<IconImage />} lede={`Images up to 15 MB. Video is MP4 H.264, ${MAX_VIDEO_MB} MB or smaller. A PowerPoint or PDF becomes one presentation: ordered slides, 10 seconds each unless you change it.`}
+        action={
+          <label className={`btn btn-primary cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
+            Upload image
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploads.busy}
+              onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "image"); }} />
+          </label>
+        }
+      />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
+          Upload video
+          <input type="file" accept="video/mp4,.mp4" multiple className="sr-only" disabled={uploads.busy}
+            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "video"); }} />
         </label>
         <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
           Upload presentation
           <input type="file" accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="sr-only" disabled={uploads.busy}
             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "presentation"); }} />
         </label>
-        <Link href="/dashboard/media/menus" className="btn btn-quiet">Make a menu board</Link>
-        <Link href="/dashboard/media/promos" className="btn btn-quiet">Make a promo</Link>
-        <label className={`btn btn-quiet cursor-pointer ${uploads.busy ? "pointer-events-none opacity-60" : ""}`}>
-          Upload video
-          <input type="file" accept="video/mp4,.mp4" multiple className="sr-only" disabled={uploads.busy}
-            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; if (files.length) uploads.enqueue(files, "video"); }} />
-        </label>
-      </PageHeader>
+      </div>
       {fixture || pathOverride ? null : (
         <Suspense fallback={null}>
           <KindSync onKind={applyKind} />
         </Suspense>
       )}
-      <ContentNav pathOverride={pathOverride ?? (kind === "presentation" ? "/dashboard/media?kind=presentation" : undefined)} />
 
       {!data ? (
         <LoadState error={error} label="Loading…" />

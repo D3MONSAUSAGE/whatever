@@ -6,7 +6,6 @@ import { api, useApi, type PlaylistDetail, type PlaylistSummary } from "@/lib/ap
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconList } from "@/components/icons";
-import { ContentNav } from "@/components/content-nav";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
 
 export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary[]; pathOverride?: string }) {
@@ -87,13 +86,12 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
   }
 
   return (
-    <section>
+    <section data-preview-path={pathOverride}>
       <PageHeader title="Playlists" icon={<IconList />} lede="A playlist loops images and video on one or more screens. Saving a draft does not change a screen." />
-      <ContentNav pathOverride={pathOverride} />
-      <form onSubmit={create} className="card p-4 md:p-5 mb-8">
+      <form id="new-playlist" onSubmit={create} className="card p-4 md:p-5 mb-8">
         <h2 className="font-semibold">New playlist</h2>
         <p className="text-sm text-muted mb-4">Name it, add slides, then publish when you want the TVs to change.</p>
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
           <input className="field" required maxLength={80} placeholder="Name, like Lunch specials" aria-label="Playlist name"
             value={name} onChange={(event) => setName(event.target.value)} />
           <button className="btn btn-primary" disabled={creating}>{creating ? "Creating…" : "Create playlist"}</button>

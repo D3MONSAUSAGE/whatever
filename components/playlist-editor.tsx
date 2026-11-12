@@ -238,10 +238,11 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   return (
     <section>
       <p className="text-sm mb-3"><Link href="/dashboard/playlists" className="underline">Playlists</Link></p>
-      <PageHeader title="Edit playlist" eyebrow="Playlists" icon={<IconList />} lede="Drafts never change a screen. Publish to send this order to every screen that plays it.">
+      <PageHeader title="Edit playlist" eyebrow="Playlists" icon={<IconList />} lede="Drafts never change a screen. Publish to send this order to every screen that plays it." />
+      <div className="mb-4 flex flex-wrap gap-2">
         <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>Duplicate</button>
         <button type="button" className="btn btn-quiet text-danger" onClick={remove}>Delete</button>
-      </PageHeader>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="grid gap-6">

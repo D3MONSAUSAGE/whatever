@@ -54,7 +54,7 @@ test("a customer sets their brand, adds a photo to a menu and applies the brand"
   // Settings links to the brand card.
   await page.goto("/dashboard/settings");
   await page.getByRole("link", { name: "Set up your brand" }).click();
-  await page.waitForURL("**/dashboard/media/menus**");
+  await page.waitForURL("**/dashboard/account/brand-kit**");
   const brand = page.getByRole("region", { name: "Your brand" });
   await brand.getByLabel("Logo").selectOption({ label: "logo.png" });
   await brand.getByLabel("Main colour", { exact: true }).fill("#c8102e");
@@ -64,6 +64,7 @@ test("a customer sets their brand, adds a photo to a menu and applies the brand"
   expect(kit.primary_color).toBe("#c8102e");
   expect(kit.logo_media_id).not.toBeNull();
 
+  await page.goto("/dashboard/media/menus");
   await page.getByRole("button", { name: "New menu board" }).click();
   const editor = page.getByTestId("menu-editor");
   await editor.getByLabel("Photo (optional)").selectOption({ label: "tacos.png" });
@@ -74,6 +75,7 @@ test("a customer sets their brand, adds a photo to a menu and applies the brand"
   const menu = (await admin.from("menus").select("id, media_id, content").eq("account_id", acct!.id).single()).data!;
   expect(menu.content).toMatchObject({ useBrand: true, photoMediaId: expect.any(String) });
 
+  await page.goto("/dashboard/account/brand-kit");
   await page.getByRole("region", { name: "Your brand" }).getByRole("button", { name: "Apply to all menus and promos" }).click();
   await expect(page.getByText("Updated 1 slide.")).toBeVisible({ timeout: 20_000 });
   const after = (await admin.from("menus").select("media_id").eq("id", menu.id).single()).data!;

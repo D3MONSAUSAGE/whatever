@@ -1,6 +1,5 @@
 "use client";
 
-import { ContentNav } from "@/components/content-nav";
 import { IconImage } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 
@@ -21,9 +20,9 @@ const GROUPS = [
 
 export function ContentHub({ pathOverride }: { pathOverride?: string }) {
   return (
-    <section className="min-w-0">
-      <PageHeader title="Content" eyebrow="Library" lede="One library. These open the pages that already hold media, menus, playlists, and presentations." icon={<IconImage />} />
-      <ContentNav pathOverride={pathOverride} />
+    <section className="min-w-0" data-preview-path={pathOverride}>
+
+      <PageHeader title="Content" eyebrow="Library" lede="One library. Use the tabs above to open media, menus, promotions, Layout Studio, playlists, and presentations." icon={<IconImage />} />
       <ul className="grid gap-3 md:grid-cols-3">
         {GROUPS.map((group) => (
           <li key={group.title} className="card p-4 min-w-0">

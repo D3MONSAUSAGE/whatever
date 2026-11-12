@@ -2,16 +2,16 @@
 import { LogoMark, WaveBackdrop } from "@/components/brand";
 
 /**
- * Brand hero used at the top of every dashboard page: dark ink panel with the
- * blue wave, an eyebrow, the page title (h1), a short lede, and the S mark.
- * Actions sit below the panel so buttons keep their normal colours.
+ * Page heading used at the top of every dashboard page, below any persistent
+ * navigation: dark ink panel, eyebrow, title (h1), a short description, and
+ * one optional primary action. Secondary actions belong in the page body.
  */
-export function PageHeader({ title, eyebrow, lede, icon, children }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; children?: React.ReactNode }) {
+export function PageHeader({ title, eyebrow, lede, icon, action, children }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <div className="banner-dark hero-gradient px-5 py-6 md:px-8 md:py-7">
+      <div className="banner-dark hero-gradient px-5 py-5 md:px-8 md:py-6">
         <WaveBackdrop tone="dark" className="h-[85%]" />
-        <div className="relative flex items-center justify-between gap-5">
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div className="min-w-0 flex items-start gap-3">
             {icon ? <span className="icon-tile icon-tile-hero size-11 rounded-2xl">{icon}</span> : null}
             <div className="min-w-0">
@@ -20,7 +20,7 @@ export function PageHeader({ title, eyebrow, lede, icon, children }: { title: st
               {lede ? <div className="text-white/85 mt-1.5 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
             </div>
           </div>
-          <LogoMark className="hidden sm:block size-14 md:size-16 shrink-0" />
+          {action ? <div className="page-header-action shrink-0 self-start sm:self-center">{action}</div> : <LogoMark className="hidden sm:block size-14 md:size-16 shrink-0" />}
         </div>
       </div>
       {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}

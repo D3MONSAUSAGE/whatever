@@ -103,3 +103,60 @@ body {
 .form-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--color-muted); margin-bottom: 0.25rem; }
 .note-error { border-radius: 12px; padding: 0.625rem 0.875rem; background: #fdecea; color: var(--color-danger); font-size: 0.875rem; }
 .note-ok { border-radius: 12px; padding: 0.625rem 0.875rem; background: color-mix(in srgb, var(--color-live) 18%, white); color: var(--color-live-ink); font-size: 0.875rem; }
+
+
+/* Persistent Content navigation: one horizontal row, scrollable on small screens. */
+.content-nav {
+  margin: 0 0 1.5rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.content-nav-list {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.15rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.content-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-height: 2.75rem;
+  padding: 0 0.95rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+.content-nav-link:hover {
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-primary) 6%, white);
+}
+.content-nav-link[aria-current="page"] {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+.content-nav-link:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* Primary action on the dark page header: high-contrast on the ink banner. */
+.page-header-action .btn-primary {
+  background: #fff;
+  color: var(--color-ink);
+}
+.page-header-action .btn-primary:hover {
+  background: #eef3fa;
+}
+.page-header-action .btn-primary:focus-visible {
+  outline-color: #fff;
+}

@@ -12,7 +12,6 @@ import {
 import { api, authToken, uploadForm } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
-import { ContentNav } from "@/components/content-nav";
 
 const TEMPLATES: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature"];
 const DRAFT_KEY = "layout-studio-draft-v1";
@@ -32,7 +31,7 @@ function blankItem(): LayoutItem {
   return { name: "", price: "", description: "" };
 }
 
-export function LayoutStudio({ mode = "preview", screenId = null, fixture = null, pathOverride }: { mode?: "preview" | "account"; screenId?: string | null; fixture?: AccountStudio | null; pathOverride?: string } = {}) {
+export function LayoutStudio({ mode = "preview", screenId = null, fixture = null, pathOverride: _pathOverride }: { mode?: "preview" | "account"; screenId?: string | null; fixture?: AccountStudio | null; pathOverride?: string } = {}) {
   const accountMode = mode === "account";
   const [template, setTemplate] = useState<LayoutTemplate>("menu-promo-67");
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout("menu-promo-67"));
@@ -252,6 +251,10 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
   }
 
   async function saveAccount(saveMode: "draft" | "publish") {
+    if (fixture) {
+      setNote(saveMode === "publish" ? "Preview only — nothing was published." : "Preview only — nothing was saved.");
+      return;
+    }
     if (saveLock.current) return;
     const doc = checkedDraft();
     if (!doc) return;
@@ -430,7 +433,6 @@ export function LayoutStudio({ mode = "preview", screenId = null, fixture = null
     <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: "100vh", background: "#efe8dc", color: "#1a1614", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <div className="studio-grid">
         <div className="studio-heading">
-          {accountMode ? <ContentNav pathOverride={pathOverride ?? "/dashboard/media/layout-studio"} /> : null}
           <div className="studio-page-title">
             <p className="studio-kicker">{accountMode ? "Media" : "Isolated preview"}</p>
             <h1 className="studio-title">Layout Studio</h1>

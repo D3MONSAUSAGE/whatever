@@ -5,9 +5,9 @@ import { api, authToken, timeAgo, useApi, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
-import { ContentNav } from "@/components/content-nav";
 import { IconImage } from "@/components/icons";
 import { artImages, type MenuBoard } from "@/components/menu-boards";
+import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { PROMO_LIMITS, PROMO_TEMPLATES, samplePromo, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
 
 export type Promo = {
@@ -24,11 +24,28 @@ function dateText(p: { startsOn: string | null; endsOn: string | null }) {
   return "no end date";
 }
 
-export function PromoSlides() {
-  const promos = useApi<{ promos: Promo[]; available: boolean }>("/api/promos");
-  const menus = useApi<{ menus: MenuBoard[]; available: boolean }>("/api/menus");
-  const media = useApi<MediaItem[]>("/api/media");
-  const [draft, setDraft] = useState<Draft | null>(null);
+export type PromoFixture = {
+  promos: Promo[];
+  available?: boolean;
+  menus?: MenuBoard[];
+  images?: MediaItem[];
+  brand?: BrandKitFixture;
+  startEditing?: boolean;
+  previewSrc?: string;
+};
+
+export function PromoSlides({ fixture }: { fixture?: PromoFixture } = {}) {
+  const livePromos = useApi<{ promos: Promo[]; available: boolean }>(fixture ? null : "/api/promos");
+  const liveMenus = useApi<{ menus: MenuBoard[]; available: boolean }>(fixture ? null : "/api/menus");
+  const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
+  const promos = fixture ? { data: { promos: fixture.promos, available: fixture.available !== false }, error: null, reload: async () => {} } : livePromos;
+  const menus = fixture ? { data: { menus: fixture.menus ?? [], available: true } } : liveMenus;
+  const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
+  const [draft, setDraft] = useState<Draft | null>(() => (
+    fixture?.startEditing
+      ? { id: null, name: "Happy hour", template: "happy", content: samplePromo("happy"), startsOn: "", endsOn: "" }
+      : null
+  ));
   const [busy, setBusy] = useState<string | null>(null);
   const [target, setTarget] = useState<Record<string, string>>({});
   const toast = useToast();
@@ -96,11 +113,10 @@ export function PromoSlides() {
         eyebrow="Media"
         icon={<IconImage />}
         lede="Make a happy hour, deal, or today's special slide in your brand colours, then add it to a menu board with one tap. Set dates and it shows up and comes down on its own."
-      >
-        {!draft ? <button className="btn btn-primary" onClick={() => startNew()} disabled={atLimit(promos.data?.promos.length, 100)}>New promo</button> : null}
-        <Link href="/dashboard/media/menus" className="btn btn-quiet">Menu boards</Link>
-      </PageHeader>
-      <ContentNav />
+        action={!draft ? <button type="button" className="btn btn-primary" onClick={() => startNew()} disabled={atLimit(promos.data?.promos.length, 100)}>New promo</button> : undefined}
+      />
+
+      {!draft ? <BrandSummary fixture={fixture?.brand} /> : null}
 
       {draft ? (
         <PromoEditor
@@ -109,6 +125,8 @@ export function PromoSlides() {
           images={artImages(media.data)}
           onSaved={async (message) => { setDraft(null); await promos.reload(); toast.show(message); }}
           onError={(message) => toast.show(message, true)}
+          previewSrc={fixture?.previewSrc}
+          readOnly={Boolean(fixture)}
         />
       ) : null}
 
@@ -177,18 +195,23 @@ export function PromoSlides() {
   );
 }
 
-function PromoEditor({ draft, setDraft, images, onSaved, onError }: {
+function PromoEditor({ draft, setDraft, images, onSaved, onError, previewSrc, readOnly }: {
   draft: Draft; setDraft: (d: Draft | null) => void; images: MediaItem[];
   onSaved: (message: string) => void; onError: (message: string) => void;
+  previewSrc?: string; readOnly?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(previewSrc ?? null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const last = useRef<string | null>(null);
   const c = draft.content;
   const update = (content: PromoContent) => setDraft({ ...draft, content });
 
   useEffect(() => {
+    if (readOnly) {
+      if (previewSrc) setPreview(previewSrc);
+      return;
+    }
     const timer = window.setTimeout(async () => {
       try {
         const token = await authToken();
@@ -212,9 +235,10 @@ function PromoEditor({ draft, setDraft, images, onSaved, onError }: {
       }
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [draft.template, draft.content]);
+  }, [draft.template, draft.content, readOnly, previewSrc]);
 
   async function save() {
+    if (readOnly) return;
     setBusy(true);
     try {
       const body = JSON.stringify({ name: draft.name, template: draft.template, content: draft.content, startsOn: draft.startsOn || null, endsOn: draft.endsOn || null });
