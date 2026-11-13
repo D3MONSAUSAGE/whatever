@@ -125,14 +125,20 @@ export function StudioStyles() {
         .template-thumb-name { font-size: 11px; font-weight: 650; line-height: 1.3; color: #0b1220; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .section-card { background: #fff; border: 1px solid #e2e7ef; border-radius: 14px; margin: 10px 0; padding: 12px; min-width: 0; }
         .section-card-legend { padding: 0 4px; }
-        .item-card { display: grid; grid-template-columns: minmax(0, 1fr) 4.25rem 2.75rem; gap: 6px 6px; align-items: start; padding: 8px 0; border-bottom: 1px solid #eef1f6; }
+        .section-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; min-width: 0; }
+        .section-card-head .section-card-legend { padding: 0; margin: 0; flex: 1 1 auto; min-width: 0; }
+        .section-remove { border: 0; background: transparent; color: #8a3a32; font: inherit; font-size: 13px; font-weight: 650; min-height: 44px; min-width: 44px; padding: 0 8px; cursor: pointer; border-radius: 8px; flex: 0 0 auto; }
+        .section-remove:hover { background: #fdecea; }
+        .section-remove:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }
+        .item-card { display: grid; grid-template-columns: minmax(0, 1fr) 84px 44px; gap: 6px; align-items: start; padding: 8px 0; border-bottom: 1px solid #eef1f6; width: 100%; min-width: 0; box-sizing: border-box; }
         .item-card:last-of-type { border-bottom: 0; }
-        .item-card .item-name { grid-column: 1; width: 100%; min-width: 0; }
-        .item-card .item-price { grid-column: 2; width: 100%; text-align: right; }
-        .item-card .item-remove { grid-column: 3; width: 44px; height: 44px; min-height: 44px; border: 0; background: transparent; color: #8a3a32; font-size: 22px; line-height: 1; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .item-card .item-name, .item-card .item-price, .item-card .item-desc { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; border: 1px solid #ddd4c6; border-radius: 8px; padding: 8px 10px; font: inherit; min-height: 44px; background: #fff; }
+        .item-card .item-name { grid-column: 1; }
+        .item-card .item-price { grid-column: 2; text-align: right; padding-left: 6px; padding-right: 8px; font-variant-numeric: tabular-nums; }
+        .item-card .item-remove { grid-column: 3; width: 44px; height: 44px; min-height: 44px; border: 0; background: transparent; color: #8a3a32; font-size: 22px; line-height: 1; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; justify-self: end; }
         .item-card .item-remove:hover { background: #fdecea; }
         .item-card .item-remove:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }
-        .item-card .item-desc { grid-column: 1 / 3; width: 100%; }
+        .item-card .item-desc { grid-column: 1 / -1; }
         .item-add { margin-top: 8px; width: 100%; min-height: 44px; }
         @media (max-width: 860px) {
           .studio-toolbar { position: static; padding: 8px 16px 4px; background: #f4f7fb; }

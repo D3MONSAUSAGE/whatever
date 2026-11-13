@@ -208,29 +208,32 @@ export function ClassicEditor({
         <label className="grid gap-1"><span className="form-label">Subtitle</span>
           <input className="field" value={c.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(e) => update({ ...c, subtitle: e.target.value })} /></label>
         {c.sections.map((section, si) => (
-          <fieldset key={si} className="rounded-xl border border-line p-3 grid gap-2">
-            <legend className="px-1 text-sm font-semibold">Section {si + 1}</legend>
-            <div className="flex gap-2">
-              <input className="field flex-1" aria-label={`Section ${si + 1} name`} placeholder="e.g. Tacos" value={section.name} maxLength={MENU_LIMITS.sectionName}
-                onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
-              <button type="button" className="btn btn-quiet min-h-11" onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove section</button>
+          <section key={si} className="section-card" aria-labelledby={`classic-section-${si}`}>
+            <div className="section-card-head">
+              <h3 id={`classic-section-${si}`} className="section-card-legend">Section {si + 1}</h3>
+              <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`}
+                onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove</button>
             </div>
+            <input className="field" aria-label={`Section ${si + 1} name`} placeholder="e.g. Tacos" value={section.name} maxLength={MENU_LIMITS.sectionName}
+              onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
             {section.items.map((item, ii) => {
               const setItem = (patch: Partial<typeof item>) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.map((it, j) => j === ii ? { ...it, ...patch } : it) } : s) });
               return (
                 <div key={ii} className="item-card">
-                  <input className="field item-name" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })} />
-                  <input className="field item-price" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })} />
+                  <input className="item-name" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })} />
+                  <input className="item-price" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })} />
                   <button type="button" className="item-remove" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
-                    onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>×</button>
-                  <input className="field item-desc text-sm" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })} />
+                    onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>
+                    <span aria-hidden="true">×</span>
+                  </button>
+                  <input className="item-desc" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })} />
                 </div>
               );
             })}
             {section.items.length < MENU_LIMITS.itemsPerSection && totalItems < MENU_LIMITS.items ? (
-              <button type="button" className="btn btn-quiet justify-self-start min-h-11" onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
+              <button type="button" className="btn btn-quiet item-add" onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
             ) : null}
-          </fieldset>
+          </section>
         ))}
         {c.sections.length < MENU_LIMITS.sections ? (
           <button type="button" className="btn btn-quiet justify-self-start min-h-11" onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>Add section</button>

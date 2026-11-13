@@ -133,6 +133,80 @@ describe("premium editor chrome", () => {
     await browser.close();
   });
 
+  it("gives item rows a flexing name, an 84px price that shows $13.99, a 44px delete, and a full-width description", async () => {
+    const style = (readFileSync("components/studio-chrome.tsx", "utf8").match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "");
+    const classic = readFileSync("components/classic-editor.tsx", "utf8");
+    expect(style).toContain("minmax(0, 1fr) 84px 44px");
+    expect(style).toContain(".item-card .item-desc { grid-column: 1 / -1; }");
+    expect(style).toContain(".section-remove");
+    expect(classic).toContain("section-card-head");
+    expect(classic).toContain("section-remove");
+    expect(classic).not.toContain(">Remove section<");
+
+    let chromium: typeof import("@playwright/test").chromium;
+    try {
+      chromium = (await import("@playwright/test")).chromium;
+    } catch {
+      return;
+    }
+    let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+    try {
+      browser = await chromium.launch({ timeout: 20000 });
+    } catch {
+      return;
+    }
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${style}</style>
+      <div class="studio-left" style="width:320px;position:static;max-height:none;overflow:visible">
+        <section class="section-card">
+          <div class="section-card-head">
+            <h3 class="section-card-legend">Section 1</h3>
+            <button type="button" class="section-remove">Remove</button>
+          </div>
+          <input class="field" value="Tacos" style="width:100%" />
+          <div class="item-card">
+            <input class="item-name" value="Al pastor" />
+            <input class="item-price" value="$13.99" />
+            <button type="button" class="item-remove"><span aria-hidden="true">×</span></button>
+            <input class="item-desc" value="Pork, pineapple, onion, cilantro" />
+          </div>
+        </section>
+      </div>`);
+    const metrics = await page.evaluate(() => {
+      const price = document.querySelector(".item-price") as HTMLInputElement;
+      const name = document.querySelector(".item-name") as HTMLInputElement;
+      const desc = document.querySelector(".item-desc") as HTMLInputElement;
+      const del = document.querySelector(".item-remove") as HTMLElement;
+      const card = document.querySelector(".item-card") as HTMLElement;
+      const headBtn = document.querySelector(".section-remove") as HTMLElement;
+      const nameInput = document.querySelector(".section-card > input") as HTMLInputElement;
+      return {
+        priceW: price.getBoundingClientRect().width,
+        priceScroll: price.scrollWidth,
+        priceClient: price.clientWidth,
+        nameW: name.getBoundingClientRect().width,
+        descW: desc.getBoundingClientRect().width,
+        cardW: card.getBoundingClientRect().width,
+        delW: del.getBoundingClientRect().width,
+        delH: del.getBoundingClientRect().height,
+        headBtnH: headBtn.getBoundingClientRect().height,
+        nameInputW: nameInput.getBoundingClientRect().width,
+        headBtnLeft: headBtn.getBoundingClientRect().left,
+        nameInputRight: nameInput.getBoundingClientRect().right,
+      };
+    });
+    expect(metrics.priceW).toBeGreaterThanOrEqual(83);
+    expect(metrics.priceW).toBeLessThanOrEqual(85);
+    expect(metrics.priceScroll).toBeLessThanOrEqual(metrics.priceClient + 1);
+    expect(metrics.delW).toBe(44);
+    expect(metrics.delH).toBe(44);
+    expect(metrics.descW).toBeGreaterThan(metrics.nameW + 50);
+    expect(metrics.descW).toBeGreaterThanOrEqual(metrics.cardW - 2);
+    expect(metrics.headBtnH).toBeGreaterThanOrEqual(44);
+    expect(metrics.nameInputW).toBeGreaterThan(200);
+    await browser.close();
+  });
+
   it("renders visual thumbnails from existing templates, and a color swatch with a hex popover", () => {
     for (const id of TEMPLATES) {
       const src = studioTemplateThumbnailSrc(id);
