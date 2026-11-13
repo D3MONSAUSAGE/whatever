@@ -22,7 +22,7 @@ describe("published legal pages", () => {
     expect(LEGAL_UPDATED).toBe("November 8, 2026");
     expect(LEGAL_PRIVACY_UPDATED).toBe("November 12, 2026");
     expect(LEGAL_ADDRESS).toBe("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
-    expect(SUPPORT_EMAIL).toBe("vivalopez06-wh5rwz@mail.grokbot.com");
+    expect(SUPPORT_EMAIL).toBe("support@pekkotv.com");
     expect(REFUND_POLICY).toMatch(/not refunded for unused time/);
     expect(REFUND_POLICY).toMatch(/required by applicable law/);
     expect(REFUND_POLICY).toMatch(/duplicate or incorrect charges/);
