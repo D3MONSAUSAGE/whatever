@@ -13,6 +13,7 @@ test("offline screens are called out on Overview and Displays", async ({ page })
     await expect(summary).toContainText("12 min");
     await expect(summary).toContainText("View");
     await summary.click();
+    await expect(summary).toContainText("Hide");
     await expect(alert).toContainText("no heartbeat for 12 min");
     await expect(page).toHaveTitle(/^\(1 offline\) /);
     if (shots) await page.screenshot({ path: `${shots}/offline-${screen}-${width}.png`, fullPage: true });

@@ -8,8 +8,8 @@ export type AssignedPreview = {
   /** Image URL suitable for an <img>. Null when no still exists in the current payload. */
   src: string | null;
   kind: AssignedKind;
-  /** Short chip on the thumbnail, never implying a live TV feed. */
-  label: "Assigned";
+  /** Short chip on the thumbnail, never implying a live TV feed. Empty screens are not "Assigned". */
+  label: "Assigned" | "No content";
   name: string;
 };
 
@@ -65,9 +65,9 @@ export function assignedContentPreview(display: DisplayItem): AssignedPreview {
     const src = display.playlist.url && !isProbablyVideo(display.playlist.name, display.playlist.url)
       ? display.playlist.url
       : null;
-    return { src, kind: display.playlist.url ? "playlist" : "playlist", label: "Assigned", name };
+    return { src, kind: "playlist", label: "Assigned", name };
   }
-  return { src: null, kind: "empty", label: "Assigned", name };
+  return { src: null, kind: "empty", label: "No content", name };
 }
 
 export function assignedKindLabel(kind: AssignedKind): string {

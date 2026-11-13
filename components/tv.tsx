@@ -120,10 +120,13 @@ export function OfflineAlert({ displays, linkToDisplays = false }: { displays: D
     ? `1 screen offline: ${snippets[0]}`
     : `${offline.length} screens offline: ${snippets.join("; ")}${extra}`;
   return (
-    <details role="status" data-testid="offline-alert" className="note-error mb-3 py-1.5">
+    <details data-testid="offline-alert" className="group note-error mb-3 py-1.5">
       <summary className="flex items-center justify-between gap-3 min-h-10 cursor-pointer list-none font-semibold [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0">{headline}.</span>
-        <span className="text-sm font-medium underline underline-offset-4 shrink-0">View</span>
+        <span className="min-w-0" role="status">{headline}.</span>
+        <span className="text-sm font-medium underline underline-offset-4 shrink-0">
+          <span className="group-open:hidden">View</span>
+          <span className="hidden group-open:inline">Hide</span>
+        </span>
       </summary>
       <div className="flex flex-col gap-1.5 pt-2">
         <ul className="text-sm">

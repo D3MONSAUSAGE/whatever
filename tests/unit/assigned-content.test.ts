@@ -31,7 +31,8 @@ describe("assigned content preview", () => {
     expect(assignedContentPreview(fixtures.video)).toMatchObject({ src: null, kind: "video", label: "Assigned" });
     expect(assignedContentPreview(fixtures.board)).toMatchObject({ src: "https://cdn.example/board.png", kind: "menu-board" });
     expect(assignedContentPreview(fixtures.playlist)).toMatchObject({ src: "https://cdn.example/loop.jpg", kind: "playlist" });
-    expect(assignedContentPreview(fixtures.empty)).toMatchObject({ src: null, kind: "empty" });
+    expect(assignedContentPreview(fixtures.empty)).toMatchObject({ src: null, kind: "empty", label: "No content" });
+    expect(assignedContentPreview(fixtures.empty).label).not.toBe("Assigned");
     expect(isProbablyVideo("specials.mp4", "https://cdn.example/specials.mp4")).toBe(true);
     expect(assignedKindLabel("menu-board")).toBe("Menu board");
   });
@@ -57,6 +58,10 @@ describe("assigned content preview", () => {
     const board = renderToStaticMarkup(createElement(AssignedThumb, { display: fixtures.board }));
     expect(board).toContain("https://cdn.example/board.png");
     expect(board).toContain('loading="lazy"');
+    const empty = renderToStaticMarkup(createElement(AssignedThumb, { display: fixtures.empty }));
+    expect(empty).toContain('data-kind="empty"');
+    expect(empty).not.toMatch(/assigned-thumb-label[^>]*>Assigned/);
+    expect(empty).toContain("No content");
   });
 
   it("shows thumbnails on My Screens cards, with Change content as the primary action", () => {

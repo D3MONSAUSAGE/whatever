@@ -35,6 +35,13 @@ describe("premium editor chrome", () => {
     expect(source).toContain("item-card");
     expect(source).toContain("ColorField");
     expect(source).not.toContain("background: #fffdf8");
+    expect(source).toContain("useStudioBreakpoint");
+    expect(source).toContain('studioBp === "phone"');
+    expect(source).toContain('studioBp === "desktop"');
+    expect(source).toContain('studioBp !== "phone"');
+    expect([...style.matchAll(/padding-bottom: calc\(168px/g)]).toHaveLength(1);
+    expect(style).toContain("studio-controls-end");
+    expect(style).toContain("body:has(.studio-app) .content-nav { display: none; }");
     expect(source).toContain("requestLeave");
     expect(source).toContain("publishSavedCopy");
     expect(source).toContain("ISOLATED_STUDIO_PHOTO_MAX_BYTES");

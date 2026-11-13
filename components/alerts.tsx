@@ -41,10 +41,13 @@ export function AlertsBanner() {
     ? (offlineCount === 1 ? "1 screen offline" : `${offlineCount} screens offline`)
     : headline;
   return (
-    <details role="status" data-testid="alerts-banner" className={`card mb-4 px-3 py-2 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`} open>
+    <details data-testid="alerts-banner" className={`group card mb-4 px-3 py-2 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`} open>
       <summary className="flex items-center justify-between gap-3 min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        <p className="font-semibold min-w-0 truncate">{headline}{offlineCount ? ` · ${summary}` : ""}</p>
-        <span className="text-sm font-medium underline underline-offset-4 shrink-0">View</span>
+        <p className="font-semibold min-w-0 truncate" role="status">{headline}{offlineCount ? ` · ${summary}` : ""}</p>
+        <span className="text-sm font-medium underline underline-offset-4 shrink-0">
+          <span className="group-open:hidden">View</span>
+          <span className="hidden group-open:inline">Hide</span>
+        </span>
       </summary>
       <div className="flex flex-wrap items-start justify-between gap-2 pb-2">
         <div className="min-w-0">

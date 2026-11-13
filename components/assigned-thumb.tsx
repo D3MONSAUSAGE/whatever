@@ -24,7 +24,7 @@ export function AssignedThumb({ display, size = "card" }: { display: DisplayItem
         )}
       </div>
       <figcaption className="assigned-thumb-caption">
-        <span className="assigned-thumb-label">{preview.label}</span>
+        {preview.kind !== "empty" ? <span className="assigned-thumb-label">{preview.label}</span> : null}
         <span className="assigned-thumb-sr sr-only">{assignedKindLabel(preview.kind)}{preview.name ? `: ${preview.name}` : ""}</span>
       </figcaption>
       <style>{`

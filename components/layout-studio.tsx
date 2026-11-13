@@ -46,6 +46,24 @@ function blankItem(): LayoutItem {
   return { name: "", price: "", description: "" };
 }
 
+/** SSR-safe: first render is "desktop" on server and client, then the effect narrows it. Avoids a hydration mismatch. */
+function useStudioBreakpoint(): "phone" | "tablet" | "desktop" {
+  const [bp, setBp] = useState<"phone" | "tablet" | "desktop">("desktop");
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 860px)");
+    const desktop = window.matchMedia("(min-width: 1180px)");
+    const apply = () => setBp(phone.matches ? "phone" : desktop.matches ? "desktop" : "tablet");
+    apply();
+    phone.addEventListener("change", apply);
+    desktop.addEventListener("change", apply);
+    return () => {
+      phone.removeEventListener("change", apply);
+      desktop.removeEventListener("change", apply);
+    };
+  }, []);
+  return bp;
+}
+
 export function LayoutStudio({
   mode = "preview",
   screenId = null,
@@ -84,7 +102,8 @@ export function LayoutStudio({
   const [menuId, setMenuId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("");
   const [renaming, setRenaming] = useState(false);
-  const [phonePreview, setPhonePreview] = useState(false);
+  const studioBp = useStudioBreakpoint();
+  const phonePreview = studioBp === "phone";
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [note, setNote] = useState(accountMode || fixture ? "" : "This browser copy does not write an account.");
   const spec = templateSpec(template);
@@ -202,13 +221,6 @@ export function LayoutStudio({
     } catch { /* a bad draft is ignored */ }
   }, [accountMode, fixture, scope]);
 
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 860px)");
-    const apply = () => setPhonePreview(query.matches);
-    apply();
-    query.addEventListener("change", apply);
-    return () => query.removeEventListener("change", apply);
-  }, []);
 
   useEffect(() => {
     if (fixture) {
@@ -841,7 +853,7 @@ export function LayoutStudio({
 
         </section>
         <div className="studio-editor-slot">{zoneEditor}</div>
-        <section className="studio-controls" data-testid="studio-tools-style">
+        <section className="studio-controls studio-controls-end" data-testid="studio-tools-style">
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
             <details className="studio-panel">
               <summary className="studio-panel-summary">Colors &amp; style</summary>
@@ -923,10 +935,14 @@ export function LayoutStudio({
         </div>
 
         <section className="studio-canvas" data-testid="studio-canvas" aria-label="Editing canvas">
-          <p className="studio-kicker">Board</p>
-          <div className="studio-canvas-stage">
-            {renderStage(true)}
-          </div>
+          {studioBp !== "phone" ? (
+            <>
+              <p className="studio-kicker">Board</p>
+              <div className="studio-canvas-stage">
+                {renderStage(true)}
+              </div>
+            </>
+          ) : null}
         </section>
 
         <section className="studio-preview" aria-label="TV preview" id="studio-tv-preview" data-testid="studio-tv-preview">
@@ -934,10 +950,14 @@ export function LayoutStudio({
             <p className="studio-kicker">Preview</p>
             <p className="studio-preview-note">Preview, not a live TV feed.</p>
           </div>
-          <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true)}</div>
-          <div className="studio-preview-still">{renderStage(false)}</div>
-          {!accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
-          {!accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
+          {studioBp === "phone" ? (
+            <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true)}</div>
+          ) : null}
+          {studioBp === "desktop" ? (
+            <div className="studio-preview-still">{renderStage(false)}</div>
+          ) : null}
+          {studioBp === "desktop" && !accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
+          {studioBp === "desktop" && !accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
         </section>
       </div>
       <div className="studio-savebar">
@@ -962,7 +982,7 @@ export function LayoutStudio({
           padding: 0.4rem 0.75rem 1rem !important;
         }
         body:has(.studio-app) nav[aria-label="Mobile"] { display: none !important; }
-        body:has(.studio-app) .content-nav { margin-bottom: 0.5rem; }
+        body:has(.studio-app) .content-nav { display: none; }
         .studio-app { overflow-x: clip; }
         .studio-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; position: sticky; top: 0; z-index: 30; background: #f4f7fb; border-bottom: 1px solid #e2e7ef; padding: 4px 4px 4px 0; }
         .studio-toolbar-lead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; flex: 1 1 240px; }
@@ -1076,9 +1096,9 @@ export function LayoutStudio({
           .studio-title-text { white-space: normal; }
           .studio-left { display: contents; max-height: none; overflow: visible; position: static; }
           .studio-grid { display: flex !important; flex-direction: column; align-items: stretch; overflow-x: clip; max-width: 100%; padding: 0 !important; gap: 0 !important; }
-          .studio-controls { padding-bottom: calc(168px + env(safe-area-inset-bottom)); order: 3; }
+          .studio-controls { order: 3; overflow-x: hidden; }
+          .studio-controls-end { padding-bottom: calc(168px + env(safe-area-inset-bottom)); }
           .studio-heading, .studio-controls, .studio-preview, .studio-editor-slot { width: 100%; max-width: 100%; min-width: 0; }
-          .studio-controls { overflow-x: hidden; }
           .studio-canvas { display: none !important; }
           .studio-preview { position: static; z-index: 1; background: #f4f7fb; padding: 0 16px 12px; order: 1; }
           .studio-preview-live { display: block; }
