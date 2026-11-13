@@ -81,7 +81,7 @@ export function LayoutStudio({
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout(startingTemplate));
   const [imageHref, setImageHref] = useState<string | null>(null);
   const [videoOn, setVideoOn] = useState(true);
-  const [published, setPublished] = useState<Snapshot | null>(null);
+  const [_published, setPublished] = useState<Snapshot | null>(null);
   const [account, setAccount] = useState<AccountStudio | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("");
@@ -347,10 +347,14 @@ export function LayoutStudio({
   }
 
   function applyFresh(created: { name: string; document: LayoutDocument }, nextScope: StudioScope | null) {
+    const colors = brand?.brand ?? liveBrand.data;
+    const seeded = (!created.document.primaryColor && !created.document.accentColor && (colors?.primaryColor || colors?.accentColor))
+      ? { ...created.document, primaryColor: colors?.primaryColor || null, accentColor: colors?.accentColor || null }
+      : created.document;
     setBoardName(created.name);
     setMenuId(null);
-    setTemplate(created.document.template);
-    setDraft(created.document);
+    setTemplate(seeded.template);
+    setDraft(seeded);
     setImageHref(null);
     setClipUrl(null);
     setVideoOn(false);
@@ -362,8 +366,8 @@ export function LayoutStudio({
     markClean({
       menuId: null,
       boardName: created.name,
-      template: created.document.template,
-      draft: created.document,
+      template: seeded.template,
+      draft: seeded,
       imageHref: null,
       clipUrl: null,
       videoOn: false,
@@ -855,11 +859,13 @@ export function LayoutStudio({
                 <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
                 <BrandSummary fixture={brand ?? undefined} />
                 <p style={{ fontSize: 13, margin: "8px 0" }}><StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</StudioGuardedLink></p>
-                <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
-                  const colors = brand?.brand ?? liveBrand.data;
-                  if (!colors?.primaryColor && !colors?.accentColor) return;
-                  update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
-                }}>Use Brand Kit colors on this board</button>
+                {!menuId ? (
+                  <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
+                    const colors = brand?.brand ?? liveBrand.data;
+                    if (!colors?.primaryColor && !colors?.accentColor) return;
+                    update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
+                  }}>Apply brand</button>
+                ) : null}
               </div>
               <button type="button" className="btn btn-quiet min-h-11" onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
               <label style={fieldLabel}>Type size
@@ -919,30 +925,16 @@ export function LayoutStudio({
         </section>
         </div>
 
-        <section className="studio-canvas" data-testid="studio-canvas" aria-label="Editing canvas">
-          {studioBp !== "phone" ? (
-            <>
-              <p className="studio-kicker">Board</p>
-              <div className="studio-canvas-stage">
-                {renderStage(true)}
-              </div>
-            </>
-          ) : null}
-        </section>
-
-        <section className="studio-preview" aria-label="TV preview" id="studio-tv-preview" data-testid="studio-tv-preview">
-          <div className="studio-preview-head">
-            <p className="studio-kicker">Preview</p>
-            <p className="studio-preview-note">Preview, not a live TV feed.</p>
+        <section
+          className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
+          id="studio-tv-preview"
+          data-testid="studio-tv-preview"
+          aria-label="Editing canvas"
+        >
+          <p className="studio-kicker">Board</p>
+          <div className="studio-canvas-stage">
+            {renderStage(true)}
           </div>
-          {studioBp === "phone" ? (
-            <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true)}</div>
-          ) : null}
-          {studioBp === "desktop" ? (
-            <div className="studio-preview-still">{renderStage(false)}</div>
-          ) : null}
-          {studioBp === "desktop" && !accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
-          {studioBp === "desktop" && !accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
         </section>
       </div>
       <div className="studio-savebar">

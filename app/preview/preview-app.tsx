@@ -14,7 +14,8 @@ import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 import { ContentHub } from "@/components/content-hub";
 import { MenuBoards, type MenuFixture } from "@/components/menu-boards";
 import { PromoSlides, type Promo } from "@/components/promo-slides";
-import { BrandKit, BrandSummary } from "@/components/brand-kit";
+import { BrandKit } from "@/components/brand-kit";
+import AccountHub from "@/app/dashboard/account/page";
 import { sampleMenu } from "@/lib/menu-templates";
 import { samplePromo } from "@/lib/promo-templates";
 import { UploadProgress, type UploadJob } from "@/components/uploads";
@@ -384,14 +385,7 @@ const promoFixture = {
 };
 
 function AccountPreview() {
-  return (
-    <section className="min-w-0">
-      <h1 className="text-2xl font-semibold mb-2">Account</h1>
-      <p className="text-sm text-muted mb-4">Settings, your brand, the plan you already have, and how to reach support.</p>
-      <BrandSummary fixture={brandFixture} />
-      <p className="text-sm"><a className="font-semibold text-primary underline underline-offset-4" href="/dashboard/account/brand-kit">Open Brand Kit</a></p>
-    </section>
-  );
+  return <AccountHub />;
 }
 
 function MyScreensPreview() {

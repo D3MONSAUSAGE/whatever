@@ -76,9 +76,9 @@ test("a customer sets their brand, adds a photo to a menu and applies the brand"
   expect(menu.content).toMatchObject({ useBrand: true, photoMediaId: expect.any(String) });
 
   await page.goto("/dashboard/account/brand-kit");
-  await page.getByRole("region", { name: "Your brand" }).getByRole("button", { name: "Apply to all menus and promos" }).click();
-  await expect(page.getByText("Updated 1 slide.")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Apply to all menus and promos" })).toHaveCount(0);
+  // Existing boards stay as they were: the web UI no longer bulk-applies. POST /api/brand/apply is unchanged for Android.
   const after = (await admin.from("menus").select("media_id").eq("id", menu.id).single()).data!;
-  expect(after.media_id).not.toBe(menu.media_id);
+  expect(after.media_id).toBe(menu.media_id);
   await context.close();
 });

@@ -8,7 +8,7 @@ import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 const TEMPLATES = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"] as const;
 
 describe("premium editor chrome", () => {
-  it("keeps a sticky TV preview on desktop and a static preview on a phone", async () => {
+  it("keeps a sticky single canvas on desktop and shows it on the phone Preview tab", async () => {
     let chromium: typeof import("@playwright/test").chromium;
     try {
       chromium = (await import("@playwright/test")).chromium;
@@ -25,7 +25,10 @@ describe("premium editor chrome", () => {
     const style = source.match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "";
     expect(style).toContain("position: sticky");
     expect(source).toContain('id="studio-tv-preview"');
-    expect(source).toContain("Preview, not a live TV feed");
+    expect(source).not.toContain("Preview, not a live TV feed");
+    expect(source).not.toContain("No published preview yet");
+    expect(style).toContain(".studio-canvas.on");
+    expect(style).not.toContain("grid-template-columns: 320px minmax(0, 1fr) 280px");
     expect(source).toContain("TemplatePicker");
     expect(source).toContain("template-thumb-check");
     expect(source).toContain("Content &amp; text");
@@ -37,12 +40,11 @@ describe("premium editor chrome", () => {
     expect(source).not.toContain("background: #fffdf8");
     expect(source).toContain("useStudioBreakpoint");
     expect(source).toContain('studioBp === "phone"');
-    expect(source).toContain('studioBp === "desktop"');
-    expect(source).toContain('studioBp !== "phone"');
+    expect(source).toContain('step === "preview" ? "studio-canvas on"');
     expect([...style.matchAll(/padding-bottom: calc\(168px/g)]).toHaveLength(1);
     expect(style).toContain("studio-controls-end");
     expect(style).toContain("body:has(.studio-app) .content-nav { display: none; }");
-    expect(style).toContain(".studio-preview:not(:has(.studio-preview-live)) .studio-preview-still { display: block; }");
+    expect(style).toContain(".studio-preview { display: none !important; }");
     expect(source).toContain("ClassicEditor");
     expect(source).toContain("Back to menu boards");
     expect(source).toContain("Loading preview…");
@@ -76,25 +78,21 @@ describe("premium editor chrome", () => {
           <div class="studio-left">
             <section class="studio-controls" data-testid="studio-tools" id="tools"><div style="height:2400px">tall tools</div></section>
           </div>
-          <section class="studio-canvas" data-testid="studio-canvas"><div class="preview-frame" style="aspect-ratio:16/9;background:#000"></div></section>
-          <section class="studio-preview" id="studio-tv-preview" data-testid="studio-tv-preview" aria-label="TV preview">
-            <p class="studio-kicker">Preview</p>
-            <p class="studio-preview-note">Preview, not a live TV feed.</p>
-            <div class="studio-preview-still"><div class="preview-frame" style="aspect-ratio:16/9;background:#111;height:160px"></div></div>
-          </section>
+          <section class="studio-canvas" id="studio-tv-preview" data-testid="studio-tv-preview" aria-label="Editing canvas"><div class="preview-frame" style="aspect-ratio:16/9;background:#000;width:100%"></div></section>
         </div>
       </main>`);
     const before = await page.evaluate(() => {
-      const preview = document.getElementById("studio-tv-preview");
+      const canvas = document.getElementById("studio-tv-preview");
       const tools = document.getElementById("tools");
-      const canvas = document.querySelector("[data-testid='studio-canvas'] .preview-frame") as HTMLElement | null;
+      const frame = document.querySelector("#studio-tv-preview .preview-frame") as HTMLElement | null;
+      const previewPane = document.querySelector(".studio-preview") as HTMLElement | null;
       return {
-        position: preview ? getComputedStyle(preview).position : "",
-        inView: preview ? preview.getBoundingClientRect().top < window.innerHeight && preview.getBoundingClientRect().bottom > 0 : false,
+        position: canvas ? getComputedStyle(canvas).position : "",
+        inView: canvas ? canvas.getBoundingClientRect().top < window.innerHeight && canvas.getBoundingClientRect().bottom > 0 : false,
         toolsScroll: tools ? tools.scrollHeight : 0,
-        canvasWidth: canvas ? canvas.getBoundingClientRect().width : 0,
+        canvasWidth: frame ? frame.getBoundingClientRect().width : 0,
         toolsWidth: document.querySelector(".studio-left")?.getBoundingClientRect().width ?? 0,
-        previewWidth: preview?.getBoundingClientRect().width ?? 0,
+        previewDisplay: previewPane ? getComputedStyle(previewPane).display : "none",
       };
     });
     expect(before.position).toBe("sticky");
@@ -102,8 +100,7 @@ describe("premium editor chrome", () => {
     expect(before.canvasWidth).toBeGreaterThanOrEqual(700);
     expect(before.toolsWidth).toBeGreaterThanOrEqual(300);
     expect(before.toolsWidth).toBeLessThanOrEqual(380);
-    expect(before.previewWidth).toBeGreaterThanOrEqual(260);
-    expect(before.previewWidth).toBeLessThanOrEqual(340);
+    expect(before.previewDisplay).toBe("none");
     await page.evaluate(() => {
       const left = document.querySelector(".studio-left") as HTMLElement | null;
       if (left) left.scrollTop = 800;
@@ -124,26 +121,28 @@ describe("premium editor chrome", () => {
     await phone.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${style}</style>
       <main class="studio-app">
         <div class="studio-grid">
-          <section class="studio-preview" aria-label="TV preview"><figure><div style="aspect-ratio:16/9;background:#000"></div></figure></section>
+          <section class="studio-canvas on" id="studio-tv-preview" aria-label="Editing canvas"><div class="preview-frame" style="aspect-ratio:16/9;background:#000;width:100%"></div></section>
           <section class="studio-controls"><div class="studio-pane on" style="width:900px">wide controls</div></section>
         </div>
         <nav class="studio-tabs"><button>Template</button><button>Section</button><button>Content</button><button>Style</button><button>Publish</button></nav>
       </main>`);
     const metrics = await phone.evaluate(() => {
       const tab = document.querySelector(".studio-tabs button");
-      const preview = document.querySelector(".studio-preview");
+      const canvas = document.getElementById("studio-tv-preview");
       return {
         scroll: document.documentElement.scrollWidth,
         client: document.documentElement.clientWidth,
-        sticky: preview ? getComputedStyle(preview).position : "",
+        display: canvas ? getComputedStyle(canvas).display : "",
+        sticky: canvas ? getComputedStyle(canvas).position : "",
         tab: tab ? tab.getBoundingClientRect().height : 0,
-        previewBottom: preview ? preview.getBoundingClientRect().bottom : 0,
+        canvasBottom: canvas ? canvas.getBoundingClientRect().bottom : 0,
         controlsTop: document.querySelector(".studio-controls")?.getBoundingClientRect().top ?? 0,
       };
     });
     expect(metrics.scroll).toBeLessThanOrEqual(metrics.client + 1);
+    expect(metrics.display).toBe("flex");
     expect(metrics.sticky).toBe("static");
-    expect(metrics.controlsTop).toBeGreaterThanOrEqual(metrics.previewBottom - 1);
+    expect(metrics.controlsTop).toBeGreaterThanOrEqual(metrics.canvasBottom - 1);
     expect(metrics.tab).toBeGreaterThanOrEqual(44);
     await browser.close();
   });

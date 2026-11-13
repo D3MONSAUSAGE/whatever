@@ -1,41 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { ContactBlock } from "@/components/contact-block";
-import { ManageBilling } from "@/components/manage-billing";
 import { IconGear } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 
+const CARDS = [
+  {
+    title: "Settings",
+    body: "Name, password, alerts, and signing out.",
+    href: "/dashboard/settings",
+    action: "Open settings",
+  },
+  {
+    title: "Brand Kit",
+    body: "Logo, main colour, and highlight colour for new menus and promotions.",
+    href: "/dashboard/account/brand-kit",
+    action: "Open Brand Kit",
+  },
+  {
+    title: "Billing",
+    body: "Your plan, invoices, and payment method.",
+    href: "/dashboard/billing",
+    action: "Open billing",
+  },
+  {
+    title: "Support",
+    body: "Get help from the support page.",
+    href: "/support",
+    action: "Contact support",
+  },
+] as const;
+
 export default function AccountHub() {
   return (
-    <section className="min-w-0">
+    <section className="min-w-0 pb-28 lg:pb-0">
       <PageHeader title="Account" eyebrow="Pekko" lede="Settings, your brand, the plan you already have, and how to reach support." icon={<IconGear />} />
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <li className="card p-4">
-          <h2 className="font-semibold">Settings</h2>
-          <p className="text-sm text-muted mt-1">Name, password, alerts, and signing out.</p>
-          <Link href="/dashboard/settings" className="btn min-h-11 mt-3">Open settings</Link>
-        </li>
-        <li className="card p-4">
-          <h2 className="font-semibold">Brand Kit</h2>
-          <p className="text-sm text-muted mt-1">Logo, main colour, and highlight colour for menus and promotions.</p>
-          <Link href="/dashboard/account/brand-kit" className="btn min-h-11 mt-3">Open Brand Kit</Link>
-        </li>
-        <li className="card p-4">
-          <h2 className="font-semibold">Billing</h2>
-          <p className="text-sm text-muted mt-1">Your plan, invoices, and payment method.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/dashboard/billing" className="btn min-h-11">Open billing</Link>
-            <ManageBilling className="btn-quiet" />
-          </div>
-        </li>
-        <li className="card p-4">
-          <h2 className="font-semibold">Support</h2>
-          <p className="text-sm text-muted mt-1">The same contact as the public support page.</p>
-          <Link href="/support" className="btn min-h-11 mt-3">Open support</Link>
-        </li>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
+        {CARDS.map((card) => (
+          <li key={card.title} className="card flex flex-col p-5 min-h-[13.5rem]">
+            <h2 className="font-semibold">{card.title}</h2>
+            <p className="text-sm text-muted mt-1 flex-1">{card.body}</p>
+            <Link href={card.href} className="btn btn-primary min-h-11 mt-auto w-full">{card.action}</Link>
+          </li>
+        ))}
       </ul>
-      <ContactBlock />
     </section>
   );
 }
