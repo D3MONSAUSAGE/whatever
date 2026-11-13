@@ -21,7 +21,7 @@ describe("premium editor chrome", () => {
     } catch {
       return;
     }
-    const source = readFileSync("components/layout-studio.tsx", "utf8");
+    const source = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("components/classic-editor.tsx", "utf8");
     const style = source.match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "";
     expect(style).toContain("position: sticky");
     expect(source).toContain('id="studio-tv-preview"');
@@ -42,6 +42,12 @@ describe("premium editor chrome", () => {
     expect([...style.matchAll(/padding-bottom: calc\(168px/g)]).toHaveLength(1);
     expect(style).toContain("studio-controls-end");
     expect(style).toContain("body:has(.studio-app) .content-nav { display: none; }");
+    expect(style).toContain(".studio-preview:not(:has(.studio-preview-live)) .studio-preview-still { display: block; }");
+    expect(source).toContain("ClassicEditor");
+    expect(source).toContain("Back to menu boards");
+    expect(source).toContain("Loading preview…");
+    expect(source).toContain("firstFetch");
+    expect(source).toContain("/api/menus/");
     expect(source).toContain("requestLeave");
     expect(source).toContain("publishSavedCopy");
     expect(source).toContain("ISOLATED_STUDIO_PHOTO_MAX_BYTES");

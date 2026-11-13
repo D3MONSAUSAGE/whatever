@@ -15,7 +15,7 @@ describe("studio phone frame", () => {
     } catch {
       return;
     }
-    const source = readFileSync("components/layout-studio.tsx", "utf8");
+    const source = readFileSync("components/studio-chrome.tsx", "utf8");
     const style = source.match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "";
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${style}</style>

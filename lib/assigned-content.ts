@@ -23,12 +23,24 @@ export function isProbablyVideo(fileName?: string | null, url?: string | null): 
 
 export function isProbablyImage(fileName?: string | null, url?: string | null): boolean {
   if (isProbablyVideo(fileName, url)) return false;
-  if (PRESENTATION_EXT.test(fileName ?? "")) return IMAGE_EXT.test(url ?? "");
-  return IMAGE_EXT.test(fileName ?? "") || IMAGE_EXT.test(url ?? "") || Boolean(url);
+  if (isProbablyPresentation(fileName, url)) return IMAGE_EXT.test(url ?? "");
+  return IMAGE_EXT.test(fileName ?? "") || IMAGE_EXT.test(url ?? "");
 }
 
-export function isProbablyPresentation(fileName?: string | null): boolean {
-  return PRESENTATION_EXT.test(fileName ?? "");
+export function isProbablyPresentation(fileName?: string | null, url?: string | null): boolean {
+  return PRESENTATION_EXT.test(fileName ?? "") || PRESENTATION_EXT.test(url ?? "");
+}
+
+/**
+ * Only a recognizable still may be used as an <img> src. A signed PPTX/PDF path,
+ * a raw video, or an extensionless private storage object is not a still.
+ * Direct-assigned images with a file name like "dinner.png" still qualify even
+ * when the signed URL itself has no extension.
+ */
+export function stillUrl(fileName?: string | null, url?: string | null): string | null {
+  if (!url) return null;
+  if (!isProbablyImage(fileName, url)) return null;
+  return url;
 }
 
 function assignedName(display: DisplayItem): string {
@@ -43,28 +55,37 @@ function assignedName(display: DisplayItem): string {
  * boardPreviewUrl (rendered menu board), playlist.url (first item or its video poster),
  * or media.url when it is an image. A raw video file is never used as an <img> src —
  * DisplayItem.media has no thumbnailUrl today, so those cards get a typed placeholder.
+ * A presentation playlist's first item is often the PPTX itself (the API signs
+ * storage_path, not thumbnail_path, for non-video media); that URL is not a still.
  */
 export function assignedContentPreview(display: DisplayItem): AssignedPreview {
   const name = assignedName(display);
   if (display.boardPreviewUrl) {
-    return { src: display.boardPreviewUrl, kind: "menu-board", label: "Assigned", name };
+    // Rendered menu-board PNGs come from the menus pipeline. Keep a signed path
+    // even when it has no extension, but never use a video or PPTX as an <img>.
+    const src = isProbablyVideo(null, display.boardPreviewUrl) || isProbablyPresentation(null, display.boardPreviewUrl)
+      ? null
+      : display.boardPreviewUrl;
+    return { src, kind: "menu-board", label: "Assigned", name };
   }
   if (display.media) {
-    if (isProbablyPresentation(display.media.fileName)) {
-      const src = display.media.url && isProbablyImage(display.media.fileName, display.media.url) ? display.media.url : null;
+    if (isProbablyPresentation(display.media.fileName, display.media.url)) {
+      const src = stillUrl(display.media.fileName, display.media.url);
       return { src, kind: "presentation", label: "Assigned", name };
     }
     if (isProbablyVideo(display.media.fileName, display.media.url)) {
       return { src: null, kind: "video", label: "Assigned", name };
     }
     if (display.media.url) {
-      return { src: display.media.url, kind: "image", label: "Assigned", name };
+      // Direct-assigned photos: fileName usually has an image extension; if it does
+      // not, the signed URL is still the photo itself (video and presentations already returned).
+      const src = stillUrl(display.media.fileName, display.media.url) ?? display.media.url;
+      return { src, kind: "image", label: "Assigned", name };
     }
   }
   if (display.playlist) {
-    const src = display.playlist.url && !isProbablyVideo(display.playlist.name, display.playlist.url)
-      ? display.playlist.url
-      : null;
+    // playlist.url is the signed first-item path. Use it only when it is clearly a still.
+    const src = stillUrl(display.playlist.name, display.playlist.url);
     return { src, kind: "playlist", label: "Assigned", name };
   }
   return { src: null, kind: "empty", label: "No content", name };

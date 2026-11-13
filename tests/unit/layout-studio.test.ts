@@ -433,7 +433,7 @@ describe("player composition contract", () => {
       }
     }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
-    const editor = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("lib/layout-studio-editor.ts", "utf8");
+    const editor = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("lib/layout-studio-editor.ts", "utf8");
     expect(editor).toContain("Each column is 20% to 60%");
     expect(editor).toContain("TV preview");
     expect(editor).toContain("Upload image");

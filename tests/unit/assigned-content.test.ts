@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { assignedContentPreview, assignedKindLabel, isProbablyVideo } from "@/lib/assigned-content";
+import { assignedContentPreview, assignedKindLabel, isProbablyVideo, stillUrl } from "@/lib/assigned-content";
 import { AssignedThumb } from "@/components/assigned-thumb";
 import type { DisplayItem } from "@/lib/api";
 
@@ -74,5 +74,43 @@ describe("assigned content preview", () => {
     expect(source).toContain("btn-primary");
     expect(source).toContain("Total screens");
     expect(source).toContain('compact');
+  });
+
+  it("does not use a PPTX or extensionless playlist URL as an img src", () => {
+    const pptx = display({
+      id: "pptx-pl",
+      name: "Lobby",
+      playlist: { id: "pl-s", name: "pekko-qa-slides", url: "https://cdn.example/storage/v1/object/sign/media/acct/deck.pptx?token=abc" },
+    });
+    expect(assignedContentPreview(pptx)).toMatchObject({ src: null, kind: "playlist", label: "Assigned", name: "pekko-qa-slides" });
+    const pdf = display({
+      id: "pdf-pl",
+      name: "Lobby",
+      playlist: { id: "pl-p", name: "pekko-qa-slides", url: "https://cdn.example/files/slides.pdf" },
+    });
+    expect(assignedContentPreview(pdf).src).toBeNull();
+    const noExt = display({
+      id: "opaque",
+      name: "Lobby",
+      playlist: { id: "pl-o", name: "pekko-qa-slides", url: "https://cdn.example/storage/v1/object/sign/media/uuid?token=abc" },
+    });
+    expect(assignedContentPreview(noExt).src).toBeNull();
+    expect(stillUrl("pekko-qa-slides", "https://cdn.example/storage/v1/object/sign/media/acct/deck.pptx?token=abc")).toBeNull();
+    expect(stillUrl("Lunch loop", "https://cdn.example/loop.jpg")).toBe("https://cdn.example/loop.jpg");
+  });
+
+  it("falls back to the typed placeholder when a still fails to load, and never leaves a broken img", () => {
+    const source = readFileSync("components/assigned-thumb.tsx", "utf8");
+    expect(source).toContain("onError");
+    expect(source).toContain("setFailedSrc");
+    expect(source).toContain("assigned-thumb-fallback");
+    expect(source).not.toContain("onError={() => {}}");
+    const html = renderToStaticMarkup(createElement(AssignedThumb, {
+      display: display({ id: "pl", name: "Lobby", playlist: { id: "pl-s", name: "pekko-qa-slides", url: "https://cdn.example/deck.pptx?token=1" } }),
+    }));
+    expect(html).toContain('data-kind="playlist"');
+    expect(html).not.toContain('src="https://cdn.example/deck.pptx?token=1"');
+    expect(html).toContain("assigned-thumb-fallback");
+    expect(html).toContain("Playlist");
   });
 });
