@@ -45,8 +45,8 @@ export function ClassicEditor({
   previewSrc?: string;
   readOnly?: boolean;
 }) {
-  const studioBp = useStudioBreakpoint();
   const [step, setStep] = useState<ClassicStep>("content");
+  const studioBp = useStudioBreakpoint();
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(previewSrc ?? draft.imageUrl ?? null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -204,9 +204,14 @@ export function ClassicEditor({
     );
   }
 
+  const editingLabel = region && (step === "content" || step === "photo") ? (
+    <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p>
+  ) : null;
+
   const contentPanel = (
     <details className="studio-panel" open>
       <summary className="studio-panel-summary">Content &amp; text</summary>
+      {editingLabel}
       <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor" className="grid gap-3">
         <label className="grid gap-1"><span className="form-label">Title on screen</span>
           <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
@@ -252,6 +257,7 @@ export function ClassicEditor({
   const photoPanel = (
     <details className="studio-panel" open={step === "photo" || hasPhoto}>
       <summary className="studio-panel-summary">Photo</summary>
+      {editingLabel}
       <label className="grid gap-1"><span className="form-label">Photo (optional)</span>
         <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
           <option value="">No photo</option>
@@ -344,24 +350,15 @@ export function ClassicEditor({
         </section>
         </div>
 
-        <section className="studio-canvas" data-testid="studio-canvas" aria-label="Editing canvas">
-          {studioBp !== "phone" ? (
-            <>
-              <p className="studio-kicker">Board</p>
-              <div className="studio-canvas-stage">{renderStage(true, "classic-preview-canvas")}</div>
-            </>
-          ) : null}
-        </section>
-
-        <section className="studio-preview" aria-label="TV preview" id="studio-tv-preview" data-testid="classic-preview-sticky">
-          <div className="studio-preview-head">
-            <p className="studio-kicker">Preview</p>
-            <p className="studio-preview-note">Preview, not a live TV feed.</p>
-          </div>
-          {studioBp === "phone" ? <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true, "classic-preview-live")}</div> : null}
-          {studioBp === "desktop" ? <div className="studio-preview-still">{renderStage(false)}</div> : null}
+        <section
+          className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
+          id="studio-tv-preview"
+          data-testid="studio-tv-preview"
+          aria-label="Editing canvas"
+        >
+          <p className="studio-kicker">Board · preview of what your TV will show</p>
+          <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
-          {region && (step === "content" || step === "photo") ? <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p> : null}
         </section>
       </div>
 

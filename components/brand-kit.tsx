@@ -29,7 +29,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   const error = fixture ? null : liveBrand.error;
   const images = artImages(fixture?.images ?? liveMedia.data);
   const [form, setForm] = useState<BrandFields | null>(null);
-  const [busy, setBusy] = useState<"save" | "apply" | null>(null);
+  const [busy, setBusy] = useState<"save" | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -48,27 +48,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
       await api("/api/brand", { method: "PUT", body: JSON.stringify(payload.body) });
       await liveBrand.reload();
       setForm(prefillBrandForm(payload.body));
-      toast.show("Brand saved. New menus use it. Choose “Apply to all menus and promos” to update the ones you have.");
-    } catch (err) {
-      toast.show((err as Error).message, true);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function applyAll() {
-    if (fixture) return;
-    setBusy("apply");
-    try {
-      let updated = 0, failed = 0;
-      for (const kind of ["menus", "promos"] as const) {
-        let after: string | null = null;
-        do {
-          const res: { updated: number; failed: number; next: string | null } = await api("/api/brand/apply", { method: "POST", body: JSON.stringify({ kind, ...(after ? { after } : {}) }) });
-          updated += res.updated; failed += res.failed; after = res.next;
-        } while (after);
-      }
-      toast.show(failed ? `Updated ${updated} slides. ${failed} couldn't be updated; try again.` : `Updated ${updated} slide${updated === 1 ? "" : "s"}. Screens refresh within a minute.`, failed > 0);
+      toast.show("Brand saved. New menus and boards can use it. Existing boards are left unchanged.");
     } catch (err) {
       toast.show((err as Error).message, true);
     } finally {
@@ -77,12 +57,12 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   }
 
   return (
-    <section className="min-w-0">
+    <section className="min-w-0 pb-28 lg:pb-0">
       <PageHeader
         title="Brand Kit"
         eyebrow="Account"
         icon={<IconGear />}
-        lede="Your logo, main colour, and highlight colour. Menus and promotions that use your brand read these same values."
+        lede="Your logo, main colour, and highlight colour. New menus and promotions can use these same values. Saving does not change boards you already have."
       />
       {!brand ? (
         <LoadState error={error} label="Loading your brand…" />
@@ -98,7 +78,6 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
           custom={brand.custom}
           busy={busy}
           onSave={() => void save()}
-          onApply={() => void applyAll()}
         />
       )}
     </section>
@@ -106,15 +85,14 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
 }
 
 function BrandEditor({
-  form, setForm, images, custom, busy, onSave, onApply,
+  form, setForm, images, custom, busy, onSave,
 }: {
   form: BrandFields;
   setForm: (next: BrandFields) => void;
   images: MediaItem[];
   custom: boolean;
-  busy: "save" | "apply" | null;
+  busy: "save" | null;
   onSave: () => void;
-  onApply: () => void;
 }) {
   const valid = Boolean(normalizeHex(form.primaryColor) && normalizeHex(form.accentColor));
   const colour = (key: "primaryColor" | "accentColor", label: string) => (
@@ -139,37 +117,99 @@ function BrandEditor({
     </label>
   );
   const logo = images.find((item) => item.id === form.logoMediaId);
+  const primary = normalizeHex(form.primaryColor) ?? DEFAULT_BRAND.primaryColor;
+  const accent = normalizeHex(form.accentColor) ?? DEFAULT_BRAND.accentColor;
+  const logoSrc = logo?.url ?? logo?.thumbnailUrl ?? "";
 
   return (
-    <section className="card p-4 md:p-6" aria-labelledby="brand-heading" id="brand">
-      <h2 id="brand-heading" className="text-lg font-semibold">Your brand</h2>
-      <p className="text-sm text-muted">These go on every menu board and promo that has “Use my brand” ticked. Saving does not change slides you already have until you apply them.</p>
-      {logo?.url || logo?.thumbnailUrl ? (
-        <div className="mt-4 flex items-center gap-3">
-          <img src={logo.url ?? logo.thumbnailUrl ?? ""} alt="" className="size-14 rounded-lg object-contain border border-line bg-paper" />
-          <p className="text-sm font-medium truncate">{logo.fileName}</p>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,24rem)] items-start">
+      <section className="card flex flex-col gap-5 p-5 md:p-6" aria-labelledby="brand-heading" id="brand">
+        <div>
+          <h2 id="brand-heading" className="text-lg font-semibold">Your brand</h2>
+          <p className="text-sm text-muted mt-1">
+            {custom
+              ? "These go on new menu boards and promos that use your brand. Saving does not change boards you already have."
+              : "Using built-in colours. Set your logo and colours, then save. New menus can use them; existing boards stay as they are."}
+          </p>
         </div>
-      ) : null}
-      <div className="mt-4 flex flex-wrap gap-4 items-end">
-        <label className="grid gap-1">
-          <span className="form-label">Logo</span>
-          <select className="field min-w-56" value={form.logoMediaId ?? ""} onChange={(e) => setForm({ ...form, logoMediaId: e.target.value || null })}>
-            <option value="">No logo</option>
-            {images.map((m) => (
-              <option key={m.id} value={m.id}>{m.fileName}</option>
-            ))}
-          </select>
-        </label>
-        {colour("primaryColor", "Main colour")}
-        {colour("accentColor", "Highlight colour")}
-      </div>
-      {!images.length ? <p className="text-xs text-muted mt-2">To add a logo, upload it as a JPG or PNG in Media first.</p> : null}
-      {!valid ? <p className="text-sm text-danger mt-2" role="alert">Use colours like #0066ff.</p> : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" className="btn btn-primary" disabled={!valid || busy !== null} onClick={onSave}>{busy === "save" ? "Saving…" : "Save brand"}</button>
-        <button type="button" className="btn btn-quiet" disabled={!custom || busy !== null} onClick={onApply}>{busy === "apply" ? "Updating…" : "Apply to all menus and promos"}</button>
-      </div>
-    </section>
+
+        <div className="grid gap-3">
+          <h3 className="text-sm font-semibold">Logo</h3>
+          {logoSrc ? (
+            <div className="flex items-center gap-3">
+              <img src={logoSrc} alt="" className="size-14 rounded-lg object-contain border border-line bg-paper" />
+              <p className="text-sm font-medium truncate">{logo?.fileName}</p>
+            </div>
+          ) : null}
+          <label className="grid gap-1">
+            <span className="form-label">Logo</span>
+            <select className="field min-w-56" value={form.logoMediaId ?? ""} onChange={(e) => setForm({ ...form, logoMediaId: e.target.value || null })}>
+              <option value="">No logo</option>
+              {images.map((m) => (
+                <option key={m.id} value={m.id}>{m.fileName}</option>
+              ))}
+            </select>
+          </label>
+          {!images.length ? <p className="text-xs text-muted">To add a logo, upload it as a JPG or PNG in Media first.</p> : null}
+        </div>
+
+        <div className="grid gap-3">
+          <h3 className="text-sm font-semibold">Colours</h3>
+          <div className="flex flex-wrap gap-4 items-end">
+            {colour("primaryColor", "Main colour")}
+            {colour("accentColor", "Highlight colour")}
+          </div>
+          {!valid ? <p className="text-sm text-danger" role="alert">Use colours like #0066ff.</p> : null}
+        </div>
+
+      </section>
+
+      <aside className="card p-5 md:p-6" aria-label="Brand preview">
+        <h2 className="text-lg font-semibold">Preview</h2>
+        <p className="text-sm text-muted mt-1 mb-4">A live look at your logo and colours. This is not a published board.</p>
+        <div
+          className="overflow-hidden rounded-xl border border-line shadow-sm"
+          style={{ aspectRatio: "16 / 9", background: "#f7f3ea" }}
+        >
+          <div
+            className="flex items-center gap-3 px-4"
+            style={{ height: "32%", background: primary, color: "#fff" }}
+          >
+            {logoSrc ? (
+              <img src={logoSrc} alt="" className="h-10 w-10 rounded-md object-contain bg-white/15" />
+            ) : (
+              <span className="h-10 w-10 rounded-md border border-white/40" aria-hidden="true" />
+            )}
+            <span className="font-semibold truncate" style={{ fontSize: 18, letterSpacing: "-0.02em" }}>Your menu</span>
+          </div>
+          <div className="grid gap-3 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium" style={{ color: "#1a1a1a" }}>Featured item</span>
+              <span
+                className="rounded-full px-2.5 py-0.5 text-sm font-semibold"
+                style={{ background: accent, color: "#1a1a1a" }}
+              >
+                $12
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span style={{ color: "#1a1a1a" }}>House special</span>
+              <span
+                className="rounded-full px-2.5 py-0.5 text-sm font-semibold"
+                style={{ background: accent, color: "#1a1a1a" }}
+              >
+                $9
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full" style={{ background: primary, width: "40%", opacity: 0.85 }} />
+          </div>
+        </div>
+      </aside>
+
+        <div className="lg:col-start-1">
+          <button type="button" className="btn btn-primary min-h-11" disabled={!valid || busy !== null} onClick={onSave}>{busy === "save" ? "Saving…" : "Save brand"}</button>
+        </div>
+    </div>
   );
 }
 

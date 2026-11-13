@@ -192,3 +192,31 @@ describe("legacy and current routes still resolve", () => {
     expect(existsSync(join(root, "public/player.html"))).toBe(true);
   });
 });
+
+describe("web Brand Kit and Account hub (no bulk apply)", () => {
+  it("does not expose Apply to all on the web, and leaves the apply API unreferenced from the client", () => {
+    const dir = join(__dirname, "../..");
+    const kit = readFileSync(join(dir, "components/brand-kit.tsx"), "utf8");
+    const account = readFileSync(join(dir, "app/dashboard/account/page.tsx"), "utf8");
+    const layout = readFileSync(join(dir, "components/layout-studio.tsx"), "utf8");
+    const classic = readFileSync(join(dir, "components/classic-editor.tsx"), "utf8");
+    expect(kit).not.toContain("Apply to all menus and promos");
+    expect(kit).not.toContain("/api/brand/apply");
+    expect(kit).not.toContain("applyAll");
+    expect(kit).toContain("Save brand");
+    expect(kit).toContain("aria-label=\"Brand preview\"");
+    expect(layout).not.toContain("/api/brand/apply");
+    expect(classic).not.toContain("/api/brand/apply");
+    expect(layout).toContain(">Apply brand<");
+    expect(layout).toContain("{!menuId ? (");
+    expect(account).toContain("Contact support");
+    expect(account).not.toContain("Open support");
+    expect(account).not.toContain("ContactBlock");
+    expect(account).not.toContain("ManageBilling");
+    expect(account).toContain("btn btn-primary min-h-11 mt-auto");
+    for (const action of ["Open settings", "Open Brand Kit", "Open billing", "Contact support"]) {
+      expect(account).toContain(action);
+    }
+  });
+});
+

@@ -7,7 +7,7 @@ import {
   type AccountBoard, type AccountLibraryFile, type AccountStudio,
 } from "@/lib/layout-account";
 import {
-  containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, templateSpec, zoneCapabilities,
+  containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, seedBrand, templateSpec, zoneCapabilities,
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import {
@@ -81,7 +81,7 @@ export function LayoutStudio({
   const [draft, setDraft] = useState<LayoutDocument>(() => sampleLayout(startingTemplate));
   const [imageHref, setImageHref] = useState<string | null>(null);
   const [videoOn, setVideoOn] = useState(true);
-  const [published, setPublished] = useState<Snapshot | null>(null);
+  const [_published, setPublished] = useState<Snapshot | null>(null);
   const [account, setAccount] = useState<AccountStudio | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [boardName, setBoardName] = useState("");
@@ -138,6 +138,19 @@ export function LayoutStudio({
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
   const zoneSrc = clipUrl || librarySrc || "/layout-studio/media/promo";
   const showZone = Boolean(videoBox) && (accountMode ? Boolean(clipUrl || (draft.videoMediaId && librarySrc)) : Boolean(clipUrl) || videoOn || Boolean(draft.videoMediaId));
+
+  useEffect(() => {
+    if (menuId) return;
+    if (studioIsDirty()) return;
+    const colors = brand?.brand ?? liveBrand.data;
+    const next = seedBrand(draft, colors);
+    if (next === draft) return;
+    setDraft(next);
+    const baseline = cleanRef.current ?? currentEdit();
+    markClean({ ...baseline, menuId: null, draft: next });
+    // Seed only when the kit arrives on a still-new, untouched board — not on every draft keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveBrand.data, brand, menuId]);
 
   useEffect(() => {
     if (fixture) {
@@ -347,10 +360,11 @@ export function LayoutStudio({
   }
 
   function applyFresh(created: { name: string; document: LayoutDocument }, nextScope: StudioScope | null) {
+    const seeded = seedBrand(created.document, brand?.brand ?? liveBrand.data);
     setBoardName(created.name);
     setMenuId(null);
-    setTemplate(created.document.template);
-    setDraft(created.document);
+    setTemplate(seeded.template);
+    setDraft(seeded);
     setImageHref(null);
     setClipUrl(null);
     setVideoOn(false);
@@ -362,8 +376,8 @@ export function LayoutStudio({
     markClean({
       menuId: null,
       boardName: created.name,
-      template: created.document.template,
-      draft: created.document,
+      template: seeded.template,
+      draft: seeded,
       imageHref: null,
       clipUrl: null,
       videoOn: false,
@@ -403,13 +417,14 @@ export function LayoutStudio({
 
   function choose(next: LayoutTemplate) {
     const sample = sampleLayout(next);
+    const document = menuId ? sample : seedBrand(sample, brand?.brand ?? liveBrand.data);
     setTemplate(next);
-    setDraft(sample);
+    setDraft(document);
     setImageHref(null);
     setClipUrl(null);
     setZone(next === "triple-column" || next === "two-menu-promo" || next === "two-column" ? "column-0" : "menu");
     setSectionIndex(0);
-    setVideoOn(accountMode ? false : frameFor(next, sample.split).video !== null);
+    setVideoOn(accountMode ? false : frameFor(next, document.split).video !== null);
   }
 
   function update(next: LayoutDocument) {
@@ -855,11 +870,13 @@ export function LayoutStudio({
                 <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
                 <BrandSummary fixture={brand ?? undefined} />
                 <p style={{ fontSize: 13, margin: "8px 0" }}><StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</StudioGuardedLink></p>
-                <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
-                  const colors = brand?.brand ?? liveBrand.data;
-                  if (!colors?.primaryColor && !colors?.accentColor) return;
-                  update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
-                }}>Use Brand Kit colors on this board</button>
+                {!menuId ? (
+                  <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
+                    const colors = brand?.brand ?? liveBrand.data;
+                    if (!colors?.primaryColor && !colors?.accentColor) return;
+                    update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
+                  }}>Apply brand</button>
+                ) : null}
               </div>
               <button type="button" className="btn btn-quiet min-h-11" onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
               <label style={fieldLabel}>Type size
@@ -919,30 +936,16 @@ export function LayoutStudio({
         </section>
         </div>
 
-        <section className="studio-canvas" data-testid="studio-canvas" aria-label="Editing canvas">
-          {studioBp !== "phone" ? (
-            <>
-              <p className="studio-kicker">Board</p>
-              <div className="studio-canvas-stage">
-                {renderStage(true)}
-              </div>
-            </>
-          ) : null}
-        </section>
-
-        <section className="studio-preview" aria-label="TV preview" id="studio-tv-preview" data-testid="studio-tv-preview">
-          <div className="studio-preview-head">
-            <p className="studio-kicker">Preview</p>
-            <p className="studio-preview-note">Preview, not a live TV feed.</p>
+        <section
+          className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
+          id="studio-tv-preview"
+          data-testid="studio-tv-preview"
+          aria-label="Editing canvas"
+        >
+          <p className="studio-kicker">Board · preview of what your TV will show</p>
+          <div className="studio-canvas-stage">
+            {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
           </div>
-          {studioBp === "phone" ? (
-            <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true)}</div>
-          ) : null}
-          {studioBp === "desktop" ? (
-            <div className="studio-preview-still">{renderStage(false)}</div>
-          ) : null}
-          {studioBp === "desktop" && !accountMode && published ? <Stage svg={published.svg || layoutSvg(published.doc, { imageHref: published.imageHref })} video={published.videoOn ? published.videoBox || frameFor(published.doc.template, published.doc.split, published.doc.columnWidths).video : null} videoSrc={libraryVideoUrl(account, published.doc.videoMediaId, false)} label="Published preview" hits={[]} active="" onHit={() => undefined} /> : null}
-          {studioBp === "desktop" && !accountMode && !published ? <p className="studio-unpublished">No published preview yet.</p> : null}
         </section>
       </div>
       <div className="studio-savebar">

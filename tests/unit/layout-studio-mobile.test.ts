@@ -21,26 +21,28 @@ describe("studio phone frame", () => {
     await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:0}${style}</style>
       <main class="studio-app">
         <div class="studio-grid">
-          <section class="studio-preview" aria-label="TV preview"><figure><div style="aspect-ratio:16/9;background:#000"></div></figure></section>
+          <section class="studio-canvas on" id="studio-tv-preview" aria-label="Editing canvas"><div class="preview-frame" style="aspect-ratio:16/9;background:#000;width:100%"></div></section>
           <section class="studio-controls"><div class="studio-pane on" style="width:900px">wide controls</div></section>
         </div>
         <nav class="studio-tabs"><button>Template</button><button>Section</button><button>Content</button><button>Style</button><button>Publish</button></nav>
       </main>`);
     const metrics = await page.evaluate(() => {
       const tab = document.querySelector(".studio-tabs button");
-      const preview = document.querySelector(".studio-preview");
+      const canvas = document.getElementById("studio-tv-preview");
       return {
         scroll: document.documentElement.scrollWidth,
         client: document.documentElement.clientWidth,
-        sticky: preview ? getComputedStyle(preview).position : "",
+        display: canvas ? getComputedStyle(canvas).display : "",
+        sticky: canvas ? getComputedStyle(canvas).position : "",
         tab: tab ? tab.getBoundingClientRect().height : 0,
-        previewBottom: preview ? preview.getBoundingClientRect().bottom : 0,
+        canvasBottom: canvas ? canvas.getBoundingClientRect().bottom : 0,
         controlsTop: document.querySelector(".studio-controls")?.getBoundingClientRect().top ?? 0,
       };
     });
     expect(metrics.scroll).toBeLessThanOrEqual(metrics.client + 1);
+    expect(metrics.display).toBe("flex");
     expect(metrics.sticky).toBe("static");
-    expect(metrics.controlsTop).toBeGreaterThanOrEqual(metrics.previewBottom - 1);
+    expect(metrics.controlsTop).toBeGreaterThanOrEqual(metrics.canvasBottom - 1);
     expect(metrics.tab).toBeGreaterThanOrEqual(44);
     await browser.close();
   });
