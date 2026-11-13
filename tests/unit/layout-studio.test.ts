@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Resvg } from "@resvg/resvg-js";
 import {
   BOARD_H, BOARD_W, boxesOverlap, clientAcceptsZoneBox, containedBoard, fontFamily, frameFor, layoutStudioEnabled, layoutStudioPreviewOpen, layoutSvg, mediaVideoBox, MENU_LIMITS, paintAfterStill, PROMO_BAND, promoBandHeight, zoneOnBoard,
-  paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, zoneVideoStyle, type LayoutTemplate, type ZoneBox,
+  paintAfterVideoFailed, paintAfterVideoPlaying, parseLayout, playerComposition, sampleLayout, seedBrand, zoneVideoStyle, type LayoutTemplate, type ZoneBox,
 } from "@/lib/layout-studio";
 import { prepareBoardPhoto, renderLayoutPng } from "@/lib/server/layout-render";
 
@@ -508,3 +508,44 @@ describe("player composition contract", () => {
     expect(attach).not.toContain("groupCount");
   });
 });
+
+describe("seedBrand for new Layout Studio boards", () => {
+  const kit = { primaryColor: "#c8102e", accentColor: "#ffd34d" };
+
+  it("seeds sample layouts that start with null colours, and does not overwrite colours already on a document", () => {
+    const fresh = sampleLayout("menu-promo-67");
+    expect(fresh.primaryColor).toBeNull();
+    expect(fresh.accentColor).toBeNull();
+    const seeded = seedBrand(fresh, kit);
+    expect(seeded).toMatchObject({ primaryColor: "#c8102e", accentColor: "#ffd34d" });
+    expect(seeded).not.toBe(fresh);
+    expect(fresh.primaryColor).toBeNull();
+
+    const existing = { ...fresh, primaryColor: "#163628", accentColor: "#f4e8c8" };
+    expect(seedBrand(existing, kit)).toBe(existing);
+    expect(seedBrand(existing, kit).primaryColor).toBe("#163628");
+  });
+
+  it("is a no-op without kit colours, and leaves a document that already has only one colour alone", () => {
+    const fresh = sampleLayout("two-column");
+    expect(seedBrand(fresh, null)).toBe(fresh);
+    expect(seedBrand(fresh, {})).toBe(fresh);
+    expect(seedBrand(fresh, { primaryColor: null, accentColor: null })).toBe(fresh);
+    const onlyPrimary = { ...fresh, primaryColor: "#0066ff", accentColor: null };
+    expect(seedBrand(onlyPrimary, kit)).toBe(onlyPrimary);
+  });
+
+  it("is used to seed new boards in applyFresh, choose when unsaved, and a late kit load, never on adoptBoard", () => {
+    const source = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(source).toContain("seedBrand(created.document, brand?.brand ?? liveBrand.data)");
+    expect(source).toContain("const document = menuId ? sample : seedBrand(sample, brand?.brand ?? liveBrand.data)");
+    expect(source).toContain("if (menuId) return;");
+    expect(source).toContain("if (studioIsDirty()) return;");
+    expect(source).toContain("const next = seedBrand(draft, colors)");
+    // Opening an existing board keeps the stored document as-is (no seedBrand in adoptBoard).
+    const adopt = source.slice(source.indexOf("function adoptBoard"), source.indexOf("function choose"));
+    expect(adopt).toContain("setDraft(board.document)");
+    expect(adopt).not.toContain("seedBrand");
+  });
+});
+

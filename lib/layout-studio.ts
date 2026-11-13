@@ -497,6 +497,20 @@ export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): Layout
   return samples[template];
 }
 
+/** Apply saved Brand Kit colours to a NEW board document only.
+ *  Leaves the document unchanged when it already has colours, or when no kit colours are available.
+ *  Callers must not run this on an existing saved board. */
+export function seedBrand(
+  doc: LayoutDocument,
+  colors: { primaryColor?: string | null; accentColor?: string | null } | null | undefined,
+): LayoutDocument {
+  if (doc.primaryColor || doc.accentColor) return doc;
+  const primaryColor = colors?.primaryColor || null;
+  const accentColor = colors?.accentColor || null;
+  if (!primaryColor && !accentColor) return doc;
+  return { ...doc, primaryColor, accentColor };
+}
+
 export function esc(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

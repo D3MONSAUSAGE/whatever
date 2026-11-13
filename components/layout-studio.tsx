@@ -7,7 +7,7 @@ import {
   type AccountBoard, type AccountLibraryFile, type AccountStudio,
 } from "@/lib/layout-account";
 import {
-  containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, templateSpec, zoneCapabilities,
+  containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, seedBrand, templateSpec, zoneCapabilities,
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import {
@@ -138,6 +138,19 @@ export function LayoutStudio({
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
   const zoneSrc = clipUrl || librarySrc || "/layout-studio/media/promo";
   const showZone = Boolean(videoBox) && (accountMode ? Boolean(clipUrl || (draft.videoMediaId && librarySrc)) : Boolean(clipUrl) || videoOn || Boolean(draft.videoMediaId));
+
+  useEffect(() => {
+    if (menuId) return;
+    if (studioIsDirty()) return;
+    const colors = brand?.brand ?? liveBrand.data;
+    const next = seedBrand(draft, colors);
+    if (next === draft) return;
+    setDraft(next);
+    const baseline = cleanRef.current ?? currentEdit();
+    markClean({ ...baseline, menuId: null, draft: next });
+    // Seed only when the kit arrives on a still-new, untouched board — not on every draft keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveBrand.data, brand, menuId]);
 
   useEffect(() => {
     if (fixture) {
@@ -347,10 +360,7 @@ export function LayoutStudio({
   }
 
   function applyFresh(created: { name: string; document: LayoutDocument }, nextScope: StudioScope | null) {
-    const colors = brand?.brand ?? liveBrand.data;
-    const seeded = (!created.document.primaryColor && !created.document.accentColor && (colors?.primaryColor || colors?.accentColor))
-      ? { ...created.document, primaryColor: colors?.primaryColor || null, accentColor: colors?.accentColor || null }
-      : created.document;
+    const seeded = seedBrand(created.document, brand?.brand ?? liveBrand.data);
     setBoardName(created.name);
     setMenuId(null);
     setTemplate(seeded.template);
@@ -407,13 +417,14 @@ export function LayoutStudio({
 
   function choose(next: LayoutTemplate) {
     const sample = sampleLayout(next);
+    const document = menuId ? sample : seedBrand(sample, brand?.brand ?? liveBrand.data);
     setTemplate(next);
-    setDraft(sample);
+    setDraft(document);
     setImageHref(null);
     setClipUrl(null);
     setZone(next === "triple-column" || next === "two-menu-promo" || next === "two-column" ? "column-0" : "menu");
     setSectionIndex(0);
-    setVideoOn(accountMode ? false : frameFor(next, sample.split).video !== null);
+    setVideoOn(accountMode ? false : frameFor(next, document.split).video !== null);
   }
 
   function update(next: LayoutDocument) {
@@ -931,9 +942,9 @@ export function LayoutStudio({
           data-testid="studio-tv-preview"
           aria-label="Editing canvas"
         >
-          <p className="studio-kicker">Board</p>
+          <p className="studio-kicker">Board · preview of what your TV will show</p>
           <div className="studio-canvas-stage">
-            {renderStage(true)}
+            {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
           </div>
         </section>
       </div>

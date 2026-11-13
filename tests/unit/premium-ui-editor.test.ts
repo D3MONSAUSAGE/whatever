@@ -41,6 +41,9 @@ describe("premium editor chrome", () => {
     expect(source).toContain("useStudioBreakpoint");
     expect(source).toContain('studioBp === "phone"');
     expect(source).toContain('step === "preview" ? "studio-canvas on"');
+    expect(source).toContain('studioBp !== "phone" || step === "preview"');
+    expect(source).toContain("Board · preview of what your TV will show");
+    expect(source).not.toMatch(/<p className="studio-kicker">Board<\/p>/);
     expect([...style.matchAll(/padding-bottom: calc\(168px/g)]).toHaveLength(1);
     expect(style).toContain("studio-controls-end");
     expect(style).toContain("body:has(.studio-app) .content-nav { display: none; }");

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, authToken, type DisplayItem, type MediaItem } from "@/lib/api";
 import { MENU_LIMITS, MENU_TEMPLATES, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/lib/menu-board-unify";
-import { StudioStyles } from "@/components/studio-chrome";
+import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 
 export type ClassicDraft = {
@@ -46,6 +46,7 @@ export function ClassicEditor({
   readOnly?: boolean;
 }) {
   const [step, setStep] = useState<ClassicStep>("content");
+  const studioBp = useStudioBreakpoint();
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(previewSrc ?? draft.imageUrl ?? null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -355,8 +356,8 @@ export function ClassicEditor({
           data-testid="studio-tv-preview"
           aria-label="Editing canvas"
         >
-          <p className="studio-kicker">Board</p>
-          <div className="studio-canvas-stage">{renderStage(true, "menu-preview")}</div>
+          <p className="studio-kicker">Board · preview of what your TV will show</p>
+          <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
         </section>
       </div>
