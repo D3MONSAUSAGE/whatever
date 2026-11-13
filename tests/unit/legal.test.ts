@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { PAYMENT_GRACE_DAYS, PLAYBACK_GRACE_DAYS, TRANSITION_DAYS, TRIAL_DAYS } from "@/lib/server/entitlements";
 import { PLANS, TRIAL } from "@/lib/plans";
 import {
-  LEGAL_ADDRESS, LEGAL_OPERATOR, REFUND_POLICY, SUPPORT_EMAIL,
+  LEGAL_ADDRESS, LEGAL_OPERATOR, LEGAL_PRIVACY_UPDATED, LEGAL_UPDATED, REFUND_POLICY, SUPPORT_EMAIL,
 } from "@/lib/legal";
 
 const PAGES = [
@@ -19,6 +19,8 @@ const PAGES = [
 describe("published legal pages", () => {
   it("uses the authorized operator, address, mailbox, and refund policy", () => {
     expect(LEGAL_OPERATOR).toBe("Francisco Lopez, a sole proprietor doing business as Pekko");
+    expect(LEGAL_UPDATED).toBe("November 8, 2026");
+    expect(LEGAL_PRIVACY_UPDATED).toBe("November 12, 2026");
     expect(LEGAL_ADDRESS).toBe("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
     expect(SUPPORT_EMAIL).toBe("vivalopez06-wh5rwz@mail.grokbot.com");
     expect(REFUND_POLICY).toMatch(/not refunded for unused time/);
@@ -52,12 +54,22 @@ describe("published legal pages", () => {
     expect(privacy).toContain("Stripe");
     expect(privacy).toContain("Resend");
     expect(privacy).toContain("90 days");
+    expect(privacy).toContain("LEGAL_PRIVACY_UPDATED");
+    expect(privacy).not.toMatch(/\bLEGAL_UPDATED\b/);
+    expect(terms).toContain("LEGAL_UPDATED");
+    expect(terms).not.toContain("LEGAL_PRIVACY_UPDATED");
+    expect(privacy).toMatch(/Ad and campaign attribution/);
+    expect(privacy).toMatch(/first-party cookie and your browser/);
+    expect(privacy).toMatch(/we do not overwrite it later/);
+    expect(privacy).toMatch(/The copy on your account is deleted when your account is deleted/);
+    expect(privacy).toMatch(/we don&apos;t use advertising pixels or third-party analytics scripts/);
+    expect(privacy).toMatch(/measure which ads and channels bring new sign-ups/);
     expect(privacy).toMatch(/does not include an advertising network or a third-party website-analytics script/);
     expect(privacy).toMatch(/not a promise that every backup/);
     expect(privacy).toMatch(/not a guarantee that all processing stays/);
     expect(privacy).toMatch(/not a claim of compliance/);
     expect(privacy).toContain('id="changes"');
-    expect(privacy).toContain("dateLine={`Effective ${LEGAL_UPDATED}. Last updated ${LEGAL_UPDATED}.`}");
+    expect(privacy).toContain("dateLine={`Effective ${LEGAL_PRIVACY_UPDATED}. Last updated ${LEGAL_PRIVACY_UPDATED}.`}");
     expect(privacy).toMatch(/Before a material change takes effect, the updated policy is posted on this page/);
     expect(privacy).toMatch(/linked from the site footer/);
     expect(privacy).toMatch(/sent to the account email/);
