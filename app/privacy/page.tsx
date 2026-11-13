@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
-import { LEGAL_ADDRESS, LEGAL_OPERATOR, LEGAL_OWNERSHIP, LEGAL_UPDATED, SUPPORT_EMAIL } from "@/lib/legal";
+import { LEGAL_ADDRESS, LEGAL_OPERATOR, LEGAL_OWNERSHIP, LEGAL_PRIVACY_UPDATED, SUPPORT_EMAIL } from "@/lib/legal";
 
 export const metadata: Metadata = { title: "Privacy Policy · Pekko" };
 
 export default function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" updated={LEGAL_UPDATED} dateLine={`Effective ${LEGAL_UPDATED}. Last updated ${LEGAL_UPDATED}.`}>
+    <LegalPage title="Privacy Policy" updated={LEGAL_PRIVACY_UPDATED} dateLine={`Effective ${LEGAL_PRIVACY_UPDATED}. Last updated ${LEGAL_PRIVACY_UPDATED}.`}>
       <p>This policy explains what {LEGAL_OPERATOR} processes when you use Pekko, why, and the choices the product actually offers. {LEGAL_OWNERSHIP}</p>
 
       <h2 className="font-semibold text-lg" id="changes">Changes to this policy</h2>
@@ -28,11 +28,19 @@ export default function Privacy() {
       </ul>
 
       <h2 className="font-semibold text-lg">Why it is used</h2>
-      <p>To sign you in, store and deliver your content to your screens, show screen status, send account and screen alerts, run billing when a paid plan is started, limit abuse, and troubleshoot the Service. You keep ownership of your content. We do not sell personal information. There is no sale to opt out of, and this policy is not a claim of compliance with any particular privacy statute.</p>
+      <p>To sign you in, store and deliver your content to your screens, show screen status, send account and screen alerts, run billing when a paid plan is started, measure which ads and channels bring new sign-ups, limit abuse, and troubleshoot the Service. You keep ownership of your content. We do not sell personal information. There is no sale to opt out of, and this policy is not a claim of compliance with any particular privacy statute.</p>
 
       <h2 className="font-semibold text-lg">What is measured, and what is not</h2>
       <p>The records above are first-party records of the account&apos;s own screens and changes. This application does not include an advertising network or a third-party website-analytics script. The dashboard sign-in client stores the session in the browser and calls Pekko&apos;s API with a bearer token.</p>
       <p>Transactional email goes through Resend as plain text. The send request does not turn on open or click tracking, and the verified pekkotv.com sending domain reports open and click tracking off. That describes this application and that domain setting. It is not a promise that a provider never logs or measures its own systems.</p>
+
+      <h2 className="font-semibold text-lg">Ad and campaign attribution</h2>
+      <p>
+        When you first arrive at pekkotv.com, we may save campaign tags from the link (source, medium, campaign, content and term) and the address of the site that sent you (the referrer) in a first-party cookie and your browser&apos;s local storage for up to 90 days.
+        If you create an account in that time, we copy this first-visit information to your account once, at sign-up, and we do not overwrite it later.
+        We use it only to measure which ads and channels bring new sign-ups. We don&apos;t sell it or share it with advertisers or ad networks, and we don&apos;t use advertising pixels or third-party analytics scripts.
+        The copy on your account is deleted when your account is deleted.
+      </p>
 
       <h2 className="font-semibold text-lg">Service providers</h2>
       <ul className="list-disc pl-5 grid gap-1">

@@ -5,6 +5,7 @@
  * placeholder back on the site.
  */
 export const LEGAL_UPDATED = "November 8, 2026";
+export const LEGAL_PRIVACY_UPDATED = "November 12, 2026";
 export const LEGAL_OPERATOR = "Francisco Lopez, a sole proprietor doing business as Pekko";
 export const LEGAL_COPYRIGHT = "Francisco Lopez";
 export const LEGAL_OWNERSHIP = "Pekko is owned entirely by Francisco Lopez. It is not a Pekko LLC and is wholly separate from Teamtegrate LLC.";
