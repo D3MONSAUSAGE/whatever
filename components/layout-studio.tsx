@@ -245,17 +245,18 @@ export function LayoutStudio({
         });
       } else {
         const created = initialTemplate ? { name: freshBoard(fixture.boards.length).name, document: sampleLayout(initialTemplate) } : freshBoard(fixture.boards.length);
+        const seeded = seedBrand(created.document, brand?.brand);
         setMenuId(null);
         setBoardName(created.name);
-        setTemplate(created.document.template);
-        setDraft(created.document);
+        setTemplate(seeded.template);
+        setDraft(seeded);
         setImageHref(null);
         setVideoOn(false);
         markClean({
           menuId: null,
           boardName: created.name,
-          template: created.document.template,
-          draft: created.document,
+          template: seeded.template,
+          draft: seeded,
           imageHref: null,
           clipUrl: null,
           videoOn: false,

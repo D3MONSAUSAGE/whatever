@@ -1,28 +1,138 @@
 import { BUCKET, db } from "./supabase";
 import { isMissingSchema } from "./schema";
-import { DEFAULT_BRAND, type MenuContent } from "@/lib/menu-templates";
+import { type MenuContent } from "@/lib/menu-templates";
 import type { MenuArt } from "./menu-render";
+import {
+  brandFromRecord,
+  brandFromRow,
+  defaultBrandResponse,
+  mergeBrandRecord,
+  parseBrandPut,
+  patchWritesIdentity,
+  type Brand,
+  type BrandRecord,
+} from "@/lib/brand-kit";
+
+export type { Brand };
 
 export const BRAND_UNAVAILABLE = "Branding isn't available yet. Try again after the next update.";
+export const BRAND_IDENTITY_UNAVAILABLE =
+  "Business details, fonts, and extra colours aren't available yet. Try again after the next update.";
+
 const ART_MAX_BYTES = 15 * 1024 * 1024;
 const ART_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
-export type Brand = { primaryColor: string; accentColor: string; logoMediaId: string | null; available: boolean; custom: boolean };
+const BRAND_FULL_COLUMNS =
+  "primary_color, accent_color, logo_media_id, display_name, text_color, background_color, heading_font, body_font, phone, website";
+const BRAND_LEGACY_COLUMNS = "primary_color, accent_color, logo_media_id";
 
 export async function getBrand(accountId: string): Promise<Brand | "error"> {
-  const row = await db().from("brand_kits").select("primary_color, accent_color, logo_media_id").eq("account_id", accountId).maybeSingle();
-  if (row.error) {
-    if (isMissingSchema(row.error)) return { ...DEFAULT_BRAND, logoMediaId: null, available: false, custom: false };
+  const full = await db().from("brand_kits").select(BRAND_FULL_COLUMNS).eq("account_id", accountId).maybeSingle();
+  if (full.error) {
+    if (isMissingSchema(full.error)) {
+      const legacy = await db().from("brand_kits").select(BRAND_LEGACY_COLUMNS).eq("account_id", accountId).maybeSingle();
+      if (legacy.error) {
+        if (isMissingSchema(legacy.error)) return defaultBrandResponse(false);
+        return "error";
+      }
+      if (!legacy.data) return defaultBrandResponse(true);
+      return brandFromRow(legacy.data, { available: true, custom: true });
+    }
     return "error";
   }
-  if (!row.data) return { ...DEFAULT_BRAND, logoMediaId: null, available: true, custom: false };
-  return {
-    primaryColor: String(row.data.primary_color),
-    accentColor: String(row.data.accent_color),
-    logoMediaId: row.data.logo_media_id ? String(row.data.logo_media_id) : null,
-    available: true,
-    custom: true,
+  if (!full.data) return defaultBrandResponse(true);
+  return brandFromRow(full.data, { available: true, custom: true });
+}
+
+async function loadBrandRecord(accountId: string): Promise<
+  { ok: true; record: BrandRecord | null; identityColumns: boolean } | { ok: false; status: number; error: string }
+> {
+  const full = await db().from("brand_kits").select(BRAND_FULL_COLUMNS).eq("account_id", accountId).maybeSingle();
+  if (full.error) {
+    if (isMissingSchema(full.error)) {
+      const legacy = await db().from("brand_kits").select(BRAND_LEGACY_COLUMNS).eq("account_id", accountId).maybeSingle();
+      if (legacy.error) {
+        if (isMissingSchema(legacy.error)) return { ok: false, status: 503, error: BRAND_UNAVAILABLE };
+        return { ok: false, status: 500, error: "Couldn't load your brand." };
+      }
+      if (!legacy.data) return { ok: true, record: null, identityColumns: false };
+      return {
+        ok: true,
+        record: {
+          primaryColor: String(legacy.data.primary_color),
+          accentColor: String(legacy.data.accent_color),
+          logoMediaId: legacy.data.logo_media_id ? String(legacy.data.logo_media_id) : null,
+          displayName: null,
+          textColor: null,
+          backgroundColor: null,
+          headingFont: null,
+          bodyFont: null,
+          phone: null,
+          website: null,
+        },
+        identityColumns: false,
+      };
+    }
+    return { ok: false, status: 500, error: "Couldn't load your brand." };
+  }
+  if (!full.data) return { ok: true, record: null, identityColumns: true };
+  const brand = brandFromRow(full.data, { available: true, custom: true });
+  const { available: _a, custom: _c, ...record } = brand;
+  return { ok: true, record, identityColumns: true };
+}
+
+function recordToRow(accountId: string, record: BrandRecord, includeIdentity: boolean) {
+  const row: Record<string, unknown> = {
+    account_id: accountId,
+    primary_color: record.primaryColor,
+    accent_color: record.accentColor,
+    logo_media_id: record.logoMediaId,
+    updated_at: new Date().toISOString(),
   };
+  if (includeIdentity) {
+    row.display_name = record.displayName;
+    row.text_color = record.textColor;
+    row.background_color = record.backgroundColor;
+    row.heading_font = record.headingFont;
+    row.body_font = record.bodyFont;
+    row.phone = record.phone;
+    row.website = record.website;
+  }
+  return row;
+}
+
+/**
+ * Merge a PUT body onto the stored brand. A present key with null clears that
+ * field. An absent key is left untouched, so an Android-shaped
+ * {primaryColor, accentColor, logoMediaId} payload cannot wipe identity fields.
+ */
+export async function putBrand(
+  accountId: string,
+  body: unknown,
+): Promise<{ ok: true; brand: Brand } | { ok: false; status: number; error: string }> {
+  const parsed = parseBrandPut(body);
+  if (!parsed.ok) return { ok: false, status: 400, error: parsed.error };
+  const loaded = await loadBrandRecord(accountId);
+  if (!loaded.ok) return loaded;
+  if (!loaded.identityColumns && patchWritesIdentity(parsed.patch)) {
+    return { ok: false, status: 503, error: BRAND_IDENTITY_UNAVAILABLE };
+  }
+  const merged = mergeBrandRecord(loaded.record, parsed.patch);
+  const saved = await db().from("brand_kits").upsert(recordToRow(accountId, merged, loaded.identityColumns));
+  if (saved.error) {
+    if (isMissingSchema(saved.error)) {
+      if (patchWritesIdentity(parsed.patch)) {
+        return { ok: false, status: 503, error: BRAND_IDENTITY_UNAVAILABLE };
+      }
+      const slim = await db().from("brand_kits").upsert(recordToRow(accountId, merged, false));
+      if (slim.error) {
+        return { ok: false, status: isMissingSchema(slim.error) ? 503 : 500, error: isMissingSchema(slim.error) ? BRAND_UNAVAILABLE : "Couldn't save your brand." };
+      }
+      return { ok: true, brand: brandFromRecord(merged, { available: true, custom: true }) };
+    }
+    return { ok: false, status: 500, error: "Couldn't save your brand." };
+  }
+  return { ok: true, brand: brandFromRecord(merged, { available: true, custom: true }) };
 }
 
 /** A logo or photo must be this account's PNG or JPEG image. Returns an error message or null. */

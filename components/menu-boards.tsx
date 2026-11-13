@@ -7,7 +7,7 @@ import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader, LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
 import { MENU_TEMPLATES, sampleMenu } from "@/lib/menu-templates";
-import { artImages, type Brand } from "@/lib/brand-kit";
+import { artImages, seedClassicMenu, type Brand } from "@/lib/brand-kit";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { LayoutStudio } from "@/components/layout-studio";
 import { ClassicEditor, type ClassicDraft } from "@/components/classic-editor";
@@ -60,8 +60,9 @@ export type MenuFixture = {
   studio?: AccountStudio;
 };
 
-function newClassicDraft(displayIds: string[] = []): ClassicDraft {
-  return { id: null, name: "Lunch menu", template: "classic", content: sampleMenu(), displayIds };
+function newClassicDraft(displayIds: string[] = [], brand?: Brand | null): ClassicDraft {
+  const content = brand ? seedClassicMenu(sampleMenu(), brand) : sampleMenu();
+  return { id: null, name: "Lunch menu", template: "classic", content, displayIds };
 }
 
 function boardKindLabel(menu: MenuBoard): string {
@@ -126,6 +127,8 @@ export function MenuBoards({
   const liveMenus = useApi<{ menus: MenuBoard[]; available: boolean }>(fixture ? null : "/api/menus");
   const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays");
   const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
+  const liveBrand = useApi<Brand>(fixture ? null : "/api/brand");
+  const kit = fixture?.brand?.brand ?? liveBrand.data ?? null;
   const menus = fixture ? { data: { menus: fixture.menus, available: fixture.available !== false }, error: null, reload: async () => {} } : liveMenus;
   const displays = fixture ? { data: fixture.displays ?? [] } : liveDisplays;
   const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
@@ -146,14 +149,24 @@ export function MenuBoards({
     setPendingBoardId(null);
   }, [menus.data, pendingBoardId, initialSearch]);
 
+  useEffect(() => {
+    if (view.mode !== "classic" || view.draft.id) return;
+    if (!kit) return;
+    const sample = sampleMenu();
+    if (view.draft.content.title !== sample.title || view.draft.content.footer !== sample.footer) return;
+    const next = seedClassicMenu(view.draft.content, kit);
+    if (next === view.draft.content) return;
+    setView({ ...view, draft: { ...view.draft, content: next } });
+  }, [kit, view]);
+
   function startNew() {
     if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
-    else setView({ mode: "classic", draft: newClassicDraft(), screenId: null });
+    else setView({ mode: "classic", draft: newClassicDraft([], kit), screenId: null });
   }
 
   function pickOption(option: LayoutOption, screenId: string | null) {
     if (option.kind === "classic") {
-      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : []), screenId });
+      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], kit), screenId });
       return;
     }
     if (option.layoutTemplate) {

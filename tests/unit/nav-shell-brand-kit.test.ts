@@ -14,6 +14,7 @@ import {
   artImages,
   brandFormUnchanged,
   brandSavePayload,
+  EMPTY_IDENTITY,
   prefillBrandForm,
   type Brand,
   type BrandFields,
@@ -25,6 +26,7 @@ const loaded: BrandFields = {
   primaryColor: "#c8102e",
   accentColor: "#ffd34d",
   logoMediaId: "logo-1",
+  ...EMPTY_IDENTITY,
 };
 
 describe("content navigation mapping", () => {
@@ -102,7 +104,7 @@ describe("brand kit value handling", () => {
   });
 
   it("rejects a save only when neither the form nor the loaded brand has valid colours", () => {
-    const empty: BrandFields = { primaryColor: "", accentColor: "", logoMediaId: null };
+    const empty: BrandFields = { primaryColor: "", accentColor: "", logoMediaId: null, ...EMPTY_IDENTITY };
     expect(brandSavePayload(empty, empty)).toEqual({ ok: false, error: "Choose colours like #0066ff." });
   });
 
