@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import type { DisplayItem } from "@/lib/api";
 import { assignedContentPreview, assignedKindLabel } from "@/lib/assigned-content";
 
-/** Small 16:9 assigned-content preview. Never presented as a live TV image. */
+/** Small 16:9 assigned-content preview. Never presented as a live TV image. A broken or expired still falls back to the typed placeholder — the browser broken-image icon is never shown. */
 export function AssignedThumb({ display, size = "card" }: { display: DisplayItem; size?: "card" | "large" }) {
   const preview = assignedContentPreview(display);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src = preview.src && preview.src !== failedSrc ? preview.src : null;
   const wide = size === "large";
   return (
     <figure
@@ -13,11 +16,18 @@ export function AssignedThumb({ display, size = "card" }: { display: DisplayItem
       data-testid="assigned-thumb"
       data-kind={preview.kind}
     >
-      <div className="assigned-thumb-frame" aria-hidden={!preview.src}>
-        {preview.src ? (
-          <img src={preview.src} alt="" loading="lazy" decoding="async" className="assigned-thumb-img" />
+      <div className="assigned-thumb-frame" aria-hidden={!src}>
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="assigned-thumb-img"
+            onError={() => setFailedSrc(src)}
+          />
         ) : (
-          <span className="assigned-thumb-fallback">
+          <span className="assigned-thumb-fallback" data-testid="assigned-thumb-fallback">
             <span className="assigned-thumb-icon">{iconFor(preview.kind)}</span>
             <span className="assigned-thumb-kind">{assignedKindLabel(preview.kind)}</span>
           </span>

@@ -167,7 +167,7 @@ export function PreviewApp() {
       {screen === "studio" ? <MenuBoards fixture={{ ...menuFixture, startBoardId: "board-lunch", startLayout: "menu-promo-67" }} /> : null}
       {screen === "content" ? <ContentHub pathOverride="/dashboard/content" fixture={contentFixture} /> : null}
       {screen === "menus" ? <MenuBoards fixture={menuFixture} /> : null}
-      {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
+      {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startMenuId: "menu-dinner" }} /> : null}
       {screen === "unify-list" ? <MenuBoards fixture={menuFixture} /> : null}
       {screen === "unify-picker" ? <MenuBoards fixture={{ ...menuFixture, startView: "pick-layout" }} /> : null}
       {screen === "unify-full-screen" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
