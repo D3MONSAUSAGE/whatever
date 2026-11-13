@@ -116,4 +116,80 @@ describe.skipIf(!configured)("brand kits", () => {
     await admin.from("media").delete().eq("id", logo);
     expect(await (await brandGet(req("/api/brand", a.token))).json()).toMatchObject({ logoMediaId: null, custom: true });
   });
+
+  it("GET includes identity keys, and PUT merges so an Android-shaped payload cannot wipe them", async () => {
+    const a = await owner();
+    const put = (body: unknown) => brandPut(req("/api/brand", a.token, { method: "PUT", body: JSON.stringify(body) }));
+    const get = async () => (await brandGet(req("/api/brand", a.token))).json();
+
+    const first = await get();
+    expect(first).toMatchObject({
+      primaryColor: "#0066ff",
+      accentColor: "#ffd34d",
+      logoMediaId: null,
+      available: true,
+      custom: false,
+      displayName: null,
+      textColor: null,
+      backgroundColor: null,
+      headingFont: null,
+      bodyFont: null,
+      phone: null,
+      website: null,
+    });
+
+    const identity = await put({
+      displayName: "Demo Café",
+      textColor: "#1a1a1a",
+      backgroundColor: "#f4e8c8",
+      headingFont: "noto-serif",
+      bodyFont: "inter",
+      phone: "(415) 555-0142",
+      website: "https://democafe.example",
+    });
+    if (identity.status === 503) return; // 0025 not applied on this database
+    expect(identity.status).toBe(200);
+    const saved = await identity.json();
+    expect(saved).toMatchObject({
+      displayName: "Demo Café",
+      headingFont: "noto-serif",
+      bodyFont: "inter",
+      phone: "(415) 555-0142",
+      website: "https://democafe.example",
+      custom: true,
+    });
+
+    const android = await put({ primaryColor: "#111111", accentColor: "#222222", logoMediaId: null });
+    expect(android.status).toBe(200);
+    const afterAndroid = await android.json();
+    expect(afterAndroid).toMatchObject({
+      primaryColor: "#111111",
+      accentColor: "#222222",
+      logoMediaId: null,
+      displayName: "Demo Café",
+      textColor: "#1a1a1a",
+      backgroundColor: "#f4e8c8",
+      headingFont: "noto-serif",
+      bodyFont: "inter",
+      phone: "(415) 555-0142",
+      website: "https://democafe.example",
+    });
+
+    const cleared = await put({ displayName: null, phone: null });
+    expect(cleared.status).toBe(200);
+    const afterClear = await cleared.json();
+    expect(afterClear.displayName).toBeNull();
+    expect(afterClear.phone).toBeNull();
+    expect(afterClear.website).toBe("https://democafe.example");
+    expect(afterClear.headingFont).toBe("noto-serif");
+    expect(afterClear.primaryColor).toBe("#111111");
+
+    expect((await put({ website: "javascript:alert(1)" })).status).toBe(400);
+    expect((await put({ headingFont: "roboto" })).status).toBe(400);
+    expect((await put({ displayName: "x".repeat(81) })).status).toBe(400);
+    expect((await put({}))).toMatchObject({ status: 400 });
+    const https = await put({ website: "HTTPS://democafe.example" });
+    expect(https.status).toBe(200);
+    expect((await https.json()).website).toBe("https://democafe.example");
+  });
 });

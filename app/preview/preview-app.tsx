@@ -179,6 +179,7 @@ export function PreviewApp() {
       {screen === "unify-media-editor" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-menu-promo", startBoardId: "board-two-menu", startZone: "feature" }} /> : null}
       {screen === "unify-mobile" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "two-menu-promo", startBoardId: "board-two-menu", startZone: "column-0" }} /> : null}
       {screen === "unify-brand" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "menu-promo-67", startBoardId: "board-branded" }} /> : null}
+      {screen === "unify-new-brand" ? <MenuBoards fixture={{ ...menuFixture, startLayout: "menu-promo-67", startBoardId: null }} /> : null}
       {screen === "promos" ? <PromoSlides fixture={promoFixture} /> : null}
       {screen === "promo-edit" ? <PromoSlides fixture={{ ...promoFixture, startEditing: true }} /> : null}
       {screen === "brand-kit" ? <BrandKit fixture={brandFixture} /> : null}
@@ -311,7 +312,20 @@ const studioFixture: AccountStudio = {
 
 
 const brandFixture = {
-  brand: { primaryColor: "#c8102e", accentColor: "#ffd34d", logoMediaId: "media-logo", available: true, custom: true },
+  brand: {
+    primaryColor: "#c8102e",
+    accentColor: "#ffd34d",
+    logoMediaId: "media-logo",
+    available: true,
+    custom: true,
+    displayName: "Demo Café",
+    textColor: "#1a1a1a",
+    backgroundColor: "#f4e8c8",
+    headingFont: "noto-serif" as const,
+    bodyFont: "inter" as const,
+    phone: "(415) 555-0142",
+    website: "https://democafe.example",
+  },
   images: media,
 };
 

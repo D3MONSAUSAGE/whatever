@@ -500,15 +500,60 @@ export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): Layout
 /** Apply saved Brand Kit colours to a NEW board document only.
  *  Leaves the document unchanged when it already has colours, or when no kit colours are available.
  *  Callers must not run this on an existing saved board. */
-export function seedBrand(
-  doc: LayoutDocument,
-  colors: { primaryColor?: string | null; accentColor?: string | null } | null | undefined,
-): LayoutDocument {
+export type BrandSeed = {
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  textColor?: string | null;
+  backgroundColor?: string | null;
+  headingFont?: string | null;
+  bodyFont?: string | null;
+  displayName?: string | null;
+  phone?: string | null;
+  website?: string | null;
+} | null | undefined;
+
+/**
+ * Seed a fresh Layout document with the account brand. Used only for new
+ * boards (no menuId). A document that already has a primary or accent colour
+ * is treated as already branded and is left untouched.
+ * Layout documents have a single `font`; headingFont wins over bodyFont.
+ * Title and footer are filled only when the kit has a display name or contact.
+ */
+export function seedBrand(doc: LayoutDocument, kit: BrandSeed): LayoutDocument {
   if (doc.primaryColor || doc.accentColor) return doc;
-  const primaryColor = colors?.primaryColor || null;
-  const accentColor = colors?.accentColor || null;
-  if (!primaryColor && !accentColor) return doc;
-  return { ...doc, primaryColor, accentColor };
+  const primaryColor = kit?.primaryColor || null;
+  const accentColor = kit?.accentColor || null;
+  const textColor = kit?.textColor || null;
+  const backgroundColor = kit?.backgroundColor || null;
+  const heading = kit?.headingFont === "inter" || kit?.headingFont === "noto-serif" ? kit.headingFont : null;
+  const body = kit?.bodyFont === "inter" || kit?.bodyFont === "noto-serif" ? kit.bodyFont : null;
+  const font = heading ?? body ?? null;
+  const title = clipSeedText(kit?.displayName, MENU_LIMITS.title);
+  const footer = clipSeedText(seedFooter(kit), MENU_LIMITS.footer);
+  if (!primaryColor && !accentColor && !textColor && !backgroundColor && !font && !title && !footer) return doc;
+  return {
+    ...doc,
+    ...(primaryColor ? { primaryColor } : {}),
+    ...(accentColor ? { accentColor } : {}),
+    ...(textColor ? { textColor } : {}),
+    ...(backgroundColor ? { backgroundColor } : {}),
+    ...(font ? { font } : {}),
+    ...(title ? { title } : {}),
+    ...(footer ? { footer } : {}),
+  };
+}
+
+function clipSeedText(value: string | null | undefined, max: number): string | null {
+  if (!value) return null;
+  const clean = value.replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").trim();
+  if (!clean) return null;
+  return clean.length > max ? clean.slice(0, max).trimEnd() : clean;
+}
+
+function seedFooter(kit: BrandSeed): string | null {
+  if (!kit) return null;
+  const parts = [kit.phone, kit.website].map((p) => (typeof p === "string" ? p.replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").trim() : "")).filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 export function esc(value: string) {
