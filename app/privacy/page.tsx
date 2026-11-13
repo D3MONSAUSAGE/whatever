@@ -47,7 +47,7 @@ export default function Privacy() {
         <li><strong>Supabase</strong> provides the database, authentication, and file storage. The Pekko project reports region us-west-1. That is the project region, not a promise that every backup, log, or support access stays there.</li>
         <li><strong>Vercel</strong> hosts the website and API.</li>
         <li><strong>Stripe</strong> processes paid subscriptions when a paid plan is started, under standard Stripe Billing. Pekko is the seller. Publishing this policy does not enable charges.</li>
-        <li><strong>Resend</strong> sends transactional service and billing email. The verified pekkotv.com sending domain reports region us-east-1. That is the sending region, not a promise that every Resend system stays there. Receiving on that domain is disabled. Use the contact below, not the billing sender, for privacy and support.</li>
+        <li><strong>Resend</strong> sends transactional service and billing email. The verified pekkotv.com sending domain reports region us-east-1. That is the sending region, not a promise that every Resend system stays there. The support address below receives mail on that domain. Use that address, not the billing sender, for privacy and support.</li>
         <li><strong>Google Firebase Cloud Messaging</strong> delivers mobile push notifications when a device token is registered and the device allows notifications.</li>
       </ul>
       <p>No exclusive residency or cross-border-transfer assurance is made. A reported project or sending region is not a guarantee that all processing stays in that region.</p>
