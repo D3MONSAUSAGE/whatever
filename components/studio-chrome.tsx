@@ -40,6 +40,7 @@ export function StudioStyles() {
         .studio-back { border: 0; background: transparent; color: #0066ff; font: inherit; font-size: 13px; font-weight: 650; min-height: 44px; padding: 0 2px; cursor: pointer; }
         .studio-back:hover { text-decoration: underline; text-underline-offset: 3px; }
         .studio-back:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; border-radius: 6px; }
+        .studio-back:disabled { opacity: 0.45; cursor: not-allowed; text-decoration: none; }
         .studio-page-title { min-width: 0; }
         .studio-title { font-size: 1.15rem; line-height: 1.25; margin: 0; display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 700; }
         .studio-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -171,6 +172,7 @@ export function StudioStyles() {
           .studio-save-inline { display: none !important; }
           .studio-tabs { display: flex; position: static; overflow-x: auto; background: transparent; border: 0; padding: 0; gap: 4px; }
           .studio-tabs button { flex: 0 0 auto; min-height: 44px; }
+          .studio-tabs button[aria-selected="true"]{color:#0066ff;font-weight:700}
           .studio-pane, .section-block, .zone-panel { display: none; }
           .studio-pane.on { display: block; padding: 0 16px 16px; }
           .section-block.on, .zone-panel.on { display: block; }
