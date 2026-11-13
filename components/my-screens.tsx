@@ -7,8 +7,8 @@ import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components
 import { syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
 import { GroupPublish } from "@/components/group-publish";
-import { EmptyState, LimitNote, LoadState, PageHeader, atLimit } from "@/components/ui";
-import { IconTv } from "@/components/icons";
+import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit } from "@/components/ui";
+import { AssignedThumb } from "@/components/assigned-thumb";
 import { ScreenActions, type ScreenLibrary } from "@/components/screen-actions";
 import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
@@ -19,11 +19,21 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
   const displays = fixture ? { data: fixture.displays, error: null as string | null } : liveDisplays;
   const groups = fixture ? { data: fixture.groups ?? [], error: null as string | null } : liveGroups;
+  const list = displays.data ?? [];
+  const onlineCount = list.filter((display) => display.online).length;
+  const offlineCount = list.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title="My Screens" eyebrow="Workspace" lede="Pick a screen or a group. Change what it plays from there." icon={<IconTv />}
+      <PageHeader compact title="My Screens" lede="Pick a screen or a group. Change what it plays from there."
         action={<Link href="/dashboard/displays#add-screen" className="btn btn-primary min-h-11">Add screen</Link>}
       />
+      {list.length ? (
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <Stat compact label="Total screens" value={list.length} />
+          <Stat compact label="Online" value={onlineCount} tone="live" />
+          <Stat compact label="Offline" value={offlineCount} tone="danger" />
+        </div>
+      ) : null}
       <p className="text-sm mb-4"><Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">Screen groups</Link></p>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       {!displays.data ? <LoadState error={displays.error} label="Loading screens…" /> : displays.data.length === 0 ? (
@@ -31,18 +41,21 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
           Pair a TV, then come back here to choose what it plays. <Link href="/dashboard/displays#add-screen" className="underline font-semibold">Add screen</Link>.
         </EmptyState>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 xl:grid-cols-2">
           {displays.data.map((display) => (
             <li key={display.id} className="min-w-0">
               <article className="card p-4 min-w-0">
-                <Link href={`/dashboard/screens/${display.id}`} className="block min-h-11">
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-semibold truncate">{display.name}</h2>
-                    <Status display={display} />
-                  </div>
-                  <p className="text-sm mt-2 truncate">{contentLabel(display)}</p>
-                  <p className="text-xs text-muted mt-1">{display.location?.name ?? "No location"} · {heartbeatLabel(display.lastSeenAt)}</p>
-                </Link>
+                <div className="flex items-start gap-3">
+                  <Link href={`/dashboard/screens/${display.id}`} className="block min-h-11 min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="font-semibold truncate">{display.name}</h2>
+                      <Status display={display} />
+                    </div>
+                    <p className="text-sm mt-2 truncate">{contentLabel(display)}</p>
+                    <p className="text-xs text-muted mt-1">{display.location?.name ?? "No location"} · {heartbeatLabel(display.lastSeenAt)}</p>
+                  </Link>
+                  <AssignedThumb display={display} />
+                </div>
                 {display.connected && !display.online ? (
                   <p className="text-sm mt-2">This screen is offline. You can still change content; the TV updates when it comes back online.</p>
                 ) : null}
@@ -107,7 +120,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title={display.name} eyebrow="Screen" lede={display.location ? `${display.location.name} · ${display.location.timezone}` : "No location yet"} icon={<IconTv />}
+      <PageHeader compact title={display.name} lede={display.location ? `${display.location.name} · ${display.location.timezone}` : "No location yet"}
         action={<Link href="/dashboard/screens" className="btn btn-primary min-h-11">All screens</Link>}
       />
       <div className="mb-4 flex flex-wrap gap-2">
@@ -187,7 +200,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
 
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title="Screen groups" eyebrow="My Screens" lede="A group shares schedules. A screen's own schedule still wins while it is on." icon={<IconTv />}
+      <PageHeader compact title="Screen groups" lede="A group shares schedules. A screen's own schedule still wins while it is on."
         action={<button type="button" className="btn btn-primary min-h-11" onClick={() => { setCreating(true); setError(null); }}>New group</button>}
       />
       <p className="text-sm mb-4"><Link href="/dashboard/screens" className="font-semibold text-primary underline underline-offset-4">All screens</Link></p>
@@ -265,7 +278,7 @@ export function GroupWorkspace({ id }: { id: string }) {
   const offline = members.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">
-      <PageHeader title={group.name} eyebrow="Screen group" lede={`${online} online · ${offline} offline · ${members.length} screens`} icon={<IconTv />}
+      <PageHeader compact title={group.name} lede={`${online} online · ${offline} offline · ${members.length} screens`}
         action={<Link href="/dashboard/screens/groups" className="btn btn-primary min-h-11">All groups</Link>}
       />
       <GroupPublish groupId={group.id} members={members} onChanged={() => displays.reload()} />

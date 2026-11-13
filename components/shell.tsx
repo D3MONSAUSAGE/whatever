@@ -119,7 +119,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
             <button type="button" onClick={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</button>
           </span>
         </header>
-        <main className={`shell-main max-w-6xl ${studio ? "studio-shell px-0 pt-3 md:px-8 md:pt-8 pb-4" : "px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
+        <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : "max-w-6xl px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
           <UploadProgress />
           {preview || studio ? null : <BillingBanner />}
           {preview || studio ? null : <AlertsBanner />}

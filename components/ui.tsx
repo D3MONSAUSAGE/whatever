@@ -9,11 +9,13 @@ import { LogoMark, WaveBackdrop } from "@/components/brand";
 export function PageHeader({ title, eyebrow, lede, icon, action, children, compact }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; compact?: boolean }) {
   if (compact) {
     return (
-      <div className="mb-6" data-testid="page-header-compact">
-        <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words">{title}</h1>
+      <div className="mb-4" data-testid="page-header-compact">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words min-w-0">{title}</h1>
+          {action ? <div className="shrink-0">{action}</div> : null}
+        </div>
         {lede ? <div className="text-muted mt-1 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
-        {action ? <div className="page-header-action mt-3">{action}</div> : null}
-        {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
+        {children ? <div className="mt-3 flex flex-wrap gap-2">{children}</div> : null}
       </div>
     );
   }
@@ -45,6 +47,7 @@ export function Stat({
   className = "",
   tone,
   icon,
+  compact,
 }: {
   label: string;
   value: string | number;
@@ -52,16 +55,17 @@ export function Stat({
   className?: string;
   tone?: "live" | "danger";
   icon?: React.ReactNode;
+  compact?: boolean;
 }) {
   const valueTone = tone === "live" ? "text-live-ink" : tone === "danger" ? "text-danger" : "";
   const labelTone = tone === "live" ? "text-live-ink" : tone === "danger" ? "text-danger" : "text-muted";
   return (
-    <div className={`card px-4 py-4 ${tone === "live" ? "stat-live" : ""} ${tone === "danger" ? "stat-danger" : ""} ${className}`} title={hint}>
+    <div className={`card ${compact ? "px-3 py-2" : "px-4 py-4"} ${tone === "live" ? "stat-live" : ""} ${tone === "danger" ? "stat-danger" : ""} ${className}`} title={hint}>
       <div className="flex items-center justify-between gap-2">
         <p className={`text-xs font-semibold uppercase tracking-wide ${labelTone}`}>{label}</p>
         {icon ? <span className="icon-tile size-8">{icon}</span> : tone === "live" ? <span className="size-2.5 rounded-full bg-live" aria-hidden /> : tone === "danger" ? <span className="size-2.5 rounded-full bg-danger" aria-hidden /> : null}
       </div>
-      <p className={`mt-2 text-2xl font-semibold tabular-nums ${valueTone}`}>{value}</p>
+      <p className={`${compact ? "mt-0.5 text-lg md:text-xl" : "mt-2 text-2xl"} font-semibold tabular-nums ${valueTone}`}>{value}</p>
     </div>
   );
 }

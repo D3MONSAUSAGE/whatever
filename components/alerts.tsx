@@ -35,11 +35,22 @@ export function AlertsBanner() {
     setBusy(true);
     try { await api("/api/alerts/read", { method: "POST", body: JSON.stringify({ all: true }) }); await feed.reload(); } finally { setBusy(false); }
   }
+  const headline = feed.data.unread === 1 ? "1 new screen alert" : `${feed.data.unread} new screen alerts`;
+  const offlineCount = feed.data.alerts.filter((a) => a.kind === "screen.offline").length;
+  const summary = offlineCount
+    ? (offlineCount === 1 ? "1 screen offline" : `${offlineCount} screens offline`)
+    : headline;
   return (
-    <div role="status" data-testid="alerts-banner" className={`card mb-5 p-3 md:p-4 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <details data-testid="alerts-banner" className={`group card mb-4 px-3 py-2 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`} open>
+      <summary className="flex items-center justify-between gap-3 min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <p className="font-semibold min-w-0 truncate" role="status">{headline}{offlineCount ? ` · ${summary}` : ""}</p>
+        <span className="text-sm font-medium underline underline-offset-4 shrink-0">
+          <span className="group-open:hidden">View</span>
+          <span className="hidden group-open:inline">Hide</span>
+        </span>
+      </summary>
+      <div className="flex flex-wrap items-start justify-between gap-2 pb-2">
         <div className="min-w-0">
-          <p className="font-semibold">{feed.data.unread === 1 ? "1 new screen alert" : `${feed.data.unread} new screen alerts`}</p>
           <ul className="text-sm mt-1 grid gap-0.5">
             {feed.data.alerts.map((a) => (
               <li key={a.id}><span aria-hidden>{a.kind === "screen.offline" ? "🔴 " : "🟢 "}</span>{alertText(a)}</li>
@@ -47,11 +58,11 @@ export function AlertsBanner() {
           </ul>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Link href="/dashboard/alerts" className="btn btn-quiet">All alerts</Link>
-          <button type="button" className="btn btn-quiet" disabled={busy} onClick={markAll}>Mark as read</button>
+          <Link href="/dashboard/alerts" className="btn btn-quiet min-h-11">All alerts</Link>
+          <button type="button" className="btn btn-quiet min-h-11" disabled={busy} onClick={markAll}>Mark as read</button>
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 

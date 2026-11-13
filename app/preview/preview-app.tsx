@@ -395,7 +395,38 @@ function AccountPreview() {
 }
 
 function MyScreensPreview() {
-  return <MyScreens fixture={{ displays, groups: demoGroups.groups }} />;
+  const board = poster("Lunch board", "#163628");
+  const extra: DisplayItem[] = [
+    {
+      id: "screen-kitchen",
+      name: "Kitchen",
+      connected: true,
+      online: true,
+      lastSeenAt: new Date(Date.now() - 10_000).toISOString(),
+      media: null,
+      playlist: { id: "pl-board", name: "Lunch board", url: null },
+      boardPreviewUrl: board,
+    },
+    {
+      id: "screen-lounge",
+      name: "Lounge",
+      connected: true,
+      online: true,
+      lastSeenAt: new Date(Date.now() - 15_000).toISOString(),
+      media: { id: "media-clip", fileName: "demo-cafe-specials.mp4", url: "https://cdn.example/specials.mp4" },
+      playlist: null,
+    },
+    {
+      id: "screen-office",
+      name: "Office",
+      connected: true,
+      online: true,
+      lastSeenAt: new Date(Date.now() - 12_000).toISOString(),
+      media: { id: "media-deck", fileName: "demo-cafe-menu.pptx", url: null },
+      playlist: null,
+    },
+  ];
+  return <MyScreens fixture={{ displays: [...displays, ...extra], groups: demoGroups.groups }} />;
 }
 
 function poster(label: string, color: string) {
