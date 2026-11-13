@@ -5,7 +5,9 @@ import type { MenuArt } from "./menu-render";
 import {
   brandFromRecord,
   brandFromRow,
+  brandPatchRow,
   defaultBrandResponse,
+  isEmptyBrandPatch,
   mergeBrandRecord,
   parseBrandPut,
   patchWritesIdentity,
@@ -81,29 +83,49 @@ async function loadBrandRecord(accountId: string): Promise<
   return { ok: true, record, identityColumns: true };
 }
 
-function recordToRow(accountId: string, record: BrandRecord, includeIdentity: boolean) {
-  const row: Record<string, unknown> = {
-    account_id: accountId,
-    primary_color: record.primaryColor,
-    accent_color: record.accentColor,
-    logo_media_id: record.logoMediaId,
-    updated_at: new Date().toISOString(),
-  };
-  if (includeIdentity) {
-    row.display_name = record.displayName;
-    row.text_color = record.textColor;
-    row.background_color = record.backgroundColor;
-    row.heading_font = record.headingFont;
-    row.body_font = record.bodyFont;
-    row.phone = record.phone;
-    row.website = record.website;
+/**
+ * Write only the provided PUT keys. An UPDATE never touches omitted columns, so
+ * concurrent Android (colours + logo) and web (identity) saves cannot overwrite
+ * each other's fields. Insert only when no row exists. A 23505 on first insert
+ * (two first-saves racing) falls back to a column-only UPDATE.
+ */
+async function writeBrandPatch(
+  accountId: string,
+  patch: Parameters<typeof brandPatchRow>[0],
+  identityColumns: boolean,
+): Promise<{ ok: true } | { ok: false; status: number; error: string; missingSchema?: boolean }> {
+  const columns = brandPatchRow(patch, { includeIdentity: identityColumns });
+  const updatedAt = new Date().toISOString();
+  const insertRow = { account_id: accountId, ...columns, updated_at: updatedAt };
+  const updateRow = { ...columns, updated_at: updatedAt };
+
+  const existing = await db().from("brand_kits").select("account_id").eq("account_id", accountId).maybeSingle();
+  if (existing.error) {
+    if (isMissingSchema(existing.error)) return { ok: false, status: 503, error: BRAND_UNAVAILABLE, missingSchema: true };
+    return { ok: false, status: 500, error: "Couldn't save your brand." };
   }
-  return row;
+
+  const write = existing.data
+    ? await db().from("brand_kits").update(updateRow).eq("account_id", accountId)
+    : await db().from("brand_kits").insert(insertRow);
+
+  if (write.error && !existing.data && write.error.code === "23505") {
+    const retry = await db().from("brand_kits").update(updateRow).eq("account_id", accountId);
+    if (!retry.error) return { ok: true };
+    if (isMissingSchema(retry.error)) return { ok: false, status: 503, error: identityColumns ? BRAND_IDENTITY_UNAVAILABLE : BRAND_UNAVAILABLE, missingSchema: true };
+    return { ok: false, status: 500, error: "Couldn't save your brand." };
+  }
+  if (write.error) {
+    if (isMissingSchema(write.error)) return { ok: false, status: 503, error: identityColumns ? BRAND_IDENTITY_UNAVAILABLE : BRAND_UNAVAILABLE, missingSchema: true };
+    return { ok: false, status: 500, error: "Couldn't save your brand." };
+  }
+  return { ok: true };
 }
 
 /**
- * Merge a PUT body onto the stored brand. A present key with null clears that
- * field. An absent key is left untouched, so an Android-shaped
+ * Merge a PUT body onto the stored brand for the response. The write itself is
+ * a column-only UPDATE (or an INSERT when no row exists). A present key with
+ * null clears that field. An absent key is left untouched, so an Android-shaped
  * {primaryColor, accentColor, logoMediaId} payload cannot wipe identity fields.
  */
 export async function putBrand(
@@ -112,26 +134,24 @@ export async function putBrand(
 ): Promise<{ ok: true; brand: Brand } | { ok: false; status: number; error: string }> {
   const parsed = parseBrandPut(body);
   if (!parsed.ok) return { ok: false, status: 400, error: parsed.error };
+  if (isEmptyBrandPatch(parsed.patch)) return { ok: false, status: 400, error: "Change at least one brand field." };
   const loaded = await loadBrandRecord(accountId);
   if (!loaded.ok) return loaded;
   if (!loaded.identityColumns && patchWritesIdentity(parsed.patch)) {
     return { ok: false, status: 503, error: BRAND_IDENTITY_UNAVAILABLE };
   }
-  const merged = mergeBrandRecord(loaded.record, parsed.patch);
-  const saved = await db().from("brand_kits").upsert(recordToRow(accountId, merged, loaded.identityColumns));
-  if (saved.error) {
-    if (isMissingSchema(saved.error)) {
-      if (patchWritesIdentity(parsed.patch)) {
-        return { ok: false, status: 503, error: BRAND_IDENTITY_UNAVAILABLE };
-      }
-      const slim = await db().from("brand_kits").upsert(recordToRow(accountId, merged, false));
-      if (slim.error) {
-        return { ok: false, status: isMissingSchema(slim.error) ? 503 : 500, error: isMissingSchema(slim.error) ? BRAND_UNAVAILABLE : "Couldn't save your brand." };
-      }
-      return { ok: true, brand: brandFromRecord(merged, { available: true, custom: true }) };
+  const saved = await writeBrandPatch(accountId, parsed.patch, loaded.identityColumns);
+  if (!saved.ok) {
+    if (saved.missingSchema && loaded.identityColumns && !patchWritesIdentity(parsed.patch)) {
+      const slim = await writeBrandPatch(accountId, parsed.patch, false);
+      if (!slim.ok) return { ok: false, status: slim.status, error: slim.error };
+    } else {
+      return { ok: false, status: saved.status, error: saved.error };
     }
-    return { ok: false, status: 500, error: "Couldn't save your brand." };
   }
+  const merged = mergeBrandRecord(loaded.record, parsed.patch);
+  const fresh = await getBrand(accountId);
+  if (fresh !== "error") return { ok: true, brand: fresh.custom ? fresh : brandFromRecord(merged, { available: true, custom: true }) };
   return { ok: true, brand: brandFromRecord(merged, { available: true, custom: true }) };
 }
 

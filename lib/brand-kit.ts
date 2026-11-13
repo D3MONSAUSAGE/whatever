@@ -1,4 +1,4 @@
-import { MENU_LIMITS, normalizeHex, type MenuContent } from "@/lib/menu-templates";
+import { MENU_LIMITS, normalizeHex, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import type { MediaItem } from "@/lib/api";
 
 /** JPG or PNG images that can go on a menu (logos and photos). Menu slides themselves are left out. */
@@ -140,8 +140,10 @@ export function parseWebsite(value: unknown): { ok: true; value: string | null }
     return { ok: false, error: "Enter a website as http:// or https://." };
   }
   if (!url.hostname) return { ok: false, error: "Enter a website as http:// or https://." };
-  // Keep the trimmed input so a valid URL is not rewritten (URL.href adds a trailing slash).
-  return { ok: true, value: raw };
+  // Lowercase only the scheme so HTTPS://… satisfies the database check ^https?://,
+  // without rewriting the rest of the URL (URL.href would add a trailing slash).
+  const normalized = raw.replace(/^(https?):\/\//i, (scheme) => scheme.toLowerCase());
+  return { ok: true, value: normalized };
 }
 
 export function parseOptionalHex(value: unknown, label: string): { ok: true; value: string | null } | { ok: false; error: string } {
@@ -236,7 +238,45 @@ export function parseBrandPut(body: unknown): { ok: true; patch: BrandPutPatch }
     if (!parsed.ok) return parsed;
     patch.website = parsed.value;
   }
+  // Android +13 always sends {primaryColor, accentColor, logoMediaId} and never {}.
+  // An empty body must not insert a default row.
+  if (!BRAND_PUT_KEYS.some((key) => hasOwn(patch, key))) {
+    return { ok: false, error: "Change at least one brand field." };
+  }
   return { ok: true, patch };
+}
+
+/** Snake_case columns for a sparse PUT patch. Only provided keys are present, so an UPDATE cannot overwrite omitted fields. */
+export const BRAND_COLUMNS: Record<(typeof BRAND_PUT_KEYS)[number], string> = {
+  primaryColor: "primary_color",
+  accentColor: "accent_color",
+  logoMediaId: "logo_media_id",
+  displayName: "display_name",
+  textColor: "text_color",
+  backgroundColor: "background_color",
+  headingFont: "heading_font",
+  bodyFont: "body_font",
+  phone: "phone",
+  website: "website",
+};
+
+/**
+ * Build a column-only write payload from a sparse PUT patch. Absent keys are
+ * omitted (not nulled). A present null is included so that field is cleared.
+ */
+export function brandPatchRow(patch: BrandPutPatch, opts?: { includeIdentity?: boolean }): Record<string, unknown> {
+  const includeIdentity = opts?.includeIdentity !== false;
+  const row: Record<string, unknown> = {};
+  for (const key of BRAND_PUT_KEYS) {
+    if (!hasOwn(patch, key)) continue;
+    if (!includeIdentity && (IDENTITY_KEYS as readonly string[]).includes(key)) continue;
+    row[BRAND_COLUMNS[key]] = patch[key] ?? null;
+  }
+  return row;
+}
+
+export function isEmptyBrandPatch(patch: BrandPutPatch): boolean {
+  return !BRAND_PUT_KEYS.some((key) => hasOwn(patch, key));
 }
 
 /** Merge a sparse PUT patch onto the stored record. Absent keys stay as they are. */
@@ -419,10 +459,52 @@ export function seedClassicMenu(content: MenuContent, kit: Partial<BrandIdentity
   const title = clipBrandText(kit?.displayName, MENU_LIMITS.title);
   const footer = clipBrandText(classicFooter(kit), MENU_LIMITS.footer);
   if (!title && !footer) return content;
+  const nextTitle = title ?? content.title;
+  const nextFooter = footer ?? content.footer;
+  if (nextTitle === content.title && nextFooter === content.footer) return content;
   return {
     ...content,
     ...(title ? { title } : {}),
     ...(footer ? { footer } : {}),
+  };
+}
+
+export type ClassicSeedDraft = {
+  id: string | null;
+  name: string;
+  template: MenuTemplate;
+  content: MenuContent;
+  displayIds: string[];
+};
+
+export type ClassicSeedBaseline = {
+  name: string;
+  template: MenuTemplate;
+  content: MenuContent;
+  displayIds: string[];
+};
+
+/**
+ * Seed a new, still-clean classic draft and return a baseline that matches, so
+ * Back and the leave guard do not prompt. Returns null when the draft already
+ * has an id, is dirty relative to the current baseline, or the kit has nothing
+ * to apply. Used inside ClassicEditor the way Layout Studio uses markClean.
+ */
+export function seedFreshClassicIfClean<T extends ClassicSeedDraft>(
+  draft: T,
+  kit: Partial<BrandIdentity> | null | undefined,
+  baseline: ClassicSeedBaseline,
+): { draft: T; baseline: ClassicSeedBaseline } | null {
+  if (draft.id) return null;
+  if (!kit) return null;
+  const current = { name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds };
+  if (JSON.stringify(current) !== JSON.stringify(baseline)) return null;
+  const content = seedClassicMenu(draft.content, kit);
+  if (content === draft.content) return null;
+  const next = { ...draft, content };
+  return {
+    draft: next,
+    baseline: { name: next.name, template: next.template, content, displayIds: next.displayIds },
   };
 }
 

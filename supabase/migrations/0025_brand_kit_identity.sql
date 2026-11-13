@@ -1,6 +1,7 @@
 -- Additive identity fields on brand_kits. Nullable, no defaults, no backfill.
 -- Existing rows stay unchanged. RLS and grants are left as they are
 -- (server-only: RLS on, no policies, revoke from anon/authenticated — 0008).
+-- A manual down-migration (not auto-run) is in docs/0025_brand_kit_identity_rollback.sql.
 
 alter table public.brand_kits
   add column if not exists display_name text,

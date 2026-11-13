@@ -6,6 +6,7 @@ import { MENU_LIMITS, MENU_TEMPLATES, type MenuContent, type MenuTemplate } from
 import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/lib/menu-board-unify";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
+import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
 
 export type ClassicDraft = {
   id: string | null;
@@ -35,6 +36,7 @@ export function ClassicEditor({
   onError,
   previewSrc,
   readOnly,
+  brand,
 }: {
   draft: ClassicDraft;
   images: MediaItem[];
@@ -44,6 +46,7 @@ export function ClassicEditor({
   onError: (message: string) => void;
   previewSrc?: string;
   readOnly?: boolean;
+  brand?: Brand | null;
 }) {
   const [step, setStep] = useState<ClassicStep>("content");
   const studioBp = useStudioBreakpoint();
@@ -56,6 +59,20 @@ export function ClassicEditor({
   const firstFetch = useRef(true);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const baseline = useRef({ name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds });
+
+  // Seed a new, still-clean draft when the brand kit arrives after mount, and
+  // advance the baseline so Back and the leave guard do not prompt. Existing
+  // boards and drafts the user has already edited are left alone.
+  useEffect(() => {
+    if (readOnly || draft.id) return;
+    const next = seedFreshClassicIfClean(draft, brand, baseline.current);
+    if (!next) return;
+    baseline.current = next.baseline;
+    setDraft(next.draft);
+    // draft and setDraft are current for this brand load; do not re-run on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brand, draft.id, readOnly]);
+
   const c = draft.content;
   const update = (content: MenuContent) => setDraft({ ...draft, content });
   const totalItems = c.sections.reduce((n, s) => n + s.items.length, 0);

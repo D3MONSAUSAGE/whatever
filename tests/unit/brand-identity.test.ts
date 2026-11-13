@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   brandFromRecord,
   brandFromRow,
+  brandPatchRow,
   defaultBrandResponse,
   EMPTY_IDENTITY,
   mergeBrandRecord,
@@ -11,11 +12,13 @@ import {
   parseDisplayName,
   parsePhone,
   parseWebsite,
+  seedFreshClassicIfClean,
+  seedClassicMenu,
   type BrandRecord,
 } from "@/lib/brand-kit";
 import { sampleLayout, seedBrand } from "@/lib/layout-studio";
 import { sampleMenu } from "@/lib/menu-templates";
-import { seedClassicMenu } from "@/lib/brand-kit";
+import { hasUnsavedEdits } from "@/lib/menu-board-unify";
 
 const APPLY_SHA = "677e466cbf7eb6e3983f0a108c510d35e6a94736a0e0e30db3418777eb16bfc3";
 const PLAYER_SHA = "091ba06d7c0630ca10d4721ca564058c46cdd282bc54b002e7d44d08170cb69b";
@@ -76,7 +79,7 @@ describe("PUT /api/brand merge semantics", () => {
     expect(merged.headingFont).toBe("noto-serif");
   });
 
-  it("leaves a field untouched when its key is absent, including an empty object", () => {
+  it("leaves a field untouched when its key is absent", () => {
     const parsed = parseBrandPut({ textColor: "#ffffff" });
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
@@ -84,9 +87,18 @@ describe("PUT /api/brand merge semantics", () => {
     expect(merged.textColor).toBe("#ffffff");
     expect(merged.displayName).toBe("Demo Café");
     expect(merged.primaryColor).toBe("#c8102e");
+  });
+
+  it("rejects an empty {} PUT without writing, and Android +13 always sends three keys so it never hits this", () => {
+    // Gother: Android +13 always sends {primaryColor, accentColor, logoMediaId}.
     const empty = parseBrandPut({});
-    expect(empty.ok).toBe(true);
-    if (empty.ok) expect(mergeBrandRecord(stored, empty.patch)).toEqual(stored);
+    expect(empty.ok).toBe(false);
+    if (empty.ok) return;
+    expect(empty.error).toBe("Change at least one brand field.");
+    const android = parseBrandPut({ primaryColor: "#111111", accentColor: "#222222", logoMediaId: null });
+    expect(android.ok).toBe(true);
+    const unknownOnly = parseBrandPut({ unexpected: true });
+    expect(unknownOnly.ok).toBe(false);
   });
 
   it("treats a present empty string on optional text as a clear", () => {
@@ -135,6 +147,8 @@ describe("PUT /api/brand validation", () => {
     expect(parseDisplayName("  ").ok).toBe(true);
     expect(parseWebsite("https://democafe.example")).toEqual({ ok: true, value: "https://democafe.example" });
     expect(parseWebsite("http://example.com/path")).toEqual({ ok: true, value: "http://example.com/path" });
+    expect(parseWebsite("HTTPS://democafe.example")).toEqual({ ok: true, value: "https://democafe.example" });
+    expect(parseWebsite("HTTP://Example.COM/Path")).toEqual({ ok: true, value: "http://Example.COM/Path" });
     expect(parseWebsite("javascript:alert(1)").ok).toBe(false);
     expect(parseWebsite("ftp://example.com").ok).toBe(false);
     expect(parseWebsite("https://user:pass@example.com").ok).toBe(false);
@@ -270,6 +284,91 @@ describe("seedBrand and seedClassicMenu apply identity only on fresh samples", (
     const next = seedClassicMenu(custom, kit);
     expect(next.title).toBe("Demo Café"); // the helper itself applies; callers only invoke it on new drafts
     expect(next.footer).toContain("555-0142");
+  });
+});
+
+describe("PUT writes only the provided columns", () => {
+  it("builds a column-only row from an Android-shaped patch, with no identity columns", () => {
+    const row = brandPatchRow({
+      primaryColor: "#111111",
+      accentColor: "#222222",
+      logoMediaId: "11111111-2222-4333-8444-555555555555",
+    });
+    expect(row).toEqual({
+      primary_color: "#111111",
+      accent_color: "#222222",
+      logo_media_id: "11111111-2222-4333-8444-555555555555",
+    });
+    expect(Object.keys(row).sort()).toEqual(["accent_color", "logo_media_id", "primary_color"]);
+  });
+
+  it("includes a present null so that field is cleared, and omits absent keys", () => {
+    const row = brandPatchRow({ displayName: null, logoMediaId: null, phone: "(415) 555-0142" });
+    expect(row).toEqual({
+      display_name: null,
+      logo_media_id: null,
+      phone: "(415) 555-0142",
+    });
+    expect("website" in row).toBe(false);
+    expect("primary_color" in row).toBe(false);
+  });
+
+  it("can omit identity columns when the database has not had 0025 applied", () => {
+    const row = brandPatchRow(
+      { primaryColor: "#111111", displayName: "Demo Café" },
+      { includeIdentity: false },
+    );
+    expect(row).toEqual({ primary_color: "#111111" });
+  });
+});
+
+describe("classic late-load seed does not dirty a new editor", () => {
+  const kit = {
+    displayName: "Demo Café",
+    phone: "(415) 555-0142",
+    website: "https://democafe.example",
+  };
+
+  function freshDraft() {
+    const content = sampleMenu();
+    const baseline = { name: "Lunch menu", template: "classic" as const, content, displayIds: [] as string[] };
+    return {
+      draft: { id: null as string | null, name: "Lunch menu", template: "classic" as const, content, displayIds: [] as string[] },
+      baseline,
+    };
+  }
+
+  it("seeds a clean new draft and returns a baseline that matches, so the leave guard stays quiet", () => {
+    const { draft, baseline } = freshDraft();
+    const result = seedFreshClassicIfClean(draft, kit, baseline);
+    expect(result).not.toBeNull();
+    if (!result) return;
+    expect(result.draft.content.title).toBe("Demo Café");
+    expect(result.draft.content.footer).toBe("(415) 555-0142 · https://democafe.example");
+    const current = { name: result.draft.name, template: result.draft.template, content: result.draft.content, displayIds: result.draft.displayIds };
+    expect(hasUnsavedEdits(current, result.baseline)).toBe(false);
+    expect(hasUnsavedEdits(current, baseline)).toBe(true); // without updating the baseline, Back would prompt
+  });
+
+  it("does not seed once the user has edited, or when the draft is an existing board", () => {
+    const { draft, baseline } = freshDraft();
+    const edited = { ...draft, content: { ...draft.content, title: "My title" } };
+    expect(seedFreshClassicIfClean(edited, kit, baseline)).toBeNull();
+    const existing = { ...draft, id: "menu-1" };
+    expect(seedFreshClassicIfClean(existing, kit, { ...baseline, content: existing.content })).toBeNull();
+    expect(seedFreshClassicIfClean(draft, null, baseline)).toBeNull();
+  });
+
+  it("is used inside ClassicEditor with a baseline update, not as a MenuBoards late setView that leaves the editor dirty", () => {
+    const editor = readFileSync("components/classic-editor.tsx", "utf8");
+    expect(editor).toContain("seedFreshClassicIfClean(draft, brand, baseline.current)");
+    expect(editor).toContain("baseline.current = next.baseline");
+    expect(editor).toContain("setDraft(next.draft)");
+    const boards = readFileSync("components/menu-boards.tsx", "utf8");
+    expect(boards).toContain("brand={kit}");
+    expect(boards).toContain("seedClassicMenu(sampleMenu(), brand)");
+    expect(boards).not.toContain("seedFreshClassicIfClean");
+    expect(boards).not.toContain("setView({ ...view, draft: { ...view.draft, content: next } })");
   });
 });
 

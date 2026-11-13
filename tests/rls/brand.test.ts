@@ -187,5 +187,9 @@ describe.skipIf(!configured)("brand kits", () => {
     expect((await put({ website: "javascript:alert(1)" })).status).toBe(400);
     expect((await put({ headingFont: "roboto" })).status).toBe(400);
     expect((await put({ displayName: "x".repeat(81) })).status).toBe(400);
+    expect((await put({}))).toMatchObject({ status: 400 });
+    const https = await put({ website: "HTTPS://democafe.example" });
+    expect(https.status).toBe(200);
+    expect((await https.json()).website).toBe("https://democafe.example");
   });
 });

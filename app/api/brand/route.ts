@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   return json(brand);
 }
 
-/** Save the account's brand. Merge semantics: an absent key is left untouched. Existing menus change when "Apply to all menus" runs. */
+/** Save the account's brand. Column-only merge: a present null clears, an absent key is left untouched. An empty {} is 400 (Android +13 always sends {primaryColor, accentColor, logoMediaId}). Existing menus change when "Apply to all menus" runs. */
 export async function PUT(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;

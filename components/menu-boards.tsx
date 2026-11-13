@@ -149,16 +149,6 @@ export function MenuBoards({
     setPendingBoardId(null);
   }, [menus.data, pendingBoardId, initialSearch]);
 
-  useEffect(() => {
-    if (view.mode !== "classic" || view.draft.id) return;
-    if (!kit) return;
-    const sample = sampleMenu();
-    if (view.draft.content.title !== sample.title || view.draft.content.footer !== sample.footer) return;
-    const next = seedClassicMenu(view.draft.content, kit);
-    if (next === view.draft.content) return;
-    setView({ ...view, draft: { ...view.draft, content: next } });
-  }, [kit, view]);
-
   function startNew() {
     if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
     else setView({ mode: "classic", draft: newClassicDraft([], kit), screenId: null });
@@ -240,6 +230,7 @@ export function MenuBoards({
           onError={(message) => toast.show(message, true)}
           previewSrc={fixture?.previewSrc}
           readOnly={Boolean(fixture)}
+          brand={kit}
         />
       ) : null}
 
