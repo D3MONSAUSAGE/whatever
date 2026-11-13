@@ -21,7 +21,7 @@ describe("premium editor chrome", () => {
     } catch {
       return;
     }
-    const source = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("components/classic-editor.tsx", "utf8");
+    const source = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("components/classic-editor.tsx", "utf8") + readFileSync("components/studio-leave.tsx", "utf8") + readFileSync("components/shell.tsx", "utf8");
     const style = source.match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "";
     expect(style).toContain("position: sticky");
     expect(source).toContain('id="studio-tv-preview"');
@@ -51,6 +51,13 @@ describe("premium editor chrome", () => {
     expect(source).toContain("requestLeave");
     expect(source).toContain("publishSavedCopy");
     expect(source).toContain("ISOLATED_STUDIO_PHOTO_MAX_BYTES");
+    expect(style).toContain('.studio-tabs button[aria-selected="true"]{color:#0066ff;font-weight:700}');
+    expect(source).toContain("disabled={busy}");
+    expect(source).toContain("disabled={saving !== null}");
+    expect(source).toContain('region && (step === "content" || step === "photo")');
+    expect(source).toContain("useRegisterStudioLeave");
+    expect(source).toContain("StudioGuardedLink");
+    expect(source).toContain("StudioLeaveProvider");
     expect(source).not.toMatch(/<input type="color"/);
 
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

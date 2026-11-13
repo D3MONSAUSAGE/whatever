@@ -25,6 +25,7 @@ import { confirmDiscardUnsaved, hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/m
 import { publishSavedCopy } from "@/lib/screen-actions-ui";
 import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
+import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
@@ -129,6 +130,7 @@ export function LayoutStudio({
     if (!confirmDiscardUnsaved(studioIsDirty())) return;
     after();
   }
+  useRegisterStudioLeave(studioIsDirty);
   const liveBrand = useApi<Brand>(accountMode && !fixture && !brand ? "/api/brand" : null);
   const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
   const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
@@ -771,7 +773,7 @@ export function LayoutStudio({
     <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#f4f7fb", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
-          {onClose ? <button type="button" className="studio-back" onClick={() => requestLeave(onClose)}>Back to menu boards</button> : null}
+          {onClose ? <button type="button" className="studio-back" disabled={saving !== null} onClick={() => requestLeave(onClose)}>Back to menu boards</button> : null}
           <div className="studio-page-title">
             {renaming && account ? (
               <input aria-label="Board name" className="studio-title-input" value={boardName} maxLength={80} autoFocus
@@ -852,7 +854,7 @@ export function LayoutStudio({
               <div style={{ margin: "12px 0" }}>
                 <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
                 <BrandSummary fixture={brand ?? undefined} />
-                <p style={{ fontSize: 13, margin: "8px 0" }}><a href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</a></p>
+                <p style={{ fontSize: 13, margin: "8px 0" }}><StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</StudioGuardedLink></p>
                 <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
                   const colors = brand?.brand ?? liveBrand.data;
                   if (!colors?.primaryColor && !colors?.accentColor) return;
@@ -947,7 +949,7 @@ export function LayoutStudio({
         {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
         <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
           {(["preview", "template", "section", "content", "style", "publish"] as const).map((id) => (
-            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12 }} onClick={() => {
+            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ flex: "1 1 0", padding: "6px 2px", fontSize: 12, minHeight: 44 }} onClick={() => {
               setStep(id);
               if (id === "preview") document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }}>{stepLabel(id)}</button>
@@ -1489,17 +1491,6 @@ function proportionNote(template: LayoutTemplate) {
   if (template === "menu-promo-67") return "Menu width is 55% to 75%. The promo area uses a photo or video from Media for the rest.";
   if (template === "split-50") return "The left side is 40% to 60%. The right side uses the rest.";
   return "The menu card is 40% to 70% of the width. The video stays in the strip beside it.";
-}
-
-function chip(active: boolean): CSSProperties {
-  return {
-    border: active ? "2px solid #1a1614" : "1px solid #ddd4c6",
-    background: "#fff",
-    borderRadius: 999,
-    padding: "8px 12px",
-    cursor: "pointer",
-    color: "#1a1614",
-  };
 }
 
 const field: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #ddd4c6", borderRadius: 8, padding: "8px 10px", font: "inherit" };

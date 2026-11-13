@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
@@ -13,6 +12,7 @@ import { ContentNav } from "@/components/content-nav";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
 import { clearLayoutStudioDraftsOnSignOut, shouldClearStudioDraftsOnAuthEvent } from "@/lib/layout-studio-draft";
 import { isContentPath } from "@/lib/content-nav";
+import { StudioGuardedLink, StudioLeaveProvider, useStudioAllowLeave } from "@/components/studio-leave";
 import { IconCalendar, IconGear, IconImage, IconList, IconTv } from "@/components/icons";
 
 const NAV = [
@@ -22,6 +22,15 @@ const NAV = [
   { href: "/dashboard/schedule", label: "Schedules", icon: IconCalendar },
   { href: "/dashboard/account", label: "Account", icon: IconGear },
 ];
+
+function SignOutButton({ onSignOut, className, children }: { onSignOut: () => void | Promise<void>; className?: string; children: React.ReactNode }) {
+  const allowLeave = useStudioAllowLeave();
+  return (
+    <button type="button" className={className} onClick={() => { if (!allowLeave()) return; void onSignOut(); }}>
+      {children}
+    </button>
+  );
+}
 
 export function DashboardShell({ children, preview = false, pathOverride }: { children: React.ReactNode; preview?: boolean; pathOverride?: string }) {
   const router = useRouter();
@@ -82,41 +91,42 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   const current = brandKit ? "Brand Kit" : (NAV.find((item) => isActive(item.href))?.label ?? "Pekko");
 
   return (
+    <StudioLeaveProvider>
     <ToastProvider>
     <UploadsProvider>
     <div className="min-h-dvh md:flex">
       <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
-        <Link href="/dashboard" className="px-1 mb-6" aria-label={PRODUCT_NAME}>
+        <StudioGuardedLink href="/dashboard" className="px-1 mb-6" aria-label={PRODUCT_NAME}>
           <BrandLockup size="sm" />
-        </Link>
+        </StudioGuardedLink>
         {NAV.map((item) => (
-          <Link key={item.href} href={item.href} aria-current={isActive(item.href) && !(item.href === "/dashboard/account" && brandKit) ? "page" : undefined} className="nav-link">
+          <StudioGuardedLink key={item.href} href={item.href} aria-current={isActive(item.href) && !(item.href === "/dashboard/account" && brandKit) ? "page" : undefined} className="nav-link">
             <span className="icon-tile size-8">
               <item.icon />
             </span>
             {item.label}
-          </Link>
+          </StudioGuardedLink>
         ))}
-        <Link
+        <StudioGuardedLink
           href="/dashboard/account/brand-kit"
           aria-current={brandKit ? "page" : undefined}
           className="nav-link md:pl-8 text-[13px]"
         >
           Brand Kit
-        </Link>
-        <button type="button" onClick={signOut} className="nav-link mt-auto text-left">
+        </StudioGuardedLink>
+        <SignOutButton onSignOut={signOut} className="nav-link mt-auto text-left">
           <span className="icon-tile size-8" aria-hidden="true">↩</span>
           Sign out
-        </button>
+        </SignOutButton>
       </nav>
       <div className="flex-1 min-w-0">
         <header className="md:hidden sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-line bg-white/95 px-4 h-14 backdrop-blur">
-          <Link href="/dashboard" className="min-w-0">
+          <StudioGuardedLink href="/dashboard" className="min-w-0">
             <BrandLockup size="sm" markClassName="size-8" />
-          </Link>
+          </StudioGuardedLink>
           <span className="flex items-center gap-3 shrink-0">
             <span className="text-sm text-muted">{current}</span>
-            <button type="button" onClick={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</button>
+            <SignOutButton onSignOut={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</SignOutButton>
           </span>
         </header>
         <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : "max-w-6xl px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
@@ -129,17 +139,18 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
       </div>
       <nav aria-label="Mobile" className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
         {NAV.map((item) => (
-          <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
+          <StudioGuardedLink key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
             className={`flex min-w-0 flex-col items-center justify-center gap-1 min-h-16 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-primary" : "text-muted"}`}>
             <span className={`icon-tile size-7 rounded-lg ${isActive(item.href) ? "icon-tile-active" : ""}`}>
               <item.icon />
             </span>
             <span className="max-w-full truncate">{item.label}</span>
-          </Link>
+          </StudioGuardedLink>
         ))}
       </nav>
     </div>
     </UploadsProvider>
     </ToastProvider>
+    </StudioLeaveProvider>
   );
 }

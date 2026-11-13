@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api, authToken, type DisplayItem, type MediaItem } from "@/lib/api";
 import { MENU_LIMITS, MENU_TEMPLATES, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/lib/menu-board-unify";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
+import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 
 export type ClassicDraft = {
   id: string | null;
@@ -134,9 +134,14 @@ export function ClassicEditor({
     }
   }
 
-  function requestClose() {
+  function isDirty() {
     const current = { name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds };
-    if (!confirmDiscardUnsaved(hasUnsavedEdits(current, baseline.current))) return;
+    return hasUnsavedEdits(current, baseline.current);
+  }
+  useRegisterStudioLeave(isDirty);
+
+  function requestClose() {
+    if (!confirmDiscardUnsaved(isDirty())) return;
     setDraft(null);
   }
 
@@ -282,7 +287,7 @@ export function ClassicEditor({
         <input type="checkbox" checked={c.useBrand !== false} onChange={(e) => update({ ...c, useBrand: e.target.checked })} />
         Use my brand (logo and colours)
       </label>
-      <p className="text-xs text-muted">Colours and the logo come from your <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</Link>. There is no separate brand form here.</p>
+      <p className="text-xs text-muted">Colours and the logo come from your <StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</StudioGuardedLink>. There is no separate brand form here.</p>
     </details>
   );
 
@@ -310,7 +315,7 @@ export function ClassicEditor({
     <div className="studio-app" data-testid="menu-editor" data-embedded="true" style={{ background: "transparent", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
-          <button type="button" className="studio-back" onClick={requestClose}>Back to menu boards</button>
+          <button type="button" className="studio-back" disabled={busy} onClick={requestClose}>Back to menu boards</button>
           <h1 className="studio-heading" style={{ margin: 0, fontSize: 18, fontWeight: 750 }}>{draft.id ? draft.name || "Edit menu board" : "New menu board"}</h1>
         </div>
         <div className="studio-toolbar-actions">
@@ -356,7 +361,7 @@ export function ClassicEditor({
           {studioBp === "phone" ? <div className="studio-preview-live" data-canvas-mobile="true">{renderStage(true, "classic-preview-live")}</div> : null}
           {studioBp === "desktop" ? <div className="studio-preview-still">{renderStage(false)}</div> : null}
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
-          {region ? <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p> : null}
+          {region && (step === "content" || step === "photo") ? <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p> : null}
         </section>
       </div>
 
