@@ -54,7 +54,7 @@ test("pricing shows the approved plans and Start free trial opens sign-up", asyn
 test("support, contact and legal pages publish the authorized contact", async ({ page }) => {
   for (const path of ["/support", "/contact", "/account-deletion"]) {
     await page.goto(path);
-    await expect(page.getByTestId("support-email")).toHaveAttribute("href", "mailto:vivalopez06-wh5rwz@mail.grokbot.com");
+    await expect(page.getByTestId("support-email")).toHaveAttribute("href", "mailto:support@pekkotv.com");
     await expect(page.getByTestId("support-address")).toContainText("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
     await expect(page.getByTestId("support-todo")).toHaveCount(0);
   }

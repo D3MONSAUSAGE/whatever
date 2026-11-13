@@ -26,7 +26,7 @@ test("published legal pages, friendly 404, and health check", async ({ page, req
     await page.goto(path);
     await expect(page.getByTestId("legal-draft")).toHaveCount(0);
     await expect(page.getByText("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US")).toBeVisible();
-    await expect(page.getByRole("link", { name: "vivalopez06-wh5rwz@mail.grokbot.com" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "support@pekkotv.com" })).toBeVisible();
     if (shots) await page.screenshot({ path: `${shots}${path}-390.png`, fullPage: true });
   }
   await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
