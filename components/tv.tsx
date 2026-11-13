@@ -111,11 +111,18 @@ export function OfflineAlert({ displays, linkToDisplays = false }: { displays: D
   }, [offline.length]);
   if (offline.length === 0) return null;
   const names = offline.slice(0, 4);
-  const headline = offline.length === 1 ? "1 screen is offline" : `${offline.length} screens are offline`;
+  const snippets = names.map((d) => {
+    const dur = d.lastSeenAt ? offlineFor(d.lastSeenAt) : "no heartbeat yet";
+    return `${d.name}, ${dur}`;
+  });
+  const extra = offline.length > names.length ? ` +${offline.length - names.length} more` : "";
+  const headline = offline.length === 1
+    ? `1 screen offline: ${snippets[0]}`
+    : `${offline.length} screens offline: ${snippets.join("; ")}${extra}`;
   return (
-    <details role="status" data-testid="offline-alert" className="note-error mb-4" open>
-      <summary className="flex items-center justify-between gap-3 min-h-11 cursor-pointer list-none font-semibold [&::-webkit-details-marker]:hidden">
-        <span>{headline}</span>
+    <details role="status" data-testid="offline-alert" className="note-error mb-3 py-1.5">
+      <summary className="flex items-center justify-between gap-3 min-h-10 cursor-pointer list-none font-semibold [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">{headline}.</span>
         <span className="text-sm font-medium underline underline-offset-4 shrink-0">View</span>
       </summary>
       <div className="flex flex-col gap-1.5 pt-2">

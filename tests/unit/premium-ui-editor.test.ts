@@ -27,7 +27,14 @@ describe("premium editor chrome", () => {
     expect(source).toContain('id="studio-tv-preview"');
     expect(source).toContain("Preview, not a live TV feed");
     expect(source).toContain("TemplatePicker");
+    expect(source).toContain("template-thumb-check");
+    expect(source).toContain("Content &amp; text");
+    expect(source).toContain("Colors &amp; style");
+    expect(source).toContain("studio-canvas-stage");
+    expect(source).toContain("board-switch");
+    expect(source).toContain("item-card");
     expect(source).toContain("ColorField");
+    expect(source).not.toContain("background: #fffdf8");
     expect(source).toContain("requestLeave");
     expect(source).toContain("publishSavedCopy");
     expect(source).toContain("ISOLATED_STUDIO_PHOTO_MAX_BYTES");
@@ -44,7 +51,7 @@ describe("premium editor chrome", () => {
           <section class="studio-canvas" data-testid="studio-canvas"><div class="preview-frame" style="aspect-ratio:16/9;background:#000"></div></section>
           <section class="studio-preview" id="studio-tv-preview" data-testid="studio-tv-preview" aria-label="TV preview">
             <p class="studio-kicker">Preview</p>
-            <p class="studio-preview-note">This is a preview of the board, Preview, not a live TV feed.</p>
+            <p class="studio-preview-note">Preview, not a live TV feed.</p>
             <div class="studio-preview-still"><div class="preview-frame" style="aspect-ratio:16/9;background:#111;height:160px"></div></div>
           </section>
         </div>
@@ -52,14 +59,23 @@ describe("premium editor chrome", () => {
     const before = await page.evaluate(() => {
       const preview = document.getElementById("studio-tv-preview");
       const tools = document.getElementById("tools");
+      const canvas = document.querySelector("[data-testid='studio-canvas'] .preview-frame") as HTMLElement | null;
       return {
         position: preview ? getComputedStyle(preview).position : "",
         inView: preview ? preview.getBoundingClientRect().top < window.innerHeight && preview.getBoundingClientRect().bottom > 0 : false,
         toolsScroll: tools ? tools.scrollHeight : 0,
+        canvasWidth: canvas ? canvas.getBoundingClientRect().width : 0,
+        toolsWidth: document.querySelector(".studio-left")?.getBoundingClientRect().width ?? 0,
+        previewWidth: preview?.getBoundingClientRect().width ?? 0,
       };
     });
     expect(before.position).toBe("sticky");
     expect(before.inView).toBe(true);
+    expect(before.canvasWidth).toBeGreaterThanOrEqual(700);
+    expect(before.toolsWidth).toBeGreaterThanOrEqual(300);
+    expect(before.toolsWidth).toBeLessThanOrEqual(380);
+    expect(before.previewWidth).toBeGreaterThanOrEqual(260);
+    expect(before.previewWidth).toBeLessThanOrEqual(340);
     await page.evaluate(() => {
       const left = document.querySelector(".studio-left") as HTMLElement | null;
       if (left) left.scrollTop = 800;

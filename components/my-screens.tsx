@@ -28,10 +28,10 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
         action={<Link href="/dashboard/displays#add-screen" className="btn btn-primary min-h-11">Add screen</Link>}
       />
       {list.length ? (
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-          <Stat label="Total screens" value={list.length} />
-          <Stat label="Online" value={onlineCount} tone="live" />
-          <Stat label="Offline" value={offlineCount} tone="danger" />
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <Stat compact label="Total screens" value={list.length} />
+          <Stat compact label="Online" value={onlineCount} tone="live" />
+          <Stat compact label="Offline" value={offlineCount} tone="danger" />
         </div>
       ) : null}
       <p className="text-sm mb-4"><Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">Screen groups</Link></p>
