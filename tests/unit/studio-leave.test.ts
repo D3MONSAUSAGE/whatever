@@ -14,5 +14,7 @@ describe("studio leave guard", () => {
     expect(source).toContain('href="/dashboard/account/brand-kit"');
     expect(source).toContain("useRegisterStudioLeave");
     expect(source).not.toContain("app/api");
+    expect(source).toContain('target === "_blank"');
+    expect(source).toContain("useMemo(() => ({ register, allowLeave }), [register, allowLeave])");
   });
 });

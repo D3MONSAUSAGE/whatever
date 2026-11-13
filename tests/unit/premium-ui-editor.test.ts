@@ -52,6 +52,14 @@ describe("premium editor chrome", () => {
     expect(source).toContain("publishSavedCopy");
     expect(source).toContain("ISOLATED_STUDIO_PHOTO_MAX_BYTES");
     expect(style).toContain('.studio-tabs button[aria-selected="true"]{color:#0066ff;font-weight:700}');
+    // Pill chrome is restored without an inline color/weight so the CSS rule still wins.
+    expect(source).toContain("...chip(step === id)");
+    expect(source).toMatch(/function chip\(active: boolean\): CSSProperties \{\s*return \{\s*border:/);
+    const chip = source.match(/function chip\(active: boolean\): CSSProperties \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(chip).toContain("borderRadius: 999");
+    expect(chip).toContain("background: \"#fff\"");
+    expect(chip).not.toContain("color:");
+    expect(chip).not.toContain("fontWeight");
     expect(source).toContain("disabled={busy}");
     expect(source).toContain("disabled={saving !== null}");
     expect(source).toContain('region && (step === "content" || step === "photo")');

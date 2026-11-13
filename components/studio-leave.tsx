@@ -1,7 +1,7 @@
 "use client";
 
 import Link, { type LinkProps } from "next/link";
-import { createContext, useCallback, useContext, useEffect, useRef, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { confirmDiscardUnsaved } from "@/lib/menu-board-unify";
 
 type Guard = () => boolean;
@@ -24,8 +24,9 @@ export function StudioLeaveProvider({ children }: { children: ReactNode }) {
     }
     return true;
   }, []);
+  const value = useMemo(() => ({ register, allowLeave }), [register, allowLeave]);
   return (
-    <StudioLeaveContext.Provider value={{ register, allowLeave }}>
+    <StudioLeaveContext.Provider value={value}>
       {children}
     </StudioLeaveContext.Provider>
   );
@@ -55,15 +56,17 @@ function isModifiedClick(event: MouseEvent) {
 export function StudioGuardedLink({
   onClick,
   children,
+  target,
   ...props
-}: LinkProps & { href: string; className?: string; "aria-label"?: string; "aria-current"?: "page" | undefined; style?: CSSProperties; children?: ReactNode }) {
+}: LinkProps & { href: string; className?: string; "aria-label"?: string; "aria-current"?: "page" | undefined; style?: CSSProperties; target?: string; children?: ReactNode }) {
   const allowLeave = useStudioAllowLeave();
   return (
     <Link
       {...props}
+      target={target}
       onClick={(event) => {
         onClick?.(event);
-        if (event.defaultPrevented || isModifiedClick(event)) return;
+        if (event.defaultPrevented || isModifiedClick(event) || target === "_blank") return;
         if (!allowLeave()) event.preventDefault();
       }}
     >

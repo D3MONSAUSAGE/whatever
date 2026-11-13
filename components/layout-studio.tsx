@@ -949,7 +949,7 @@ export function LayoutStudio({
         {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
         <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
           {(["preview", "template", "section", "content", "style", "publish"] as const).map((id) => (
-            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ flex: "1 1 0", padding: "6px 2px", fontSize: 12, minHeight: 44 }} onClick={() => {
+            <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12, minHeight: 44 }} onClick={() => {
               setStep(id);
               if (id === "preview") document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }}>{stepLabel(id)}</button>
@@ -1491,6 +1491,16 @@ function proportionNote(template: LayoutTemplate) {
   if (template === "menu-promo-67") return "Menu width is 55% to 75%. The promo area uses a photo or video from Media for the rest.";
   if (template === "split-50") return "The left side is 40% to 60%. The right side uses the rest.";
   return "The menu card is 40% to 70% of the width. The video stays in the strip beside it.";
+}
+
+function chip(active: boolean): CSSProperties {
+  return {
+    border: active ? "2px solid #1a1614" : "1px solid #ddd4c6",
+    background: "#fff",
+    borderRadius: 999,
+    padding: "8px 12px",
+    cursor: "pointer",
+  };
 }
 
 const field: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #ddd4c6", borderRadius: 8, padding: "8px 10px", font: "inherit" };
