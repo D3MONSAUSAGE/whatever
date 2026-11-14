@@ -165,7 +165,7 @@ describe("layout studio frames", () => {
       }
     }
     const banner = layoutSvg(sampleLayout("menu-banner"));
-    const footerAt = banner.indexOf("Members save 10% after 4");
+    const footerAt = banner.indexOf("Ask about today's specials");
     const footerSlice = banner.slice(Math.max(0, footerAt - 80), footerAt);
     const footerY = Number(footerSlice.match(/y="([\d.]+)"/)?.[1]);
     expect(footerY).toBeLessThan(frameFor("menu-banner", 0.18).video!.y);
@@ -173,10 +173,10 @@ describe("layout studio frames", () => {
     const triple = layoutSvg({ ...sampleLayout("triple-column"), imageMediaId: "00000000-0000-4000-8000-000000000002" }, { imageHref: columnPhoto });
     expect(triple.lastIndexOf("<image ")).toBeGreaterThan(triple.indexOf("<rect"));
     const split = layoutSvg(sampleLayout("split-50"));
-    expect(split).toContain("Noon ride");
-    expect(split).toContain("Studio B");
-    const head = split.indexOf("Noon ride");
-    const detail = split.indexOf("bikes leave at 12:15");
+    expect(split).toContain("Chef's special");
+    expect(split).toContain("Grilled chicken");
+    const head = split.indexOf("Chef's special");
+    const detail = split.indexOf("Add your special and its price here");
     const headY = Number(split.slice(Math.max(0, head - 120), head).match(/y="([\d.]+)"/)?.[1]);
     const detailY = Number(split.slice(Math.max(0, detail - 120), detail).match(/y="([\d.]+)"/)?.[1]);
     expect(detailY - headY).toBeGreaterThanOrEqual(60);
@@ -447,11 +447,12 @@ describe("player composition contract", () => {
     expect(editor).toContain("position: static"); // preview scrolls with the under-preview editor; sticky would cover it
     expect(editor).toContain("min-height: 44px");
     const banner = layoutSvg(sampleLayout("menu-banner"));
-    expect(banner).toContain("Today's counter");
-    const flower = banner.indexOf("Flowers");
+    expect(banner).toContain("Happy hour");
+    const flower = banner.indexOf(">Soda<") + 1;
     const flowerY = Number(banner.slice(Math.max(0, flower - 160), flower).match(/y="([\d.]+)"/g)?.at(-1)?.match(/[\d.]+/)?.[0]);
-    expect(flowerY).toBeGreaterThan(700);
-    expect(flowerY).toBeLessThan(frameFor("menu-banner", 0.18).menu.h);
+    const bannerMenuH = frameFor("menu-banner", sampleLayout("menu-banner").split).menu.h;
+    expect(flowerY).toBeGreaterThan(bannerMenuH * 0.75);
+    expect(flowerY).toBeLessThan(bannerMenuH);
     expect(player).toContain("v.loop = true");
     expect(player).toContain("playsinline");
     expect(player).toContain("webkit-playsinline");

@@ -18,8 +18,8 @@ describe("two-column menu + promo template", () => {
     expect(sampleLayout("menu-promo-67").title).toBe("Casa Mesa");
     expect(sampleLayout("menu-promo-67").template).toBe("menu-promo-67");
     expect(sampleLayout("triple-column").title).toBe("Northbeam Coffee");
-    expect(sampleLayout("split-50").featureTitle).toBe("Noon ride");
-    expect(sampleLayout("menu-banner").footer).toBe("Members save 10% after 4");
+    expect(sampleLayout("split-50").featureTitle).toBe("Chef's special");
+    expect(sampleLayout("menu-banner").footer).toBe("Ask about today's specials");
     expect(sampleLayout("signature").title).toBe("Evening service");
     for (const template of existingTemplates) {
       const sample = sampleLayout(template);

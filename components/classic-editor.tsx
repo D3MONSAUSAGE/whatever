@@ -7,6 +7,8 @@ import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/li
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
+import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, needsName, normalizePrice } from "@/lib/menu-fields";
+import { ItemNotes, MenuLimits } from "@/components/menu-item-fields";
 
 export type ClassicDraft = {
   id: string | null;
@@ -58,6 +60,9 @@ export function ClassicEditor({
   const last = useRef<string | null>(null);
   const firstFetch = useRef(true);
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const photoPanelRef = useRef<HTMLDetailsElement | null>(null);
+  const photoSelectRef = useRef<HTMLSelectElement | null>(null);
+  const [nameCheck, setNameCheck] = useState(false);
   const baseline = useRef({ name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds });
 
   // Seed a new, still-clean draft when the brand kit arrives after mount, and
@@ -75,7 +80,7 @@ export function ClassicEditor({
 
   const c = draft.content;
   const update = (content: MenuContent) => setDraft({ ...draft, content });
-  const totalItems = c.sections.reduce((n, s) => n + s.items.length, 0);
+  const counts = menuCounts(c.sections);
   const hasPhoto = Boolean(c.photoMediaId);
   const hits = classicPreviewHits(hasPhoto);
   const saveLabel = busy ? (draft.id ? "Saving…" : "Creating…") : draft.id ? "Save changes" : "Create menu board";
@@ -146,6 +151,16 @@ export function ClassicEditor({
   function selectRegion(id: "menu" | "photo") {
     setRegion(id);
     setStep(id === "photo" ? "photo" : "content");
+    if (id === "photo") {
+      // Open the photo controls under the board and move focus there (QA U1-04a). A collapsed
+      // <details> stays collapsed when only React's open prop is unchanged, so open it directly.
+      window.setTimeout(() => {
+        if (photoPanelRef.current) photoPanelRef.current.open = true;
+        photoPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        photoSelectRef.current?.focus({ preventScroll: true });
+      }, 0);
+      return;
+    }
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches) {
       editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -169,6 +184,16 @@ export function ClassicEditor({
 
   async function save() {
     if (readOnly) return;
+    // A row with a price or description but no name would be dropped on save. Ask for the name instead (QA B1-02).
+    const nameless = firstNamelessItem(c.sections);
+    if (nameless) {
+      setNameCheck(true);
+      setRegion("menu");
+      setStep("content");
+      onError(ITEM_NAME_REQUIRED);
+      window.setTimeout(() => document.getElementById(`classic-item-${nameless.section}-${nameless.item}-name`)?.focus(), 0);
+      return;
+    }
     setBusy(true);
     try {
       const body = JSON.stringify({ name: draft.name, template: draft.template, content: draft.content, ...(draft.displayIds.length ? { displayIds: draft.displayIds } : {}) });
@@ -217,6 +242,9 @@ export function ClassicEditor({
               />
             ))
           : null}
+        {interactive && !hasPhoto ? (
+          <button type="button" className="classic-add-photo" onClick={() => selectRegion("photo")}>Add a photo</button>
+        ) : null}
       </div>
     );
   }
@@ -230,6 +258,7 @@ export function ClassicEditor({
       <summary className="studio-panel-summary">Content &amp; text</summary>
       {region === "menu" ? editingLabel : null}
       <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor" className="grid gap-3">
+        <MenuLimits sections={counts.sections} items={counts.items} maxSections={counts.maxSections} maxItems={counts.maxItems} />
         <label className="grid gap-1"><span className="form-label">Title on screen</span>
           <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
         <label className="grid gap-1"><span className="form-label">Subtitle</span>
@@ -245,26 +274,33 @@ export function ClassicEditor({
               onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
             {section.items.map((item, ii) => {
               const setItem = (patch: Partial<typeof item>) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.map((it, j) => j === ii ? { ...it, ...patch } : it) } : s) });
+              const idBase = `classic-item-${si}-${ii}`;
+              const nameInvalid = nameCheck && needsName(item);
               return (
                 <div key={ii} className="item-card">
-                  <input className="item-name" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })} />
-                  <input className="item-price" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })} />
+                  <input id={`${idBase}-name`} className="item-name" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item name" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })}
+                    aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined} />
+                  <input className="item-price" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })}
+                    onBlur={(e) => { const next = normalizePrice(e.target.value); if (next !== item.price) setItem({ price: next }); if (needsName({ ...item, price: next })) setNameCheck(true); }}
+                    aria-describedby={`${idBase}-price-hint`} />
                   <button type="button" className="item-remove" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
                     onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>
                     <span aria-hidden="true">×</span>
                   </button>
-                  <input className="item-desc" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })} />
+                  <input className="item-desc" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })}
+                    onBlur={() => { if (needsName(item)) setNameCheck(true); }} aria-describedby={`${idBase}-desc-count`} />
+                  <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
                 </div>
               );
             })}
-            {section.items.length < MENU_LIMITS.itemsPerSection && totalItems < MENU_LIMITS.items ? (
-              <button type="button" className="btn btn-quiet item-add" onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
-            ) : null}
+            <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(c.sections, si)} onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>
+              {canAddItem(c.sections, si) ? `Add item (${section.items.length} of ${MENU_LIMITS.itemsPerSection})` : section.items.length >= MENU_LIMITS.itemsPerSection ? `Section full (${MENU_LIMITS.itemsPerSection} items)` : `Menu full (${MENU_LIMITS.items} items)`}
+            </button>
           </section>
         ))}
-        {c.sections.length < MENU_LIMITS.sections ? (
-          <button type="button" className="btn btn-quiet justify-self-start min-h-11" onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>Add section</button>
-        ) : null}
+        <button type="button" className="btn btn-quiet justify-self-start min-h-11" disabled={!canAddSection(c.sections)} onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>
+          {canAddSection(c.sections) ? `Add section (${c.sections.length} of ${MENU_LIMITS.sections})` : `${MENU_LIMITS.sections} sections is the limit. Remove one to add another.`}
+        </button>
         <label className="grid gap-1"><span className="form-label">Footer</span>
           <input className="field" value={c.footer} maxLength={MENU_LIMITS.footer} onChange={(e) => update({ ...c, footer: e.target.value })} /></label>
       </div>
@@ -272,11 +308,11 @@ export function ClassicEditor({
   );
 
   const photoPanel = (
-    <details className="studio-panel" open={step === "photo" || hasPhoto}>
+    <details ref={photoPanelRef} className="studio-panel" open={step === "photo" || hasPhoto}>
       <summary className="studio-panel-summary">Photo</summary>
       {region === "photo" ? editingLabel : null}
       <label className="grid gap-1"><span className="form-label">Photo (optional)</span>
-        <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
+        <select ref={photoSelectRef} className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
           <option value="">No photo</option>
           {images.map((m) => <option key={m.id} value={m.id}>{m.fileName}</option>)}
         </select>

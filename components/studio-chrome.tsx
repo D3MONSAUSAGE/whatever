@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MENU_FIELD_STYLES } from "@/lib/menu-fields";
 
 /** SSR-safe: first render is "desktop" on server and client, then the effect narrows it. Avoids a hydration mismatch. */
 export function useStudioBreakpoint(): "phone" | "tablet" | "desktop" {
@@ -146,6 +147,7 @@ export function StudioStyles() {
         .item-card .item-remove:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }
         .item-card .item-desc { grid-column: 1 / -1; }
         .item-add { margin-top: 8px; width: 100%; min-height: 44px; }
+${MENU_FIELD_STYLES}
         @media (max-width: 860px) {
           .studio-toolbar { position: static; padding: 8px 16px 4px; background: #f4f7fb; }
           .studio-toolbar-actions { display: none; }
