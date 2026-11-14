@@ -174,7 +174,18 @@ async function uploadImage(file: File, onProgress: (progress: number, detail: st
   form.append("file", blob, "image.jpg");
   form.append("name", file.name);
   const token = await authToken();
-  await uploadForm("/api/media", form, token, (progress) => onProgress(Math.max(15, progress), "Uploading…"));
+  return uploadForm("/api/media", form, token, (progress) => onProgress(Math.max(15, progress), "Uploading…"));
+}
+
+/**
+ * Upload one logo or photo straight from an editor (E3). Same checks, image preparation,
+ * 15 MB limit and /api/media endpoint as the Media page; it only also returns the new id
+ * so the editor can select it.
+ */
+export async function uploadArtImage(file: File, onProgress: (progress: number, detail: string) => void): Promise<string> {
+  const result = await uploadImage(file, onProgress);
+  if (!result?.id) throw new Error("Something went wrong. Try again.");
+  return result.id;
 }
 
 async function uploadVideo(file: File, onProgress: (progress: number, detail: string) => void) {
