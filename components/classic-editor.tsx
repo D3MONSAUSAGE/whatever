@@ -353,9 +353,12 @@ export function ClassicEditor({
           <div className={step === "content" ? "studio-pane on" : "studio-pane"} data-step="template">
             {contentPanel}
           </div>
-          <div className={step === "photo" ? "studio-pane on" : "studio-pane"} data-step="template">
-            {photoPanel}
-          </div>
+          {/* Phones keep the Photo step in the stacked column; wider screens show it under the board. */}
+          {studioBp === "phone" ? (
+            <div className={step === "photo" ? "studio-pane on" : "studio-pane"} data-step="template">
+              {photoPanel}
+            </div>
+          ) : null}
         </section>
         <section className="studio-controls studio-controls-end" data-testid="studio-tools-style">
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
@@ -376,6 +379,11 @@ export function ClassicEditor({
           <p className="studio-kicker">Board · preview of what your TV will show</p>
           <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
+          {studioBp !== "phone" ? (
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools">
+              {photoPanel}
+            </div>
+          ) : null}
         </section>
       </div>
 

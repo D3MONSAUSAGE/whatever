@@ -14,6 +14,18 @@ export function editorPanelForZone(zone: string): EditorPanel {
 }
 
 /**
+ * Where the selected area's editor sits. On tablet and desktop, photo, video and background
+ * areas open directly under the board in the canvas column, so the user does not hunt through
+ * the left column. Menu text stays in the left column. On phones everything already opens
+ * under the board in the single stacked column, so it stays in the editor slot.
+ */
+export function zoneEditorPlacement(zone: string, breakpoint: "phone" | "tablet" | "desktop"): "canvas" | "left" {
+  if (breakpoint === "phone") return "left";
+  const panel = editorPanelForZone(zone);
+  return panel === "media" || panel === "background" ? "canvas" : "left";
+}
+
+/**
  * Switching the selected area must not reset the draft. Unsaved edits stay on the document
  * until Save draft, Publish, or an explicit template change.
  */

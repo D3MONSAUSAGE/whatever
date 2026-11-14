@@ -15,7 +15,7 @@ import {
   saveAccountGuard, saveShouldWaitForScope, signedInPreviewLoad, writeStudioDraft, writeStudioPublished,
   type StudioScope,
 } from "@/lib/layout-studio-draft";
-import { editorPanelForZone, keepDraftOnZoneChange, previewHits } from "@/lib/layout-studio-editor";
+import { editorPanelForZone, keepDraftOnZoneChange, previewHits, zoneEditorPlacement } from "@/lib/layout-studio-editor";
 import { api, authToken, uploadForm, useApi } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
@@ -600,6 +600,9 @@ export function LayoutStudio({
       requestAnimationFrame(() => {
         document.getElementById("studio-selected-editor")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       });
+    } else if (typeof window !== "undefined") {
+      // Photo/video controls open under the board; start them at the top for the new area.
+      requestAnimationFrame(() => { document.getElementById("studio-canvas-tools")?.scrollTo({ top: 0 }); });
     }
   }
 
@@ -737,8 +740,10 @@ export function LayoutStudio({
       />
     );
   }
+  const editorPlacement = zoneEditorPlacement(zone, studioBp);
   const zoneEditor = (
     <SelectedZoneEditor
+      key={editorPlacement === "canvas" ? `canvas-${zone}` : "left"}
       zone={zone}
       template={template}
       draft={draft}
@@ -840,7 +845,7 @@ export function LayoutStudio({
             </details>
             <details className="studio-panel">
               <summary className="studio-panel-summary">Images &amp; video</summary>
-              <p className="zone-help">Select a photo or video area on the board to choose, replace, or remove media. The editor opens below.</p>
+              <p className="zone-help">Select a photo or video area on the board to choose, replace, or remove media. Its controls open directly under the board.</p>
             </details>
           </div>
 
@@ -853,7 +858,7 @@ export function LayoutStudio({
           </div>
 
         </section>
-        <div className="studio-editor-slot">{zoneEditor}</div>
+        {editorPlacement === "left" ? <div className="studio-editor-slot">{zoneEditor}</div> : null}
         <section className="studio-controls studio-controls-end" data-testid="studio-tools-style">
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
             <details className="studio-panel">
@@ -947,6 +952,13 @@ export function LayoutStudio({
           <div className="studio-canvas-stage">
             {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
           </div>
+          {studioBp !== "phone" ? (
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools">
+              {editorPlacement === "canvas"
+                ? zoneEditor
+                : <p className="studio-zone-hint">Select a photo or video area on the board to replace it, choose from your library, remove it, or change how it fits. Its controls open here.</p>}
+            </div>
+          ) : null}
         </section>
       </div>
       <div className="studio-savebar">

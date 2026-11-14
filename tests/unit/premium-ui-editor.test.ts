@@ -101,8 +101,9 @@ describe("premium editor chrome", () => {
     expect(before.position).toBe("sticky");
     expect(before.inView).toBe(true);
     expect(before.canvasWidth).toBeGreaterThanOrEqual(700);
-    expect(before.toolsWidth).toBeGreaterThanOrEqual(300);
-    expect(before.toolsWidth).toBeLessThanOrEqual(380);
+    // t244u: the editing column is noticeably wider than the old fixed 320/360px, capped at 560px.
+    expect(before.toolsWidth).toBeGreaterThanOrEqual(400);
+    expect(before.toolsWidth).toBeLessThanOrEqual(560);
     expect(before.previewDisplay).toBe("none");
     await page.evaluate(() => {
       const left = document.querySelector(".studio-left") as HTMLElement | null;
