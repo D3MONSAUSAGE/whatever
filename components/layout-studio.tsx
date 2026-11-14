@@ -28,7 +28,7 @@ import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
-import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
+import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
@@ -1172,7 +1172,7 @@ function SelectedZoneEditor({
             {columns ? null : (
               <button type="button" className="btn btn-quiet item-add" disabled={!canAddSection(draft.sections)}
                 onClick={() => { update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] }); setSectionIndex(draft.sections.length); }}>
-                {canAddSection(draft.sections) ? `Add section (${draft.sections.length} of ${MENU_LIMITS.sections})` : `${MENU_LIMITS.sections} sections is the limit. Remove one to add another.`}
+                {canAddSection(draft.sections) ? `Add section (${draft.sections.length} of ${MENU_LIMITS.sections})` : sectionLimitMessage(draft.sections)}
               </button>
             )}
           </section>

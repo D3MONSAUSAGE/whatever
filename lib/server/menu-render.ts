@@ -1,6 +1,7 @@
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import type { MenuContent, MenuSection, MenuTemplate } from "@/lib/menu-templates";
+import { shownSections } from "@/lib/menu-fields";
 
 export const MENU_WIDTH = 1920;
 export const MENU_HEIGHT = 1080;
@@ -153,7 +154,7 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
 
   const top = headerH + 70;
   const bottom = H - (content.footer ? 120 : 70);
-  const cols = columnsFor(content.sections, art.photo ? 11 : 9);
+  const cols = columnsFor(shownSections(content.sections), art.photo ? 11 : 9); // QA B1-04: no headings for empty sections
   const gap = 120;
   const colW = (W - 2 * pad - gap * (cols.length - 1)) / cols.length;
   const maxUnits = Math.max(1, ...cols.map((c) => c.reduce((n, s) => n + units(s), 0)));

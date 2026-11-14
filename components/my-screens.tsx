@@ -25,7 +25,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   return (
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader compact title="My Screens" lede="Pick a screen or a group. Change what it plays from there."
-        action={<Link href="/dashboard/displays#add-screen" className="btn btn-primary min-h-11">Add screen</Link>}
+        action={<Link href="/dashboard/screens/add#add-screen" className="btn btn-primary min-h-11">Add screen</Link>}
       />
       {list.length ? (
         <div className="hidden sm:grid grid-cols-3 gap-2 mb-3">
@@ -47,7 +47,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
       {displays.data ? <div className="hidden sm:block"><OfflineAlert displays={displays.data} /></div> : null}
       {!displays.data ? <LoadState error={displays.error} label="Loading screens…" /> : displays.data.length === 0 ? (
         <EmptyState title="No screens yet">
-          Pair a TV, then come back here to choose what it plays. <Link href="/dashboard/displays#add-screen" className="underline font-semibold">Add screen</Link>.
+          Pair a TV, then come back here to choose what it plays. <Link href="/dashboard/screens/add#add-screen" className="underline font-semibold">Add screen</Link>.
         </EmptyState>
       ) : (
         <ul className="grid gap-3 xl:grid-cols-2">
@@ -133,7 +133,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
         action={<Link href="/dashboard/screens" className="btn btn-primary min-h-11">All screens</Link>}
       />
       <div className="mb-4 flex flex-wrap gap-2">
-        <Link href="/dashboard/displays#add-screen" className="btn btn-quiet min-h-11">Add screen</Link>
+        <Link href="/dashboard/screens/add#add-screen" className="btn btn-quiet min-h-11">Add screen</Link>
         {fixture ? null : <button type="button" className="btn btn-quiet text-danger min-h-11" onClick={() => { void removeScreen(); }}>Remove screen</button>}
       </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

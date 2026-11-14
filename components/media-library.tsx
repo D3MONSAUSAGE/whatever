@@ -9,6 +9,7 @@ import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { FileUploadControl } from "@/components/file-upload";
+import { duplicateMessage, libraryLookupUrl, lookupWithTimeout, sameLibraryVideo } from "@/lib/media-dupes";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
@@ -82,6 +83,29 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   const reload = live.reload;
   const toast = useToast();
   const confirm = useConfirm();
+
+  /** QA B1-10 retest: before uploading a video that is already in the library, offer to keep the existing one. */
+  async function uploadVideos(picked: FileList | File[]) {
+    const files = Array.from(picked);
+    const found = await Promise.all(files.map(async (file) => {
+      // If the check fails or takes longer than a few seconds, upload as before.
+      const page = await lookupWithTimeout((signal) => api<{ items: MediaItem[] }>(libraryLookupUrl(file.name), { signal }));
+      return page && sameLibraryVideo(page.items, file) ? file : null;
+    }));
+    const dupes = found.filter((file): file is File => Boolean(file));
+    if (!dupes.length) { uploads.enqueue(files, "video"); return; }
+    const copy = await confirm.ask({
+      title: "Already in your library",
+      body: duplicateMessage(dupes.map((file) => file.name)),
+      confirmLabel: "Upload a copy anyway",
+      cancelLabel: "Keep the one I have",
+    });
+    if (copy) { uploads.enqueue(files, "video"); return; }
+    const fresh = files.filter((file) => !dupes.includes(file));
+    if (fresh.length) uploads.enqueue(fresh, "video");
+    setQuery(dupes[0].name);
+    toast.show(dupes.length === 1 ? "Kept the video already in your library." : "Kept the videos already in your library.");
+  }
   const wasBusy = useRef(false);
   const [renaming, setRenaming] = useState<MediaItem | null>(null);
   const [adding, setAdding] = useState<MediaItem | null>(null);
@@ -156,7 +180,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
       <PageHeader title="Media library" icon={<IconImage />} lede="Pictures, video, and documents in your library." />
       <div className="mb-6 grid grid-cols-3 gap-3" data-testid="media-uploads">
         <FileUploadControl kind="image" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "image")} />
-        <FileUploadControl kind="video" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "video")} />
+        <FileUploadControl kind="video" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadVideos(files)} />
         <FileUploadControl kind="document" disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "presentation")} />
       </div>
       {fixture || pathOverride ? null : (
