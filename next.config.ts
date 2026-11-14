@@ -45,6 +45,8 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/:path*", headers: security },
+      // B2-07A: email links carry a one-time token_hash in the URL; never send it on as a Referer.
+      { source: "/auth/:path*", headers: [...security.filter((h) => h.key !== "Referrer-Policy"), { key: "Referrer-Policy", value: "no-referrer" }] },
       ...["/player", "/player.html", "/tv", "/pair"].map((source) => ({
         source,
         headers: [

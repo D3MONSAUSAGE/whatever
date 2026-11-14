@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 import { canonicalAuthRedirect, confirmPlan, safeAuthNext } from "@/lib/auth-confirm";
 import { middleware } from "@/middleware";
+import { captureFirstTouch, isSensitiveReferrer, sanitizeAttribution } from "@/lib/signup-attribution";
+import nextConfig from "@/next.config";
 
 const q = (s: string) => new URLSearchParams(s);
 
@@ -42,7 +44,13 @@ describe("B2-07A: /auth/confirm token_hash links", () => {
   it("verifies only when the owner presses the button, with the browser client", () => {
     const page = readFileSync("app/auth/confirm/page.tsx", "utf8");
     expect(page).toMatch(/verifyOtp\(\{ token_hash: plan\.tokenHash, type: plan\.type \}\)/);
-    expect(page).not.toMatch(/useEffect/);
+    // The only effect cleans the URL; it never verifies on load.
+    const effect = page.slice(page.indexOf("useEffect(() => {"), page.indexOf("}, []);"));
+    expect(effect).toMatch(/window\.history\.replaceState\(null, "", CLEAN_CONFIRM_PATH\)/);
+    expect(effect).not.toMatch(/verifyOtp|confirm\(/);
+    expect(page.match(/useEffect\(/g)).toHaveLength(1);
+    // token_hash/type are read once into state, so they survive the URL being cleaned.
+    expect(page).toMatch(/const \[plan\] = useState\(\(\) => confirmPlan\(/);
     expect(page).toMatch(/onClick=\{\(\) => void confirm\(\)\}/);
     expect(page).toMatch(/location\.replace\(plan\.next\)/);
   });
@@ -54,7 +62,7 @@ describe("B2-07A: pantalla-chi sign-in pages move to pekkotv.com; TVs and the ap
     expect(canonicalAuthRedirect(old, "/auth/confirm", "?token_hash=h&type=recovery")).toBe("https://pekkotv.com/auth/confirm?token_hash=h&type=recovery");
     expect(canonicalAuthRedirect(old, "/dashboard", "")).toBe("https://pekkotv.com/dashboard");
     expect(canonicalAuthRedirect(old, "/dashboard/screens/add", "?x=1")).toBe("https://pekkotv.com/dashboard/screens/add?x=1");
-    for (const p of ["/login", "/forgot-password", "/reset-password"]) expect(canonicalAuthRedirect(old, p, "")).toBe(`https://pekkotv.com${p}`);
+    for (const p of ["/login", "/forgot-password", "/reset-password", "/login/", "/forgot-password/", "/reset-password/"]) expect(canonicalAuthRedirect(old, p, "")).toBe(`https://pekkotv.com${p}`);
     for (const p of ["/", "/tv", "/pair", "/player", "/player.html", "/api/player/state", "/api/player/pair/status", "/api/health", "/api/media", "/api/layout-studio/assign", "/dashboards", "/authx", "/layout-studio/media/font/inter"]) {
       expect(canonicalAuthRedirect(old, p, "")).toBeNull();
     }
@@ -76,5 +84,48 @@ describe("B2-07A: pantalla-chi sign-in pages move to pekkotv.com; TVs and the ap
     }
     const canonical = middleware(req("https://pekkotv.com/dashboard", "pekkotv.com"));
     expect(canonical.headers.get("location")).toBeNull();
+  });
+});
+
+describe("B2-07A: the email link token never leaks (Gother MEDIUM)", () => {
+  it("(a) /auth/* sends Referrer-Policy: no-referrer; the rest of the site keeps its policy", async () => {
+    const rules = await nextConfig.headers!();
+    const auth = rules.find((r) => r.source === "/auth/:path*");
+    expect(auth?.headers).toContainEqual({ key: "Referrer-Policy", value: "no-referrer" });
+    expect(auth?.headers.filter((h) => h.key === "Referrer-Policy")).toHaveLength(1);
+    expect(auth?.headers).toContainEqual({ key: "X-Content-Type-Options", value: "nosniff" });
+    // Listed after the catch-all so it wins for /auth/*.
+    expect(rules.findIndex((r) => r.source === "/auth/:path*")).toBeGreaterThan(rules.findIndex((r) => r.source === "/:path*"));
+    expect(rules.find((r) => r.source === "/:path*")?.headers).toContainEqual({ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" });
+    const layout = readFileSync("app/auth/confirm/layout.tsx", "utf8");
+    expect(layout).toMatch(/referrer: "no-referrer"/);
+  });
+
+  it("(b) the URL is cleaned to /auth/confirm right after reading it", () => {
+    const page = readFileSync("app/auth/confirm/page.tsx", "utf8");
+    expect(page).toMatch(/CLEAN_CONFIRM_PATH/);
+    expect(readFileSync("lib/auth-confirm.ts", "utf8")).toMatch(/export const CLEAN_CONFIRM_PATH = "\/auth\/confirm";/);
+  });
+
+  it("(c) auth links are never stored as an attribution referrer", () => {
+    for (const bad of [
+      "https://pekkotv.com/auth/confirm?token_hash=abc&type=recovery",
+      "https://pekkotv.com/auth/confirm",
+      "https://pantalla-chi.vercel.app/auth/confirm?token_hash=abc",
+      "https://pekkotv.com/reset-password#access_token=x&type=recovery",
+      "https://pekkotv.com/dashboard?code=123",
+      "https://iybmjtkjfxcqupvhoddh.supabase.co/auth/v1/verify?token=abc&type=recovery",
+    ]) {
+      expect(isSensitiveReferrer(bad), bad).toBe(true);
+      expect(sanitizeAttribution({ referrer: bad })).toBeNull();
+      expect(captureFirstTouch("?utm_source=email", bad, null)).toEqual({ utm_source: "email" });
+    }
+    expect(isSensitiveReferrer("https://www.google.com/")).toBe(false);
+    expect(sanitizeAttribution({ referrer: "https://pekkotv.com/pricing" })).toEqual({ referrer: "https://pekkotv.com/pricing" });
+  });
+
+  it("wrong link types get their own message", () => {
+    const page = readFileSync("app/auth/confirm/page.tsx", "utf8");
+    expect(page).toMatch(/plan\.reason === "type"[\s\S]*?This kind of email link isn't used by Pekko/);
   });
 });

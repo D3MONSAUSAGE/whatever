@@ -45,6 +45,9 @@ export function safeAuthNext(raw: string | null | undefined): string | null {
   return SAFE_PATH.test(path) ? path : null;
 }
 
+/** The address bar after the link is read: token_hash and type are kept in memory only. */
+export const CLEAN_CONFIRM_PATH = "/auth/confirm";
+
 export type ConfirmPlan =
   | { ok: true; tokenHash: string; type: ConfirmType; next: string }
   | { ok: false; reason: "missing" | "type" };
@@ -96,7 +99,7 @@ export const CONFIRM_COPY: Record<ConfirmType, { title: string; lede: string; bu
  */
 export const OLD_HOST = "pantalla-chi.vercel.app";
 export const CANONICAL_ORIGIN = "https://pekkotv.com";
-const REDIRECT_PATH = /^\/(auth(\/.*)?|dashboard(\/.*)?|login|forgot-password|reset-password)$/;
+const REDIRECT_PATH = /^\/(auth(\/.*)?|dashboard(\/.*)?|login\/?|forgot-password\/?|reset-password\/?)$/;
 
 export function canonicalAuthRedirect(host: string | null | undefined, pathname: string, search: string): string | null {
   if ((host ?? "").toLowerCase().split(":")[0] !== OLD_HOST) return null;

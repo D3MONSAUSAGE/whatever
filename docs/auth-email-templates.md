@@ -15,6 +15,15 @@ The page confirms nothing until the person presses its button. Email link scanne
 
 ---
 
+## Exact dashboard steps (in this order)
+
+1. Open https://supabase.com/dashboard/project/iybmjtkjfxcqupvhoddh/auth/templates (Authentication → Emails → Templates).
+2. **Rollback copy first.** For **Reset Password**, **Confirm signup** and **Change Email Address**, copy the current **Subject heading** and the full **Message body** (switch to the source/HTML view) into `/home/box/pekko-qa/auth-templates-before.md`, one section per template. Don't change anything yet.
+3. Open **Reset Password**. Replace the Subject and the Message body with section 1 below, then **Save**.
+4. Ask QA Captain to run the end-to-end reset check below on the QA account. If anything fails, paste the saved Reset Password subject and body back and Save. That's the full rollback, and it needs no deploy.
+5. Only after step 4 passes: replace **Confirm signup** (section 2) and **Change Email Address** (section 3) the same way, and Save each.
+6. Leave alone: SMTP settings, "Confirm email" (stays off), Site URL, Redirect URLs, and the Magic link, Invite and Reauthentication templates.
+
 ## 1. Reset password ("Reset Password" template)
 
 **Subject:** `Reset your Pekko password`

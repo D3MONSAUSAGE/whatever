@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { AuthFrame, friendlyAuthError } from "@/components/auth-frame";
-import { CONFIRM_COPY, confirmPlan } from "@/lib/auth-confirm";
+import { CLEAN_CONFIRM_PATH, CONFIRM_COPY, confirmPlan } from "@/lib/auth-confirm";
 
 /**
  * Branded landing page for Supabase email links (B2-07 option A).
@@ -21,7 +21,13 @@ export default function AuthConfirmPage() {
 
 function AuthConfirm() {
   const params = useSearchParams();
-  const plan = confirmPlan(new URLSearchParams(params.toString()));
+  // Read the link once and keep token_hash/type in memory only (B2-07A, Gother MEDIUM).
+  const [plan] = useState(() => confirmPlan(new URLSearchParams(params.toString())));
+  useEffect(() => {
+    // Strip token_hash and type from the address bar, history and any later Referer.
+    // This only cleans the URL; nothing is verified until the button is pressed.
+    if (window.location.search) window.history.replaceState(null, "", CLEAN_CONFIRM_PATH);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -30,7 +36,9 @@ function AuthConfirm() {
     return (
       <AuthFrame
         title="This link can't be used"
-        lede="The link is incomplete. Open it straight from the email, or ask for a new one."
+        lede={plan.reason === "type"
+          ? "This kind of email link isn't used by Pekko. Sign in, or ask for a new password reset link."
+          : "The link is incomplete. Open it straight from the email, or ask for a new one."}
         footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">Back to sign in</Link>}
       >
         <Link href="/forgot-password" className="btn btn-primary w-full">Send a new reset link</Link>
