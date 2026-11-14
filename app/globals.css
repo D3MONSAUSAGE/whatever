@@ -36,6 +36,11 @@ body {
 .nav-link[aria-current="page"] { background: var(--color-primary); color: #fff; }
 .nav-link[aria-current="page"]:hover { background: #0052d6; }
 .nav-link:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+/* Sub-item (Brand Kit under Account): indented under its parent's icon with a guide line. */
+.nav-sublink { position: relative; min-height: 36px; margin-left: 27px; padding-left: 14px; font-size: 13px; font-weight: 600; color: var(--color-muted, #5c6474); border-radius: 10px; }
+.nav-sublink::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--color-line, #e2e7ef); }
+.nav-sublink:hover { color: inherit; }
+.nav-sublink[aria-current="page"]::before { display: none; }
 
 .icon-tile {
   display: inline-grid;

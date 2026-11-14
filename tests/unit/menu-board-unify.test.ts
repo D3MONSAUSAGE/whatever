@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   LAYOUT_OPTIONS, canSaveThrough, classicEditorForRegion, classicPreviewHits,
-  classifyBoardContent, CONTENT_TAB_MENUS_LABEL, confirmDiscardUnsaved, DISCARD_UNSAVED_MESSAGE,
+  classifyBoardContent, confirmDiscardUnsaved, DISCARD_UNSAVED_MESSAGE,
   hasUnsavedEdits, layoutStudioRedirect, parseUnifiedSearch, publishPathFor, unifiedEditorPath,
 } from "@/lib/menu-board-unify";
 import { parseLayout, layoutSvg, frameFor, sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
@@ -114,7 +114,6 @@ describe("old-route redirects and in-app paths", () => {
     expect(parseUnifiedSearch({ screen: "s1", new: "1" })).toEqual({
       boardId: null, screenId: "s1", layout: null, isNew: true,
     });
-    expect(CONTENT_TAB_MENUS_LABEL).toBe("Menu boards");
     const page = readFileSync("app/dashboard/media/layout-studio/page.tsx", "utf8");
     expect(page).toContain("permanentRedirect");
     expect(page).toContain("layoutStudioRedirect");

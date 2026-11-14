@@ -192,8 +192,6 @@ export function classicPreviewHits(hasPhoto: boolean): { id: "menu" | "photo"; l
   ];
 }
 
-export const CONTENT_TAB_MENUS_LABEL = "Menu boards";
-
 /** True when the current editor snapshot differs from the last clean (loaded or saved) snapshot. */
 export function hasUnsavedEdits(current: unknown, baseline: unknown): boolean {
   return JSON.stringify(current) !== JSON.stringify(baseline);

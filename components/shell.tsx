@@ -11,17 +11,19 @@ import { isRecoveryUrl } from "@/components/auth-frame";
 import { ContentNav } from "@/components/content-nav";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
 import { clearLayoutStudioDraftsOnSignOut, shouldClearStudioDraftsOnAuthEvent } from "@/lib/layout-studio-draft";
-import { isContentPath } from "@/lib/content-nav";
+import { isContentPath, isMainNavActive, MAIN_NAV } from "@/lib/content-nav";
 import { StudioGuardedLink, StudioLeaveProvider, useStudioAllowLeave } from "@/components/studio-leave";
-import { IconCalendar, IconGear, IconImage, IconList, IconTv } from "@/components/icons";
+import { IconCalendar, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
 
-const NAV = [
-  { href: "/dashboard/screens", label: "My Screens", icon: IconTv },
-  { href: "/dashboard/content", label: "Content", icon: IconImage },
-  { href: "/dashboard/playlists", label: "Playlists", icon: IconList },
-  { href: "/dashboard/schedule", label: "Schedules", icon: IconCalendar },
-  { href: "/dashboard/account", label: "Account", icon: IconGear },
-];
+const NAV_ICONS: Record<string, () => React.ReactElement> = {
+  "/dashboard/screens": IconTv,
+  "/dashboard/media/menus": IconGrid,
+  "/dashboard/content": IconImage,
+  "/dashboard/playlists": IconList,
+  "/dashboard/schedule": IconCalendar,
+  "/dashboard/account": IconGear,
+};
+const NAV = MAIN_NAV.map((item) => ({ ...item, icon: NAV_ICONS[item.href] ?? IconGrid }));
 
 function SignOutButton({ onSignOut, className, children }: { onSignOut: () => void | Promise<void>; className?: string; children: React.ReactNode }) {
   const allowLeave = useStudioAllowLeave();
@@ -82,11 +84,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
 
   const studio = path.startsWith("/dashboard/media/layout-studio") || path.startsWith("/layout-studio");
   const showContentNav = isContentPath(path);
-  const isActive = (href: string) => {
-    if (href === "/dashboard/content") return path.startsWith("/dashboard/content") || path.startsWith("/dashboard/media");
-    if (href === "/dashboard/account") return path.startsWith("/dashboard/account") || path.startsWith("/dashboard/settings") || path.startsWith("/dashboard/billing");
-    return href === "/dashboard" ? path === href : path.startsWith(href);
-  };
+  const isActive = (href: string) => isMainNavActive(href, path);
   const brandKit = path.startsWith("/dashboard/account/brand-kit");
   const current = brandKit ? "Brand Kit" : (NAV.find((item) => isActive(item.href))?.label ?? "Pekko");
 
@@ -107,10 +105,11 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
             {item.label}
           </StudioGuardedLink>
         ))}
+        {/* Brand Kit lives inside Account, so it is a sub-item of Account rather than a top-level section. */}
         <StudioGuardedLink
           href="/dashboard/account/brand-kit"
           aria-current={brandKit ? "page" : undefined}
-          className="nav-link md:pl-8 text-[13px]"
+          className="nav-link nav-sublink"
         >
           Brand Kit
         </StudioGuardedLink>
@@ -139,14 +138,14 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           {children}
         </main>
       </div>
-      <nav aria-label="Mobile" className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
+      <nav aria-label="Mobile" className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
         {NAV.map((item) => (
-          <StudioGuardedLink key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
+          <StudioGuardedLink key={item.href} href={item.href} aria-label={item.short ? `${item.short} (${item.label})` : undefined} aria-current={isActive(item.href) ? "page" : undefined}
             className={`flex min-w-0 flex-col items-center justify-center gap-1 min-h-16 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-primary" : "text-muted"}`}>
             <span className={`icon-tile size-7 rounded-lg ${isActive(item.href) ? "icon-tile-active" : ""}`}>
               <item.icon />
             </span>
-            <span className="max-w-full truncate">{item.label}</span>
+            <span className="max-w-full truncate">{item.short ?? item.label}</span>
           </StudioGuardedLink>
         ))}
       </nav>

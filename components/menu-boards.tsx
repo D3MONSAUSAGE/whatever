@@ -195,7 +195,7 @@ export function MenuBoards({
         <>
           <PageHeader
             title="Menu boards"
-            eyebrow="Media"
+            eyebrow="Menu Boards"
             icon={<IconImage />}
             lede="Pick a layout, fill each area, and Pekko makes a full-screen slide. Every menu board you already have stays in this list, and you can edit it any time."
             action={<button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button>}
