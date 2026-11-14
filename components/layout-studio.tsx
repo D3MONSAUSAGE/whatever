@@ -16,7 +16,7 @@ import {
   type StudioScope,
 } from "@/lib/layout-studio-draft";
 import { editorPanelForZone, keepDraftOnZoneChange, previewHits, zoneEditorPlacement } from "@/lib/layout-studio-editor";
-import { api, authToken, uploadForm, useApi } from "@/lib/api";
+import { api, authToken, uploadForm, useApi, type DisplayItem } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { findSameVideo } from "@/lib/layout-account";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
@@ -24,6 +24,7 @@ import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { ColorField } from "@/components/color-field";
 import { confirmDiscardUnsaved, hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/menu-board-unify";
 import { publishSavedCopy } from "@/lib/screen-actions-ui";
+import { ShowOnScreens } from "@/components/show-on-screens";
 import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
@@ -55,6 +56,7 @@ export function LayoutStudio({
   mode = "preview",
   screenId = null,
   screenOnline,
+  displays,
   screenConnected,
   fixture = null,
   pathOverride: _pathOverride,
@@ -68,6 +70,8 @@ export function LayoutStudio({
   mode?: "preview" | "account";
   screenId?: string | null;
   screenOnline?: boolean;
+  /** Account screens, for the optional "Show on which screen?" step after Publish (E2). */
+  displays?: DisplayItem[];
   screenConnected?: boolean;
   fixture?: AccountStudio | null;
   pathOverride?: string;
@@ -102,6 +106,7 @@ export function LayoutStudio({
   const [progress, setProgress] = useState<string | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
+  const [pickFor, setPickFor] = useState<{ id: string; name: string; playlistId: string | null; preview: boolean } | null>(null);
   const saveLock = useRef<"draft" | "publish" | null>(null);
   const [scope, setScope] = useState<StudioScope | null>(null);
   const [origin, setOrigin] = useState<StudioScope | null>(null);
@@ -534,6 +539,10 @@ export function LayoutStudio({
     if (namelessBlocked()) return;
     if (fixture) {
       setNote(saveMode === "publish" ? "Preview only — nothing was published." : "Preview only — nothing was saved.");
+      if (saveMode === "publish" && displays && menuId && !screenId) {
+        const board = fixture.boards.find((item) => item.id === menuId);
+        setPickFor({ id: menuId, name: boardName || board?.name || "This board", playlistId: board?.playlistId ?? null, preview: true });
+      }
       return;
     }
     let currentScope = scopeRef.current;
@@ -595,6 +604,8 @@ export function LayoutStudio({
         }
       } else if (board?.playlistId) {
         setNote("Published to this account. Screens already playing this board will update when they are online.");
+        // E2: offer screens, but never assign without the user's choice.
+        if (displays) setPickFor({ id: board.id, name: board.name || boardName || "This board", playlistId: board.playlistId, preview: false });
       } else {
         setNote("The board was saved, but publishing did not create a playlist.");
       }
@@ -860,6 +871,10 @@ export function LayoutStudio({
         </div>
         {progress || note ? <p className="studio-toolbar-note" role="status">{progress || note}</p> : null}
       </header>
+      {pickFor && displays ? (
+        <ShowOnScreens boardId={pickFor.id} boardName={pickFor.name} playlistId={pickFor.playlistId} displays={displays} preview={pickFor.preview}
+          onSkip={() => setPickFor(null)} onDone={(message) => { setPickFor(null); setNote(message); }} />
+      ) : null}
       <div className="studio-grid">
         <div className="studio-left">
         <section className="studio-controls" data-testid="studio-tools">
