@@ -38,8 +38,22 @@ function sanitizeValue(raw: unknown, key: AttributionKey): string | undefined {
   if (key === "referrer") {
     const lower = value.toLowerCase();
     if (!lower.startsWith("https://") && !lower.startsWith("http://")) return undefined;
+    if (isSensitiveReferrer(value)) return undefined;
   }
   return value;
+}
+
+/**
+ * B2-07A: never keep an auth link as a referrer. /auth/* pages (email confirm and reset links)
+ * and any URL carrying a one-time token are dropped, whatever the host.
+ */
+export function isSensitiveReferrer(value: string): boolean {
+  if (/[?&#](token_hash|token|access_token|refresh_token|code)=/i.test(value)) return true;
+  try {
+    return /^\/auth(\/|$)/i.test(new URL(value).pathname);
+  } catch {
+    return true;
+  }
 }
 
 /** Whitelist keys, max lengths, control characters stripped. Empty input becomes null. */
