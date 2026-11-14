@@ -1121,7 +1121,7 @@ function SelectedZoneEditor({
                   {columns ? null : (
                     <div className="section-card-head">
                       <span className="item-limit">{section.items.filter((item) => item.name.trim()).length} of {MENU_LIMITS.itemsPerSection} items</span>
-                      <OrderButtons className="section-order" label={`section ${si + 1}`} index={si} count={draft.sections.length}
+                      <OrderButtons className="section-order" kind="section" name={section.name} scope="studio-sections" index={si} count={draft.sections.length}
                         onMove={(dir) => {
                           update({ ...draft, sections: moveSection(draft.sections, si, dir) });
                           setSectionIndex(Math.max(0, Math.min(draft.sections.length - 1, si + dir)));
@@ -1155,7 +1155,7 @@ function SelectedZoneEditor({
                         aria-describedby={`${idBase}-desc-count`} onBlur={() => { if (needsName(item)) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { description: event.target.value }, update)} />
                       <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
-                      <OrderButtons label={`item ${ii + 1} in section ${si + 1}`} index={ii} count={section.items.length}
+                      <OrderButtons kind="item" name={item.name} scope={`studio-items-${si}`} index={ii} count={section.items.length}
                         onMove={(dir) => update({ ...draft, sections: moveItem(draft.sections, si, ii, dir) })} />
                     </div>
                     );

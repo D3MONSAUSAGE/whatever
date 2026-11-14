@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { moveEntry, moveItem, moveSection } from "@/lib/menu-fields";
+import { focusAfterMove, orderLabel } from "@/components/menu-item-fields";
 
 const sections = [
   { name: "Starters", items: [{ name: "A" }, { name: "B" }, { name: "C" }] },
@@ -30,8 +31,23 @@ describe("E1 move up/down", () => {
     for (const file of ["components/classic-editor.tsx", "components/layout-studio.tsx"]) {
       const src = readFileSync(file, "utf8");
       expect(src).toMatch(/OrderButtons className="section-order"[\s\S]*moveSection/);
-      expect(src).toMatch(/OrderButtons label=\{`item[\s\S]*moveItem/);
+      expect(src).toMatch(/OrderButtons kind="item" name=\{item\.name\}[\s\S]*moveItem/);
       expect(src).not.toMatch(/draggable/);
     }
+  });
+  it("labels say which item moves (Gother PR93 LOW)", () => {
+    expect(orderLabel("item", "Fish Tacos", 1, 5, -1)).toBe("Move “Fish Tacos” up (item 2 of 5)");
+    expect(orderLabel("section", "", 0, 3, 1)).toBe("Move unnamed section down (section 1 of 3)");
+  });
+  it("focus follows the moved row, so pressing Down again keeps moving the same item (Gother PR93 MEDIUM)", () => {
+    expect(focusAfterMove(0, 1, 5)).toEqual({ index: 1, dir: 1 });
+    expect(focusAfterMove(3, 1, 5)).toEqual({ index: 4, dir: -1 }); // reached the bottom: Down is disabled, focus Up
+    expect(focusAfterMove(1, -1, 5)).toEqual({ index: 0, dir: 1 });
+    const src = readFileSync("components/menu-item-fields.tsx", "utf8");
+    expect(src).toMatch(/requestAnimationFrame/);
+    expect(src).toMatch(/data-order-scope/);
+  });
+  it("studio section header wraps at phone width (Gother PR93 MEDIUM)", () => {
+    expect(readFileSync("components/studio-chrome.tsx", "utf8")).toMatch(/\.section-card-head \{ display: flex; flex-wrap: wrap;/);
   });
 });

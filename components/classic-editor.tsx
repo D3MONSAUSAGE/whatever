@@ -267,7 +267,7 @@ export function ClassicEditor({
           <section key={si} className="section-card" aria-labelledby={`classic-section-${si}`}>
             <div className="section-card-head">
               <h3 id={`classic-section-${si}`} className="section-card-legend">Section {si + 1}</h3>
-              <OrderButtons className="section-order" label={`section ${si + 1}`} index={si} count={c.sections.length}
+              <OrderButtons className="section-order" kind="section" name={section.name} scope="classic-sections" index={si} count={c.sections.length}
                 onMove={(dir) => update({ ...c, sections: moveSection(c.sections, si, dir) })} />
               <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`}
                 onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove</button>
@@ -292,7 +292,7 @@ export function ClassicEditor({
                   <input className="item-desc" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })}
                     onBlur={() => { if (needsName(item)) setNameCheck(true); }} aria-describedby={`${idBase}-desc-count`} />
                   <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
-                  <OrderButtons label={`item ${ii + 1} in section ${si + 1}`} index={ii} count={section.items.length}
+                  <OrderButtons kind="item" name={item.name} scope={`classic-items-${si}`} index={ii} count={section.items.length}
                     onMove={(dir) => update({ ...c, sections: moveItem(c.sections, si, ii, dir) })} />
                 </div>
               );
