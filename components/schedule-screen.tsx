@@ -17,6 +17,7 @@ import { IconCalendar } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
 import { formatClock12 } from "@/lib/clock";
 import { ScheduleViews } from "@/components/schedule-views";
+import { orderedZones } from "@/lib/time-zones";
 
 const DAYS: { value: number; label: string }[] = [
   { value: 1, label: "Mon" },
@@ -28,7 +29,7 @@ const DAYS: { value: number; label: string }[] = [
   { value: 7, label: "Sun" },
 ];
 
-const ZONES = [
+const ZONE_EXTRAS = [
   "UTC",
   "America/Los_Angeles",
   "America/Denver",
@@ -53,6 +54,8 @@ const ZONES = [
   "Australia/Sydney",
   "Pacific/Auckland",
 ];
+// Common US zones first, then the rest A–Z (QA U1-08).
+const ZONES = orderedZones(ZONE_EXTRAS);
 
 export type ScheduleFixture = {
   locations: LocationItem[];

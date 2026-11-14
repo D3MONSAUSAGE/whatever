@@ -9,18 +9,28 @@ function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
   return null;
 }
 
+/**
+ * Library file name for a board's rendered still. Uses the board's own name so several boards
+ * no longer all show up as "<Business name> (menu).png" (QA B1-10); the on-board title is the fallback.
+ */
+export function boardRenderFileName(boardName: string | null | undefined, title: string | null | undefined): string {
+  const base = (boardName ?? "").trim() || (title ?? "").trim() || "Menu";
+  return `${base.slice(0, 50)} (menu).png`;
+}
+
 /** Boards and library for the signed-in account. Flag off never reaches the database. */
 export async function loadLayoutStudio(accountId: string) {
   if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
   const menus = await db().from("menus").select("id, name, content, media_id, playlist_id, updated_at").eq("account_id", accountId);
   if (menus.error) return { status: 500 as const, error: "Couldn't load boards." };
-  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path").eq("account_id", accountId);
+  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path, size_bytes").eq("account_id", accountId);
   if (media.error) return { status: 500 as const, error: "Couldn't load your media library." };
   const rows = (media.data ?? []).flatMap((row) => {
     const mime = String(row.mime_type ?? "");
     const kind = libraryKind(row.kind, mime);
     if (!kind) return [];
-    return [{ id: String(row.id), name: String(row.file_name ?? "File"), kind, mime, path: String(row.storage_path ?? "") }];
+    const size = Number(row.size_bytes);
+    return [{ id: String(row.id), name: String(row.file_name ?? "File"), kind, mime, path: String(row.storage_path ?? ""), sizeBytes: Number.isFinite(size) && size > 0 ? size : null }];
   });
   const paths = rows.map((row) => row.path).filter((path) => path.startsWith(`${accountId}/`));
   const signed = paths.length ? await db().storage.from(BUCKET).createSignedUrls(paths, 3600) : { data: [], error: null };
@@ -49,7 +59,7 @@ export async function loadLayoutStudio(accountId: string) {
     status: 200 as const,
     boards,
     legacy,
-    library: rows.map((row) => ({ id: row.id, name: row.name, kind: row.kind, mime: row.mime, url: urls.get(row.path) ?? null })),
+    library: rows.map((row) => ({ id: row.id, name: row.name, kind: row.kind, mime: row.mime, url: urls.get(row.path) ?? null, sizeBytes: row.sizeBytes })),
   };
 }
 
@@ -118,7 +128,7 @@ export async function saveLayoutForAccount(accountId: string, body: {
       const fitted = raw && raw.bytes.length ? await prepareBoardPhoto(raw.bytes, raw.mime) : null;
       const png = renderLayoutPng(document, fitted);
       const { storeRenderedImage } = await import("@/lib/server/menus");
-      const id = await storeRenderedImage(accountId, `${(document.title || "Menu").slice(0, 50)} (menu).png`, png);
+      const id = await storeRenderedImage(accountId, boardRenderFileName(body.name, document.title), png);
       if (!id) throw new Error("Couldn't store the board.");
       return id;
     },

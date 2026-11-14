@@ -18,6 +18,7 @@ import {
 import { editorPanelForZone, keepDraftOnZoneChange, previewHits, zoneEditorPlacement } from "@/lib/layout-studio-editor";
 import { api, authToken, uploadForm, useApi } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
+import { findSameVideo } from "@/lib/layout-account";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { ColorField } from "@/components/color-field";
@@ -676,6 +677,18 @@ export function LayoutStudio({
     }
     if (!accountMode && !sessionToken) {
       setNote(replacedImage ? "Video replaces the image in this zone. Sign in to save it to the library." : "Video is in the preview. Sign in to add it to your library.");
+      return;
+    }
+    const existing = accountMode ? findSameVideo(account?.library, file) : null;
+    if (existing) {
+      // Same file is already in the library: use it instead of uploading a second copy (QA B1-10).
+      setDraft((current) => {
+        const applied = applyLibraryFile(current, existing, "video");
+        return placeZoneMedia(applied, "video", applied.videoMediaId, exclusive);
+      });
+      if (exclusive) setImageHref(null);
+      if (existing.url) setClipUrl(null);
+      setNote("This video is already in your library, so the board uses that copy.");
       return;
     }
     setProgress("Uploading…");

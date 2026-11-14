@@ -12,6 +12,15 @@ import { syncLine } from "@/lib/sync-line";
 import { assignBusyFor } from "@/lib/assign-publish";
 import { publishSavedCopy, publishSavedCopyForTargets, publishTimingCopy } from "@/lib/screen-actions-ui";
 
+const PAIR_WATCH_MS = 3_000;
+const PAIR_WATCH_FOR_MS = 2 * 60_000;
+
+/** True when no screen is still waiting for its TV to collect the token or send its first heartbeat. */
+export function pairingSettled(list: DisplayItem[] | null | undefined): boolean {
+  if (!list) return false;
+  return list.every((display) => display.connected && Boolean(display.lastSeenAt));
+}
+
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
   const locations = useApi<LocationItem[]>(fixture ? null : "/api/locations");
@@ -23,6 +32,20 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const [assigning, setAssigning] = useState<string[] | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
+  // After pairing, check every few seconds (even if this tab is behind the TV window) until the
+  // new screen reports in, so the card flips from "Waiting" to "Online" by itself (QA B1-08).
+  const [watchUntil, setWatchUntil] = useState(0);
+  const reloadDisplays = displays.reload;
+  const settled = pairingSettled(displays.data);
+  useEffect(() => {
+    if (!watchUntil || fixture) return;
+    if (settled) { setWatchUntil(0); return; }
+    const timer = setInterval(() => {
+      if (Date.now() > watchUntil) { setWatchUntil(0); return; }
+      reloadDisplays();
+    }, PAIR_WATCH_MS);
+    return () => clearInterval(timer);
+  }, [watchUntil, settled, reloadDisplays, fixture]);
 
   async function rename(display: DisplayItem) {
     const name = await confirm.ask({
@@ -63,7 +86,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}
+      <PageHeader title="Add and manage screens" icon={<IconTv />} lede={ONLINE_HINT}
         action={
           <a href="#add-screen" className="btn btn-primary" data-testid="add-screen"
             onClick={(event) => { event.preventDefault(); const form = document.getElementById("add-screen"); form?.scrollIntoView({ behavior: "smooth", block: "start" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus({ preventScroll: true }); }}>
@@ -75,8 +98,11 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
         <button type="button" className="btn btn-quiet" onClick={() => setAssigning([])}>Assign playlist</button>
       </div>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
+      {watchUntil ? (
+        <p role="status" className="card p-3 mb-3 text-sm" data-testid="pair-watch">Connecting your TV… This page updates by itself as soon as the TV checks in (usually within a minute).</p>
+      ) : null}
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
-        onPaired={(warning) => { toast.show(warning || "Connected. The TV will switch over in a few seconds."); displays.reload(); }}
+        onPaired={(warning) => { toast.show(warning || "Connected. The TV will switch over in a few seconds."); displays.reload(); setWatchUntil(Date.now() + PAIR_WATCH_FOR_MS); }}
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
@@ -231,7 +257,7 @@ function PlayerUrl() {
   return (
     <span className="mt-2 flex flex-wrap items-center gap-2">
       <code data-testid="player-url" className="rounded-lg border border-line bg-white px-3 py-2 text-base font-semibold text-ink break-all">{url}</code>
-      <span className="text-sm text-muted">Player: {url.replace(/\/pair$/, "/tv")}</span>
+      <span className="text-sm text-muted">({url.replace(/^https?:\/\//, "").replace(/\/pair$/, "/tv")} opens the same player.)</span>
       <button type="button" className="btn" onClick={copy} aria-label="Copy TV address">{copied ? "Copied" : "Copy"}</button>
       <span role="status" className="sr-only">{copied ? "TV address copied" : ""}</span>
     </span>

@@ -109,14 +109,19 @@ export function parseDisplayName(value: unknown): { ok: true; value: string | nu
   return { ok: true, value: clean };
 }
 
+export const PHONE_FORMAT_ERROR = "Use digits with spaces, dashes, dots or brackets, like (555) 010-0199 or +1 555 010 0199.";
+
 export function parsePhone(value: unknown): { ok: true; value: string | null } | { ok: false; error: string } {
   if (value == null) return { ok: true, value: null };
-  if (typeof value !== "string") return { ok: false, error: "Enter a phone number." };
+  if (typeof value !== "string") return { ok: false, error: PHONE_FORMAT_ERROR };
   const trimmed = value.replace(/\p{Cc}/gu, " ").replace(/\s+/g, " ").trim();
   if (!trimmed) return { ok: true, value: null };
-  if (!/^[+\d][\d\s().\-+]*$/.test(trimmed)) return { ok: false, error: "Enter a phone number." };
+  // Common formats are accepted as typed (QA B1-07): (555) 010-0199, 555-010-0199, 555.010.0199, +1 555 010 0199.
+  if (!/^[+(\d][\d\s().\-+]*$/.test(trimmed)) return { ok: false, error: PHONE_FORMAT_ERROR };
   if (trimmed.length > PHONE_MAX) return { ok: false, error: `Keep the phone number under ${PHONE_MAX} characters.` };
-  if ((trimmed.match(/\d/g) || []).length < 4) return { ok: false, error: "Enter a phone number." };
+  const digits = (trimmed.match(/\d/g) || []).length;
+  if (digits < 4) return { ok: false, error: "That phone number is too short. Include the area code, like (555) 010-0199." };
+  if (digits > 15) return { ok: false, error: "That phone number has too many digits (15 at most)." };
   return { ok: true, value: trimmed };
 }
 
@@ -519,4 +524,12 @@ function classicFooter(kit: Partial<BrandIdentity> | null | undefined): string |
   if (!kit) return null;
   const parts = [kit.phone, kit.website].map((p) => (p ? cleanText(p) : "")).filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
+}
+
+/** The business name to suggest for an empty Brand Kit display name, or null to leave it alone. */
+export function displayNameSuggestion(current: string | null | undefined, businessName: string | null | undefined): string | null {
+  if ((current ?? "").trim()) return null;
+  const name = (businessName ?? "").trim();
+  if (!name) return null;
+  return name.slice(0, DISPLAY_NAME_MAX);
 }
