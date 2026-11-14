@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAddItem, canAddSection, filledSections, firstNamelessItem, menuCounts, needsName, normalizePrice, priceHint, withoutNamelessItems,
 } from "@/lib/menu-fields";
-import { frameFor, layoutSvg, longMenuColumns, LONG_MENU_ITEMS, parseLayout, sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
+import { frameFor, layoutSvg, longMenuColumns, LONG_MENU_DESC_MIN, LONG_MENU_ITEMS, parseLayout, sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
 import { previewHits } from "@/lib/layout-studio-editor";
 import { MENU_LIMITS, parseMenuContent } from "@/lib/menu-templates";
 import { menuSvg } from "@/lib/server/menu-render";
@@ -116,6 +116,13 @@ describe("B1-05 long menus use two columns and the full height", () => {
     const ys = [...svg.matchAll(/<text x="[\d.]+" y="([\d.]+)"[^>]*font-weight="700"/g)].map((m) => Number(m[1]));
     expect(Math.max(...ys)).toBeGreaterThan(1080 * 0.75);
     expect(Math.max(...ys)).toBeLessThan(1080 - 60);
+    // Descriptions keep a 14px floor on long menus (Gother #90 low) and stay on the board.
+    const desc = [...svg.matchAll(/<text x="[\d.]+" y="([\d.]+)"[^>]*font-size="(\d+)"[^>]*>House sauce</g)];
+    expect(desc.length).toBeGreaterThan(0);
+    for (const m of desc) {
+      expect(Number(m[2])).toBeGreaterThanOrEqual(LONG_MENU_DESC_MIN);
+      expect(Number(m[1])).toBeLessThan(1080 - 40);
+    }
   });
   it("short menus render exactly as before (golden legacy fixtures are checked in menu-board-unify)", () => {
     expect(readFileSync("tests/unit/menu-board-unify.test.ts", "utf8")).toContain("legacy-layout-");

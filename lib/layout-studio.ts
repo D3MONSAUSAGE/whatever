@@ -732,10 +732,11 @@ function itemUnit(sections: LayoutSection[], top: number, bottom: number, scale:
   return unit;
 }
 
-function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false, unitOverride?: number) {
+function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false, unitOverride?: number, minDescSize = 10) {
   const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
   const nameSize = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
-  const descSize = Math.max(10, Math.round(nameSize * 0.55));
+  // Boards up to 12 items keep the 10px floor (unchanged renders); long two-column menus use 14px.
+  const descSize = Math.max(minDescSize, Math.round(nameSize * 0.55));
   let y = top;
   for (const section of sections) {
     if (section.name) {
@@ -764,6 +765,8 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
 
 /** Single-column layouts switch to two columns above this many items. */
 export const LONG_MENU_ITEMS = 12;
+/** Smallest description text on a long (two-column) menu, in board pixels (1920×1080). */
+export const LONG_MENU_DESC_MIN = 14;
 
 function sectionWeight(section: LayoutSection) {
   return (section.name ? 1 : 0) + section.items.reduce((n, item) => n + (item.description ? 1.26 : 0.78), 0) + 0.2;
@@ -874,7 +877,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const colW = (menu.w - gap) / 2;
       const unit = Math.min(...columns.map((column) => itemUnit(column, textTop, menu.bottom, doc.typeScale, true)));
       columns.forEach((column, index) => {
-        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, family, true, unit);
+        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, family, true, unit, LONG_MENU_DESC_MIN);
       });
     } else {
       paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");

@@ -33,7 +33,7 @@ export function keepDraftOnZoneChange<T>(draft: T, _fromZone: string, _toZone: s
   return draft;
 }
 
-/** The shared title band on column layouts is 132px tall on the 1920×1080 board. */
+/** The shared title band on column layouts is 140px tall on the 1920×1080 board. */
 const TITLE_BAND = 140;
 function belowTitle(box: ZoneBox): ZoneBox {
   if (box.h <= TITLE_BAND * 2) return box;
