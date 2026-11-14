@@ -36,7 +36,8 @@ describe("E2: optional Show on which screen? after Publish", () => {
     const choices = screenChoices([d("x", "Patio", { playlist: { id: "pl-9", name: "Happy hour", url: null } })], "pl-1");
     expect(choices[0].nowShowing).toBe("Happy hour");
     const comp = readFileSync("components/show-on-screens.tsx", "utf8");
-    expect(comp).toMatch(/This replaces what a ticked screen is set to show\./);
+    // E2b: the warning now names what each ticked screen loses (see e2b-classic-screens.test.ts).
+    expect(comp).toMatch(/replaceNotes\(choices, picked\)/);
     expect(comp).toMatch(/Now showing: /);
   });
   it("lows: add-screen link, heading focus, Escape, wording, loading state", () => {

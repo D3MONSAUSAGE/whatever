@@ -3,14 +3,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type DisplayItem } from "@/lib/api";
 import { publishSavedCopyForTargets } from "@/lib/screen-actions-ui";
-import { screenChoices, screensToAssign } from "@/lib/show-on-screens";
+import { replaceNotes, screenChoices, screensToAssign } from "@/lib/show-on-screens";
 
 /**
  * E2: after Publish, an optional "Show on which screen?" step.
  * Uses the existing assignment route (POST /api/layout-studio/assign) once per ticked screen.
  * Nothing changes on any screen unless the user ticks one and confirms.
  */
-export function ShowOnScreens({ boardId, boardName, playlistId, displays, loading = false, preview = false, onDone, onSkip }: {
+export function ShowOnScreens({ boardId, boardName, playlistId, displays, loading = false, preview = false, assignAll, onDone, onSkip }: {
   boardId: string;
   boardName: string;
   playlistId: string | null;
@@ -18,6 +18,12 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, loadin
   /** Screens are still loading. */
   loading?: boolean;
   preview?: boolean;
+  /**
+   * E2b: classic boards assign all ticked screens in one call to the existing
+   * POST /api/playlists/[id]/publish (the same publish_playlist the classic save uses).
+   * Layout boards keep POST /api/layout-studio/assign per screen.
+   */
+  assignAll?: (displayIds: string[]) => Promise<void>;
   onDone: (message: string) => void;
   onSkip: () => void;
 }) {
@@ -45,7 +51,16 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, loadin
     setError(null);
     const done: DisplayItem[] = [];
     const failed: string[] = [];
-    for (const id of targets) {
+    if (assignAll) {
+      try {
+        await assignAll(targets);
+        for (const id of targets) { const display = displays.find((item) => item.id === id); if (display) done.push(display); }
+      } catch {
+        setBusy(false);
+        setError(`Couldn't show it on ${targets.map((id) => choices.find((choice) => choice.id === id)?.name ?? "a screen").join(", ")}. Try again or use My Screens.`);
+        return;
+      }
+    } else for (const id of targets) {
       try {
         await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: boardId, displayId: id }) });
         const display = displays.find((item) => item.id === id);
@@ -66,7 +81,9 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, loadin
       <p className="show-on-screens-lede">“{boardName}” is published. Optional: pick screens to show it on now, or skip and choose later in My Screens or Schedules.</p>
       {loading ? <p className="show-on-screens-lede" role="status">Loading your screens…</p> : choices.length ? (
         <>
-        <p className="show-on-screens-warn">This replaces what a ticked screen is set to show.</p>
+        <div className="show-on-screens-warn" aria-live="polite" data-testid="show-on-screens-warn">
+          {replaceNotes(choices, picked).map((note) => <p key={note}>{note}</p>)}
+        </div>
         <fieldset className="show-on-screens-list">
           <legend className="sr-only">Screens</legend>
           {choices.map((choice) => (

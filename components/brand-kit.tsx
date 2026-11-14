@@ -39,6 +39,8 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   const images = artImages(fixture?.images ?? liveMedia.data);
   const [form, setForm] = useState<BrandFields | null>(null);
   const [busy, setBusy] = useState<"save" | null>(null);
+  // QA r7: a save result must stay visible, not only in a toast that can be replaced or missed.
+  const [saveResult, setSaveResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [nameFromBusiness, setNameFromBusiness] = useState(false);
   const [savedOnce, setSavedOnce] = useState(false);
   const me = useApi<{ accountName: string }>(fixture ? null : "/api/me");
@@ -65,17 +67,22 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
     const payload = brandSavePayload(brand, form);
     if (!payload.ok) {
       toast.show(payload.error, true);
+      setSaveResult({ ok: false, text: payload.error });
       return;
     }
     setBusy("save");
+    setSaveResult(null);
     try {
       await api("/api/brand", { method: "PUT", body: JSON.stringify(payload.body) });
       await liveBrand.reload();
       setForm(prefillBrandForm(payload.body));
       setSavedOnce(true);
       toast.show("Brand saved. New menus and boards can use it. Existing boards are left unchanged.");
+      setSaveResult({ ok: true, text: `Brand saved at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.` });
     } catch (err) {
-      toast.show((err as Error).message, true);
+      const message = (err as Error)?.message || "Couldn't save your brand. Try again.";
+      toast.show(message, true);
+      setSaveResult({ ok: false, text: message });
     } finally {
       setBusy(null);
     }
@@ -103,6 +110,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
           images={images}
           custom={brand.custom}
           busy={busy}
+          saveResult={saveResult}
           onSave={() => void save()}
           onLogoUploaded={fixture ? undefined : async (id) => {
             await liveMedia.reload();
@@ -117,8 +125,9 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
 const FONT_OPTIONS: { id: BrandFont; label: string }[] = BOARD_FONTS.map((font) => ({ id: font.id, label: font.label }));
 
 function BrandEditor({
-  form, setForm, images, custom, busy, onSave, nameFromBusiness = false, onLogoUploaded,
+  form, setForm, images, custom, busy, onSave, nameFromBusiness = false, onLogoUploaded, saveResult = null,
 }: {
+  saveResult?: { ok: boolean; text: string } | null;
   /** Reload media and select the new logo after a direct upload (E3). Absent in fixtures. */
   onLogoUploaded?: (id: string) => Promise<void>;
   nameFromBusiness?: boolean;
@@ -360,6 +369,9 @@ function BrandEditor({
 
         <div className="lg:col-start-1">
           <button type="button" className="btn btn-primary min-h-11" disabled={!valid || busy !== null} onClick={onSave}>{busy === "save" ? "Saving…" : "Save brand"}</button>
+          <p className={`mt-2 text-sm ${saveResult && !saveResult.ok ? "text-danger" : "text-muted"}`} role={saveResult && !saveResult.ok ? "alert" : "status"} aria-live="polite" data-testid="brand-save-result">
+            {saveResult?.text ?? ""}
+          </p>
         </div>
     </div>
   );

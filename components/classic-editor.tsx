@@ -11,6 +11,8 @@ import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM
 import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
 import { DirectImageUpload } from "@/components/direct-image-upload";
 
+export type ClassicSaved = { id: string; name: string; playlistId: string | null; tickedScreens: number };
+
 export type ClassicDraft = {
   id: string | null;
   name: string;
@@ -46,7 +48,8 @@ export function ClassicEditor({
   images: MediaItem[];
   setDraft: (d: ClassicDraft | null) => void;
   displays: DisplayItem[];
-  onSaved: (message: string) => void;
+  /** E2b: `saved` describes the board so the page can offer "Show on which screen?". */
+  onSaved: (message: string, saved?: ClassicSaved) => void;
   onError: (message: string) => void;
   previewSrc?: string;
   readOnly?: boolean;
@@ -220,11 +223,15 @@ export function ClassicEditor({
     try {
       const body = JSON.stringify({ name: draft.name, template: draft.template, content: draft.content, ...(draft.displayIds.length ? { displayIds: draft.displayIds } : {}) });
       const res = draft.id
-        ? await api<{ published?: boolean }>(`/api/menus/${draft.id}`, { method: "PATCH", body })
-        : await api<{ published?: boolean; warning?: string }>("/api/menus", { method: "POST", body });
+        ? await api<{ id?: string; playlistId?: string | null; published?: boolean }>(`/api/menus/${draft.id}`, { method: "PATCH", body })
+        : await api<{ id?: string; playlistId?: string | null; published?: boolean; warning?: string }>("/api/menus", { method: "POST", body });
       const warning = (res as { warning?: string }).warning;
       if (warning) onError(warning);
-      onSaved(draft.id ? "Menu updated. Screens showing it refresh within a minute." : draft.displayIds.length ? "Menu board created and sent to your screens" : "Menu board created. It's in your media and playlists.");
+      const savedId = res.id ?? draft.id;
+      onSaved(
+        draft.id ? "Menu updated. Screens showing it refresh within a minute." : draft.displayIds.length ? "Menu board created and sent to your screens" : "Menu board created. It's in your media and playlists.",
+        savedId ? { id: savedId, name: draft.name, playlistId: res.playlistId ?? null, tickedScreens: draft.displayIds.length } : undefined,
+      );
     } catch (err) {
       onError((err as Error).message);
     } finally {
