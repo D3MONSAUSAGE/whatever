@@ -229,6 +229,7 @@ export function MenuBoards({
           onSaved={async (message) => { setView({ mode: "list" }); await menus.reload(); toast.show(message); }}
           onError={(message) => toast.show(message, true)}
           previewSrc={fixture?.previewSrc}
+          onImageUploaded={fixture ? undefined : () => liveMedia.reload()}
           readOnly={Boolean(fixture)}
           brand={kit}
         />
