@@ -25,7 +25,7 @@ describe("E3 hotfix: the upload button opens the file chooser", () => {
 
   const hasBrowser = (() => { try { return existsSync(chromium.executablePath()); } catch { return false; } })();
 
-  it.skipIf(!hasBrowser)("in a real browser, a click and Enter both open the chooser and an upload completes", async () => {
+  it.skipIf(!hasBrowser)("in a real browser, a click, Enter and Space all open the chooser and an upload completes", async () => {
     const root = process.cwd();
     const entry = `
       import React from "react";
@@ -61,6 +61,11 @@ describe("E3 hotfix: the upload button opens the file chooser", () => {
       await logo.focus();
       await page.keyboard.press("Enter");
       await byKey;
+
+      const bySpace = page.waitForEvent("filechooser", { timeout: 5000 });
+      await logo.focus();
+      await page.keyboard.press("Space");
+      await bySpace;
 
       // Disabled stays disabled (editor read-only), and the hidden input is out of the tab order.
       expect(await page.getByRole("button", { name: "Upload a photo" }).isDisabled()).toBe(true);

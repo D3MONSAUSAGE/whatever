@@ -1,5 +1,6 @@
 /** Layout Studio boards. Shared by the editor and the server. No database and no HTML from clients. */
 
+import { boardFont, FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type BoardFontId } from "@/lib/board-fonts";
 import { MENU_LIMITS } from "@/lib/menu-templates";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
 
@@ -16,7 +17,7 @@ export type LayoutSection = { name: string; items: LayoutItem[] };
 
 export type BoardPalette = "classic" | "fresh" | "bold";
 export type TypeScale = "room" | "counter";
-export type BoardFont = "inter" | "noto-serif";
+export type BoardFont = BoardFontId;
 
 export type LayoutDocument = {
   layoutVersion: 1;
@@ -293,8 +294,8 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   if (featureTitle == null || featureDetail == null) return { ok: false, error: "Check the feature text." };
   const palette = raw.palette === "classic" || raw.palette === "bold" || raw.palette === "fresh" ? raw.palette : "fresh";
   const typeScale = raw.typeScale === "counter" ? "counter" : "room";
-  const font = raw.font === "noto-serif" || raw.font === "inter" ? raw.font : raw.font == null || raw.font === "" ? "inter" : null;
-  if (font == null) return { ok: false, error: "Choose Inter or Noto Serif." };
+  const font = isBoardFont(raw.font) ? raw.font : raw.font == null || raw.font === "" ? "inter" : null;
+  if (font == null) return { ok: false, error: FONT_CHOICE_ERROR };
   const primaryColor = hexColor(raw.primaryColor);
   const accentColor = hexColor(raw.accentColor);
   const textColor = hexColor(raw.textColor);
@@ -531,8 +532,8 @@ export function seedBrand(doc: LayoutDocument, kit: BrandSeed): LayoutDocument {
   const accentColor = kit?.accentColor || null;
   const textColor = kit?.textColor || null;
   const backgroundColor = kit?.backgroundColor || null;
-  const heading = kit?.headingFont === "inter" || kit?.headingFont === "noto-serif" ? kit.headingFont : null;
-  const body = kit?.bodyFont === "inter" || kit?.bodyFont === "noto-serif" ? kit.bodyFont : null;
+  const heading = isBoardFont(kit?.headingFont) ? kit.headingFont : null;
+  const body = isBoardFont(kit?.bodyFont) ? kit.bodyFont : null;
   const font = heading ?? body ?? null;
   const title = clipSeedText(kit?.displayName, MENU_LIMITS.title);
   const footer = clipSeedText(seedFooter(kit), MENU_LIMITS.footer);
@@ -616,7 +617,7 @@ export function imageAspect(doc: { imageFit?: "cover" | "contain"; imageAnchor?:
   return `${x}${y} ${fit}`;
 }
 
-function measure(value: string, size: number) {
+function measure(value: string, size: number, family = "Inter") {
   let units = 0;
   for (const ch of value) {
     if (/[ilI.,:;'!|]/.test(ch)) units += 0.28;
@@ -625,13 +626,13 @@ function measure(value: string, size: number) {
     else if (ch === " ") units += 0.27;
     else units += 0.56;
   }
-  return units * size * 1.05;
+  return units * size * 1.05 * widthScaleForFamily(family);
 }
 
-function fitWidth(value: string, size: number, max: number) {
-  if (measure(value, size) <= max) return value;
+function fitWidth(value: string, size: number, max: number, family = "Inter") {
+  if (measure(value, size, family) <= max) return value;
   const chars = [...value];
-  while (chars.length > 1 && measure(`${chars.join("")}…`, size) > max) chars.pop();
+  while (chars.length > 1 && measure(`${chars.join("")}…`, size, family) > max) chars.pop();
   return `${chars.join("").trimEnd()}…`;
 }
 
@@ -706,7 +707,7 @@ export function zoneVideoStyle(box: ZoneBox) {
 }
 
 export function fontFamily(font: BoardFont | undefined) {
-  return font === "noto-serif" ? "Noto Serif" : "Inter";
+  return boardFont(font).family;
 }
 
 function itemUnit(sections: LayoutSection[], top: number, bottom: number, scale: TypeScale, spread = false) {
@@ -742,14 +743,14 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
   for (const section of sections) {
     if (section.name) {
       y += unit * 0.72;
-      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(fitWidth(section.name.toUpperCase(), nameSize - 6, width))}</text>`);
+      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(fitWidth(section.name.toUpperCase(), nameSize - 6, width, family))}</text>`);
       y += unit * 0.28;
     }
     for (const item of section.items) {
       y += unit * 0.78;
       const price = item.price || "";
-      const priceW = price ? measure(price, nameSize) + (colors.priceBg ? 28 : 0) : 0;
-      const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24));
+      const priceW = price ? measure(price, nameSize, family) + (colors.priceBg ? 28 : 0) : 0;
+      const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24), family);
       if (price && colors.priceBg) {
         parts.push(`<rect x="${(x + width - priceW).toFixed(1)}" y="${(y - nameSize).toFixed(1)}" width="${priceW.toFixed(1)}" height="${(nameSize * 1.35).toFixed(1)}" rx="8" fill="${colors.priceBg}"/>`);
       }
@@ -757,7 +758,7 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
       parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${nameSize}" font-weight="700" fill="${colors.ink}">${esc(name)}</text>`);
       if (item.description) {
         y += unit * 0.48;
-        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${descSize}" fill="${colors.muted}">${esc(fitWidth(item.description, descSize, width))}</text>`);
+        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${descSize}" fill="${colors.muted}">${esc(fitWidth(item.description, descSize, width, family))}</text>`);
       }
     }
     y += unit * 0.2;
@@ -842,13 +843,13 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
         ? { x: 48, y: colors.band ? 156 : 72, w: frame.columns[0].w - 80, bottom: BOARD_H - 64 }
         : { x: frame.menu.x + 48, y: colors.band ? 168 : 88, w: frame.menu.w - 96, bottom: BOARD_H - 72 };
   let titleSize = 64;
-  while (titleSize > 34 && measure(doc.title || "Menu", titleSize) > menu.w) titleSize -= 2;
-  const title = fitWidth(doc.title || "Menu", titleSize, menu.w);
+  while (titleSize > 34 && measure(doc.title || "Menu", titleSize, family) > menu.w) titleSize -= 2;
+  const title = fitWidth(doc.title || "Menu", titleSize, menu.w, family);
   const titleFill = colors.band && doc.template !== "signature" ? colors.featureInk : colors.ink;
   parts.push(`<text x="${menu.x}" y="${colors.band && doc.template !== "signature" ? 86 : menu.y}" font-family="${family}" font-size="${titleSize}" font-weight="800" fill="${titleFill}">${esc(title)}</text>`);
   if (doc.subtitle) {
     const onBand = Boolean(colors.band && doc.template !== "signature");
-    parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${family}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w))}</text>`);
+    parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${family}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w, family))}</text>`);
   }
   const textTop = colors.band && doc.template !== "signature" ? 180 : menu.y + (doc.subtitle ? 72 : 36);
   if (doc.template === "triple-column" || doc.template === "two-column") {
@@ -888,10 +889,10 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     }
   }
   if (doc.footer && doc.template === "menu-banner") {
-    parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${family}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144))}</text>`);
+    parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${family}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144, family))}</text>`);
   } else if (doc.footer) {
     const footerY = doc.template === "signature" ? BOARD_H - 78 : BOARD_H - 40;
-    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${family}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w))}</text>`);
+    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${family}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w, family))}</text>`);
   }
   if (doc.template === "menu-banner") {
     const head = doc.featureTitle || "Today";
@@ -901,14 +902,14 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const headY = feature.y + Math.round(feature.h * (detail ? 0.46 : 0.62));
     if (!href) {
       parts.push(`<rect x="${feature.x}" y="${feature.y}" width="10" height="${feature.h}" fill="${colors.featureInk}"/>`);
-      parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="${headSize}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120))}</text>`);
-      if (detail) parts.push(`<text x="${hx}" y="${Math.min(feature.y + feature.h - 24, headY + headSize)}" font-family="${family}" font-size="${Math.max(16, headSize - 12)}" fill="${colors.featureInk}">${esc(fitWidth(detail, headSize - 12, feature.w - 120))}</text>`);
+      parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="${headSize}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120, family))}</text>`);
+      if (detail) parts.push(`<text x="${hx}" y="${Math.min(feature.y + feature.h - 24, headY + headSize)}" font-family="${family}" font-size="${Math.max(16, headSize - 12)}" fill="${colors.featureInk}">${esc(fitWidth(detail, headSize - 12, feature.w - 120, family))}</text>`);
     } else {
       const bandH = Math.min(84, Math.max(48, Math.round(feature.h * 0.42)));
       const bandY = feature.y + feature.h - bandH;
       parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${bandH}" fill="${colors.feature}"/>`);
-      parts.push(`<text x="${hx}" y="${bandY + Math.round(bandH * 0.42)}" font-family="${family}" font-size="${Math.min(32, headSize)}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120))}</text>`);
-      if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${family}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120))}</text>`);
+      parts.push(`<text x="${hx}" y="${bandY + Math.round(bandH * 0.42)}" font-family="${family}" font-size="${Math.min(32, headSize)}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120, family))}</text>`);
+      if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${family}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120, family))}</text>`);
     }
   } else if ((doc.template === "menu-promo-67" || doc.template === "split-50" || doc.template === "two-menu-promo") && promoBandHeight(doc) > 0) {
     const band = promoBandHeight(doc);
@@ -917,8 +918,8 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const title = (doc.featureTitle || "").trim();
     const detail = (doc.featureDetail || "").trim();
     parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${band}" fill="${colors.feature}"/>`);
-    if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(title, 40, feature.w - 80))}</text>`);
-    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80))}</text>`);
+    if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(title, 40, feature.w - 80, family))}</text>`);
+    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80, family))}</text>`);
   } else if (feature.h >= 280 && doc.template !== "triple-column" && doc.template !== "two-column" && ((doc.featureTitle || "").trim() || (doc.featureDetail || "").trim())) {
     const head = (doc.featureTitle || "").trim();
     const hx = feature.x + 48;
@@ -930,16 +931,16 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       parts.push(`<rect x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${cap}" fill="${shade}"/>`);
       parts.push(`<rect x="${feature.x}" y="${feature.y + feature.h - cap}" width="${feature.w}" height="${cap}" fill="${shade}"/>`);
       const headY = feature.y + Math.round(cap * 0.62);
-      parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="52" font-weight="800" fill="${ink}">${esc(fitWidth(head, 52, feature.w - 96))}</text>`);
+      parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="52" font-weight="800" fill="${ink}">${esc(fitWidth(head, 52, feature.w - 96, family))}</text>`);
       if (doc.featureDetail) {
-        parts.push(`<text x="${hx}" y="${headY + 72}" font-family="${family}" font-size="24" fill="${ink}">${esc(fitWidth(doc.featureDetail, 24, feature.w - 96))}</text>`);
+        parts.push(`<text x="${hx}" y="${headY + 72}" font-family="${family}" font-size="24" fill="${ink}">${esc(fitWidth(doc.featureDetail, 24, feature.w - 96, family))}</text>`);
       }
     } else {
       const bandY = feature.y + feature.h - 170;
       parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="170" fill="${colors.feature}"/>`);
-      parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, 40, feature.w - 80))}</text>`);
+      parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, 40, feature.w - 80, family))}</text>`);
       if (doc.featureDetail) {
-        parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80))}</text>`);
+        parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80, family))}</text>`);
       }
     }
   }

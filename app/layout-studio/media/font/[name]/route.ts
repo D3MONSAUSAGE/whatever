@@ -1,23 +1,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
+import { FONT_FILES } from "@/lib/board-fonts";
 import { layoutStudioEnabled, layoutStudioPreviewOpen } from "@/lib/layout-studio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const FILES: Record<string, string> = {
-  "noto-serif": "NotoSerif-Regular.ttf",
-  "noto-serif-bold": "NotoSerif-Bold.ttf",
-  inter: "Inter-Regular.ttf",
-  "inter-bold": "Inter-Bold.ttf",
-  "inter-extrabold": "Inter-ExtraBold.ttf",
-};
+const FILES = FONT_FILES;
 
 export async function GET(_req: Request, context: { params: Promise<{ name: string }> }) {
   if (!layoutStudioPreviewOpen() && !layoutStudioEnabled()) return new NextResponse("Not found", { status: 404 });
   const { name } = await context.params;
-  const file = FILES[name];
+  const file = Object.hasOwn(FILES, name) ? FILES[name] : undefined;
   if (!file) return new NextResponse("Not found", { status: 404 });
   const bytes = readFileSync(join(process.cwd(), "assets", "fonts", file));
   return new NextResponse(new Uint8Array(bytes), {

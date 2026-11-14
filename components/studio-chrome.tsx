@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MENU_FIELD_STYLES } from "@/lib/menu-fields";
 import { SHOW_ON_SCREENS_STYLES } from "@/lib/show-on-screens";
+import { fontFaceCss } from "@/lib/board-fonts";
 
 /** SSR-safe: first render is "desktop" on server and client, then the effect narrows it. Avoids a hydration mismatch. */
 export function useStudioBreakpoint(): "phone" | "tablet" | "desktop" {
@@ -212,11 +213,7 @@ ${SHOW_ON_SCREENS_STYLES}
           .studio-preview { display: none !important; }
           .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
         }
-        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
-        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-bold") format("truetype"); font-weight: 700; font-style: normal; }
-        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-extrabold") format("truetype"); font-weight: 800; font-style: normal; }
-        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif") format("truetype"); font-weight: 400; font-style: normal; }
-        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif-bold") format("truetype"); font-weight: 700; font-style: normal; }
+        ${fontFaceCss()}
         figure svg { width: 100%; height: 100%; display: block; }
       
     `}</style>
