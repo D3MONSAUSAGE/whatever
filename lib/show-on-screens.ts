@@ -22,6 +22,32 @@ export function screensToAssign(choices: ScreenChoice[], picked: string[]): stri
   return picked.filter((id) => allowed.has(id));
 }
 
+/**
+ * E2b: name what each ticked screen loses, e.g. "Replaces QA Mixed Loop on QA Bar TV 2."
+ * Before anything is ticked, one general line explains it.
+ */
+export function replaceNotes(choices: ScreenChoice[], picked: string[]): string[] {
+  const ticked = choices.filter((choice) => !choice.showing && picked.includes(choice.id));
+  if (!ticked.length) return ["Ticking a screen replaces what it's set to show."];
+  return ticked.map((choice) => choice.nowShowing
+    ? `Replaces ${choice.nowShowing} on ${choice.name}.`
+    : `${choice.name} isn't set to show anything yet.`);
+}
+
+/**
+ * E2b: after saving a classic board, offer the same picker only when no screen was ticked
+ * and no screen already plays the board. Never for an edit opened from one screen.
+ */
+export function shouldOfferScreens(input: {
+  fromScreen: boolean;
+  tickedScreens: number;
+  playlistId: string | null | undefined;
+  displays: DisplayItem[] | null | undefined;
+}): boolean {
+  if (input.fromScreen || input.tickedScreens > 0 || !input.playlistId) return false;
+  return !(input.displays ?? []).some((display) => display.connected && display.playlist?.id === input.playlistId);
+}
+
 export const SHOW_ON_SCREENS_STYLES = `
         .show-on-screens { background: #fff; border: 1px solid #cfe0ff; border-radius: 14px; padding: 14px; margin: 10px 0; box-shadow: 0 6px 20px rgba(15, 23, 42, .06); }
         .show-on-screens h2 { margin: 0 0 4px; font-size: 16px; font-weight: 750; }
@@ -33,6 +59,7 @@ export const SHOW_ON_SCREENS_STYLES = `
         .show-on-screens-now { flex-basis: 100%; margin: -8px 0 0 26px; font-size: 12px; color: #5c6474; }
         .show-on-screens h2:focus { outline: none; }
         .show-on-screens-warn { margin: 0 0 8px; font-size: 13px; color: #7a5b00; }
+        .show-on-screens-warn p { margin: 0; }
         .show-on-screens-error { color: #b42318; font-size: 13px; font-weight: 650; margin: 6px 0 0; }
         .show-on-screens-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 8px; }
 `;

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, timeAgo, useApi, type DisplayItem, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { ShowOnScreens } from "@/components/show-on-screens";
+import { SHOW_ON_SCREENS_STYLES, shouldOfferScreens } from "@/lib/show-on-screens";
 import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader, LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
@@ -137,6 +139,8 @@ export function MenuBoards({
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(started.pendingBoardId);
   const [selectedLayout, setSelectedLayout] = useState<LayoutOption | null>(null);
   const toast = useToast();
+  // E2b: "Show on which screen?" after saving a classic board that isn't on any screen yet.
+  const [pickClassic, setPickClassic] = useState<{ id: string; name: string; playlistId: string } | null>(null);
   const confirm = useConfirm();
   const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout";
 
@@ -226,7 +230,19 @@ export function MenuBoards({
           draft={view.draft}
           setDraft={(draft) => { if (!draft) setView({ mode: "list" }); else setView({ ...view, draft }); }}
           displays={(displays.data ?? []).filter((d) => d.connected)}
-          onSaved={async (message) => { setView({ mode: "list" }); await menus.reload(); toast.show(message); }}
+          onSaved={async (message, saved) => {
+            setPickClassic(null); // Gother #100 low: never bring back a previous board's picker.
+            const fromScreen = Boolean(view.screenId);
+            setView({ mode: "list" });
+            await menus.reload();
+            toast.show(message);
+            if (!saved || fixture) return;
+            const fresh = await api<DisplayItem[]>("/api/displays").catch(() => displays.data ?? []);
+            if (shouldOfferScreens({ fromScreen, tickedScreens: saved.tickedScreens, playlistId: saved.playlistId, displays: fresh }) && saved.playlistId) {
+              setPickClassic({ id: saved.id, name: saved.name || "This board", playlistId: saved.playlistId });
+              void liveDisplays.reload();
+            }
+          }}
           onError={(message) => toast.show(message, true)}
           previewSrc={fixture?.previewSrc}
           onImageUploaded={fixture ? undefined : () => liveMedia.reload()}
@@ -251,6 +267,24 @@ export function MenuBoards({
           brand={fixture?.brand}
           onClose={() => setView({ mode: "list" })}
         />
+      ) : null}
+
+      {pickClassic && view.mode === "list" ? (
+        <>
+          <style>{SHOW_ON_SCREENS_STYLES}</style>
+          <ShowOnScreens
+            boardId={pickClassic.id}
+            boardName={pickClassic.name}
+            playlistId={pickClassic.playlistId}
+            displays={displays.data ?? []}
+            loading={!displays.data}
+            assignAll={async (displayIds) => {
+              await api(`/api/playlists/${pickClassic.playlistId}/publish`, { method: "POST", body: JSON.stringify({ displayIds }) });
+            }}
+            onSkip={() => setPickClassic(null)}
+            onDone={(message) => { setPickClassic(null); toast.show(message); void liveDisplays.reload(); }}
+          />
+        </>
       ) : null}
 
       <LimitNote count={menus.data?.menus.length} max={100} noun="menu boards" />
