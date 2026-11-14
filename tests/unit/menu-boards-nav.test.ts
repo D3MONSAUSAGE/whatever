@@ -53,7 +53,13 @@ describe("Menu Boards in the main navigation (t248u)", () => {
     expect(MAIN_NAV.find((item) => item.label === "My Screens")?.short).toBe("Screens");
     for (const item of MAIN_NAV) expect((item.short ?? item.label).length).toBeLessThanOrEqual(9);
     const shell = readFileSync("components/shell.tsx", "utf8");
-    expect(shell).toContain('<span className="sr-only">{item.label}</span>');
+    // WCAG 2.5.3: the accessible name contains the visible text, e.g. "Menus (Menu Boards)".
+    expect(shell).toContain("aria-label={item.short ? `${item.short} (${item.label})` : undefined}");
+    expect(shell).not.toContain("sr-only");
+    // Icons are keyed by href, so reordering MAIN_NAV can't mismatch them.
+    expect(shell).toContain('"/dashboard/media/menus": IconGrid');
+    for (const item of MAIN_NAV) expect(shell).toContain(`"${item.href}": Icon`);
+    expect(readFileSync("components/menu-boards.tsx", "utf8")).toContain('eyebrow="Menu Boards"');
   });
 
   it("styles Brand Kit as a proper sub-item of Account, not a bare text line or a new section", () => {

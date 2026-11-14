@@ -15,8 +15,15 @@ import { isContentPath, isMainNavActive, MAIN_NAV } from "@/lib/content-nav";
 import { StudioGuardedLink, StudioLeaveProvider, useStudioAllowLeave } from "@/components/studio-leave";
 import { IconCalendar, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
 
-const NAV_ICONS = [IconTv, IconGrid, IconImage, IconList, IconCalendar, IconGear];
-const NAV = MAIN_NAV.map((item, index) => ({ ...item, icon: NAV_ICONS[index] }));
+const NAV_ICONS: Record<string, () => React.ReactElement> = {
+  "/dashboard/screens": IconTv,
+  "/dashboard/media/menus": IconGrid,
+  "/dashboard/content": IconImage,
+  "/dashboard/playlists": IconList,
+  "/dashboard/schedule": IconCalendar,
+  "/dashboard/account": IconGear,
+};
+const NAV = MAIN_NAV.map((item) => ({ ...item, icon: NAV_ICONS[item.href] ?? IconGrid }));
 
 function SignOutButton({ onSignOut, className, children }: { onSignOut: () => void | Promise<void>; className?: string; children: React.ReactNode }) {
   const allowLeave = useStudioAllowLeave();
@@ -133,16 +140,12 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
       </div>
       <nav aria-label="Mobile" className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
         {NAV.map((item) => (
-          <StudioGuardedLink key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined}
+          <StudioGuardedLink key={item.href} href={item.href} aria-label={item.short ? `${item.short} (${item.label})` : undefined} aria-current={isActive(item.href) ? "page" : undefined}
             className={`flex min-w-0 flex-col items-center justify-center gap-1 min-h-16 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-primary" : "text-muted"}`}>
             <span className={`icon-tile size-7 rounded-lg ${isActive(item.href) ? "icon-tile-active" : ""}`}>
               <item.icon />
             </span>
-            {item.short ? (
-              <><span className="max-w-full truncate" aria-hidden="true">{item.short}</span><span className="sr-only">{item.label}</span></>
-            ) : (
-              <span className="max-w-full truncate">{item.label}</span>
-            )}
+            <span className="max-w-full truncate">{item.short ?? item.label}</span>
           </StudioGuardedLink>
         ))}
       </nav>
