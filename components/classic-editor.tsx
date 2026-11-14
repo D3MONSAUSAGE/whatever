@@ -9,6 +9,7 @@ import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-l
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
+import { DirectImageUpload } from "@/components/direct-image-upload";
 
 export type ClassicDraft = {
   id: string | null;
@@ -39,6 +40,7 @@ export function ClassicEditor({
   previewSrc,
   readOnly,
   brand,
+  onImageUploaded,
 }: {
   draft: ClassicDraft;
   images: MediaItem[];
@@ -49,6 +51,8 @@ export function ClassicEditor({
   previewSrc?: string;
   readOnly?: boolean;
   brand?: Brand | null;
+  /** Reload the media list after a direct photo upload (E3). Absent in fixtures. */
+  onImageUploaded?: () => Promise<void>;
 }) {
   const [step, setStep] = useState<ClassicStep>("content");
   const studioBp = useStudioBreakpoint();
@@ -63,6 +67,12 @@ export function ClassicEditor({
   const photoPanelRef = useRef<HTMLDetailsElement | null>(null);
   const photoSelectRef = useRef<HTMLSelectElement | null>(null);
   const [nameCheck, setNameCheck] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewRetry, setPreviewRetry] = useState(0);
+  // Up/Down moves refresh the preview at once instead of after the typing debounce (QA retest 3 low).
+  const refreshNow = useRef(false);
+  const latest = useRef({ draft, setDraft });
+  latest.current = { draft, setDraft };
   const baseline = useRef({ name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds });
 
   // Seed a new, still-clean draft when the brand kit arrives after mount, and
@@ -94,7 +104,10 @@ export function ClassicEditor({
       return;
     }
     let cancelled = false;
+    // Abort the in-flight render when a newer edit or move supersedes it (no overlapping POSTs).
+    const abort = new AbortController();
     const run = async () => {
+      setPreviewBusy(true);
       try {
         const token = await authToken();
         if (cancelled) return;
@@ -102,12 +115,14 @@ export function ClassicEditor({
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ template: draft.template, content: draft.content }),
+          signal: abort.signal,
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           if (!cancelled) {
             setPreviewError(body.error || "Preview unavailable.");
             setPreviewLoading(false);
+            setPreviewBusy(false);
           }
           return;
         }
@@ -121,10 +136,12 @@ export function ClassicEditor({
         setPreview(url);
         setPreviewError(null);
         setPreviewLoading(false);
+        setPreviewBusy(false);
       } catch {
         if (!cancelled) {
           setPreviewError("Preview unavailable.");
           setPreviewLoading(false);
+          setPreviewBusy(false);
         }
       }
     };
@@ -135,14 +152,19 @@ export function ClassicEditor({
       void run();
       return () => {
         cancelled = true;
+        abort.abort();
       };
     }
-    const timer = window.setTimeout(() => { void run(); }, 450);
+    // Moves refresh after a short 150ms debounce (rapid Up/Down coalesces); typing keeps 450ms.
+    const delay = refreshNow.current ? 150 : 450;
+    refreshNow.current = false;
+    const timer = window.setTimeout(() => { void run(); }, delay);
     return () => {
       cancelled = true;
+      abort.abort();
       window.clearTimeout(timer);
     };
-  }, [draft.template, draft.content, readOnly, previewSrc]);
+  }, [draft.template, draft.content, readOnly, previewSrc, previewRetry]);
 
   useEffect(() => () => {
     if (last.current) URL.revokeObjectURL(last.current);
@@ -221,7 +243,17 @@ export function ClassicEditor({
       >
         {preview ? (
           <img src={preview} alt="Menu board preview" data-testid={testId ? "menu-preview" : undefined} className="w-full h-full object-contain" />
-        ) : (
+        ) : null}
+        {preview && previewBusy ? (
+          <span role="status" style={{ position: "absolute", top: 8, right: 8, padding: "2px 8px", borderRadius: 999, background: "rgba(0,0,0,.65)", color: "#fff", fontSize: 12 }}>Updating preview…</span>
+        ) : null}
+        {preview && previewError && !previewBusy ? (
+          <span role="alert" style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", gap: 8, padding: "2px 4px 2px 10px", borderRadius: 999, background: "rgba(120,20,20,.85)", color: "#fff", fontSize: 12 }}>
+            Preview didn&apos;t update.
+            <button type="button" onClick={() => { refreshNow.current = true; setPreviewRetry((n) => n + 1); }} style={{ background: "#fff", color: "#7a1414", borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>Try again</button>
+          </span>
+        ) : null}
+        {preview ? null : (
           <p style={{ margin: 0, padding: 16, fontSize: 14, color: "#5c6474", textAlign: "center" }}>{previewLoading ? "Loading preview…" : previewError || "Preview will appear here."}</p>
         )}
         {interactive
@@ -268,7 +300,7 @@ export function ClassicEditor({
             <div className="section-card-head">
               <h3 id={`classic-section-${si}`} className="section-card-legend">Section {si + 1}</h3>
               <OrderButtons className="section-order" kind="section" name={section.name} scope="classic-sections" index={si} count={c.sections.length}
-                onMove={(dir) => update({ ...c, sections: moveSection(c.sections, si, dir) })} />
+                onMove={(dir) => { refreshNow.current = true; update({ ...c, sections: moveSection(c.sections, si, dir) }); }} />
               <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`}
                 onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove</button>
             </div>
@@ -293,7 +325,7 @@ export function ClassicEditor({
                     onBlur={() => { if (needsName(item)) setNameCheck(true); }} aria-describedby={`${idBase}-desc-count`} />
                   <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
                   <OrderButtons kind="item" name={item.name} scope={`classic-items-${si}`} index={ii} count={section.items.length}
-                    onMove={(dir) => update({ ...c, sections: moveItem(c.sections, si, ii, dir) })} />
+                    onMove={(dir) => { refreshNow.current = true; update({ ...c, sections: moveItem(c.sections, si, ii, dir) }); }} />
                 </div>
               );
             })}
@@ -320,8 +352,19 @@ export function ClassicEditor({
           <option value="">No photo</option>
           {images.map((m) => <option key={m.id} value={m.id}>{m.fileName}</option>)}
         </select>
-        <span className="text-xs text-muted">{images.length ? "Shows on the right side of the menu. JPG or PNG from your media." : "Upload a JPG or PNG to your media to add a photo."}</span>
+        <span className="text-xs text-muted">{images.length ? "Shows on the right side of the menu. JPG or PNG from your media." : "No photos yet. Upload one below."}</span>
       </label>
+      <DirectImageUpload
+        what="photo"
+        disabled={readOnly || !onImageUploaded}
+        onUploaded={async (id) => {
+          await onImageUploaded?.();
+          // Use the newest draft and setter: the owner may have kept editing during the upload.
+          const { draft: current, setDraft: apply } = latest.current;
+          apply({ ...current, content: { ...current.content, photoMediaId: id } });
+          setRegion("photo");
+        }}
+      />
     </details>
   );
 

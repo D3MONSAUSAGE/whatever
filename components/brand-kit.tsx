@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, useApi, type MediaItem } from "@/lib/api";
+import { DirectImageUpload } from "@/components/direct-image-upload";
 import { useToast } from "@/components/toast";
 import { IconGear } from "@/components/icons";
 import { LoadState, PageHeader } from "@/components/ui";
@@ -102,6 +103,10 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
           custom={brand.custom}
           busy={busy}
           onSave={() => void save()}
+          onLogoUploaded={fixture ? undefined : async (id) => {
+            await liveMedia.reload();
+            setForm((current) => (current ? { ...current, logoMediaId: id } : current));
+          }}
         />
       )}
     </section>
@@ -114,8 +119,10 @@ const FONT_OPTIONS: { id: BrandFont; label: string }[] = [
 ];
 
 function BrandEditor({
-  form, setForm, images, custom, busy, onSave, nameFromBusiness = false,
+  form, setForm, images, custom, busy, onSave, nameFromBusiness = false, onLogoUploaded,
 }: {
+  /** Reload media and select the new logo after a direct upload (E3). Absent in fixtures. */
+  onLogoUploaded?: (id: string) => Promise<void>;
   nameFromBusiness?: boolean;
   form: BrandFields;
   setForm: (next: BrandFields) => void;
@@ -253,7 +260,12 @@ function BrandEditor({
               ))}
             </select>
           </label>
-          {!images.length ? <p className="text-xs text-muted">To add a logo, upload it as a JPG or PNG in Media first.</p> : null}
+          <DirectImageUpload
+            what="logo"
+            disabled={!onLogoUploaded}
+            onUploaded={async (id) => { await onLogoUploaded?.(id); }}
+          />
+          {!images.length ? <p className="text-xs text-muted">No logos yet. Upload one here or in Media.</p> : null}
         </div>
 
         <div className="grid gap-3">
