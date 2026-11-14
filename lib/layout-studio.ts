@@ -249,7 +249,9 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   const subtitle = text(raw.subtitle, 80);
   const footer = text(raw.footer, 80);
   if (title == null || subtitle == null || footer == null) return { ok: false, error: "Check the title and footer." };
-  if (!Array.isArray(raw.sections) || raw.sections.length > MENU_LIMITS.sections) {
+  // Emptied sections and blank rows are dropped and do not count toward the limits (QA B1-04).
+  // The raw arrays still have a generous hard cap so a request cannot be unbounded.
+  if (!Array.isArray(raw.sections) || raw.sections.length > MENU_LIMITS.sections * 3) {
     return { ok: false, error: `Use up to ${MENU_LIMITS.sections} sections.` };
   }
   const sections: LayoutSection[] = [];
@@ -259,7 +261,7 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
     const sec = section as Record<string, unknown>;
     const name = text(sec.name, 30);
     if (name == null) return { ok: false, error: "Check your sections." };
-    if (!Array.isArray(sec.items) || sec.items.length > MENU_LIMITS.itemsPerSection) {
+    if (!Array.isArray(sec.items) || sec.items.length > MENU_LIMITS.itemsPerSection * 3) {
       return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     }
     const items: LayoutItem[] = [];
@@ -274,9 +276,11 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       if (!itemName) continue;
       items.push({ name: itemName, price: price ?? "", description: description ?? "" });
     }
+    if (items.length > MENU_LIMITS.itemsPerSection) return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     total += items.length;
     if (name || items.length) sections.push({ name: name ?? "", items });
   }
+  if (sections.length > MENU_LIMITS.sections) return { ok: false, error: `Use up to ${MENU_LIMITS.sections} sections.` };
   if (total > MENU_LIMITS.items) return { ok: false, error: `Use up to ${MENU_LIMITS.items} items.` };
   const imageMediaId = raw.imageMediaId == null || raw.imageMediaId === "" ? null : String(raw.imageMediaId);
   const videoMediaId = raw.videoMediaId == null || raw.videoMediaId === "" ? null : String(raw.videoMediaId);
@@ -395,37 +399,38 @@ export function sampleLayout(template: LayoutTemplate = "menu-promo-67"): Layout
     }),
     "split-50": board(template, {
       split: 0.5, palette: "bold", primaryColor: null, accentColor: null, typeScale: "room",
-      title: "Harbor Gym", subtitle: "Today's floor", footer: "Towels at the desk",
-      featureTitle: "Noon ride", featureDetail: "Studio B · bikes leave at 12:15",
+      title: "Your restaurant", subtitle: "Today's specials", footer: "Ask your server about allergens",
+      featureTitle: "Chef's special", featureDetail: "Add your special and its price here",
       sections: [
-        { name: "Morning", items: [
-          { name: "Strength", price: "6:30", description: "Studio A" },
-          { name: "Conditioning", price: "9:00", description: "Studio B" },
-          { name: "Mobility", price: "10:30", description: "All levels" },
+        { name: "Starters", items: [
+          { name: "Soup of the day", price: "$7", description: "Ask your server" },
+          { name: "House salad", price: "$9", description: "Greens, vinaigrette" },
+          { name: "Garlic bread", price: "$6", description: "Toasted, herb butter" },
         ] },
-        { name: "Evening", items: [
-          { name: "Lift", price: "5:30", description: "Studio A" },
-          { name: "Row", price: "6:15", description: "Studio B" },
-          { name: "Restore", price: "7:30", description: "Low impact" },
+        { name: "Mains", items: [
+          { name: "Grilled chicken", price: "$16", description: "Rice, seasonal vegetables" },
+          { name: "Burger", price: "$15", description: "Cheddar, fries" },
+          { name: "Pasta", price: "$14", description: "Tomato, basil" },
         ] },
       ],
     }),
     "menu-banner": board(template, {
-      split: 0.18, palette: "classic", primaryColor: null, accentColor: null, typeScale: "room",
-      title: "Field & Vine", subtitle: "Groceries and lunch", footer: "Members save 10% after 4",
-      featureTitle: "Today's counter", featureDetail: "Groceries until 7",
+      // New boards start with a taller banner (25% of the board) so a photo is not a thin sliver (QA B1-06).
+      split: 0.25, palette: "classic", primaryColor: null, accentColor: null, typeScale: "room",
+      title: "Your restaurant", subtitle: "Lunch and dinner", footer: "Ask about today's specials",
+      featureTitle: "Happy hour", featureDetail: "Add your times and deal here",
       sections: [
-        { name: "Counter", items: [
+        { name: "Plates", items: [
           { name: "Soup and salad", price: "$11", description: "Rotates daily" },
           { name: "Grain bowl", price: "$13", description: "Greens, grains, tahini" },
           { name: "Half sandwich", price: "$9", description: "Chicken or veggie" },
           { name: "Chili", price: "$8", description: "Cup or bowl" },
         ] },
-        { name: "Market", items: [
-          { name: "Citrus bag", price: "$6", description: "Picked this morning" },
-          { name: "Sourdough", price: "$7", description: "Baked at dawn" },
-          { name: "Olive oil", price: "$14", description: "House blend" },
-          { name: "Flowers", price: "$12", description: "Mixed bunch" },
+        { name: "Drinks", items: [
+          { name: "Lemonade", price: "$4", description: "Fresh squeezed" },
+          { name: "Iced tea", price: "$3", description: "Unsweetened" },
+          { name: "Coffee", price: "$3", description: "Free refills" },
+          { name: "Soda", price: "$3", description: "Fountain" },
         ] },
       ],
     }),
@@ -727,10 +732,11 @@ function itemUnit(sections: LayoutSection[], top: number, bottom: number, scale:
   return unit;
 }
 
-function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false, unitOverride?: number) {
+function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false, unitOverride?: number, minDescSize = 10) {
   const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
   const nameSize = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
-  const descSize = Math.max(10, Math.round(nameSize * 0.55));
+  // Boards up to 12 items keep the 10px floor (unchanged renders); long two-column menus use 14px.
+  const descSize = Math.max(minDescSize, Math.round(nameSize * 0.55));
   let y = top;
   for (const section of sections) {
     if (section.name) {
@@ -755,6 +761,36 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
     }
     y += unit * 0.2;
   }
+}
+
+/** Single-column layouts switch to two columns above this many items. */
+export const LONG_MENU_ITEMS = 12;
+/** Smallest description text on a long (two-column) menu, in board pixels (1920×1080). */
+export const LONG_MENU_DESC_MIN = 14;
+
+function sectionWeight(section: LayoutSection) {
+  return (section.name ? 1 : 0) + section.items.reduce((n, item) => n + (item.description ? 1.26 : 0.78), 0) + 0.2;
+}
+
+/** Two balanced columns for a long menu, or null when the menu should stay in one column. */
+export function longMenuColumns(sections: LayoutSection[], width: number): LayoutSection[][] | null {
+  const count = sections.reduce((n, section) => n + section.items.length, 0);
+  if (count <= LONG_MENU_ITEMS || width < 760) return null;
+  if (sections.length === 1) {
+    const only = sections[0];
+    const half = Math.ceil(only.items.length / 2);
+    return [[{ name: only.name, items: only.items.slice(0, half) }], [{ name: "", items: only.items.slice(half) }]];
+  }
+  const total = sections.reduce((n, section) => n + sectionWeight(section), 0);
+  let best = 1;
+  let bestDiff = Infinity;
+  let left = 0;
+  for (let k = 1; k < sections.length; k++) {
+    left += sectionWeight(sections[k - 1]);
+    const diff = Math.abs(total - 2 * left);
+    if (diff < bestDiff) { bestDiff = diff; best = k; }
+  }
+  return [sections.slice(0, best), sections.slice(best)];
 }
 
 export type LayoutArt = { imageHref?: string | null };
@@ -833,7 +869,19 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
     });
   } else {
-    paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
+    const columns = longMenuColumns(doc.sections, menu.w);
+    if (columns) {
+      // Long menus (more than LONG_MENU_ITEMS items) flow into two columns and use the full height,
+      // instead of one column of tiny text in the top of the board (QA B1-05). Shorter menus are unchanged.
+      const gap = 56;
+      const colW = (menu.w - gap) / 2;
+      const unit = Math.min(...columns.map((column) => itemUnit(column, textTop, menu.bottom, doc.typeScale, true)));
+      columns.forEach((column, index) => {
+        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, family, true, unit, LONG_MENU_DESC_MIN);
+      });
+    } else {
+      paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
+    }
   }
   if (doc.footer && doc.template === "menu-banner") {
     parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${family}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144))}</text>`);

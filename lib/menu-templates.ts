@@ -49,7 +49,8 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
   if (subtitle == null) return { ok: false, error: `Keep the subtitle under ${MENU_LIMITS.subtitle} characters.` };
   const footer = text(raw.footer, MENU_LIMITS.footer);
   if (footer == null) return { ok: false, error: `Keep the footer under ${MENU_LIMITS.footer} characters.` };
-  if (!Array.isArray(raw.sections) || raw.sections.length > MENU_LIMITS.sections) {
+  // Emptied sections and blank rows are dropped and do not count toward the limits (QA B1-04).
+  if (!Array.isArray(raw.sections) || raw.sections.length > MENU_LIMITS.sections * 3) {
     return { ok: false, error: `Use up to ${MENU_LIMITS.sections} sections.` };
   }
   const sections: MenuSection[] = [];
@@ -59,7 +60,7 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
     const sec = s as Record<string, unknown>;
     const name = text(sec.name, MENU_LIMITS.sectionName);
     if (name == null) return { ok: false, error: `Keep section names under ${MENU_LIMITS.sectionName} characters.` };
-    if (!Array.isArray(sec.items) || sec.items.length > MENU_LIMITS.itemsPerSection) {
+    if (!Array.isArray(sec.items) || sec.items.length > MENU_LIMITS.itemsPerSection * 3) {
       return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     }
     const items: MenuItem[] = [];
@@ -75,10 +76,12 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
       if (!itemName) continue; // blank rows are ignored
       items.push({ name: itemName, price: price!, description: description! });
     }
+    if (items.length > MENU_LIMITS.itemsPerSection) return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     total += items.length;
     if (!name && items.length === 0) continue;
     sections.push({ name: name!, items });
   }
+  if (sections.length > MENU_LIMITS.sections) return { ok: false, error: `Use up to ${MENU_LIMITS.sections} sections.` };
   if (total > MENU_LIMITS.items) return { ok: false, error: `Use up to ${MENU_LIMITS.items} items in total.` };
   if (!title && total === 0) return { ok: false, error: "Add a title or at least one item." };
   let photoMediaId: string | null = null;

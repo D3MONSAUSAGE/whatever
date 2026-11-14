@@ -138,8 +138,9 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
   if (!t.band) out.push(`<rect x="${pad}" y="${headerH - 24}" width="${hasHeader ? 160 : 0}" height="8" rx="4" fill="${t.section}"/>`);
   const titleW = W - 2 * pad - (logoBox ? logoBox.w + 40 : 0);
   if (content.title) {
+    // Shrink long titles further (down to 40) before shortening them with "…" (QA B1-06).
     let size = 96;
-    while (size > 64 && approxWidth(content.title, size, 800) > titleW) size -= 4;
+    while (size > 40 && approxWidth(content.title, size, 800) > titleW) size -= 4;
     out.push(`<text x="${pad}" y="${content.subtitle ? 140 : 145}" font-size="${size}" font-weight="800" fill="${t.title}">${esc(fit(content.title, size, titleW, 800))}</text>`);
   }
   if (content.subtitle) {

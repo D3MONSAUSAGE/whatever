@@ -1,7 +1,7 @@
 "use client";
 import { FileUploadControl } from "@/components/file-upload";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   accountSaveBody, applyLibraryFile, boardAfterReload, freshBoard, placeZoneMedia, readAccountStudio,
   type AccountBoard, type AccountLibraryFile, type AccountStudio,
@@ -27,6 +27,8 @@ import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
+import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
+import { ItemNotes, MenuLimits } from "@/components/menu-item-fields";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
 export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000;
@@ -95,6 +97,7 @@ export function LayoutStudio({
   const [step, setStep] = useState<StudioStep>("template");
   const [zone, setZone] = useState(initialZone || (startingTemplate === "triple-column" || startingTemplate === "two-menu-promo" || startingTemplate === "two-column" ? "column-0" : "menu"));
   const [sectionIndex, setSectionIndex] = useState(0);
+  const [nameCheck, setNameCheck] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [clipUrl, setClipUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
@@ -132,7 +135,10 @@ export function LayoutStudio({
   }
   useRegisterStudioLeave(studioIsDirty);
   const liveBrand = useApi<Brand>(accountMode && !fixture && !brand ? "/api/brand" : null);
-  const svg = useMemo(() => layoutSvg(draft, { imageHref }), [draft, imageHref]);
+  // The board preview follows typing at low priority so long menus stay responsive (QA B1-05),
+  // and rows without a name are left out, as they are when the board is saved (QA B1-02).
+  const previewDraft = useDeferredValue(draft);
+  const svg = useMemo(() => layoutSvg(withoutNamelessItems(previewDraft), { imageHref }), [previewDraft, imageHref]);
   const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
   const videoBox = mediaVideoBox(draft);
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
@@ -434,7 +440,20 @@ export function LayoutStudio({
     setNote("Editing the draft. It is not on a screen.");
   }
 
+  function namelessBlocked(): boolean {
+    const nameless = firstNamelessItem(draft.sections);
+    if (!nameless) return false;
+    setNameCheck(true);
+    setNote(ITEM_NAME_REQUIRED);
+    const columns = template === "triple-column" || template === "two-menu-promo" || template === "two-column";
+    setSectionIndex(nameless.section);
+    setZone(columns ? `column-${nameless.section}` : "menu");
+    window.setTimeout(() => document.getElementById(`studio-item-${nameless.section}-${nameless.item}-name`)?.focus(), 50);
+    return true;
+  }
+
   function checkedDraft(): LayoutDocument | null {
+    if (namelessBlocked()) return null;
     const parsed = parseLayout(draft);
     if (!parsed.ok) { setNote(parsed.error); return null; }
     return parsed.value;
@@ -511,6 +530,7 @@ export function LayoutStudio({
   }
 
   async function saveAccount(saveMode: "draft" | "publish") {
+    if (namelessBlocked()) return;
     if (fixture) {
       setNote(saveMode === "publish" ? "Preview only — nothing was published." : "Preview only — nothing was saved.");
       return;
@@ -767,6 +787,8 @@ export function LayoutStudio({
       setClipUrl={setClipUrl}
       setVideoOn={setVideoOn}
       setNote={setNote}
+      nameCheck={nameCheck}
+      setNameCheck={setNameCheck}
     />
   );
   function renderSaveDraft() {
@@ -1027,7 +1049,10 @@ function SelectedZoneEditor({
   zone, template, draft, update, closeZone, account, progress, imageHref, clipUrl, videoOn, accountMode,
   isolatedPhotoLimit = false,
   sectionIndex, setSectionIndex, photoLabel, onPhoto, onVideo, removePhoto, removeVideo, setImageHref, setClipUrl, setVideoOn, setNote,
+  nameCheck = false, setNameCheck = () => {},
 }: {
+  nameCheck?: boolean;
+  setNameCheck?: (on: boolean) => void;
   zone: string;
   template: LayoutTemplate;
   draft: LayoutDocument;
@@ -1065,6 +1090,7 @@ function SelectedZoneEditor({
         <div className="zone-groups">
           <section className="zone-group">
             <h3>{columns ? "Menu column" : "Menu sections"}</h3>
+            {(() => { const counts = menuCounts(draft.sections); return <MenuLimits sections={counts.sections} items={counts.items} maxSections={counts.maxSections} maxItems={counts.maxItems} columns={Boolean(columns)} />; })()}
             {columns ? null : (
               <div className="segment section-tabs" role="group" aria-label="Menu sections">
                 {draft.sections.map((section, index) => (
@@ -1079,23 +1105,44 @@ function SelectedZoneEditor({
               return (
                 <fieldset key={si} className={si === sectionIndex ? "section-card section-block on" : "section-card section-block"}>
                   <legend className="section-card-legend">{columns ? `Menu column ${si + 1}` : `Section ${si + 1}`}</legend>
+                  {columns ? null : (
+                    <div className="section-card-head">
+                      <span className="item-limit">{section.items.filter((item) => item.name.trim()).length} of {MENU_LIMITS.itemsPerSection} items</span>
+                      <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`} disabled={draft.sections.length <= 1}
+                        onClick={() => {
+                          update({ ...draft, sections: draft.sections.filter((_, i) => i !== si) });
+                          setSectionIndex(Math.max(0, Math.min(si, draft.sections.length - 2)));
+                        }}>Remove section</button>
+                    </div>
+                  )}
                   <input aria-label={`Section ${si + 1} name`} className="item-field" style={field} value={section.name} maxLength={MENU_LIMITS.sectionName}
                     onChange={(event) => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, name: event.target.value } : s) })} />
-                  {section.items.map((item, ii) => (
+                  {section.items.map((item, ii) => {
+                    const idBase = `studio-item-${si}-${ii}`;
+                    const nameInvalid = nameCheck && needsName(item);
+                    return (
                     <div key={ii} className="item-card">
-                      <input aria-label={`Item ${ii + 1} in section ${si + 1}`} className="item-name" style={field} placeholder="Item name" value={item.name} maxLength={MENU_LIMITS.itemName}
+                      <input id={`${idBase}-name`} aria-label={`Item ${ii + 1} in section ${si + 1}`} className="item-name" style={field} placeholder="Item name" value={item.name} maxLength={MENU_LIMITS.itemName}
+                        aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined}
                         onChange={(event) => setItem(draft, si, ii, { name: event.target.value }, update)} />
                       <input aria-label={`Price ${ii + 1} in section ${si + 1}`} className="item-price" style={field} placeholder="$0" value={item.price} maxLength={MENU_LIMITS.price}
+                        aria-describedby={`${idBase}-price-hint`}
+                        onBlur={(event) => { const next = normalizePrice(event.target.value); if (next !== item.price) setItem(draft, si, ii, { price: next }, update); if (needsName({ ...item, price: next })) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { price: event.target.value }, update)} />
                       <button type="button" className="item-remove" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
                         onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>
                         <span aria-hidden="true">×</span>
                       </button>
                       <input aria-label={`Description ${ii + 1} in section ${si + 1}`} className="item-desc" style={field} placeholder="Description" value={item.description} maxLength={MENU_LIMITS.description}
+                        aria-describedby={`${idBase}-desc-count`} onBlur={() => { if (needsName(item)) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { description: event.target.value }, update)} />
+                      <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
                     </div>
-                  ))}
-                  <button type="button" className="btn btn-quiet item-add" onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>Add item</button>
+                    );
+                  })}
+                  <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(draft.sections, si)} onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>
+                    {canAddItem(draft.sections, si) ? "Add item" : section.items.length >= MENU_LIMITS.itemsPerSection ? `Section full (${MENU_LIMITS.itemsPerSection} items)` : `Menu full (${MENU_LIMITS.items} items)`}
+                  </button>
                   {template === "triple-column" && si === draft.sections.length - 1 ? (
                     <p className="zone-help">A photo sits behind all three columns. A video is not added, because it would cover a column.</p>
                   ) : null}
@@ -1103,7 +1150,10 @@ function SelectedZoneEditor({
               );
             })}
             {columns ? null : (
-              <button type="button" className="btn btn-quiet item-add" onClick={() => update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] })}>Add section</button>
+              <button type="button" className="btn btn-quiet item-add" disabled={!canAddSection(draft.sections)}
+                onClick={() => { update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] }); setSectionIndex(draft.sections.length); }}>
+                {canAddSection(draft.sections) ? `Add section (${draft.sections.length} of ${MENU_LIMITS.sections})` : `${MENU_LIMITS.sections} sections is the limit. Remove one to add another.`}
+              </button>
             )}
           </section>
         </div>
@@ -1238,9 +1288,10 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
               top: frame.top + hit.box.y * frame.scale,
               width: Math.max(44, hit.box.w * frame.scale),
               height: Math.max(44, hit.box.h * frame.scale),
-              background: active === hit.id ? "rgba(255, 211, 77, 0.28)" : "transparent",
-              border: active === hit.id ? "3px solid #ffd34d" : "2px solid rgba(255,255,255,0.92)",
-              boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.55)",
+              // Selected area: a clear outline, no tint over the board colours (QA U1-10).
+              background: "transparent",
+              border: active === hit.id ? "3px solid #0066ff" : "2px solid rgba(255,255,255,0.92)",
+              boxShadow: active === hit.id ? "0 0 0 2px #ffffff, inset 0 0 0 1px rgba(255,255,255,0.9)" : "inset 0 0 0 1px rgba(0,0,0,0.55)",
               cursor: "pointer", padding: 0, color: "#fff",
             }}
           >

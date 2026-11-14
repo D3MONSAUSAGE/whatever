@@ -33,16 +33,25 @@ export function keepDraftOnZoneChange<T>(draft: T, _fromZone: string, _toZone: s
   return draft;
 }
 
+/** The shared title band on column layouts is 140px tall on the 1920×1080 board. */
+const TITLE_BAND = 140;
+function belowTitle(box: ZoneBox): ZoneBox {
+  if (box.h <= TITLE_BAND * 2) return box;
+  return { x: box.x, y: box.y + TITLE_BAND, w: box.w, h: box.h - TITLE_BAND };
+}
+
 export function previewHits(template: LayoutTemplate, frame: LayoutFrame): { id: string; label: string; box: ZoneBox }[] {
   if (template === "two-menu-promo") {
+    // Column targets start below the shared title band, so their outlines do not cut through the
+    // board title that spans both columns (QA B1-06).
     return [
-      { id: "column-0", label: "Edit menu column 1", box: frame.columns[0] },
-      { id: "column-1", label: "Edit menu column 2", box: frame.columns[1] },
+      { id: "column-0", label: "Edit menu column 1", box: belowTitle(frame.columns[0]) },
+      { id: "column-1", label: "Edit menu column 2", box: belowTitle(frame.columns[1]) },
       { id: "feature", label: "Edit promotion", box: frame.video ?? frame.feature },
     ];
   }
   if (template === "triple-column" || template === "two-column") {
-    const columns = frame.columns.map((box, index) => ({ id: `column-${index}`, label: `Edit column ${index + 1}`, box }));
+    const columns = frame.columns.map((box, index) => ({ id: `column-${index}`, label: `Edit column ${index + 1}`, box: belowTitle(box) }));
     return [...columns, { id: "photo", label: "Edit board photo", box: { x: 0, y: 980, w: 420, h: 100 } }];
   }
   const hits: { id: string; label: string; box: ZoneBox }[] = [];
