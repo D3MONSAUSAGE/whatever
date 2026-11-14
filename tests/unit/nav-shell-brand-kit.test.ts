@@ -30,9 +30,9 @@ const loaded: BrandFields = {
 };
 
 describe("content navigation mapping", () => {
-  it("names the five library destinations", () => {
+  it("names the four library destinations (Menu Boards is its own main-nav section)", () => {
     expect(CONTENT_TABS.map((tab) => tab.label)).toEqual([
-      "Media", "Menu boards", "Promotions", "Playlists", "Presentations",
+      "Media", "Promotions", "Playlists", "Presentations",
     ]);
   });
 
@@ -43,11 +43,11 @@ describe("content navigation mapping", () => {
     expect(activeContentTab("/dashboard/media?kind=image", null)).toBe("media");
     expect(activeContentTab("/dashboard/media", "presentation")).toBe("presentations");
     expect(activeContentTab("/dashboard/media?kind=presentation", "presentation")).toBe("presentations");
-    expect(activeContentTab("/dashboard/media/menus", null)).toBe("menus");
-    expect(activeContentTab("/dashboard/media/menus/", null)).toBe("menus");
+    expect(activeContentTab("/dashboard/media/menus", null)).toBeNull();
+    expect(activeContentTab("/dashboard/media/menus/", null)).toBeNull();
     expect(activeContentTab("/dashboard/media/promos", null)).toBe("promotions");
-    expect(activeContentTab("/dashboard/media/layout-studio", null)).toBe("menus");
-    expect(activeContentTab("/dashboard/media/layout-studio?screen=abc", null)).toBe("menus");
+    expect(activeContentTab("/dashboard/media/layout-studio", null)).toBeNull();
+    expect(activeContentTab("/dashboard/media/layout-studio?screen=abc", null)).toBeNull();
     expect(activeContentTab("/dashboard/playlists/pl-1", null)).toBe("playlists");
     expect(activeContentTab("/dashboard/media/presentations/deck-1", null)).toBe("presentations");
     expect(activeContentTab("/dashboard/screens", null)).toBeNull();
@@ -57,8 +57,8 @@ describe("content navigation mapping", () => {
   it("shows the shared Content nav on library routes and not on account or screens", () => {
     expect(isContentPath("/dashboard/content")).toBe(true);
     expect(isContentPath("/dashboard/media")).toBe(true);
-    expect(isContentPath("/dashboard/media/menus")).toBe(true);
-    expect(isContentPath("/dashboard/media/layout-studio")).toBe(true);
+    expect(isContentPath("/dashboard/media/menus")).toBe(false);
+    expect(isContentPath("/dashboard/media/layout-studio")).toBe(false);
     expect(isContentPath("/dashboard/playlists/pl-1")).toBe(true);
     expect(isContentPath("/dashboard/media?kind=presentation")).toBe(true);
     expect(isContentPath("/dashboard/screens")).toBe(false);
