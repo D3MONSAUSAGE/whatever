@@ -31,6 +31,7 @@ import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-l
 import type { Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
+import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
 export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000;
@@ -943,12 +944,11 @@ export function LayoutStudio({
               </label>
               <p className="zone-help">Room is for a television. Counter is slightly denser.</p>
               <label style={fieldLabel}>Font
-                <div className="segment" role="group" aria-label="Font">
-                  <button type="button" aria-pressed={draft.font === "inter"} onClick={() => update({ ...draft, font: "inter" })}>Inter</button>
-                  <button type="button" aria-pressed={draft.font === "noto-serif"} onClick={() => update({ ...draft, font: "noto-serif" })}>Noto Serif</button>
-                </div>
+                <select className="field" aria-label="Font" value={draft.font} onChange={(event) => { if (isBoardFont(event.target.value)) update({ ...draft, font: event.target.value }); }}>
+                  {BOARD_FONTS.map((font) => <option key={font.id} value={font.id}>{font.label} · {font.hint}</option>)}
+                </select>
               </label>
-              <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif on this page are the same files drawn into the published image.</p>
+              <p style={{ fontSize: 13, color: "#5c534c" }}>The fonts on this page are the same files drawn into the published image.</p>
               <p className="zone-help">Photo and video fit and position are under the board when you select a photo or video area.</p>
               <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
                 <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split} aria-describedby="proportion-note"

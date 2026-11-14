@@ -1,21 +1,22 @@
 import { MENU_LIMITS, normalizeHex, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import type { MediaItem } from "@/lib/api";
+import { BOARD_FONT_IDS, boardFont, FONT_CHOICE_ERROR, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
 
 /** JPG or PNG images that can go on a menu (logos and photos). Menu slides themselves are left out. */
 export function artImages(media: MediaItem[] | null | undefined) {
   return (media ?? []).filter((m) => m.kind !== "video" && /\.(png|jpe?g)$/i.test(m.fileName) && !/\((menu|promo)\)\.png$/.test(m.fileName));
 }
 
-/** Fonts Layout documents and the published PNG renderer already support. Do not expand without player/editor work. */
-export const BRAND_FONTS = ["inter", "noto-serif"] as const;
-export type BrandFont = (typeof BRAND_FONTS)[number];
+/** Fonts Layout documents and the published PNG renderer support (lib/board-fonts.ts). Keep in sync with the brand_kits font check. */
+export const BRAND_FONTS = BOARD_FONT_IDS;
+export type BrandFont = BoardFontId;
 
 export const DISPLAY_NAME_MAX = 80;
 export const PHONE_MAX = 32;
 export const WEBSITE_MAX = 200;
 
 export function isBrandFont(value: unknown): value is BrandFont {
-  return value === "inter" || value === "noto-serif";
+  return isBoardFont(value);
 }
 
 export type BrandIdentity = {
@@ -162,9 +163,9 @@ export function parseOptionalHex(value: unknown, label: string): { ok: true; val
 
 export function parseOptionalFont(value: unknown, label: string): { ok: true; value: BrandFont | null } | { ok: false; error: string } {
   if (value == null) return { ok: true, value: null };
-  if (typeof value !== "string") return { ok: false, error: `Choose Inter or Noto Serif for the ${label}.` };
+  if (typeof value !== "string") return { ok: false, error: `${FONT_CHOICE_ERROR.replace(/\.$/, "")} for the ${label}.` };
   if (!value.trim()) return { ok: true, value: null };
-  if (!isBrandFont(value)) return { ok: false, error: `Choose Inter or Noto Serif for the ${label}.` };
+  if (!isBrandFont(value)) return { ok: false, error: `${FONT_CHOICE_ERROR.replace(/\.$/, "")} for the ${label}.` };
   return { ok: true, value };
 }
 
@@ -455,7 +456,7 @@ export function brandFormUnchanged(
 }
 
 export function fontFamilyName(font: BrandFont | null | undefined): string {
-  return font === "noto-serif" ? "Noto Serif" : "Inter";
+  return boardFont(font).family;
 }
 
 

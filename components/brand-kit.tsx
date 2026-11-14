@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, useApi, type MediaItem } from "@/lib/api";
 import { DirectImageUpload } from "@/components/direct-image-upload";
+import { BOARD_FONTS, fontFaceCss } from "@/lib/board-fonts";
 import { useToast } from "@/components/toast";
 import { IconGear } from "@/components/icons";
 import { LoadState, PageHeader } from "@/components/ui";
@@ -113,10 +114,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   );
 }
 
-const FONT_OPTIONS: { id: BrandFont; label: string }[] = [
-  { id: "inter", label: "Inter" },
-  { id: "noto-serif", label: "Noto Serif" },
-];
+const FONT_OPTIONS: { id: BrandFont; label: string }[] = BOARD_FONTS.map((font) => ({ id: font.id, label: font.label }));
 
 function BrandEditor({
   form, setForm, images, custom, busy, onSave, nameFromBusiness = false, onLogoUploaded,
@@ -180,10 +178,7 @@ function BrandEditor({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,24rem)] items-start">
       <style>{`
-        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
-        @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-bold") format("truetype"); font-weight: 700; font-style: normal; }
-        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif") format("truetype"); font-weight: 400; font-style: normal; }
-        @font-face { font-family: "Noto Serif"; src: url("/layout-studio/media/font/noto-serif-bold") format("truetype"); font-weight: 700; font-style: normal; }
+        ${fontFaceCss()}
       `}</style>
       <section className="card flex flex-col gap-6 p-5 md:p-6" aria-labelledby="brand-heading" id="brand">
         <div>
@@ -281,7 +276,7 @@ function BrandEditor({
 
         <div className="grid gap-3">
           <h3 className="text-sm font-semibold">Fonts</h3>
-          <p className="text-xs text-muted">Inter and Noto Serif, the same faces already drawn into published boards.</p>
+          <p className="text-xs text-muted">The same font files are drawn into published boards. New boards use these; existing boards keep their font.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1">
               <span className="form-label">Heading</span>

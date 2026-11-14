@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { Resvg } from "@resvg/resvg-js";
 import { fontFamily, layoutSvg, type LayoutDocument } from "@/lib/layout-studio";
+import { boardFont } from "@/lib/board-fonts";
 
 const BOARD_EDGE = 1920;
 
@@ -28,10 +29,14 @@ export async function prepareBoardPhoto(bytes: Uint8Array, mime: string): Promis
   }
 }
 
-const FONTS = [
-  "Inter-Regular.ttf", "Inter-Bold.ttf", "Inter-ExtraBold.ttf",
-  "NotoSerif-Regular.ttf", "NotoSerif-Bold.ttf",
-].map((file) => join(process.cwd(), "assets", "fonts", file));
+// Inter and Noto Serif are always loaded (as before, so existing boards render identically);
+// an E6 face is added only for boards that use it.
+const BASE_FONTS = ["inter", "noto-serif"].flatMap((id) => boardFont(id as "inter").files.map((face) => face.file));
+const fontPath = (file: string) => join(process.cwd(), "assets", "fonts", file);
+function fontsFor(font: LayoutDocument["font"]): string[] {
+  const extra = BASE_FONTS.includes(boardFont(font).files[0].file) ? [] : boardFont(font).files.map((face) => face.file);
+  return [...BASE_FONTS, ...extra].map(fontPath);
+}
 
 /** Whole-board PNG. The selected bundled face and the assigned photo are drawn into this file. */
 export function renderLayoutPng(doc: LayoutDocument, image?: { bytes: Uint8Array; mime: "image/png" | "image/jpeg" | "image/webp" } | null): Buffer {
@@ -39,7 +44,7 @@ export function renderLayoutPng(doc: LayoutDocument, image?: { bytes: Uint8Array
     ? `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`
     : null;
   const resvg = new Resvg(layoutSvg(doc, { imageHref: href }), {
-    font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
+    font: { fontFiles: fontsFor(doc.font), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
     fitTo: { mode: "original" },
   });
   return Buffer.from(resvg.render().asPng());
