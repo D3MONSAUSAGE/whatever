@@ -96,8 +96,8 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
 
 export const DAY_PARTS = [
   { key: "breakfast", label: "Breakfast", start: "06:00", end: "11:00" },
-  { key: "lunch", label: "Lunch", start: "11:00", end: "16:00" },
-  { key: "dinner", label: "Dinner", start: "16:00", end: "22:00" },
+  { key: "lunch", label: "Lunch", start: "11:00", end: "17:00" }, // meets Dinner at 5 PM
+  { key: "dinner", label: "Dinner", start: "17:00", end: "22:00" }, // 5 PM, after Lunch ends (QA B2-05)
 ] as const;
 
 export function sampleMenu(): MenuContent {

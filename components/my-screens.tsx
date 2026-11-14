@@ -28,14 +28,23 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
         action={<Link href="/dashboard/displays#add-screen" className="btn btn-primary min-h-11">Add screen</Link>}
       />
       {list.length ? (
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="hidden sm:grid grid-cols-3 gap-2 mb-3">
           <Stat compact label="Total screens" value={list.length} />
           <Stat compact label="Online" value={onlineCount} tone="live" />
           <Stat compact label="Offline" value={offlineCount} tone="danger" />
         </div>
       ) : null}
-      <p className="text-sm mb-4"><Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">Screen groups</Link></p>
-      {displays.data ? <OfflineAlert displays={displays.data} /> : null}
+      {/* Phone: one summary line instead of three tiles and the offline banner, so the first
+          screen's buttons are visible without scrolling (QA U2-06). Each card still shows its status. */}
+      <p className="text-sm mb-3 sm:mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+        {list.length ? (
+          <span className="sm:hidden" data-testid="screens-summary">
+            {list.length} {list.length === 1 ? "screen" : "screens"} · <span className="text-live-ink font-semibold">{onlineCount} online</span>{offlineCount ? <> · <span className="text-danger font-semibold">{offlineCount} offline</span></> : null}
+          </span>
+        ) : null}
+        <Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">Screen groups</Link>
+      </p>
+      {displays.data ? <div className="hidden sm:block"><OfflineAlert displays={displays.data} /></div> : null}
       {!displays.data ? <LoadState error={displays.error} label="Loading screens…" /> : displays.data.length === 0 ? (
         <EmptyState title="No screens yet">
           Pair a TV, then come back here to choose what it plays. <Link href="/dashboard/displays#add-screen" className="underline font-semibold">Add screen</Link>.

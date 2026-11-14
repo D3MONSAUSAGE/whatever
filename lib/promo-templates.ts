@@ -10,15 +10,15 @@ export type PromoContent = {
 export const PROMO_TEMPLATES: { id: PromoTemplate; name: string; blurb: string; base: MenuTemplate; sample: PromoContent; swatch: [string, string] }[] = [
   {
     id: "happy", name: "Happy hour", blurb: "Bold colour with a big price tag.", base: "bold", swatch: ["#0066ff", "#ffd34d"],
-    sample: { tag: "Happy hour", headline: "Half-price drinks", subheadline: "Beer, wine and house cocktails", price: "$4", details: "Every weekday at the bar", footer: "4–7 PM", useBrand: true },
+    sample: { tag: "Happy hour", headline: "[Your drink deal]", subheadline: "[What's included]", price: "[$0]", details: "[Which days, where]", footer: "[Hours]", useBrand: true },
   },
   {
     id: "deal", name: "Deal", blurb: "Bright and clean. Great for 2-for-1s and combos.", base: "fresh", swatch: ["#f6f9fe", "#0066ff"],
-    sample: { tag: "Deal", headline: "2 tacos + drink", subheadline: "Any tacos, any agua fresca", price: "$9.99", details: "", footer: "While supplies last", useBrand: true },
+    sample: { tag: "Deal", headline: "[Your combo]", subheadline: "[What's in it]", price: "[$0]", details: "", footer: "[Fine print]", useBrand: true },
   },
   {
     id: "special", name: "Today's special", blurb: "Dark and elegant. Made for a photo of the dish.", base: "classic", swatch: ["#0b1220", "#4d94ff"],
-    sample: { tag: "Today's special", headline: "Birria tacos", subheadline: "Slow-cooked beef with consommé", price: "$14", details: "", footer: "Ask your server", useBrand: true },
+    sample: { tag: "Today's special", headline: "[Dish name]", subheadline: "[Short description]", price: "[$0]", details: "", footer: "[Ask your server]", useBrand: true },
   },
 ];
 
@@ -31,6 +31,16 @@ export function isPromoTemplate(value: unknown): value is PromoTemplate {
 export function promoBase(template: PromoTemplate): MenuTemplate {
   return PROMO_TEMPLATES.find((t) => t.id === template)!.base;
 }
+/**
+ * New promos start with clearly marked placeholders in [brackets] (QA U2-04), so a realistic-looking
+ * deal is never published by accident. Saved promos keep whatever they already say.
+ */
+const PLACEHOLDER = /^\[.*\]$/;
+const FIELD_NAMES: Record<string, string> = { headline: "headline", subheadline: "subheadline", price: "price", details: "details", footer: "bottom line" };
+export function placeholderFields(content: PromoContent): string[] {
+  return (Object.keys(FIELD_NAMES) as (keyof PromoContent)[]).filter((key) => typeof content[key] === "string" && PLACEHOLDER.test((content[key] as string).trim())).map((key) => FIELD_NAMES[key as string]);
+}
+
 export function samplePromo(template: PromoTemplate = "happy"): PromoContent {
   return { ...PROMO_TEMPLATES.find((t) => t.id === template)!.sample };
 }

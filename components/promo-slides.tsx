@@ -8,7 +8,7 @@ import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/compon
 import { IconImage } from "@/components/icons";
 import { artImages, type MenuBoard } from "@/components/menu-boards";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
-import { PROMO_LIMITS, PROMO_TEMPLATES, samplePromo, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
+import { PROMO_LIMITS, PROMO_TEMPLATES, placeholderFields, samplePromo, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
 
 export type Promo = {
   id: string; name: string; template: PromoTemplate; content: PromoContent | null; mediaId: string | null; imageUrl: string | null;
@@ -253,7 +253,7 @@ function PromoEditor({ draft, setDraft, images, onSaved, onError, previewSrc, re
       const body = JSON.stringify({ name: draft.name, template: draft.template, content: draft.content, startsOn: draft.startsOn || null, endsOn: draft.endsOn || null });
       if (draft.id) await api(`/api/promos/${draft.id}`, { method: "PATCH", body });
       else await api("/api/promos", { method: "POST", body });
-      onSaved(draft.id ? "Promo updated. Screens showing it refresh within a minute." : "Promo created. Add it to a menu to put it on your screens.");
+      onSaved(draft.id ? "Promo updated. Screens showing it refresh within a minute." : `Promo created, with a one-slide playlist called “${draft.name}” in Playlists. Add it to a menu to put it on your screens.`);
     } catch (err) {
       onError((err as Error).message);
     } finally {
@@ -324,6 +324,10 @@ function PromoEditor({ draft, setDraft, images, onSaved, onError, previewSrc, re
             <button className="btn btn-primary" disabled={busy} onClick={save}>{busy ? "Saving…" : draft.id ? "Save changes" : "Create promo"}</button>
             <button className="btn btn-quiet" disabled={busy} onClick={() => setDraft(null)}>Cancel</button>
           </div>
+          {placeholderFields(c).length ? (
+            <p className="note-warn text-sm" role="status" data-testid="promo-placeholders">Still placeholder text: {placeholderFields(c).join(", ")}. Replace it with your real offer before you add this to a menu.</p>
+          ) : null}
+          {!draft.id ? <p className="text-xs text-muted" data-testid="promo-playlist-note">Creating a promo also adds a one-slide playlist with the same name to Playlists, so you can schedule it or put it on a screen by itself.</p> : null}
         </div>
       </div>
     </div>

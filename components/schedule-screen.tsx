@@ -1,5 +1,6 @@
 "use client";
 import { DayPartSetup } from "@/components/day-parts";
+import { findOverlaps, isOvernight, isPastRange, overnightMessage, pastRangeMessage, type RuleLike } from "@/lib/schedule-checks";
 import { useMemo, useState } from "react";
 import {
   api,
@@ -173,6 +174,8 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
         displays={(displays.data ?? []).filter((d) => d.connected)}
         groups={groups.data ?? []}
         playlists={playlists.data ?? []}
+        schedules={schedules.data ?? []}
+        ask={confirm.ask}
         preview={!!fixture}
         onSubmit={async (body) => {
           let ok = false;
@@ -192,6 +195,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
         groups={groups.data ?? []}
         playlists={playlists.data ?? []}
         error={schedules.error}
+        ask={confirm.ask}
         onSnapshot={(playlistId) => run(async () => {
           await api(`/api/playlists/${playlistId}/snapshot`, { method: "POST" });
           await playlists.reload();
@@ -383,8 +387,9 @@ function DisplayChecks({ displays, picked, onChange, legend }: { displays: Displ
 }
 
 function Rules({
-  schedules, displays, groups, playlists, error, onSnapshot, onCreate, onToggle, onDelete,
+  schedules, displays, groups, playlists, error, ask, onSnapshot, onCreate, onToggle, onDelete,
 }: {
+  ask: ReturnType<typeof useConfirm>["ask"];
   schedules: ScheduleItem[] | null;
   displays: DisplayItem[];
   groups: ScreenGroupItem[];
@@ -408,14 +413,34 @@ function Rules({
   const [endsOn, setEndsOn] = useState("");
   const [priority, setPriority] = useState("0");
   const selected = playlists.find((playlist) => playlist.id === playlistId);
+  const effectiveEnd = untilMidnight ? "24:00" : endTime;
+  const draft: RuleLike = {
+    name: name || "This rule",
+    displayId: target === "display" ? displayId || null : null,
+    groupId: target === "group" ? groupId || null : null,
+    weekdays, startTime, endTime: effectiveEnd, startsOn: startsOn || null, endsOn: endsOn || null,
+    priority: Number(priority) || 0,
+  };
+  const overnight = isOvernight(startTime, effectiveEnd);
+  const past = isPastRange(endsOn || null);
+  const overlaps = draft.displayId || draft.groupId ? findOverlaps(draft, schedules ?? [], groups) : [];
 
   return (
     <div className="mb-10">
       <h2 className="text-lg font-semibold mb-3">Schedules</h2>
       <form
         className="card p-4 grid gap-3 mb-3"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
+          // QA B2-02 / B2-04: an overnight window or a range that already ended needs an explicit OK.
+          if (overnight) {
+            const ok = await ask({ title: "This runs overnight", body: overnightMessage(startTime, effectiveEnd), confirmLabel: "Yes, run overnight" });
+            if (ok !== true) return;
+          }
+          if (past) {
+            const ok = await ask({ title: "These dates have passed", body: pastRangeMessage(endsOn), confirmLabel: "Save anyway" });
+            if (ok !== true) return;
+          }
           onCreate({
             name,
             playlistId,
@@ -511,6 +536,13 @@ function Rules({
           <input className="field mt-1" type="number" min={-1000} max={1000} step={1} value={priority} onChange={(event) => setPriority(event.target.value)} />
         </label>
         <p className="text-xs text-muted">Higher priority wins between two rules of the same kind. A screen rule still beats a group rule.</p>
+        {overnight ? <p className="note-warn text-sm" role="status" data-testid="schedule-overnight">{overnightMessage(startTime, effectiveEnd)}</p> : null}
+        {past ? <p className="note-warn text-sm" role="status" data-testid="schedule-past">{pastRangeMessage(endsOn)}</p> : null}
+        {overlaps.length ? (
+          <div className="note-warn text-sm grid gap-1" role="status" data-testid="schedule-overlaps">
+            {overlaps.map((item) => <p key={item.other.id ?? item.other.name}>{item.message}</p>)}
+          </div>
+        ) : null}
         <LimitNote count={schedules?.length} max={200} noun="schedules" />
         <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(schedules?.length, 200)}>Add schedule</button>
       </form>
@@ -529,6 +561,10 @@ function Rules({
                 {schedule.priority ? ` · priority ${schedule.priority}` : ""}
               </p>
               <p className="text-xs text-muted">{schedule.displayId ? "This screen" : "Group"}{schedule.startsOn ? ` · from ${schedule.startsOn}` : ""}{schedule.endsOn ? ` · through ${schedule.endsOn}` : ""}</p>
+              {schedule.enabled ? findOverlaps(schedule, schedules, groups).map((item) => (
+                <p key={item.other.id} className="text-xs text-muted" data-testid="schedule-overlap-note">{item.message}</p>
+              )) : null}
+              {schedule.enabled && isPastRange(schedule.endsOn) ? <p className="text-xs text-muted">Its dates have passed, so it no longer plays.</p> : null}
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn btn-quiet" onClick={() => onToggle(schedule)}>{schedule.enabled ? `Pause ${schedule.name}` : `Enable ${schedule.name}`}</button>
                 <button type="button" className="btn btn-quiet text-danger" onClick={() => onDelete(schedule)}>Delete {schedule.name}</button>
