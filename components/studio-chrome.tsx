@@ -132,8 +132,9 @@ export function StudioStyles() {
         .template-thumb-name { font-size: 11px; font-weight: 650; line-height: 1.3; color: #0b1220; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .section-card { background: #fff; border: 1px solid #e2e7ef; border-radius: 14px; margin: 10px 0; padding: 12px; min-width: 0; }
         .section-card-legend { padding: 0 4px; }
-        .section-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; min-width: 0; }
+        .section-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; min-width: 0; }
         .section-card-head .section-card-legend { padding: 0; margin: 0; flex: 1 1 auto; min-width: 0; }
+        .section-card-head > .item-limit { flex: 1 1 auto; min-width: 0; }
         .section-remove { border: 0; background: transparent; color: #8a3a32; font: inherit; font-size: 13px; font-weight: 650; min-height: 44px; min-width: 44px; padding: 0 8px; cursor: pointer; border-radius: 8px; flex: 0 0 auto; }
         .section-remove:hover { background: #fdecea; }
         .section-remove:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }

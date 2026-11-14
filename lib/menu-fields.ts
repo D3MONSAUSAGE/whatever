@@ -98,6 +98,11 @@ export function charCount(value: string, max: number): string {
 
 /** Styles for the shared item notes, injected by StudioStyles. */
 export const MENU_FIELD_STYLES = `
+        .item-card .item-order { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; margin-top: -2px; }
+        .section-order { display: inline-flex; gap: 6px; flex: 0 0 auto; }
+        .order-btn { border: 1px solid #d5dae3; background: #fff; color: #1f2937; font: inherit; font-size: 12px; font-weight: 650; min-height: 32px; min-width: 44px; padding: 0 10px; border-radius: 8px; cursor: pointer; }
+        .order-btn:hover:not(:disabled) { background: #f2f5fa; }
+        .order-btn:disabled { opacity: .4; cursor: default; }
         .item-card .item-note { grid-column: 1 / -1; margin: -2px 0 0; font-size: 12px; line-height: 1.35; }
         .item-card .item-note-error { color: #b42318; font-weight: 650; }
         .item-card .item-note-hint { color: #7a5b00; }
@@ -111,3 +116,22 @@ export const MENU_FIELD_STYLES = `
         .classic-add-photo:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; }
         .item-limit { margin: 6px 0 0; font-size: 12px; color: #5c6474; }
 `;
+
+/** Move one entry up (-1) or down (+1); out-of-range moves return the same array (E1). */
+export function moveEntry<T>(list: T[], index: number, dir: -1 | 1): T[] {
+  const to = index + dir;
+  if (index < 0 || index >= list.length || to < 0 || to >= list.length) return list;
+  const next = list.slice();
+  [next[index], next[to]] = [next[to], next[index]];
+  return next;
+}
+
+/** Move a section up or down. Items travel with it. */
+export function moveSection<S>(sections: S[], si: number, dir: -1 | 1): S[] {
+  return moveEntry(sections, si, dir);
+}
+
+/** Move an item up or down inside its own section. */
+export function moveItem<S extends { items: I[] }, I>(sections: S[], si: number, ii: number, dir: -1 | 1): S[] {
+  return sections.map((section, i) => (i === si ? { ...section, items: moveEntry(section.items, ii, dir) } : section));
+}
