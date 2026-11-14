@@ -25,7 +25,9 @@ export function directUploadStatus(state: DirectUploadState, what: "logo" | "pho
     case "busy":
       return `Uploading ${state.name}… ${Math.round(state.progress)}%`;
     case "done":
-      return `Uploaded ${state.name}. It's selected as your ${what} and saved in Media.`;
+      return what === "logo"
+        ? `Uploaded ${state.name} to Media and selected. Click Save brand to apply.`
+        : `Uploaded ${state.name} to Media and selected. Save the board to apply.`;
     case "error":
       return state.message;
     default:

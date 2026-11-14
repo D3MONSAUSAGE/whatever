@@ -68,6 +68,7 @@ export function ClassicEditor({
   const photoSelectRef = useRef<HTMLSelectElement | null>(null);
   const [nameCheck, setNameCheck] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewRetry, setPreviewRetry] = useState(0);
   // Up/Down moves refresh the preview at once instead of after the typing debounce (QA retest 3 low).
   const refreshNow = useRef(false);
   const latest = useRef({ draft, setDraft });
@@ -103,6 +104,8 @@ export function ClassicEditor({
       return;
     }
     let cancelled = false;
+    // Abort the in-flight render when a newer edit or move supersedes it (no overlapping POSTs).
+    const abort = new AbortController();
     const run = async () => {
       setPreviewBusy(true);
       try {
@@ -112,6 +115,7 @@ export function ClassicEditor({
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ template: draft.template, content: draft.content }),
+          signal: abort.signal,
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -148,16 +152,19 @@ export function ClassicEditor({
       void run();
       return () => {
         cancelled = true;
+        abort.abort();
       };
     }
-    const delay = refreshNow.current ? 0 : 450;
+    // Moves refresh after a short 150ms debounce (rapid Up/Down coalesces); typing keeps 450ms.
+    const delay = refreshNow.current ? 150 : 450;
     refreshNow.current = false;
     const timer = window.setTimeout(() => { void run(); }, delay);
     return () => {
       cancelled = true;
+      abort.abort();
       window.clearTimeout(timer);
     };
-  }, [draft.template, draft.content, readOnly, previewSrc]);
+  }, [draft.template, draft.content, readOnly, previewSrc, previewRetry]);
 
   useEffect(() => () => {
     if (last.current) URL.revokeObjectURL(last.current);
@@ -239,6 +246,12 @@ export function ClassicEditor({
         ) : null}
         {preview && previewBusy ? (
           <span role="status" style={{ position: "absolute", top: 8, right: 8, padding: "2px 8px", borderRadius: 999, background: "rgba(0,0,0,.65)", color: "#fff", fontSize: 12 }}>Updating preview…</span>
+        ) : null}
+        {preview && previewError && !previewBusy ? (
+          <span role="alert" style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", gap: 8, padding: "2px 4px 2px 10px", borderRadius: 999, background: "rgba(120,20,20,.85)", color: "#fff", fontSize: 12 }}>
+            Preview didn&apos;t update.
+            <button type="button" onClick={() => { refreshNow.current = true; setPreviewRetry((n) => n + 1); }} style={{ background: "#fff", color: "#7a1414", borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>Try again</button>
+          </span>
         ) : null}
         {preview ? null : (
           <p style={{ margin: 0, padding: 16, fontSize: 14, color: "#5c6474", textAlign: "center" }}>{previewLoading ? "Loading preview…" : previewError || "Preview will appear here."}</p>

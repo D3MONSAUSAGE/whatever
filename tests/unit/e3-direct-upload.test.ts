@@ -19,7 +19,8 @@ describe("E3: upload a logo or photo from the editor", () => {
   it("explains progress, success and errors in plain words", () => {
     expect(directUploadStatus({ phase: "idle" }, "logo")).toBe("");
     expect(directUploadStatus({ phase: "busy", name: "logo.png", progress: 41.6 }, "logo")).toBe("Uploading logo.png… 42%");
-    expect(directUploadStatus({ phase: "done", name: "patio.jpg" }, "photo")).toBe("Uploaded patio.jpg. It's selected as your photo and saved in Media.");
+    expect(directUploadStatus({ phase: "done", name: "logo.png" }, "logo")).toBe("Uploaded logo.png to Media and selected. Click Save brand to apply.");
+    expect(directUploadStatus({ phase: "done", name: "patio.jpg" }, "photo")).toBe("Uploaded patio.jpg to Media and selected. Save the board to apply.");
     expect(directUploadStatus({ phase: "error", message: "Images must be 15 MB or smaller." }, "photo")).toBe("Images must be 15 MB or smaller.");
   });
 
@@ -45,7 +46,13 @@ describe("E3: upload a logo or photo from the editor", () => {
   it("refreshes the classic preview right after an Up/Down move (QA retest 3 low)", () => {
     const classic = readFileSync("components/classic-editor.tsx", "utf8");
     expect(classic.match(/refreshNow\.current = true; update\(/g)).toHaveLength(2);
-    expect(classic).toMatch(/const delay = refreshNow\.current \? 0 : 450;/);
+    expect(classic).toMatch(/const delay = refreshNow\.current \? 150 : 450;/);
+    // Superseded renders are aborted, so rapid moves never overlap preview POSTs (Gother low 1).
+    expect(classic).toMatch(/signal: abort\.signal/);
+    expect(classic.match(/abort\.abort\(\);/g)).toHaveLength(2);
+    // A failed refresh over an existing preview says so and offers a retry (Gother low 2).
+    expect(classic).toMatch(/Preview didn&apos;t update\./);
+    expect(classic).toMatch(/setPreviewRetry\(\(n\) => n \+ 1\)/);
     expect(classic).toMatch(/Updating preview…/);
   });
 });
