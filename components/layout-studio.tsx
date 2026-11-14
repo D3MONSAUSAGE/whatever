@@ -28,8 +28,8 @@ import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
-import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
-import { ItemNotes, MenuLimits } from "@/components/menu-item-fields";
+import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
+import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
 export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000;
@@ -1121,6 +1121,11 @@ function SelectedZoneEditor({
                   {columns ? null : (
                     <div className="section-card-head">
                       <span className="item-limit">{section.items.filter((item) => item.name.trim()).length} of {MENU_LIMITS.itemsPerSection} items</span>
+                      <OrderButtons className="section-order" label={`section ${si + 1}`} index={si} count={draft.sections.length}
+                        onMove={(dir) => {
+                          update({ ...draft, sections: moveSection(draft.sections, si, dir) });
+                          setSectionIndex(Math.max(0, Math.min(draft.sections.length - 1, si + dir)));
+                        }} />
                       <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`} disabled={draft.sections.length <= 1}
                         onClick={() => {
                           update({ ...draft, sections: draft.sections.filter((_, i) => i !== si) });
@@ -1150,6 +1155,8 @@ function SelectedZoneEditor({
                         aria-describedby={`${idBase}-desc-count`} onBlur={() => { if (needsName(item)) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { description: event.target.value }, update)} />
                       <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
+                      <OrderButtons label={`item ${ii + 1} in section ${si + 1}`} index={ii} count={section.items.length}
+                        onMove={(dir) => update({ ...draft, sections: moveItem(draft.sections, si, ii, dir) })} />
                     </div>
                     );
                   })}

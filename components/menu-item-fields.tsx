@@ -36,3 +36,20 @@ export function MenuLimits({ sections, items, maxSections, maxItems, columns }: 
     </p>
   );
 }
+
+/** Up/Down buttons for an item or a section (E1). No drag and drop. */
+export function OrderButtons({ label, index, count, onMove, className = "item-order" }: {
+  label: string;
+  index: number;
+  count: number;
+  onMove: (dir: -1 | 1) => void;
+  className?: string;
+}) {
+  if (count < 2) return null;
+  return (
+    <div className={className} role="group" aria-label={`Order of ${label}`}>
+      <button type="button" className="order-btn" aria-label={`Move ${label} up`} disabled={index === 0} onClick={() => onMove(-1)}>↑ Up</button>
+      <button type="button" className="order-btn" aria-label={`Move ${label} down`} disabled={index === count - 1} onClick={() => onMove(1)}>↓ Down</button>
+    </div>
+  );
+}

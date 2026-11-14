@@ -7,8 +7,8 @@ import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/li
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
-import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, needsName, normalizePrice } from "@/lib/menu-fields";
-import { ItemNotes, MenuLimits } from "@/components/menu-item-fields";
+import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
+import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
 
 export type ClassicDraft = {
   id: string | null;
@@ -267,6 +267,8 @@ export function ClassicEditor({
           <section key={si} className="section-card" aria-labelledby={`classic-section-${si}`}>
             <div className="section-card-head">
               <h3 id={`classic-section-${si}`} className="section-card-legend">Section {si + 1}</h3>
+              <OrderButtons className="section-order" label={`section ${si + 1}`} index={si} count={c.sections.length}
+                onMove={(dir) => update({ ...c, sections: moveSection(c.sections, si, dir) })} />
               <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`}
                 onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove</button>
             </div>
@@ -290,6 +292,8 @@ export function ClassicEditor({
                   <input className="item-desc" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })}
                     onBlur={() => { if (needsName(item)) setNameCheck(true); }} aria-describedby={`${idBase}-desc-count`} />
                   <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
+                  <OrderButtons label={`item ${ii + 1} in section ${si + 1}`} index={ii} count={section.items.length}
+                    onMove={(dir) => update({ ...c, sections: moveItem(c.sections, si, ii, dir) })} />
                 </div>
               );
             })}
