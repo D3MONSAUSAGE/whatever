@@ -9,7 +9,7 @@ import { useUploads } from "@/components/uploads";
 import { useConfirm } from "@/components/confirm";
 import { ContentPicker } from "@/components/content-picker";
 import { buildScreenPickerEntries, type PickerEntry } from "@/lib/content-picker";
-import { findOverlaps, isOvernight, overnightMessage } from "@/lib/schedule-checks";
+import { findOverlaps, isOvernight, overnightMessage, savedOvernightOk } from "@/lib/schedule-checks";
 import { FileUploadControl } from "@/components/file-upload";
 import {
   SCREEN_ACTION_ORDER,
@@ -391,6 +391,7 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
       setStart("11:00");
       setEnd("14:00");
       setWeekdays([1, 2, 3, 4, 5, 6, 7]);
+      setOvernightOk(false);
       return;
     }
     const from = shiftClock(item.startTime.slice(0, 5), storedZone, nextZone);
@@ -399,8 +400,11 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
     setName(item.name);
     setPlaylistId(item.playlistId);
     setStart(from.time);
-    setEnd(until.time === "00:00" && item.endTime.startsWith("24") ? "24:00" : until.time);
+    const endShown = until.time === "00:00" && item.endTime.startsWith("24") ? "24:00" : until.time;
+    setEnd(endShown);
     setWeekdays(shiftWeekdays(item.weekdays, from.dayDelta));
+    // A rule that was already saved as overnight was confirmed then; name or playlist edits must not ask again.
+    setOvernightOk(savedOvernightOk(from.time, endShown));
   }
 
   useEffect(() => {
@@ -475,10 +479,10 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-sm">From
-          <input className="field mt-1 w-full" aria-label="Start time" type="time" value={start === "24:00" ? "00:00" : start} onChange={(event) => setStart(event.target.value)} />
+          <input className="field mt-1 w-full" aria-label="Start time" type="time" value={start === "24:00" ? "00:00" : start} onChange={(event) => { setStart(event.target.value); setOvernightOk(false); }} />
         </label>
         <label className="text-sm">Until
-          <input className="field mt-1 w-full" aria-label="End time" type="time" value={end === "24:00" ? "00:00" : end} onChange={(event) => setEnd(event.target.value)} />
+          <input className="field mt-1 w-full" aria-label="End time" type="time" value={end === "24:00" ? "00:00" : end} onChange={(event) => { setEnd(event.target.value); setOvernightOk(false); }} />
         </label>
       </div>
       {overnight ? (

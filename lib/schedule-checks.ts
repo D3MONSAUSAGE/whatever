@@ -40,6 +40,11 @@ export function isOvernight(startTime: string, endTime: string): boolean {
   return end < start;
 }
 
+/** A saved overnight rule was already confirmed, so loading it pre-ticks "Yes, run overnight" (Gother PR92 MEDIUM). */
+export function savedOvernightOk(startTime: string, endTime: string): boolean {
+  return isOvernight(startTime.slice(0, 5), endTime.slice(0, 5));
+}
+
 export function overnightMessage(startTime: string, endTime: string): string {
   return `This runs overnight: it starts at ${formatClock12(startTime)} and ends at ${formatClock12(endTime)} the next day. While it runs it replaces anything else on that screen.`;
 }

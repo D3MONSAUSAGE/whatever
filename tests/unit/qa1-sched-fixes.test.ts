@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { findOverlaps, isOvernight, isPastRange, overlapDays, overnightMessage, winner, type RuleLike } from "@/lib/schedule-checks";
+import { findOverlaps, isOvernight, isPastRange, overlapDays, overnightMessage, savedOvernightOk, winner, type RuleLike } from "@/lib/schedule-checks";
 import { dayPartSources, DAY_PART_PRIORITY } from "@/lib/day-part-sources";
 import { DAY_PARTS } from "@/lib/menu-templates";
 import { togglePicks } from "@/lib/pick-order";
@@ -93,7 +93,7 @@ describe("B2-01 / B2-05 wizard sources and defaults", () => {
   });
   it("starts Dinner at 5 PM after Lunch and keeps the wizard priority", () => {
     expect(DAY_PARTS.find((p) => p.key === "dinner")?.start).toBe("17:00");
-    expect(DAY_PARTS.find((p) => p.key === "lunch")?.end).toBe("16:00");
+    expect(DAY_PARTS.find((p) => p.key === "lunch")?.end).toBe("17:00");
     expect(DAY_PART_PRIORITY).toBe(10);
   });
   it("replaces the misleading server message", () => {
@@ -131,5 +131,17 @@ describe("U2-04 promo placeholders", () => {
 describe("B2-08 reset link wording", () => {
   it("covers both used and expired links", () => {
     expect(friendlyAuthError("Email link is invalid or has expired")).toBe("This link has expired or was already used. Ask for a new one.");
+  });
+  it("a saved overnight rule loads already confirmed, so name or playlist edits can save (Gother PR92 MEDIUM)", () => {
+    expect(savedOvernightOk("22:00:00", "02:00:00")).toBe(true);
+    expect(savedOvernightOk("11:00:00", "14:00:00")).toBe(false);
+    expect(savedOvernightOk("18:00:00", "24:00:00")).toBe(false);
+    const src = readFileSync("components/screen-actions.tsx", "utf8");
+    expect(src).toMatch(/setOvernightOk\(savedOvernightOk\(from\.time, endShown\)\)/);
+    expect(src).toMatch(/setWeekdays\(\[1, 2, 3, 4, 5, 6, 7\]\);\s*setOvernightOk\(false\);/);
+    // Changing the times to a new overnight window still needs the tick at save time.
+    expect(src).toMatch(/if \(overnight && !overnightOk\) throw/);
+    expect(src).toMatch(/setStart\(event\.target\.value\); setOvernightOk\(false\);/);
+    expect(src).toMatch(/setEnd\(event\.target\.value\); setOvernightOk\(false\);/);
   });
 });
