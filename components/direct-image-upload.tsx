@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { uploadArtImage } from "@/components/uploads";
-import { ART_UPLOAD_ACCEPT, artUploadError, directUploadStatus, type DirectUploadState } from "@/lib/direct-upload";
+import { ART_UPLOAD_ACCEPT, artUploadError, directUploadStatus, openFilePicker, type DirectUploadState } from "@/lib/direct-upload";
 
 /**
  * Upload a logo or photo without leaving the editor (E3). Uses the Media page's image
@@ -20,6 +20,7 @@ export function DirectImageUpload({
   upload?: typeof uploadArtImage;
 }) {
   const [state, setState] = useState<DirectUploadState>({ phase: "idle" });
+  const inputRef = useRef<HTMLInputElement>(null);
   const busy = state.phase === "busy";
   const status = directUploadStatus(state, what);
 
@@ -43,20 +44,31 @@ export function DirectImageUpload({
 
   return (
     <div className="grid gap-1" data-testid={`direct-upload-${what}`}>
-      <label className={`btn btn-quiet cursor-pointer min-h-11 justify-self-start ${disabled || busy ? "pointer-events-none opacity-60" : ""}`}>
+      {/* A real button (mouse, Enter and Space) that opens the hidden file input directly (E3 hotfix). */}
+      <button
+        type="button"
+        className="btn btn-quiet min-h-11 justify-self-start"
+        disabled={disabled || busy}
+        aria-busy={busy || undefined}
+        onClick={() => openFilePicker(inputRef.current)}
+      >
         {busy ? "Uploading…" : what === "logo" ? "Upload a logo" : "Upload a photo"}
-        <input
-          type="file"
-          accept={ART_UPLOAD_ACCEPT}
-          disabled={disabled || busy}
-          className="sr-only"
-          onChange={(event) => {
-            const files = [...(event.target.files ?? [])];
-            event.target.value = "";
-            void onFiles(files);
-          }}
-        />
-      </label>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ART_UPLOAD_ACCEPT}
+        disabled={disabled || busy}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
+        data-testid={`direct-upload-${what}-input`}
+        onChange={(event) => {
+          const files = [...(event.target.files ?? [])];
+          event.target.value = "";
+          void onFiles(files);
+        }}
+      />
       <p className="text-xs text-muted">JPG or PNG, 15 MB or smaller. It's also saved in Media.</p>
       <p
         className={`text-sm ${state.phase === "error" ? "text-danger" : "text-muted"}`}
