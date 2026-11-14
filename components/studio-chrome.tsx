@@ -25,9 +25,12 @@ export function StudioStyles() {
   return (
     <style>{`
 
+        /* Menu-board workspaces get a wider cap than standard dashboard pages, centred in the
+           space next to the sidebar, so ultrawide monitors do not stretch the board edge to edge. */
         body:has(.studio-app) main.shell-main {
-          max-width: none !important;
-          width: auto;
+          max-width: 1880px !important;
+          width: 100%;
+          margin-inline: auto;
           padding: 0.4rem 0.75rem 1rem !important;
         }
         body:has(.studio-app) nav[aria-label="Mobile"] { display: none !important; }
@@ -59,6 +62,8 @@ export function StudioStyles() {
         .studio-heading { grid-area: head; }
         .studio-controls { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
         .studio-canvas { grid-area: canvas; display: none; min-width: 0; position: sticky; top: 4.25rem; }
+        .studio-canvas-tools { min-width: 0; }
+        .studio-canvas-tools .studio-selected-editor, .studio-canvas-tools .studio-panel { box-shadow: 0 1px 2px rgba(11,18,32,.04); }
         .studio-canvas-stage { background: #e7edf5; border-radius: 16px; padding: 12px; display: flex; align-items: flex-start; justify-content: center; }
         .studio-canvas .preview-frame { width: 100%; box-shadow: 0 10px 36px rgba(11,18,32,.16); border-radius: 12px; }
         .studio-preview { grid-area: preview; display: flex; flex-direction: column; gap: 8px; min-width: 0; position: sticky; top: 4.25rem; align-self: start; }
@@ -177,6 +182,11 @@ export function StudioStyles() {
           .studio-controls input, .studio-controls select, .studio-controls button, .studio-controls a { min-height: 44px; max-width: 100%; }
         }
         @media (min-width: 861px) {
+          /* One sticky column: board on top, the selected photo/video area's controls under it.
+             The column never grows past the viewport; only the controls scroll inside it. */
+          .studio-canvas { max-height: calc(100dvh - 5rem); }
+          .studio-canvas > .studio-canvas-stage { flex: 0 0 auto; width: min(100%, calc((100dvh - 26rem) * 16 / 9 + 24px)); align-self: center; }
+          .studio-canvas-tools { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
           .studio-toolbar .studio-kicker { display: none; }
           .studio-save-inline { display: none !important; }
           .studio-tabs { display: none !important; }
@@ -188,16 +198,14 @@ export function StudioStyles() {
           .studio-preview { display: none !important; }
         }
         @media (min-width: 1180px) {
-          .studio-grid { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "controls canvas"; }
+          /* Wider editing column, moderately smaller board (still 16:9). */
+          .studio-grid { grid-template-columns: clamp(400px, 40%, 560px) minmax(0, 1fr); grid-template-areas: "controls canvas"; }
           .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
           .studio-preview { display: none !important; }
         }
         @media (min-width: 861px) and (max-width: 1179px) {
           .studio-preview { display: none !important; }
           .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
-        }
-        @media (min-width: 1680px) {
-          .studio-grid { grid-template-columns: 360px minmax(0, 1fr); }
         }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter") format("truetype"); font-weight: 400; font-style: normal; }
         @font-face { font-family: Inter; src: url("/layout-studio/media/font/inter-bold") format("truetype"); font-weight: 700; font-style: normal; }

@@ -228,7 +228,7 @@ export function ClassicEditor({
   const contentPanel = (
     <details className="studio-panel" open>
       <summary className="studio-panel-summary">Content &amp; text</summary>
-      {editingLabel}
+      {region === "menu" ? editingLabel : null}
       <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor" className="grid gap-3">
         <label className="grid gap-1"><span className="form-label">Title on screen</span>
           <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
@@ -274,7 +274,7 @@ export function ClassicEditor({
   const photoPanel = (
     <details className="studio-panel" open={step === "photo" || hasPhoto}>
       <summary className="studio-panel-summary">Photo</summary>
-      {editingLabel}
+      {region === "photo" ? editingLabel : null}
       <label className="grid gap-1"><span className="form-label">Photo (optional)</span>
         <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
           <option value="">No photo</option>
@@ -353,9 +353,12 @@ export function ClassicEditor({
           <div className={step === "content" ? "studio-pane on" : "studio-pane"} data-step="template">
             {contentPanel}
           </div>
-          <div className={step === "photo" ? "studio-pane on" : "studio-pane"} data-step="template">
-            {photoPanel}
-          </div>
+          {/* Phones keep the Photo step in the stacked column; wider screens show it under the board. */}
+          {studioBp === "phone" ? (
+            <div className={step === "photo" ? "studio-pane on" : "studio-pane"} data-step="template">
+              {photoPanel}
+            </div>
+          ) : null}
         </section>
         <section className="studio-controls studio-controls-end" data-testid="studio-tools-style">
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
@@ -376,6 +379,11 @@ export function ClassicEditor({
           <p className="studio-kicker">Board · preview of what your TV will show</p>
           <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
+          {studioBp !== "phone" ? (
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label="Photo controls" tabIndex={0}>
+              {photoPanel}
+            </div>
+          ) : null}
         </section>
       </div>
 

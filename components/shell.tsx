@@ -129,7 +129,9 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
             <SignOutButton onSignOut={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</SignOutButton>
           </span>
         </header>
-        <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : "max-w-6xl px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
+        {/* Standard pages sit in one centred column (max 1360px) inside the space next to the sidebar.
+            The menu-board workspaces opt out via StudioStyles and use their own wider cap. */}
+        <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : "w-full max-w-[1360px] mx-auto px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
           <UploadProgress />
           {preview || studio ? null : <BillingBanner />}
           {preview || studio ? null : <AlertsBanner />}
