@@ -274,7 +274,7 @@ export function ClassicEditor({
   const photoPanel = (
     <details className="studio-panel" open={step === "photo" || hasPhoto}>
       <summary className="studio-panel-summary">Photo</summary>
-      {editingLabel}
+      {region === "photo" ? editingLabel : null}
       <label className="grid gap-1"><span className="form-label">Photo (optional)</span>
         <select className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
           <option value="">No photo</option>
