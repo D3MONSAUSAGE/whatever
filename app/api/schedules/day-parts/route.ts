@@ -6,6 +6,7 @@ import { isUuid } from "@/lib/server/crypto";
 import { CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
 import { parseScheduleBody, type ScheduleDraft } from "@/lib/server/schedule";
 import { assertTarget } from "@/lib/server/schedule-target";
+import { DAY_PART_PRIORITY } from "@/lib/day-part-sources";
 const DAY_PART_MAX = 6;
 const MAX_SCHEDULES = 200;
 
@@ -30,15 +31,17 @@ export async function POST(req: Request) {
     let playlistId = part.playlistId;
     if (part.menuId != null) {
       if (typeof part.menuId !== "string" || !isUuid(part.menuId)) return fail("Menu not found.", 404);
-      const menu = await db().from("menus").select("playlist_id").eq("id", part.menuId).eq("account_id", admin.accountId).maybeSingle();
+      const menu = await db().from("menus").select("name, playlist_id").eq("id", part.menuId).eq("account_id", admin.accountId).maybeSingle();
       if (menu.error) return isMissingSchema(menu.error) ? fail(SCHEDULES_UNAVAILABLE_TEXT, 503) : fail("Couldn't add the schedule.", 500);
-      if (!menu.data?.playlist_id) return fail("Menu not found.", 404);
+      if (!menu.data) return fail("That menu board was deleted or isn't in this account. Reload the page and pick again.", 404);
+      // A board saved only as a draft has no playlist yet (QA B2-01).
+      if (!menu.data.playlist_id) return fail(`“${String(menu.data.name || "This board")}” hasn't been published yet. Publish this board first, then schedule it.`, 409);
       playlistId = menu.data.playlist_id;
     }
     const parsed = parseScheduleBody({
       name: part.name, playlistId, displayId: body.displayId, groupId: body.groupId,
       weekdays: body.weekdays ?? [1, 2, 3, 4, 5, 6, 7], startTime: part.startTime, endTime: part.endTime,
-      priority: 10,
+      priority: DAY_PART_PRIORITY,
     });
     if (!parsed.ok) return fail(`${String(part.name || "Part")}: ${parsed.error}`, 400);
     drafts.push(parsed.value);

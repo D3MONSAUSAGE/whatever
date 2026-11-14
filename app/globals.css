@@ -109,6 +109,7 @@ body {
 .form-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--color-muted); margin-bottom: 0.25rem; }
 .note-error { border-radius: 12px; padding: 0.625rem 0.875rem; background: #fdecea; color: var(--color-danger); font-size: 0.875rem; }
 .note-ok { border-radius: 12px; padding: 0.625rem 0.875rem; background: color-mix(in srgb, var(--color-live) 18%, white); color: var(--color-live-ink); font-size: 0.875rem; }
+.note-warn { border-radius: 12px; padding: 0.625rem 0.875rem; background: #fff4d6; color: #6b4a00; font-size: 0.875rem; }
 
 
 /* Persistent Content navigation: one horizontal row, scrollable on small screens. */

@@ -6,6 +6,7 @@ import { api, useApi, type MediaItem, type PlaylistDetail } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { LimitNote, PageHeader, atLimit } from "@/components/ui";
+import { togglePicks } from "@/lib/pick-order";
 
 /** Same as PLAYLIST_MAX_ITEMS on the server. */
 const MAX_SLIDES = 40;
@@ -34,6 +35,8 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [chosen, setChosen] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState(false);
+  // Ticks in "Add images" survive Close, in the order they were ticked (QA U2-02).
+  const [addPicks, setAddPicks] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const dragRef = useRef<number | null>(null);
@@ -327,7 +330,8 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
                             onChange={(event) => setSlides(slides.map((row, i) => i === index ? { ...row, seconds: event.target.value } : row))} />
                         </label>
                       )}
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <div className="slide-order inline-flex items-center gap-1 rounded-xl border border-line p-1" role="group" aria-label={`Order of ${slide.fileName}`}>
                         <button type="button" className="btn btn-quiet cursor-grab" draggable aria-label={`Drag ${slide.fileName}`}
                           onDragStart={(event) => {
                             event.dataTransfer.effectAllowed = "move";
@@ -336,9 +340,10 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
                             setDragFrom(index);
                           }}
                           onDragEnd={() => { dragRef.current = null; setDragFrom(null); }}>Drag</button>
-                        <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</button>
+                        <button type="button" className="btn btn-quiet min-w-16" aria-label={`Move ${slide.fileName} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</button>
                         <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} down`} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>Down</button>
-                        <button type="button" className="btn btn-quiet text-danger" aria-label={`Remove ${slide.fileName}`}
+                        </div>
+                        <button type="button" className="btn btn-quiet text-danger ml-auto" aria-label={`Remove ${slide.fileName}`}
                           onClick={() => setSlides(slides.filter((_, i) => i !== index))}>Remove</button>
                       </div>
                     </div>
@@ -398,11 +403,14 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
       {adding && (
         <AddImages
           existing={slides}
+          picks={addPicks}
+          setPicks={setAddPicks}
           onClose={() => setAdding(false)}
           onAdd={(picked) => {
             const room = MAX_SLIDES - slides.length;
             if (picked.length > room) toast.show(`A playlist holds up to ${MAX_SLIDES} slides, so only the first ${Math.max(0, room)} were added.`);
             setSlides(slides.concat(picked.slice(0, Math.max(0, room))));
+            setAddPicks([]);
             setAdding(false);
           }}
         />
@@ -486,13 +494,16 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
   );
 }
 
-function AddImages({ existing, onClose, onAdd }: {
+function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
   existing: Slide[];
+  picks: string[];
+  setPicks: (next: string[]) => void;
   onClose: () => void;
   onAdd: (slides: Slide[]) => void;
 }) {
   const media = useApi<MediaItem[]>("/api/media");
-  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const picked: Record<string, boolean> = Object.fromEntries(picks.map((id) => [id, true]));
+  const setPicked = (next: Record<string, boolean>) => setPicks(togglePicks(picks, next));
   const [openDeck, setOpenDeck] = useState<string | null>(null);
   const [deckSlides, setDeckSlides] = useState<Record<string, { id: string; fileName: string; url: string | null }[]>>({});
   const rows = (media.data ?? []).filter((item) => !item.sourceMediaId);
@@ -510,6 +521,7 @@ function AddImages({ existing, onClose, onAdd }: {
           <h2 className="text-lg font-semibold">Add images</h2>
           <button type="button" className="btn btn-quiet px-3" onClick={onClose}>Close</button>
         </div>
+        <p className="text-sm text-muted mb-3">Tick images in the order you want them to play. Closing keeps your ticks.</p>
         {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : rows.length === 0 ? (
           <p className="text-muted">Upload an image in Media first.</p>
         ) : (
@@ -530,6 +542,7 @@ function AddImages({ existing, onClose, onAdd }: {
                     <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]}
                       onChange={(event) => setPicked({ ...picked, [item.id]: event.target.checked })} />
                     <span className="truncate">{item.fileName}{item.kind === "presentation" ? ` (${item.slideCount ?? 0})` : ""}</span>
+                    {picked[item.id] ? <span className="badge ml-auto" aria-label={`Number ${picks.indexOf(item.id) + 1} in order`}>{picks.indexOf(item.id) + 1}</span> : null}
                   </span>
                 </label>
                 {item.kind === "presentation" ? (
@@ -552,24 +565,31 @@ function AddImages({ existing, onClose, onAdd }: {
             ))}
           </ul>
         )}
-        <button type="button" className="btn btn-primary w-full mt-5" onClick={() => {
-          const chosen = rows.filter((item) => picked[item.id]);
-          const singles = Object.entries(deckSlides).flatMap(([, slides]) => slides.filter((slide) => picked[slide.id]));
-          onAdd([
-            ...chosen.map((item) => ({
-              key: `${item.id}-${existing.length}-${Math.random().toString(36).slice(2, 8)}`,
-              mediaId: item.id,
-              fileName: item.fileName,
-              url: item.kind === "presentation" ? item.coverUrl ?? null : item.url,
-              thumbnailUrl: item.thumbnailUrl ?? null,
-              kind: item.kind === "video" ? "video" as const : item.kind === "presentation" ? "presentation" as const : "image" as const,
-              mediaDurationMs: item.durationMs ?? null,
-              seconds: item.kind === "presentation" && item.defaultDurationMs ? String(Math.round(item.defaultDurationMs / 1000)) : "",
-              slideCount: item.slideCount ?? undefined,
-              groupDurationMs: item.defaultDurationMs ?? null,
-            })),
-            ...singles.map((slide) => ({
-              key: `${slide.id}-${existing.length}-${Math.random().toString(36).slice(2, 8)}`,
+        <div className="sticky bottom-0 -mx-5 mt-5 bg-paper px-5 pt-3 pb-1 border-t border-line">
+        <button type="button" className="btn btn-primary w-full" disabled={!picks.length} onClick={() => {
+          // Added in the order ticked (QA U2-02), not library order.
+          const deck = Object.values(deckSlides).flat();
+          const tag = () => `${existing.length}-${Math.random().toString(36).slice(2, 8)}`;
+          onAdd(picks.flatMap((id): Slide[] => {
+            const item = rows.find((row) => row.id === id);
+            if (item) {
+              return [{
+                key: `${item.id}-${tag()}`,
+                mediaId: item.id,
+                fileName: item.fileName,
+                url: item.kind === "presentation" ? item.coverUrl ?? null : item.url,
+                thumbnailUrl: item.thumbnailUrl ?? null,
+                kind: item.kind === "video" ? "video" as const : item.kind === "presentation" ? "presentation" as const : "image" as const,
+                mediaDurationMs: item.durationMs ?? null,
+                seconds: item.kind === "presentation" && item.defaultDurationMs ? String(Math.round(item.defaultDurationMs / 1000)) : "",
+                slideCount: item.slideCount ?? undefined,
+                groupDurationMs: item.defaultDurationMs ?? null,
+              }];
+            }
+            const slide = deck.find((row) => row.id === id);
+            if (!slide) return [];
+            return [{
+              key: `${slide.id}-${tag()}`,
               mediaId: slide.id,
               fileName: slide.fileName,
               url: slide.url,
@@ -577,9 +597,10 @@ function AddImages({ existing, onClose, onAdd }: {
               kind: "image" as const,
               mediaDurationMs: null,
               seconds: "",
-            })),
-          ]);
-        }}>Add selected</button>
+            }];
+          }));
+        }}>{picks.length ? `Add ${picks.length} selected` : "Add selected"}</button>
+        </div>
       </div>
     </div>
   );

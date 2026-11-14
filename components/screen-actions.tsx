@@ -9,6 +9,7 @@ import { useUploads } from "@/components/uploads";
 import { useConfirm } from "@/components/confirm";
 import { ContentPicker } from "@/components/content-picker";
 import { buildScreenPickerEntries, type PickerEntry } from "@/lib/content-picker";
+import { findOverlaps, isOvernight, overnightMessage } from "@/lib/schedule-checks";
 import { FileUploadControl } from "@/components/file-upload";
 import {
   SCREEN_ACTION_ORDER,
@@ -374,7 +375,13 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
   const [end, setEnd] = useState("14:00");
   const [name, setName] = useState("Screen promotion");
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
+  const [overnightOk, setOvernightOk] = useState(false);
   const opened = useRef(false);
+  // QA B2-02 / B2-03: overnight windows need an explicit tick; overlaps say which rule plays.
+  const overnight = isOvernight(start, end);
+  const overlaps = zone === storedZone
+    ? findOverlaps({ id: scheduleId || undefined, name: name || "This rule", displayId: display.id, groupId: null, weekdays, startTime: start, endTime: end, startsOn: null, endsOn: null, priority: 0 }, saved.data ?? [], [])
+    : [];
 
   function load(item: ScheduleItem | null, nextZone = zone) {
     if (!item) {
@@ -407,6 +414,7 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
 
   async function save() {
     if (!playlistId) throw new Error("Choose a playlist to schedule.");
+    if (overnight && !overnightOk) throw new Error("This window ends the next day. Tick “Yes, run overnight” to save it, or change the end time.");
     if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) throw new Error("Use times like 21:24 and 22:00.");
     try { Intl.DateTimeFormat("en-US", { timeZone: zone }); } catch { throw new Error("Use a timezone like America/Los_Angeles."); }
     const clockChanged = Boolean(display.location && zone !== display.location.timezone);
@@ -473,6 +481,15 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
           <input className="field mt-1 w-full" aria-label="End time" type="time" value={end === "24:00" ? "00:00" : end} onChange={(event) => setEnd(event.target.value)} />
         </label>
       </div>
+      {overnight ? (
+        <div className="note-warn grid gap-2" role="status">
+          <p>{overnightMessage(start, end)}</p>
+          <label className="flex items-center gap-2 min-h-11"><input type="checkbox" checked={overnightOk} onChange={(event) => setOvernightOk(event.target.checked)} /> Yes, run overnight</label>
+        </div>
+      ) : null}
+      {overlaps.length ? (
+        <div className="note-warn text-sm grid gap-1" role="status">{overlaps.map((item) => <p key={item.other.id ?? item.other.name}>{item.message}</p>)}</div>
+      ) : null}
       <button type="submit" className="btn btn-primary min-h-11">{scheduleId ? "Update schedule" : "Save schedule"}</button>
     </form>
   );

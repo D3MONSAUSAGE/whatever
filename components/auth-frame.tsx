@@ -40,7 +40,7 @@ export function friendlyAuthError(message: string | undefined | null): string {
   if (text.includes("same") && text.includes("password")) return "Choose a password you haven't used here before.";
   if (text.includes("password") && (text.includes("short") || text.includes("least"))) return "Use at least 8 characters.";
   if (text.includes("weak")) return "That password is too easy to guess. Try a longer one.";
-  if (text.includes("expired") || text.includes("invalid") && text.includes("link")) return "This link has expired. Ask for a new one.";
+  if (text.includes("expired") || text.includes("invalid") && text.includes("link")) return "This link has expired or was already used. Ask for a new one.";
   if (text.includes("fetch") || text.includes("network")) return "Can't reach the server. Check your connection and try again.";
   return message as string;
 }
