@@ -242,6 +242,7 @@ export function MenuBoards({
           screenId={view.screenId}
           screenOnline={(displays.data ?? []).find((item) => item.id === view.screenId)?.online}
           screenConnected={(displays.data ?? []).find((item) => item.id === view.screenId)?.connected}
+          displays={displays.data ?? null}
           initialBoardId={view.boardId}
           initialTemplate={view.boardId ? null : view.template}
           initialZone={view.zone}
