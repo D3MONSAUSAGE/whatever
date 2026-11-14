@@ -37,3 +37,12 @@ describe("U2-05: rename in Media (display name only)", () => {
     expect(ui).toMatch(/Only the name shown in Pekko changes\. Screens and playlists keep using this file\./);
   });
 });
+
+describe("U2-05 Gother low: no spoofing characters", () => {
+  it("strips bidi overrides/isolates, line separators and C1 controls", () => {
+    expect(mediaRename("photo.jpg", "invoice\u202Egpj.exe")).toEqual({ ok: true, name: "invoicegpj.exe.jpg" });
+    expect(mediaRename("photo.jpg", "a\u202Ab\u202Bc\u202Cd\u202De\u2066f\u2067g\u2068h\u2069i")).toEqual({ ok: true, name: "abcdefghi.jpg" });
+    expect(mediaRename("photo.jpg", "line\u2028two\u2029x\u0085")).toEqual({ ok: true, name: "linetwox.jpg" });
+    expect(mediaRename("photo.jpg", "\u202E\u2066")).toEqual({ ok: false, error: "Give the file a name." });
+  });
+});

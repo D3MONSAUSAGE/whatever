@@ -10,7 +10,10 @@ function stripControls(value: string) {
   let out = "";
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
-    if (code >= 32 && code !== 127) out += value[i];
+    // Control characters (C0, DEL, C1), bidi embeddings/overrides/isolates and line/paragraph
+    // separators: they could spoof how a name reads (e.g. "invoice\u202Egpj.exe"). Gother #101 low.
+    const hidden = code < 32 || (code >= 127 && code <= 159) || (code >= 0x202a && code <= 0x202e) || (code >= 0x2066 && code <= 0x2069) || code === 0x2028 || code === 0x2029;
+    if (!hidden) out += value[i];
   }
   return out;
 }
