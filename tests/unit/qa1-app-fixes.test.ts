@@ -54,12 +54,23 @@ describe("U1-08 time zones", () => {
 });
 
 describe("B1-08 pairing watch", () => {
-  const base = { id: "d", name: "TV", online: false, media: null, playlist: null } as const;
-  it("keeps checking while a screen has not collected its token or sent a heartbeat", () => {
-    expect(pairingSettled(null)).toBe(false);
-    expect(pairingSettled([{ ...base, connected: false, lastSeenAt: null } as DisplayItem])).toBe(false);
-    expect(pairingSettled([{ ...base, connected: true, lastSeenAt: null } as DisplayItem])).toBe(false);
-    expect(pairingSettled([{ ...base, connected: true, lastSeenAt: "2026-11-14T20:00:00Z" } as DisplayItem])).toBe(true);
+  const base = { online: false, media: null, playlist: null } as const;
+  const tv = (id: string, connected: boolean, lastSeenAt: string | null) => ({ ...base, id, name: id, connected, lastSeenAt }) as DisplayItem;
+  const offlineOld = tv("old", true, "2026-11-13T20:00:00Z");
+  const waitingOther = tv("other", false, null);
+  it("settles on the newly paired screen, by id", () => {
+    const watch = { id: "new", before: ["old", "other"] };
+    expect(pairingSettled(null, watch)).toBe(false);
+    expect(pairingSettled([offlineOld, waitingOther, tv("new", false, null)], watch)).toBe(false);
+    expect(pairingSettled([offlineOld, waitingOther, tv("new", true, null)], watch)).toBe(false);
+    // Another screen still waiting or offline no longer holds the banner up (Gother #91 MEDIUM).
+    expect(pairingSettled([offlineOld, waitingOther, tv("new", true, "2026-11-14T20:00:00Z")], watch)).toBe(true);
+  });
+  it("without an id, settles when a screen that wasn't there before checks in", () => {
+    const watch = { id: null, before: ["old", "other"] };
+    expect(pairingSettled([offlineOld, waitingOther], watch)).toBe(false);
+    expect(pairingSettled([offlineOld, waitingOther, tv("new", true, null)], watch)).toBe(false);
+    expect(pairingSettled([offlineOld, waitingOther, tv("new", true, "2026-11-14T20:00:00Z")], watch)).toBe(true);
   });
 });
 

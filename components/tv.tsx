@@ -140,7 +140,7 @@ export function OfflineAlert({ displays, linkToDisplays = false }: { displays: D
         </ul>
         <p className="text-sm text-ink/80">
           Check that the TV is on, connected to Wi-Fi, and showing the Pekko player.
-          {linkToDisplays ? <> <a href="/dashboard/displays" className="underline">Open My Screens → Add and manage</a>.</> : null}
+          {linkToDisplays ? <> <a href="/dashboard/displays" className="underline">Check your screens</a>.</> : null}
           {" "}This page refreshes every 10 seconds.
         </p>
       </div>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { ONLINE_HINT, OfflineAlert, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
@@ -15,10 +15,21 @@ import { publishSavedCopy, publishSavedCopyForTargets, publishTimingCopy } from 
 const PAIR_WATCH_MS = 3_000;
 const PAIR_WATCH_FOR_MS = 2 * 60_000;
 
-/** True when no screen is still waiting for its TV to collect the token or send its first heartbeat. */
-export function pairingSettled(list: DisplayItem[] | null | undefined): boolean {
+export type PairWatch = { id: string | null; before: string[] };
+
+/**
+ * True once the screen just paired has its token and a first heartbeat. Other screens (for example
+ * one that is offline) never hold the "Connecting" banner up. Without the new id, the first screen
+ * that was not in the list before pairing is used.
+ */
+export function pairingSettled(list: DisplayItem[] | null | undefined, watch: PairWatch): boolean {
   if (!list) return false;
-  return list.every((display) => display.connected && Boolean(display.lastSeenAt));
+  const ready = (display: DisplayItem) => display.connected && Boolean(display.lastSeenAt);
+  if (watch.id) {
+    const paired = list.find((display) => display.id === watch.id);
+    return paired ? ready(paired) : false;
+  }
+  return list.some((display) => !watch.before.includes(display.id) && ready(display));
 }
 
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
@@ -35,8 +46,10 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   // After pairing, check every few seconds (even if this tab is behind the TV window) until the
   // new screen reports in, so the card flips from "Waiting" to "Online" by itself (QA B1-08).
   const [watchUntil, setWatchUntil] = useState(0);
+  const [watch, setWatch] = useState<PairWatch>({ id: null, before: [] });
+  const beforePair = useRef<string[]>([]);
   const reloadDisplays = displays.reload;
-  const settled = pairingSettled(displays.data);
+  const settled = pairingSettled(displays.data, watch);
   useEffect(() => {
     if (!watchUntil || fixture) return;
     if (settled) { setWatchUntil(0); return; }
@@ -102,7 +115,13 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
         <p role="status" className="card p-3 mb-3 text-sm" data-testid="pair-watch">Connecting your TV… This page updates by itself as soon as the TV checks in (usually within a minute).</p>
       ) : null}
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
-        onPaired={(warning) => { toast.show(warning || "Connected. The TV will switch over in a few seconds."); displays.reload(); setWatchUntil(Date.now() + PAIR_WATCH_FOR_MS); }}
+        onPaired={(warning, id) => {
+          toast.show(warning || "Connected. The TV will switch over in a few seconds.");
+          setWatch({ id: id ?? null, before: beforePair.current });
+          displays.reload();
+          setWatchUntil(Date.now() + PAIR_WATCH_FOR_MS);
+        }}
+        onSubmitting={() => { beforePair.current = (displays.data ?? []).map((display) => display.id); }}
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
@@ -192,18 +211,19 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   );
 }
 
-function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: (warning?: string) => void; onError: (message: string) => void }) {
+function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[]; onPaired: (warning?: string, id?: string) => void; onSubmitting?: () => void; onError: (message: string) => void }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
+    onSubmitting?.();
     try {
-      const paired = await api<{ nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
+      const paired = await api<{ id?: string; nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
       setCode("");
       setName("");
-      onPaired(paired.nameWarning ? `${paired.nameWarning} Suggested: ${paired.suggestedName}` : undefined);
+      onPaired(paired.nameWarning ? `${paired.nameWarning} Suggested: ${paired.suggestedName}` : undefined, typeof paired.id === "string" ? paired.id : undefined);
     } catch (err) {
       onError((err as Error).message);
     } finally {
