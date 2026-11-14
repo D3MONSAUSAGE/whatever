@@ -61,3 +61,10 @@ describe("Brand Kit: a save always leaves a visible result (QA r7)", () => {
     expect(kit).toMatch(/setSaveResult\(\{ ok: false, text: payload\.error \}\)/);
   });
 });
+
+describe("E2b Gother lows", () => {
+  it("clears the Brand Kit result line on edits and resets the classic picker on every save", () => {
+    expect(readFileSync("components/brand-kit.tsx", "utf8")).toMatch(/setForm=\{\(next\) => \{ setSaveResult\(null\); setForm\(next\); \}\}/);
+    expect(readFileSync("components/menu-boards.tsx", "utf8")).toMatch(/onSaved=\{async \(message, saved\) => \{\s+setPickClassic\(null\);/);
+  });
+});

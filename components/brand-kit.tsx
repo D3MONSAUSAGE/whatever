@@ -106,7 +106,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
         <BrandEditor
           nameFromBusiness={nameFromBusiness && !savedOnce}
           form={form}
-          setForm={setForm}
+          setForm={(next) => { setSaveResult(null); setForm(next); }}
           images={images}
           custom={brand.custom}
           busy={busy}
@@ -115,6 +115,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
           onLogoUploaded={fixture ? undefined : async (id) => {
             await liveMedia.reload();
             setForm((current) => (current ? { ...current, logoMediaId: id } : current));
+            setSaveResult(null);
           }}
         />
       )}

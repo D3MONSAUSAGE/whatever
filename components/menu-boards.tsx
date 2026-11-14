@@ -231,6 +231,7 @@ export function MenuBoards({
           setDraft={(draft) => { if (!draft) setView({ mode: "list" }); else setView({ ...view, draft }); }}
           displays={(displays.data ?? []).filter((d) => d.connected)}
           onSaved={async (message, saved) => {
+            setPickClassic(null); // Gother #100 low: never bring back a previous board's picker.
             const fromScreen = Boolean(view.screenId);
             setView({ mode: "list" });
             await menus.reload();
