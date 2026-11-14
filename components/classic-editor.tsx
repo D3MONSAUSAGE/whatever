@@ -228,7 +228,7 @@ export function ClassicEditor({
   const contentPanel = (
     <details className="studio-panel" open>
       <summary className="studio-panel-summary">Content &amp; text</summary>
-      {editingLabel}
+      {region === "menu" ? editingLabel : null}
       <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor" className="grid gap-3">
         <label className="grid gap-1"><span className="form-label">Title on screen</span>
           <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
