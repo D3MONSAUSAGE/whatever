@@ -139,10 +139,13 @@ export function dayNames(days: number[]): string {
 export type Overlap = { other: RuleLike; days: number[]; winsHere: boolean; message: string };
 
 /** Overlaps between a (draft or saved) rule and the other enabled rules, with who wins. */
-export function findOverlaps(rule: RuleLike, others: RuleLike[], groups: GroupLike[]): Overlap[] {
+export function findOverlaps(rule: RuleLike, others: RuleLike[], groups: GroupLike[], today = todayLocal()): Overlap[] {
   const out: Overlap[] = [];
+  // A rule whose dates have all passed never plays, so it neither wins nor loses an overlap (QA retest 2, B2-04 note).
+  if (isPastRange(rule.endsOn ?? null, today)) return out;
   for (const other of others) {
     if (other.enabled === false) continue;
+    if (isPastRange(other.endsOn ?? null, today)) continue;
     if (rule.id && other.id === rule.id) continue;
     if (!sameScreens(rule, other, groups)) continue;
     const days = overlapDays(rule, other);

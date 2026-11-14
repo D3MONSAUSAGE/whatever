@@ -7,7 +7,7 @@ import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/li
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
-import { canAddItem, canAddSection, firstNamelessItem, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
+import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
 
 export type ClassicDraft = {
@@ -303,7 +303,7 @@ export function ClassicEditor({
           </section>
         ))}
         <button type="button" className="btn btn-quiet justify-self-start min-h-11" disabled={!canAddSection(c.sections)} onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>
-          {canAddSection(c.sections) ? `Add section (${c.sections.length} of ${MENU_LIMITS.sections})` : `${MENU_LIMITS.sections} sections is the limit. Remove one to add another.`}
+          {canAddSection(c.sections) ? `Add section (${c.sections.length} of ${MENU_LIMITS.sections})` : sectionLimitMessage(c.sections)}
         </button>
         <label className="grid gap-1"><span className="form-label">Footer</span>
           <input className="field" value={c.footer} maxLength={MENU_LIMITS.footer} onChange={(e) => update({ ...c, footer: e.target.value })} /></label>

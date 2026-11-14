@@ -1,6 +1,7 @@
 /** Layout Studio boards. Shared by the editor and the server. No database and no HTML from clients. */
 
 import { MENU_LIMITS } from "@/lib/menu-templates";
+import { sectionShows, shownSections } from "@/lib/menu-fields";
 
 export { MENU_LIMITS };
 
@@ -853,23 +854,26 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   if (doc.template === "triple-column" || doc.template === "two-column") {
     const textTop = 176;
     const textBottom = BOARD_H - 64;
-    const shared = Math.min(...frame.columns.map((_, index) => itemUnit(doc.sections[index] ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
+    const shared = Math.min(...frame.columns.map((_, index) => itemUnit(doc.sections[index] && sectionShows(doc.sections[index]) ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
     frame.columns.forEach((column, index) => {
       const section = doc.sections[index];
-      if (!section) return;
+      // Fixed columns keep their place; an empty column draws nothing, not even its heading (QA B1-04).
+      if (!section || !sectionShows(section)) return;
       paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
     });
   } else if (doc.template === "two-menu-promo") {
     const textBottom = BOARD_H - 64;
     const menuColumns = frame.columns.slice(0, 2);
-    const shared = Math.min(...menuColumns.map((_, index) => itemUnit(doc.sections[index] ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
+    const shared = Math.min(...menuColumns.map((_, index) => itemUnit(doc.sections[index] && sectionShows(doc.sections[index]) ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
     menuColumns.forEach((column, index) => {
       const section = doc.sections[index];
-      if (!section) return;
+      // Fixed columns keep their place; an empty column draws nothing, not even its heading (QA B1-04).
+      if (!section || !sectionShows(section)) return;
       paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
     });
   } else {
-    const columns = longMenuColumns(doc.sections, menu.w);
+    const shown = shownSections(doc.sections); // QA B1-04: sections with no items draw nothing
+    const columns = longMenuColumns(shown, menu.w);
     if (columns) {
       // Long menus (more than LONG_MENU_ITEMS items) flow into two columns and use the full height,
       // instead of one column of tiny text in the top of the board (QA B1-05). Shorter menus are unchanged.
@@ -880,7 +884,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
         paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, family, true, unit, LONG_MENU_DESC_MIN);
       });
     } else {
-      paintItems(parts, doc.sections, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
+      paintItems(parts, shown, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
     }
   }
   if (doc.footer && doc.template === "menu-banner") {

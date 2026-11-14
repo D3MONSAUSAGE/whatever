@@ -55,9 +55,19 @@ export function filledItems(section: Section): number {
   return section.items.filter((item) => item.name.trim()).length;
 }
 
-/** Sections that count toward the limit: a name or at least one named item. Emptied sections do not count. */
+/** Sections that count toward the limit: at least one named item. A section with no items never counts, whatever its name (QA B1-04 retest). */
 export function filledSections(sections: Section[]): number {
-  return sections.filter((section) => section.name.trim() || filledItems(section) > 0).length;
+  return sections.filter((section) => filledItems(section) > 0).length;
+}
+
+/** Whether a section appears on the board: it needs at least one named item. Its name alone never shows a heading. */
+export function sectionShows(section: Section): boolean {
+  return filledItems(section) > 0;
+}
+
+/** Sections the board draws, in order. Sections with items are never dropped. Stored content is not changed. */
+export function shownSections<S extends Section>(sections: S[]): S[] {
+  return sections.filter(sectionShows);
 }
 
 export function menuCounts(sections: Section[]) {
@@ -77,6 +87,14 @@ export function menuCounts(sections: Section[]) {
 /** Whether another section row can be added (rows, not just filled ones, so the editor never shows more than the limit). */
 export function canAddSection(sections: Section[]): boolean {
   return sections.length < MENU_LIMITS.sections;
+}
+
+/** Message when no more section rows fit. Points at an empty section when there is one (QA B1-04 retest). */
+export function sectionLimitMessage(sections: Section[]): string {
+  const empty = sections.findIndex((section) => !sectionShows(section));
+  return empty >= 0
+    ? `${MENU_LIMITS.sections} sections is the limit. Section ${empty + 1} is empty and isn't shown; remove it to add another.`
+    : `${MENU_LIMITS.sections} sections is the limit. Remove one to add another.`;
 }
 
 /** Whether another item row can be added to one section. */
