@@ -70,8 +70,8 @@ export function LayoutStudio({
   mode?: "preview" | "account";
   screenId?: string | null;
   screenOnline?: boolean;
-  /** Account screens, for the optional "Show on which screen?" step after Publish (E2). */
-  displays?: DisplayItem[];
+  /** Account screens for the optional "Show on which screen?" step after Publish (E2). null = still loading; undefined = no step. */
+  displays?: DisplayItem[] | null;
   screenConnected?: boolean;
   fixture?: AccountStudio | null;
   pathOverride?: string;
@@ -539,7 +539,7 @@ export function LayoutStudio({
     if (namelessBlocked()) return;
     if (fixture) {
       setNote(saveMode === "publish" ? "Preview only — nothing was published." : "Preview only — nothing was saved.");
-      if (saveMode === "publish" && displays && menuId && !screenId) {
+      if (saveMode === "publish" && displays !== undefined && menuId && !screenId) {
         const board = fixture.boards.find((item) => item.id === menuId);
         setPickFor({ id: menuId, name: boardName || board?.name || "This board", playlistId: board?.playlistId ?? null, preview: true });
       }
@@ -605,7 +605,7 @@ export function LayoutStudio({
       } else if (board?.playlistId) {
         setNote("Published to this account. Screens already playing this board will update when they are online.");
         // E2: offer screens, but never assign without the user's choice.
-        if (displays) setPickFor({ id: board.id, name: board.name || boardName || "This board", playlistId: board.playlistId, preview: false });
+        if (displays !== undefined) setPickFor({ id: board.id, name: board.name || boardName || "This board", playlistId: board.playlistId, preview: false });
       } else {
         setNote("The board was saved, but publishing did not create a playlist.");
       }
@@ -871,8 +871,8 @@ export function LayoutStudio({
         </div>
         {progress || note ? <p className="studio-toolbar-note" role="status">{progress || note}</p> : null}
       </header>
-      {pickFor && displays ? (
-        <ShowOnScreens boardId={pickFor.id} boardName={pickFor.name} playlistId={pickFor.playlistId} displays={displays} preview={pickFor.preview}
+      {pickFor && displays !== undefined ? (
+        <ShowOnScreens boardId={pickFor.id} boardName={pickFor.name} playlistId={pickFor.playlistId} displays={displays ?? []} loading={displays === null} preview={pickFor.preview}
           onSkip={() => setPickFor(null)} onDone={(message) => { setPickFor(null); setNote(message); }} />
       ) : null}
       <div className="studio-grid">

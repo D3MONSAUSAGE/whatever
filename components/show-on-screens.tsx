@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type DisplayItem } from "@/lib/api";
 import { publishSavedCopyForTargets } from "@/lib/screen-actions-ui";
 import { screenChoices, screensToAssign } from "@/lib/show-on-screens";
@@ -9,11 +10,13 @@ import { screenChoices, screensToAssign } from "@/lib/show-on-screens";
  * Uses the existing assignment route (POST /api/layout-studio/assign) once per ticked screen.
  * Nothing changes on any screen unless the user ticks one and confirms.
  */
-export function ShowOnScreens({ boardId, boardName, playlistId, displays, preview = false, onDone, onSkip }: {
+export function ShowOnScreens({ boardId, boardName, playlistId, displays, loading = false, preview = false, onDone, onSkip }: {
   boardId: string;
   boardName: string;
   playlistId: string | null;
   displays: DisplayItem[];
+  /** Screens are still loading. */
+  loading?: boolean;
   preview?: boolean;
   onDone: (message: string) => void;
   onSkip: () => void;
@@ -23,6 +26,17 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, previe
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const targets = screensToAssign(choices, picked);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Gother PR95 lows: focus the heading when the card appears; Escape acts like "Not now".
+  useEffect(() => { headingRef.current?.focus(); }, []);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) onSkip();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onSkip]);
 
   async function assign() {
     if (!targets.length || busy) return;
@@ -48,9 +62,11 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, previe
 
   return (
     <section className="show-on-screens" role="region" aria-labelledby="show-on-screens-title" data-testid="show-on-screens">
-      <h2 id="show-on-screens-title">Show on which screen?</h2>
+      <h2 id="show-on-screens-title" ref={headingRef} tabIndex={-1}>Show on which screen?</h2>
       <p className="show-on-screens-lede">“{boardName}” is published. Optional: pick screens to show it on now, or skip and choose later in My Screens or Schedules.</p>
-      {choices.length ? (
+      {loading ? <p className="show-on-screens-lede" role="status">Loading your screens…</p> : choices.length ? (
+        <>
+        <p className="show-on-screens-warn">This replaces what a ticked screen is set to show.</p>
         <fieldset className="show-on-screens-list">
           <legend className="sr-only">Screens</legend>
           {choices.map((choice) => (
@@ -58,17 +74,19 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, previe
               <input type="checkbox" disabled={choice.showing || busy} checked={choice.showing || picked.includes(choice.id)}
                 onChange={(event) => setPicked(event.target.checked ? [...picked, choice.id] : picked.filter((id) => id !== choice.id))} />
               <span className="show-on-screens-name">{choice.name}</span>
-              <span className="show-on-screens-status">{choice.showing ? "Already showing this board" : choice.status}</span>
+              <span className="show-on-screens-status">{choice.showing ? "Set to show this board" : choice.status}</span>
+              {!choice.showing && choice.nowShowing ? <span className="show-on-screens-now">Now showing: {choice.nowShowing}</span> : null}
             </label>
           ))}
         </fieldset>
+        </>
       ) : (
-        <p className="show-on-screens-lede">No paired screens yet. Add a screen in My Screens, then assign this board there.</p>
+        <p className="show-on-screens-lede">No paired screens yet. <Link href="/dashboard/screens/add#add-screen" className="underline font-semibold">Add a screen</Link>, then come back to show this board on it.</p>
       )}
       {error ? <p className="show-on-screens-error" role="alert">{error}</p> : null}
       <div className="show-on-screens-actions">
         <button type="button" className="btn btn-quiet min-h-11" disabled={busy} onClick={onSkip}>Not now</button>
-        {choices.length ? (
+        {!loading && choices.length ? (
           <button type="button" className="btn btn-primary min-h-11" disabled={!targets.length || busy} onClick={() => { void assign(); }}>
             {busy ? "Showing…" : targets.length > 1 ? `Show on ${targets.length} screens` : "Show on this screen"}
           </button>
