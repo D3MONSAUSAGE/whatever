@@ -9,7 +9,7 @@ import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { FileUploadControl } from "@/components/file-upload";
-import { duplicateMessage, libraryLookupUrl, sameLibraryVideo } from "@/lib/media-dupes";
+import { duplicateMessage, libraryLookupUrl, lookupWithTimeout, sameLibraryVideo } from "@/lib/media-dupes";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
 
@@ -88,12 +88,9 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   async function uploadVideos(picked: FileList | File[]) {
     const files = Array.from(picked);
     const found = await Promise.all(files.map(async (file) => {
-      try {
-        const page = await api<{ items: MediaItem[] }>(libraryLookupUrl(file.name));
-        return sameLibraryVideo(page.items, file) ? file : null;
-      } catch {
-        return null; // If the check fails, upload as before.
-      }
+      // If the check fails or takes longer than a few seconds, upload as before.
+      const page = await lookupWithTimeout((signal) => api<{ items: MediaItem[] }>(libraryLookupUrl(file.name), { signal }));
+      return page && sameLibraryVideo(page.items, file) ? file : null;
     }));
     const dupes = found.filter((file): file is File => Boolean(file));
     if (!dupes.length) { uploads.enqueue(files, "video"); return; }

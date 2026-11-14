@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { filledSections, menuCounts, sectionLimitMessage, shownSections } from "@/lib/menu-fields";
 import { layoutSvg, sampleLayout } from "@/lib/layout-studio";
 import { menuSvg } from "@/lib/server/menu-render";
-import { duplicateMessage, libraryLookupUrl, sameLibraryVideo } from "@/lib/media-dupes";
+import { duplicateMessage, libraryLookupUrl, lookupWithTimeout, sameLibraryVideo } from "@/lib/media-dupes";
+import { vi } from "vitest";
+import { createHash } from "node:crypto";
 import type { MediaItem } from "@/lib/api";
 
 const it1 = (name: string) => ({ name, price: "$5", description: "" });
@@ -91,5 +93,46 @@ describe("B2-04 note: expired rules are left out of overlap lines", () => {
   });
   it("still warns while the dates are current", () => {
     expect(findOverlaps(base, [past], [], "2026-01-15")).toHaveLength(1);
+  });
+});
+
+describe("Gother PR94 lows", () => {
+  it("a hung duplicate lookup is aborted and falls back to the normal upload", async () => {
+    vi.useFakeTimers();
+    let aborted = false;
+    const pending = lookupWithTimeout((signal) => new Promise((_, reject) => { signal.addEventListener("abort", () => { aborted = true; reject(new Error("aborted")); }); }), 4000);
+    await vi.advanceTimersByTimeAsync(4000);
+    await expect(pending).resolves.toBeNull();
+    expect(aborted).toBe(true);
+    vi.useRealTimers();
+    await expect(lookupWithTimeout(async () => ({ items: [] }))).resolves.toEqual({ items: [] });
+    await expect(lookupWithTimeout(async () => { throw new Error("x"); })).resolves.toBeNull();
+  });
+  it("boards where every section has items render byte-identical to before this change (SHA-256 of main 77ae704 output)", () => {
+    const filled = [
+      { name: "Tacos", items: [it1("Al pastor"), it1("Pollo")] },
+      { name: "Drinks", items: [it1("Horchata")] },
+    ];
+    const golden: Record<string, string> = {
+      "menu-promo-67": "6d977eec267cecf5cf9cf3ff33f704dfe1cd6904e5130f7bb12194c6ba3673e5",
+      "menu-promo-67:sample": "c906e1d96de39eaa0bee6ed19f28be44c87875cef4ef2442785dc10de541b579",
+      "menu-banner": "6be17cf6409233d19cbf0a3d7fa50aaa7e88f87935336af756ce86f9a2848d21",
+      "menu-banner:sample": "1803dd569a25c6a70bd3759654c4dc26bce3600ff702df4a611e5a637a807c60",
+      "signature": "48c2fd20331c72bb0629086a256c1e8b72aeb682bbdacc6adfc6e4d1c192ea33",
+      "signature:sample": "2d5f52a8c8e5c4b05bb40078c9c34ce920234c8c2c92fc2fa40ff494a4e69927",
+      "two-column": "da0e65fa5b26e3776d32c10a8cde751ee4f666c0d4703f0eec7c49eae1003976",
+      "two-column:sample": "f96c427c1dffa753d1f4bbe6c992a9b13f3b8722b36d72e5c0d14b9fd0bd1a06",
+      "triple-column": "a61df553e715735483b3ac17c1138af66b00f42430e113024f8f6ae83356b01c",
+      "triple-column:sample": "196f27335eb13b6d04c3cdb794da28d7820ae60015923effd37fe0ef45d8100c",
+      "two-menu-promo": "aecd15eef72185ca6a576096a7ce1c72209862ce8b09e2ccb4d79232e52bdc4b",
+      "two-menu-promo:sample": "77bb8456a0c8e3372f5f439f60fa0c9a25b1d41e1aa556000814c5396c7dcc1f",
+      "classic": "551137380eeaa914948a3493758190b114fa5d090d7c56845da814d870122bb1"
+    };
+    const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+    for (const template of ["menu-promo-67", "menu-banner", "signature", "two-column", "triple-column", "two-menu-promo"] as const) {
+      expect(sha(layoutSvg({ ...sampleLayout(template), sections: filled }))).toBe(golden[template]);
+      expect(sha(layoutSvg(sampleLayout(template)))).toBe(golden[`${template}:sample`]);
+    }
+    expect(sha(menuSvg("classic" as never, { title: "Menu", subtitle: "", sections: filled, footer: "" } as never))).toBe(golden.classic);
   });
 });
