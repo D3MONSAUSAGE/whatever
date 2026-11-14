@@ -380,7 +380,7 @@ export function ClassicEditor({
           <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
           {studioBp !== "phone" ? (
-            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools">
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label="Photo controls" tabIndex={0}>
               {photoPanel}
             </div>
           ) : null}

@@ -899,21 +899,7 @@ export function LayoutStudio({
                 </div>
               </label>
               <p style={{ fontSize: 13, color: "#5c534c" }}>Inter and Noto Serif on this page are the same files drawn into the published image.</p>
-              <label style={fieldLabel}>Photo fit
-                <div className="segment" role="group" aria-label="Photo fit">
-                  <button type="button" aria-pressed={draft.imageFit === "cover"} onClick={() => update({ ...draft, imageFit: "cover" })}>Fill</button>
-                  <button type="button" aria-pressed={draft.imageFit === "contain"} onClick={() => update({ ...draft, imageFit: "contain" })}>Fit</button>
-                </div>
-              </label>
-              <label style={fieldLabel}>Photo position
-                <select aria-label="Photo position" value={draft.imageAnchor} onChange={(event) => update({ ...draft, imageAnchor: anchorValue(event.target.value) })}>
-                  <option value="center">Center</option>
-                  <option value="top">Top</option>
-                  <option value="bottom">Bottom</option>
-                  <option value="left">Left</option>
-                  <option value="right">Right</option>
-                </select>
-              </label>
+              <p className="zone-help">Photo and video fit and position are under the board when you select a photo or video area.</p>
               <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
                 <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split} aria-describedby="proportion-note"
                   onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
@@ -953,7 +939,7 @@ export function LayoutStudio({
             {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
           </div>
           {studioBp !== "phone" ? (
-            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools">
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label="Selected area controls" tabIndex={0}>
               {editorPlacement === "canvas"
                 ? zoneEditor
                 : <p className="studio-zone-hint">Select a photo or video area on the board to replace it, choose from your library, remove it, or change how it fits. Its controls open here.</p>}

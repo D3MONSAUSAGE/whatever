@@ -27,9 +27,9 @@ describe("t244u fix 1: centred dashboard container", () => {
     expect(style).toMatch(/body:has\(\.studio-app\) main\.shell-main \{[^}]*max-width: 1880px !important;[^}]*margin-inline: auto;/);
   });
 
-  it("keeps equal left and right gutters around the content at 2560px", async () => {
+  it("keeps equal left and right gutters around the content at 2560px", async (ctx) => {
     const browser = await launch();
-    if (!browser) return;
+    if (!browser) return ctx.skip("Chromium is not available");
     const page = await browser.newPage({ viewport: { width: 2560, height: 1440 } });
     // Same structure as DashboardShell, with the Tailwind classes resolved.
     await page.setContent(`<!doctype html><style>*{box-sizing:border-box}body{margin:0}</style>
@@ -56,9 +56,9 @@ describe("t244u fix 2: wider editing column, smaller 16:9 board", () => {
     expect(style).not.toContain("grid-template-columns: 360px minmax(0, 1fr)");
   });
 
-  it("at 1440 next to the sidebar, the editor widens and the board shrinks moderately, without overflow", async () => {
+  it("at 1440 next to the sidebar, the editor widens and the board shrinks moderately, without overflow", async (ctx) => {
     const browser = await launch();
-    if (!browser) return;
+    if (!browser) return ctx.skip("Chromium is not available");
     const style = studioStyle();
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.setContent(`<!doctype html><style>*{box-sizing:border-box}body{margin:0}${style}</style>
@@ -116,12 +116,22 @@ describe("t244u fix 3: selected media controls under the board", () => {
     expect([...src.matchAll(/\{zoneEditor\}|\? zoneEditor/g)]).toHaveLength(2);
     // Switching areas remounts the under-board editor so it always matches the selected area.
     expect(src).toContain('key={editorPlacement === "canvas" ? `canvas-${zone}` : "left"}');
+    // The under-board region is a named, keyboard-focusable scroll area.
+    expect(src).toContain('role="region" aria-label="Selected area controls" tabIndex={0}');
+  });
+
+  it("does not repeat photo fit and position in the left Style panel (one place, under the board)", () => {
+    const src = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(src).not.toContain('aria-label="Photo fit"');
+    expect([...src.matchAll(/aria-label="Photo position"/g)]).toHaveLength(1);
+    expect([...src.matchAll(/aria-label="How the media fits"/g)]).toHaveLength(1);
   });
 
   it("the classic editor shows its Photo controls under the board, and in the stacked column only on phones", () => {
     const src = readFileSync("components/classic-editor.tsx", "utf8");
     expect([...src.matchAll(/\{photoPanel\}/g)]).toHaveLength(2);
     expect(src).toMatch(/studioBp === "phone" \? \([\s\S]{0,160}\{photoPanel\}/);
-    expect(src).toMatch(/studioBp !== "phone" \? \([\s\S]{0,160}studio-canvas-tools[\s\S]{0,120}\{photoPanel\}/);
+    expect(src).toMatch(/studioBp !== "phone" \? \([\s\S]{0,160}studio-canvas-tools[\s\S]{0,220}\{photoPanel\}/);
+    expect(src).toContain('role="region" aria-label="Photo controls" tabIndex={0}');
   });
 });
