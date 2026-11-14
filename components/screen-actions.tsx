@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { orderedZones } from "@/lib/time-zones";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type MediaItem, type PlaylistDetail, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { browserTimeZone, formatClock12, shiftClock, shiftWeekdays, zoneLabel } from "@/lib/clock";
@@ -355,7 +356,8 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
   );
 }
 
-const ZONES = ["America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "America/Phoenix", "UTC", "Europe/London"];
+// Common US zones first, then the rest A–Z (QA U1-08).
+const ZONES = orderedZones(["Europe/London"]);
 const DAYS = [
   { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" },
   { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" }, { value: 7, label: "Sun" },

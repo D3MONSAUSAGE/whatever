@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, useApi, type OnboardingState, type OnboardingStepId } from "@/lib/api";
 import { useToast } from "@/components/toast";
+import { COMMON_ZONES, otherZones, zoneLabel } from "@/lib/time-zones";
 
 const COPY: Record<OnboardingStepId, { title: string; body: string; href?: string; action?: string; altHref?: string; altAction?: string }> = {
   account: { title: "Create your account", body: "You're signed in. Your account is ready." },
   business: { title: "Name your business", body: "The name you and your team will see in Pekko." },
   location: { title: "Add your first location", body: "Where your screens are. The time zone keeps schedules on local time." },
-  screen: { title: "Pair a screen", body: "On the TV, open the player address below. Then type the 6-digit code it shows on the Displays page.", href: "/dashboard/displays", action: "Pair a screen" },
+  screen: { title: "Pair a screen", body: "On the TV, open the player address below. Then type the 6-digit code it shows under My Screens → Add screen.", href: "/dashboard/displays", action: "Pair a screen" },
   media: { title: "Upload media", body: "Add a photo (JPG, PNG, WebP) or an MP4 video of your menu, offer, or message. No artwork? Type your items and prices into a menu board template.", href: "/dashboard/media", action: "Upload", altHref: "/dashboard/media/menus", altAction: "Make a menu board" },
   playlist: { title: "Create a playlist", body: "Put your images and videos in order and choose how long each one shows.", href: "/dashboard/playlists", action: "Create playlist" },
   publish: { title: "Publish to your screen", body: "Open the playlist, tick your screen, and press Publish. Saving a draft doesn't change the TV.", href: "/dashboard/playlists", action: "Publish" },
@@ -88,7 +89,7 @@ export function SetupTracker({ fixture, origin }: { fixture?: OnboardingState; o
                   <p className="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="tracker-player-url">
                     <span className="text-muted">TV address:</span>
                     <code className="rounded-lg border border-line bg-paper px-2 py-1 text-base font-semibold text-ink break-all">{origin}/pair</code>
-                    <span className="text-muted">Player {origin}/tv</span>
+                    <span className="text-muted">({origin.replace(/^https?:\/\//, "")}/tv opens the same player.)</span>
                     <button type="button" className="btn btn-quiet" onClick={() => navigator.clipboard?.writeText(`${origin}/pair`).catch(() => {})}>Copy</button>
                   </p>
                 ) : null}
@@ -190,7 +191,12 @@ function LocationStep({ locationId, disabled, onDone }: { locationId: string | n
       <div>
         <label className="form-label" htmlFor="setup-timezone">Time zone</label>
         <select id="setup-timezone" className="field" value={tz} onChange={(e) => setTz(e.target.value)}>
-          {(list.includes(tz) ? list : [tz, ...list]).map((z) => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+          <optgroup label="Common (US)">
+            {COMMON_ZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}
+          </optgroup>
+          <optgroup label="All time zones (A–Z)">
+            {otherZones(list.includes(tz) ? list : [tz, ...list]).map((z) => <option key={z} value={z}>{zoneLabel(z)}</option>)}
+          </optgroup>
         </select>
       </div>
       <button className="btn btn-primary" disabled={busy || disabled}>{busy ? "Saving…" : "Save location"}</button>

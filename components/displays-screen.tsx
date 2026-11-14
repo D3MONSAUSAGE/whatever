@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { ONLINE_HINT, OfflineAlert, ScreenCard } from "@/components/tv";
 import { useToast } from "@/components/toast";
@@ -12,6 +12,26 @@ import { syncLine } from "@/lib/sync-line";
 import { assignBusyFor } from "@/lib/assign-publish";
 import { publishSavedCopy, publishSavedCopyForTargets, publishTimingCopy } from "@/lib/screen-actions-ui";
 
+const PAIR_WATCH_MS = 3_000;
+const PAIR_WATCH_FOR_MS = 2 * 60_000;
+
+export type PairWatch = { id: string | null; before: string[] };
+
+/**
+ * True once the screen just paired has its token and a first heartbeat. Other screens (for example
+ * one that is offline) never hold the "Connecting" banner up. Without the new id, the first screen
+ * that was not in the list before pairing is used.
+ */
+export function pairingSettled(list: DisplayItem[] | null | undefined, watch: PairWatch): boolean {
+  if (!list) return false;
+  const ready = (display: DisplayItem) => display.connected && Boolean(display.lastSeenAt);
+  if (watch.id) {
+    const paired = list.find((display) => display.id === watch.id);
+    return paired ? ready(paired) : false;
+  }
+  return list.some((display) => !watch.before.includes(display.id) && ready(display));
+}
+
 export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const live = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
   const locations = useApi<LocationItem[]>(fixture ? null : "/api/locations");
@@ -23,6 +43,22 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const [assigning, setAssigning] = useState<string[] | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
+  // After pairing, check every few seconds (even if this tab is behind the TV window) until the
+  // new screen reports in, so the card flips from "Waiting" to "Online" by itself (QA B1-08).
+  const [watchUntil, setWatchUntil] = useState(0);
+  const [watch, setWatch] = useState<PairWatch>({ id: null, before: [] });
+  const beforePair = useRef<string[]>([]);
+  const reloadDisplays = displays.reload;
+  const settled = pairingSettled(displays.data, watch);
+  useEffect(() => {
+    if (!watchUntil || fixture) return;
+    if (settled) { setWatchUntil(0); return; }
+    const timer = setInterval(() => {
+      if (Date.now() > watchUntil) { setWatchUntil(0); return; }
+      reloadDisplays();
+    }, PAIR_WATCH_MS);
+    return () => clearInterval(timer);
+  }, [watchUntil, settled, reloadDisplays, fixture]);
 
   async function rename(display: DisplayItem) {
     const name = await confirm.ask({
@@ -63,7 +99,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Displays" icon={<IconTv />} lede={ONLINE_HINT}
+      <PageHeader title="Add and manage screens" icon={<IconTv />} lede={ONLINE_HINT}
         action={
           <a href="#add-screen" className="btn btn-primary" data-testid="add-screen"
             onClick={(event) => { event.preventDefault(); const form = document.getElementById("add-screen"); form?.scrollIntoView({ behavior: "smooth", block: "start" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus({ preventScroll: true }); }}>
@@ -75,8 +111,17 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
         <button type="button" className="btn btn-quiet" onClick={() => setAssigning([])}>Assign playlist</button>
       </div>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
+      {watchUntil ? (
+        <p role="status" className="card p-3 mb-3 text-sm" data-testid="pair-watch">Connecting your TV… This page updates by itself as soon as the TV checks in (usually within a minute).</p>
+      ) : null}
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
-        onPaired={(warning) => { toast.show(warning || "Connected. The TV will switch over in a few seconds."); displays.reload(); }}
+        onPaired={(warning, id) => {
+          toast.show(warning || "Connected. The TV will switch over in a few seconds.");
+          setWatch({ id: id ?? null, before: beforePair.current });
+          displays.reload();
+          setWatchUntil(Date.now() + PAIR_WATCH_FOR_MS);
+        }}
+        onSubmitting={() => { beforePair.current = (displays.data ?? []).map((display) => display.id); }}
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
@@ -166,18 +211,19 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   );
 }
 
-function PairForm({ names, onPaired, onError }: { names: string[]; onPaired: (warning?: string) => void; onError: (message: string) => void }) {
+function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[]; onPaired: (warning?: string, id?: string) => void; onSubmitting?: () => void; onError: (message: string) => void }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
+    onSubmitting?.();
     try {
-      const paired = await api<{ nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
+      const paired = await api<{ id?: string; nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
       setCode("");
       setName("");
-      onPaired(paired.nameWarning ? `${paired.nameWarning} Suggested: ${paired.suggestedName}` : undefined);
+      onPaired(paired.nameWarning ? `${paired.nameWarning} Suggested: ${paired.suggestedName}` : undefined, typeof paired.id === "string" ? paired.id : undefined);
     } catch (err) {
       onError((err as Error).message);
     } finally {
@@ -231,7 +277,7 @@ function PlayerUrl() {
   return (
     <span className="mt-2 flex flex-wrap items-center gap-2">
       <code data-testid="player-url" className="rounded-lg border border-line bg-white px-3 py-2 text-base font-semibold text-ink break-all">{url}</code>
-      <span className="text-sm text-muted">Player: {url.replace(/\/pair$/, "/tv")}</span>
+      <span className="text-sm text-muted">({url.replace(/^https?:\/\//, "").replace(/\/pair$/, "/tv")} opens the same player.)</span>
       <button type="button" className="btn" onClick={copy} aria-label="Copy TV address">{copied ? "Copied" : "Copy"}</button>
       <span role="status" className="sr-only">{copied ? "TV address copied" : ""}</span>
     </span>

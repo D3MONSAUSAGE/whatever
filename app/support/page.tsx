@@ -6,9 +6,9 @@ import { ContactBlock } from "@/components/contact-block";
 export const metadata: Metadata = { title: "Support · Pekko" };
 
 const FAQ: { q: string; a: React.ReactNode }[] = [
-  { q: "The TV shows a 6-digit code and nothing else", a: <>It isn&apos;t paired yet. In Pekko, open <strong>Displays → Add screen</strong> and type the code. A new code appears every 10 minutes. You can also reload the TV page for a new one.</> },
-  { q: "What address do I open on the TV?", a: <>Open the TV&apos;s web browser and go to <strong>pekkotv.com/pair</strong>. The address is also on the Displays page with a copy button.</> },
-  { q: "I published but the TV still shows the old content", a: <>Check the TV is online (Displays shows <em>Online</em>). The TV checks in about every 30 seconds. Saving a draft doesn&apos;t change the TV; press <strong>Publish</strong>.</> },
+  { q: "The TV shows a 6-digit code and nothing else", a: <>It isn&apos;t paired yet. In Pekko, open <strong>My Screens → Add screen</strong> and type the code. A new code appears every 10 minutes. You can also reload the TV page for a new one.</> },
+  { q: "What address do I open on the TV?", a: <>Open the TV&apos;s web browser and go to <strong>pekkotv.com/pair</strong>. (pekkotv.com/tv opens the same player.) The address is also on the Add screen page with a copy button.</> },
+  { q: "I published but the TV still shows the old content", a: <>Check the TV is online (My Screens shows <em>Online</em>). The TV checks in about every 30 seconds. Saving a draft doesn&apos;t change the TV; press <strong>Publish</strong>.</> },
   { q: "The screen says “This screen is paused”", a: <>Your trial or plan has ended, or this screen is beyond your plan&apos;s screen limit. Open <strong>Settings → Plan &amp; billing</strong>. Your content is kept and the TV resumes on its own.</> },
   { q: "The screen says it's offline", a: <>Check the TV&apos;s Wi-Fi and power, and that the Pekko player is still open.</> },
   { q: "My video won't upload or play", a: <>Use MP4 (H.264). Very large files take longer; keep the page open until it finishes.</> },

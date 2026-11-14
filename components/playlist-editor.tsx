@@ -357,7 +357,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
                 : "Not on a screen yet."}
             </p>
             {playlist.data.displays.length === 0 ? (
-              <p className="text-sm text-muted">Connect a TV under Displays first.</p>
+              <p className="text-sm text-muted">Connect a TV first: My Screens → Add screen.</p>
             ) : (
               <ul className="grid gap-2 mb-4">
                 {playlist.data.displays.map((display) => (

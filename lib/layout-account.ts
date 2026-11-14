@@ -7,7 +7,19 @@ export type AccountLibraryFile = {
   kind: "image" | "video";
   mime: string;
   url: string | null;
+  /** Stored size in bytes, when known. Used to reuse an identical upload instead of storing it twice. */
+  sizeBytes?: number | null;
 };
+
+/**
+ * A library video with the same file name and byte size as the file being added (QA B1-10).
+ * Videos are stored byte-for-byte, so name + size identifies a repeat upload. Photos are re-encoded
+ * on upload, so their stored size never matches the original and they are not matched here.
+ */
+export function findSameVideo(library: AccountLibraryFile[] | null | undefined, file: { name: string; size: number }): AccountLibraryFile | null {
+  if (!library || !file.size) return null;
+  return library.find((item) => item.kind === "video" && item.name === file.name && item.sizeBytes === file.size) ?? null;
+}
 
 export type AccountBoard = {
   id: string;
@@ -52,6 +64,7 @@ function file(value: unknown): AccountLibraryFile | null {
     kind: row.kind,
     mime: row.mime,
     url: typeof row.url === "string" ? row.url : null,
+    sizeBytes: typeof row.sizeBytes === "number" && Number.isFinite(row.sizeBytes) ? row.sizeBytes : null,
   };
 }
 

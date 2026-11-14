@@ -41,7 +41,7 @@ export function AssignedThumb({ display, size = "card" }: { display: DisplayItem
         .assigned-thumb { margin: 0; flex: 0 0 auto; width: 128px; min-width: 112px; }
         .assigned-thumb-lg { width: 100%; min-width: 0; }
         .assigned-thumb-frame { aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #1a1614; border: 1px solid rgba(11,18,32,.08); display: grid; place-items: center; }
-        .assigned-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .assigned-thumb-img { width: 100%; height: 100%; object-fit: contain; display: block; } /* whole image, no crop (QA U1-09) */
         .assigned-thumb-fallback { display: grid; place-items: center; gap: 2px; color: #f3ecdf; text-align: center; padding: 4px; }
         .assigned-thumb-icon { font-size: 16px; line-height: 1; }
         .assigned-thumb-kind { font-size: 10px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; opacity: .85; }

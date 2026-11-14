@@ -14,6 +14,8 @@ import {
   fontFamilyName,
   PHONE_MAX,
   prefillBrandForm,
+  displayNameSuggestion,
+  parsePhone,
   WEBSITE_MAX,
   type Brand,
   type BrandFields,
@@ -35,11 +37,26 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   const images = artImages(fixture?.images ?? liveMedia.data);
   const [form, setForm] = useState<BrandFields | null>(null);
   const [busy, setBusy] = useState<"save" | null>(null);
+  const [nameFromBusiness, setNameFromBusiness] = useState(false);
+  const [savedOnce, setSavedOnce] = useState(false);
+  const me = useApi<{ accountName: string }>(fixture ? null : "/api/me");
   const toast = useToast();
 
   useEffect(() => {
     if (brand && !form) setForm(prefillBrandForm(brand));
   }, [brand, form]);
+
+  // Suggest the business name as the display name, only when it is empty (QA U1-06a).
+  // It is a suggestion in the form; nothing is saved until the owner presses Save.
+  const businessName = me.data?.accountName?.trim() ?? "";
+  useEffect(() => {
+    if (!form || nameFromBusiness) return;
+    const next = displayNameSuggestion(form.displayName, businessName);
+    if (next) {
+      setForm({ ...form, displayName: next });
+      setNameFromBusiness(true);
+    }
+  }, [form, businessName, nameFromBusiness]);
 
   async function save() {
     if (!brand || !form || fixture) return;
@@ -53,6 +70,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
       await api("/api/brand", { method: "PUT", body: JSON.stringify(payload.body) });
       await liveBrand.reload();
       setForm(prefillBrandForm(payload.body));
+      setSavedOnce(true);
       toast.show("Brand saved. New menus and boards can use it. Existing boards are left unchanged.");
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -77,6 +95,7 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
         <LoadState label="Loading your brand…" />
       ) : (
         <BrandEditor
+          nameFromBusiness={nameFromBusiness && !savedOnce}
           form={form}
           setForm={setForm}
           images={images}
@@ -95,8 +114,9 @@ const FONT_OPTIONS: { id: BrandFont; label: string }[] = [
 ];
 
 function BrandEditor({
-  form, setForm, images, custom, busy, onSave,
+  form, setForm, images, custom, busy, onSave, nameFromBusiness = false,
 }: {
+  nameFromBusiness?: boolean;
   form: BrandFields;
   setForm: (next: BrandFields) => void;
   images: MediaItem[];
@@ -145,6 +165,9 @@ function BrandEditor({
   const bodyFamily = fontFamilyName(form.bodyFont);
   const logoSrc = logo?.url ?? logo?.thumbnailUrl ?? "";
   const title = form.displayName?.trim() || "Your menu";
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const phoneCheck = parsePhone(form.phone ?? "");
+  const phoneError = phoneCheck.ok || !phoneTouched ? null : phoneCheck.error;
   const footerParts = [form.phone?.trim(), form.website?.trim()].filter(Boolean);
 
   return (
@@ -178,6 +201,7 @@ function BrandEditor({
               placeholder="Your business"
               onChange={(e) => setForm({ ...form, displayName: e.target.value || null })}
             />
+            {nameFromBusiness ? <span className="text-xs text-muted">Filled in from your business name. Change it if your screens should show something else, then save.</span> : null}
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1">
@@ -191,7 +215,10 @@ function BrandEditor({
                 autoComplete="tel"
                 placeholder="(415) 555-0100"
                 onChange={(e) => setForm({ ...form, phone: e.target.value || null })}
+                onBlur={() => setPhoneTouched(true)}
+                aria-describedby={phoneError ? "brand-phone-error" : undefined}
               />
+              {phoneError ? <span id="brand-phone-error" role="alert" className="text-xs text-danger">{phoneError}</span> : null}
             </label>
             <label className="grid gap-1">
               <span className="form-label">Website</span>
