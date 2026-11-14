@@ -34,3 +34,13 @@ export function directUploadStatus(state: DirectUploadState, what: "logo" | "pho
       return "";
   }
 }
+
+/**
+ * Open the browser's file chooser for a hidden file input (E3 hotfix). Called from the
+ * button's click handler, so it runs inside the user's click or key press.
+ */
+export function openFilePicker(input: Pick<HTMLInputElement, "click" | "disabled"> | null): boolean {
+  if (!input || input.disabled) return false;
+  input.click();
+  return true;
+}
