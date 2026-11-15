@@ -118,11 +118,14 @@ function Login() {
       {!supabaseConfigured() && (
         <p className="mb-4 note-error">{t("auth.missingConfig")}</p>
       )}
-      <form onSubmit={submit} className="space-y-3">
-        <input className="field" type="email" autoComplete="email" placeholder={t("common.email")} aria-label={t("common.email")} required
+      <form onSubmit={submit} className="space-y-3" name="login">
+        {/* Stable name/id/autocomplete and real <label for> in every language, so password managers find the fields (I18N-1F). */}
+        <label htmlFor="login-email" className="sr-only">{t("common.email")}</label>
+        <input id="login-email" name="email" className="field" type="email" autoComplete="email" inputMode="email" placeholder={t("common.email")} required
           value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className="field" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"}
-          placeholder={t("common.password")} aria-label={t("common.password")} minLength={MIN_PASSWORD} required value={password} onChange={(e) => setPassword(e.target.value)} />
+        <label htmlFor="login-password" className="sr-only">{t("common.password")}</label>
+        <input id="login-password" name="password" className="field" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"}
+          placeholder={t("common.password")} minLength={MIN_PASSWORD} required value={password} onChange={(e) => setPassword(e.target.value)} />
         {mode === "in" ? (
           <div className="text-right">
             <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">{t("auth.forgot")}</Link>

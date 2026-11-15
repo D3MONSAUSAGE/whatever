@@ -23,12 +23,12 @@ import { findSameVideo } from "@/lib/layout-account";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { ColorField } from "@/components/color-field";
-import { confirmDiscardUnsaved, hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/menu-board-unify";
+import { hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/menu-board-unify";
 import { publishSavedCopy } from "@/lib/screen-actions-ui";
 import { ShowOnScreens } from "@/components/show-on-screens";
 import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
-import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
+import { StudioGuardedLink, useConfirmDiscard, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
@@ -129,6 +129,7 @@ export function LayoutStudio({
     videoOn: boolean;
   };
   const cleanRef = useRef<CleanEdit | null>(null);
+  const confirmDiscard = useConfirmDiscard();
   function markClean(state: CleanEdit) { cleanRef.current = state; }
   function currentEdit(): CleanEdit {
     return { menuId, boardName, template, draft, imageHref, clipUrl, videoOn };
@@ -139,8 +140,7 @@ export function LayoutStudio({
 
   /** Leave the editor (back, or the Menu boards link). Prompts only when there are unsaved changes. */
   function requestLeave(after: () => void) {
-    if (!confirmDiscardUnsaved(studioIsDirty())) return;
-    after();
+    confirmDiscard(studioIsDirty(), after);
   }
   useRegisterStudioLeave(studioIsDirty);
   const liveBrand = useApi<Brand>(accountMode && !fixture && !brand ? "/api/brand" : null);
@@ -335,7 +335,11 @@ export function LayoutStudio({
   function selectBoard(id: string) {
     if (!account) return;
     if (id === (menuId ?? "")) return;
-    if (!confirmDiscardUnsaved(studioIsDirty())) return;
+    confirmDiscard(studioIsDirty(), () => openBoard(id));
+  }
+
+  function openBoard(id: string) {
+    if (!account) return;
     if (!id) { newBoard(true); return; }
     const board = account.boards.find((item) => item.id === id);
     if (!board) return;
@@ -369,7 +373,11 @@ export function LayoutStudio({
   }
 
   function newBoard(alreadyConfirmed = false) {
-    if (!alreadyConfirmed && !confirmDiscardUnsaved(studioIsDirty())) return;
+    if (alreadyConfirmed) { startFreshBoard(); return; }
+    confirmDiscard(studioIsDirty(), startFreshBoard);
+  }
+
+  function startFreshBoard() {
     const created = freshBoard(account?.boards.length ?? 0, window.prompt("Name this board", freshBoard(account?.boards.length ?? 0).name));
     applyFresh(created, scopeRef.current);
     setNote("");

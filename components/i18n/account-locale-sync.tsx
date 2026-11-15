@@ -5,15 +5,21 @@ import { currentLocale, onLocaleChange, useLocale } from "@/lib/i18n/client";
 import { isLocale, type Locale } from "@/lib/i18n/locales";
 import { useToast } from "@/components/toast";
 
-type Me = { locale?: string; localeChosen?: boolean };
+type Me = { locale?: string; localeChosen?: boolean; newAccount?: boolean };
 
 /**
  * Keeps the signed-in account's saved language (accounts.locale) and this browser in step.
  * - On load: a saved account choice wins (and refreshes the cookie). With no saved choice yet, the
- *   language picked before sign-up/sign-in is saved to the account once.
+ *   language picked before sign-up is saved to the account once, but only for a new account
+ *   (newAccount from /api/me, I18N-1F-07). An older account stays unset; this device keeps its cookie.
  * - On switch: saves to the account. If that fails the switch still applies on this device.
  * Mounted once in the dashboard shell. Renders nothing.
  */
+/** I18N-1F-07: adopt this device's language into the account only when none is saved and the account is new. */
+export function shouldAdoptDeviceLocale(me: Me, device: Locale): boolean {
+  return !me.localeChosen && me.newAccount === true && device !== "en";
+}
+
 export function AccountLocaleSync() {
   const { setLocale, t } = useLocale();
   const toast = useToast();
@@ -28,7 +34,7 @@ export function AccountLocaleSync() {
       const saved = me.localeChosen && isLocale(me.locale) ? me.locale : null;
       if (saved) {
         if (saved !== currentLocale()) { adopting.current = saved; setLocale(saved); }
-      } else if (currentLocale() !== "en") {
+      } else if (shouldAdoptDeviceLocale(me, currentLocale())) {
         void api("/api/me", { method: "PATCH", body: JSON.stringify({ locale: currentLocale() }) }).catch(() => undefined);
       }
     }).catch(() => undefined);

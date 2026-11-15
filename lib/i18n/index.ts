@@ -15,10 +15,11 @@ export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, es };
  * key from this list is the switch-on; the unit test enforces es === en for every key still listed.
  */
 export const ENGLISH_ONLY: readonly MessageKey[] = [
-  "faq.trial.q", "faq.trial.a",
-  "faq.trialEnd.q", "faq.trialEnd.a",
-  "faq.plans.q", "faq.plans.a",
-  "faq.cancel.q", "faq.cancel.a",
+  // Answers only: the questions are translated so the FAQ reads as Spanish (I18N-1F); billing answers stay English.
+  "faq.trial.a",
+  "faq.trialEnd.a",
+  "faq.plans.a",
+  "faq.cancel.a",
 ];
 
 export type Vars = Record<string, string | number>;

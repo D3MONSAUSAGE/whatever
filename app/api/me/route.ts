@@ -4,7 +4,7 @@ import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { stripControls } from "@/lib/server/validate";
 import { accountLocale, withLocalizedErrors } from "@/lib/server/locale";
-import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/locales";
+import { DEFAULT_LOCALE, isLocale, isNewAccount } from "@/lib/i18n/locales";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,15 +12,23 @@ export const dynamic = "force-dynamic";
 /**
  * { email, accountName, locale, localeChosen }. locale is "en" | "es" (I18N-1): the saved choice, else "en".
  * localeChosen is false until the owner picks a language (or before 0028).
+ * newAccount (I18N-1F, additive): true for accounts created in the last 24 h. Only then does the web adopt the
+ * language picked before sign-up, so a device's cookie never sets the language of an older account.
  */
 export const GET = withLocalizedErrors(async (req: Request) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const [{ data }, locale] = await Promise.all([
-    db().from("accounts").select("name").eq("id", admin.accountId).single(),
+    db().from("accounts").select("name, created_at").eq("id", admin.accountId).single(),
     accountLocale(admin.accountId),
   ]);
-  return json({ email: admin.email, accountName: data?.name ?? "", locale: locale ?? DEFAULT_LOCALE, localeChosen: locale !== null });
+  return json({
+    email: admin.email,
+    accountName: data?.name ?? "",
+    locale: locale ?? DEFAULT_LOCALE,
+    localeChosen: locale !== null,
+    newAccount: isNewAccount((data as { created_at?: string | null } | null)?.created_at),
+  });
 });
 
 /**

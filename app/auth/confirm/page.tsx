@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
 import { AuthFrame, friendlyAuthError } from "@/components/auth-frame";
 import { CLEAN_CONFIRM_PATH, confirmPlan } from "@/lib/auth-confirm";
+import { ResendConfirmation } from "@/components/auth/resend-confirmation";
 
 /**
  * Branded landing page for Supabase email links (B2-07 option A).
@@ -58,7 +59,12 @@ function AuthConfirm() {
         lede={plan.reason === "type" ? t("auth.linkType") : t("auth.linkIncomplete")}
         footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">{t("common.backToSignIn")}</Link>}
       >
-        <Link href="/forgot-password" className="btn btn-primary w-full">{t("auth.sendNewResetLink")}</Link>
+        {/* I18N-1F: the usual reason to land here is a sign-up link, so offer a new confirmation email first. */}
+        <ResendConfirmation />
+        <p className="mt-5 text-sm text-muted text-center">
+          {t("auth.confirmResendOr")}{" "}
+          <Link href="/forgot-password" className="font-semibold text-primary underline underline-offset-4" data-testid="confirm-reset-link">{t("auth.sendNewResetLink")}</Link>
+        </p>
       </AuthFrame>
     );
   }
@@ -103,6 +109,7 @@ function AuthConfirm() {
             <div className="mt-4 grid gap-3">
               <p role="alert" className="text-sm text-danger">{error}</p>
               {plan.type === "recovery" ? <Link href="/forgot-password" className="btn btn-quiet w-full">{t("auth.sendNewResetLink")}</Link> : null}
+              {plan.type === "signup" || plan.type === "email" ? <ResendConfirmation next={plan.next} /> : null}
             </div>
           ) : null}
         </>

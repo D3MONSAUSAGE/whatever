@@ -52,3 +52,14 @@ export function readLocaleCookie(cookieHeader: string | null | undefined): Local
   const match = (cookieHeader ?? "").match(new RegExp(`(?:^|;\\s*)${LOCALE_COOKIE}=([a-z]{2})`));
   return match && isLocale(match[1]) ? match[1] : null;
 }
+
+/** I18N-1F-07: how long after sign-up the pre-sign-up language choice may still be adopted into accounts.locale. */
+export const NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** True when the account was created within NEW_ACCOUNT_WINDOW_MS. Unknown or invalid dates count as not new. */
+export function isNewAccount(createdAt: string | null | undefined, now: number = Date.now()): boolean {
+  if (!createdAt) return false;
+  const at = Date.parse(createdAt);
+  if (Number.isNaN(at)) return false;
+  return now - at >= -60_000 && now - at < NEW_ACCOUNT_WINDOW_MS;
+}

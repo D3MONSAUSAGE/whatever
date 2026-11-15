@@ -13,7 +13,7 @@ import { ContentNav } from "@/components/content-nav";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
 import { clearLayoutStudioDraftsOnSignOut, shouldClearStudioDraftsOnAuthEvent } from "@/lib/layout-studio-draft";
 import { isContentPath, isMainNavActive, MAIN_NAV } from "@/lib/content-nav";
-import { StudioGuardedLink, StudioLeaveProvider, useStudioAllowLeave } from "@/components/studio-leave";
+import { StudioGuardedLink, StudioLeaveProvider, useStudioRequestLeave } from "@/components/studio-leave";
 import { IconCalendar, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
 
 const NAV_ICONS: Record<string, () => React.ReactElement> = {
@@ -27,9 +27,9 @@ const NAV_ICONS: Record<string, () => React.ReactElement> = {
 const NAV = MAIN_NAV.map((item) => ({ ...item, icon: NAV_ICONS[item.href] ?? IconGrid }));
 
 function SignOutButton({ onSignOut, className, children }: { onSignOut: () => void | Promise<void>; className?: string; children: React.ReactNode }) {
-  const allowLeave = useStudioAllowLeave();
+  const requestLeave = useStudioRequestLeave();
   return (
-    <button type="button" className={className} onClick={() => { if (!allowLeave()) return; void onSignOut(); }}>
+    <button type="button" className={className} onClick={() => requestLeave(() => void onSignOut())}>
       {children}
     </button>
   );
