@@ -160,7 +160,7 @@ describe("Legal ES: scope", () => {
   it("does not touch Stripe-hosted flows, API routes, the player or server code", () => {
     let changed: string[] = [];
     try {
-      changed = execSync("git diff --name-only fabd22e -- .", { encoding: "utf8" }).split("\n").filter(Boolean);
+      changed = execSync("git diff --name-only 003ba7c -- .", { encoding: "utf8" }).split("\n").filter(Boolean);
     } catch {
       return;
     }
