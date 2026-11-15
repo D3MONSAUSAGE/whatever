@@ -49,7 +49,28 @@ describe("MB-1 product cards", () => {
     expect(html).toContain(">Tacos de birria<");
     expect(card({ name: "", price: "", description: "" }, true, "es")).toMatch(/>Producto nuevo<[\s\S]*>Sin precio<[\s\S]*>Listo</);
     for (const k of Object.keys(en).filter((k) => k.startsWith("menuCard."))) expect(es[k as keyof typeof es]).toBeTruthy();
-    expect(es["menuCard.priceLabel"]).toBe("Precio"); // glossary: price = precio; product = producto
+    expect(es["menuCard.priceLabel"]).toBe("Precio {item} de la sección {section}"); // glossary: price = precio; product = producto
+  });
+
+  it("Gother #108 lows: field labels/placeholders/remove via t(), every menuCard key used, AA placeholder colour, prices wrap", () => {
+    const keys = Object.keys(en).filter((k) => k.startsWith("menuCard."));
+    const src = ["components/menu-item-fields.tsx", "components/classic-editor.tsx", "components/layout-studio.tsx"].map((f) => readFileSync(f, "utf8")).join("\n");
+    for (const k of keys) expect(src, k).toContain(`"${k}"`);
+    for (const f of ["components/classic-editor.tsx", "components/layout-studio.tsx"]) {
+      const s = readFileSync(f, "utf8");
+      expect(s).not.toMatch(/`(Item|Price|Description|Remove item) \$\{ii \+ 1\}/);
+      expect(s).not.toMatch(/placeholder="(Item name|Description|Short description \(optional\))"/);
+    }
+    // English stays byte-identical for screen readers and e2e selectors.
+    expect(en["menuCard.removeLabel"].replace("{item}", "1").replace("{section}", "1")).toBe("Remove item 1 in section 1");
+    expect(en["menuCard.nameLabel"].replace("{item}", "2").replace("{section}", "1")).toBe("Item 2 in section 1");
+    // #5b6577 on white is 5.9:1 (AA 4.5:1); on the card's #f3f5f9 it's 5.4:1.
+    expect(MENU_FIELD_STYLES).toMatch(/\.product-name\.is-placeholder \{ color: #5b6577;/);
+    expect(MENU_FIELD_STYLES).toMatch(/\.product-price\.is-empty \{[^}]*color: #5b6577;/);
+    const price = /\.product-price \{[^}]*\}/.exec(MENU_FIELD_STYLES)![0];
+    expect(price).not.toContain("ellipsis");
+    expect(price).not.toContain("nowrap");
+    expect(price).toContain("overflow-wrap: anywhere");
   });
 
   it("both editors use the card; menu data, limits and TV layouts are unchanged", () => {

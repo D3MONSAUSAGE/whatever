@@ -968,7 +968,7 @@ export function LayoutStudio({
                 </select>
               </label>
               <p className="zone-help">{t("studio.bodyFontHelp")}</p>
-              <p style={{ fontSize: 13, color: "#5c534c" }}>The fonts on this page are the same files drawn into the published image.</p>
+              <p style={{ fontSize: 13, color: "#5c534c" }}>{t("studio.fontsNote")}</p>
               <p className="zone-help">Photo and video fit and position are under the board when you select a photo or video area.</p>
               <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
                 <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split} aria-describedby="proportion-note"
@@ -1126,6 +1126,7 @@ function SelectedZoneEditor({
   setNote: (note: string) => void;
 }) {
   const cards = useOpenItem(); // MB-1: which product card is open
+  const t = useT();
   const panel = editorPanelForZone(zone);
   if (panel === "none") {
     return <p className="studio-zone-hint">Select an area in the preview to edit it here.</p>;
@@ -1178,18 +1179,18 @@ function SelectedZoneEditor({
                     const nameInvalid = nameCheck && needsName(item);
                     return (
                     <ProductCard key={ii} item={item} idBase={idBase} open={cards.isOpen(si, ii) || nameInvalid} onToggle={() => cards.toggle(si, ii)}
-                      removeLabel={`Remove item ${ii + 1} in section ${si + 1}`}
+                      removeLabel={t("menuCard.removeLabel", { item: ii + 1, section: si + 1 })}
                       onRemove={() => { cards.clear(); update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) }); }}
                       order={<OrderButtons kind="item" name={item.name} scope={`studio-items-${si}`} index={ii} count={section.items.length} className="item-order product-order"
                         onMove={(dir) => { cards.moved(si, ii, dir); update({ ...draft, sections: moveItem(draft.sections, si, ii, dir) }); }} />}>
-                      <input id={`${idBase}-name`} aria-label={`Item ${ii + 1} in section ${si + 1}`} className="item-name" style={field} placeholder="Item name" value={item.name} maxLength={MENU_LIMITS.itemName}
+                      <input id={`${idBase}-name`} aria-label={t("menuCard.nameLabel", { item: ii + 1, section: si + 1 })} className="item-name" style={field} placeholder={t("menuCard.namePlaceholder")} value={item.name} maxLength={MENU_LIMITS.itemName}
                         aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined}
                         onChange={(event) => setItem(draft, si, ii, { name: event.target.value }, update)} />
-                      <input aria-label={`Price ${ii + 1} in section ${si + 1}`} className="item-price" style={field} placeholder="$0" value={item.price} maxLength={MENU_LIMITS.price}
+                      <input aria-label={t("menuCard.priceLabel", { item: ii + 1, section: si + 1 })} className="item-price" style={field} placeholder="$0" value={item.price} maxLength={MENU_LIMITS.price}
                         aria-describedby={`${idBase}-price-hint`}
                         onBlur={(event) => { const next = normalizePrice(event.target.value); if (next !== item.price) setItem(draft, si, ii, { price: next }, update); if (needsName({ ...item, price: next })) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { price: event.target.value }, update)} />
-                      <input aria-label={`Description ${ii + 1} in section ${si + 1}`} className="item-desc" style={field} placeholder="Description" value={item.description} maxLength={MENU_LIMITS.description}
+                      <input aria-label={t("menuCard.descLabel", { item: ii + 1, section: si + 1 })} className="item-desc" style={field} placeholder={t("menuCard.descPlaceholder")} value={item.description} maxLength={MENU_LIMITS.description}
                         aria-describedby={`${idBase}-desc-count`} onBlur={() => { if (needsName(item)) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { description: event.target.value }, update)} />
                       <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />

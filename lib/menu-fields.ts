@@ -144,10 +144,10 @@ export const MENU_FIELD_STYLES = `
         .product-thumb.is-empty { color: #8a96ab; background: #f3f5f9; border-style: dashed; }
         .product-main { grid-area: main; min-width: 0; display: grid; gap: 2px; cursor: pointer; }
         .product-name { font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .product-name.is-placeholder { color: #8a96ab; font-weight: 600; font-style: italic; }
+        .product-name.is-placeholder { color: #5b6577; font-weight: 600; font-style: italic; }
         .product-desc { font-size: 13px; color: #5c6474; line-height: 1.4; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .product-price { grid-area: price; font-size: 15px; font-weight: 750; color: #0f172a; font-variant-numeric: tabular-nums; white-space: nowrap; max-width: 9ch; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-        .product-price.is-empty { font-size: 12px; font-weight: 600; color: #8a96ab; }
+        .product-price { grid-area: price; font-size: 15px; font-weight: 750; color: #0f172a; font-variant-numeric: tabular-nums; max-width: 12ch; overflow-wrap: anywhere; text-align: right; line-height: 1.3; cursor: pointer; }
+        .product-price.is-empty { font-size: 12px; font-weight: 600; color: #5b6577; }
         .product-actions { grid-area: actions; display: inline-flex; align-items: center; gap: 2px; }
         .product-edit { border: 1px solid #d5dae3; background: #fff; color: #1f2937; font: inherit; font-size: 13px; font-weight: 650; min-height: 36px; min-width: 56px; padding: 0 12px; border-radius: 999px; cursor: pointer; }
         .product-edit:hover { background: #f2f5fa; }

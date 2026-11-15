@@ -329,9 +329,13 @@ export const en = {
   "menuCard.done": "Done",
   "menuCard.editLabel": "Edit {name}",
   "menuCard.doneLabel": "Done editing {name}",
-  "menuCard.nameLabel": "Item name",
-  "menuCard.priceLabel": "Price",
-  "menuCard.descLabel": "Description",
+  "menuCard.nameLabel": "Item {item} in section {section}",
+  "menuCard.priceLabel": "Price {item} in section {section}",
+  "menuCard.descLabel": "Description {item} in section {section}",
+  "menuCard.removeLabel": "Remove item {item} in section {section}",
+  "menuCard.namePlaceholder": "Item name",
+  "menuCard.descPlaceholder": "Short description (optional)",
+  "studio.fontsNote": "The fonts on this page are the same files drawn into the published image.",
 } as const;
 
 export type MessageKey = keyof typeof en;
