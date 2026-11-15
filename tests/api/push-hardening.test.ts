@@ -220,3 +220,14 @@ describe("FCM wire format for the test push", () => {
   });
 });
 
+
+describe("Spanish error text for the new routes", () => {
+  it("429 and 400 answers come back in Spanish with Accept-Language: es", async () => {
+    fakeSender.current = { name: "fake", async send() { return { ok: true }; } };
+    const es = (body: unknown) => new Request("http://localhost/x", { method: "POST", headers: { Authorization: "Bearer token-a", "Accept-Language": "es" }, body: JSON.stringify(body) });
+    expect((await (await pushTest(es({ x: 1 }))).json()).error).toBe("Envíe un cuerpo JSON vacío {}.");
+    expect((await (await signOut(es({ scope: "all" }))).json()).error).toBe("scope debe ser 'global' o 'local'.");
+    for (let i = 0; i < 5; i++) await pushTest(es({}));
+    expect((await (await pushTest(es({}))).json()).error).toBe("Demasiadas notificaciones de prueba. Intente de nuevo más tarde.");
+  });
+});
