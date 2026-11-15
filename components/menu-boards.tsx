@@ -73,9 +73,10 @@ function newClassicDraft(displayIds: string[] = [], brand?: Brand | null, t: T =
 
 function boardKindLabel(menu: MenuBoard, t: T): string {
   const classified = classifyBoardContent(menu.template, menu.content);
-  if (classified.kind === "layout") return layoutOptionForTemplate(classified.document.template).name;
+  if (classified.kind === "layout") return t(`lo.${layoutOptionForTemplate(classified.document.template).id}.name`);
   if (classified.kind === "classic") {
-    return MENU_TEMPLATES.find((t) => t.id === classified.template)?.name ?? t("mb.kindMenu");
+    const tpl = MENU_TEMPLATES.find((item) => item.id === classified.template);
+    return tpl ? t(`tpl.${tpl.id}.name`) : t("mb.kindMenu");
   }
   return t("mb.kindBoard");
 }
@@ -251,7 +252,7 @@ export function MenuBoards({
             }
             toast.show(message);
             if (next.kind === "picker" && saved.playlistId) {
-              setPickClassic({ id: saved.id, name: saved.name || "This board", playlistId: saved.playlistId });
+              setPickClassic({ id: saved.id, name: saved.name || t("ls.thisBoard"), playlistId: saved.playlistId });
               void liveDisplays.reload();
             }
           }}

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "@/lib/i18n/client";
 
 export type ConfirmRequest = {
   title: string;
@@ -35,6 +36,7 @@ export function useConfirm() {
 }
 
 function ConfirmDialog({ pending, onClose }: { pending: Pending; onClose: (value: string | boolean | null) => void }) {
+  const t = useT();
   const titleId = useId();
   const bodyId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +103,7 @@ function ConfirmDialog({ pending, onClose }: { pending: Pending; onClose: (value
           )}
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
             <button ref={cancelRef} type="button" className="btn btn-quiet" onClick={() => onClose(null)}>
-              {pending.cancelLabel ?? "Cancel"}
+              {pending.cancelLabel ?? t("common.cancel")}
             </button>
             {pending.confirmLabel && (
               <button type="submit" className={`btn ${pending.danger ? "btn-danger" : "btn-primary"}`}>

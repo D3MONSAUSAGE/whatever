@@ -162,7 +162,7 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
       e.current_period_end || e.grace_ends_at || "none",
       es ? "Sus pantallas de Pekko están en pausa" : "Your Pekko screens are paused",
       es
-        ? "Su suscripción no está activa, así que sus pantallas están en pausa. Su contenido y su configuración están guardados. Elija un plan o actualice su método de pago en Configuración → Plan y facturación para volver a encenderlas."
+        ? "Su suscripción no está activa, así que sus pantallas están en pausa. Su contenido y su configuración están guardados. Elija un plan o actualice su método de pago en Facturación para volver a encenderlas."
         : "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on.",
     ));
   }
