@@ -17,7 +17,7 @@ const page = (q?: Record<string, string>) => (Page as unknown as P)({ searchPara
 const meta = async (q?: Record<string, string>) => (await generateMetadata({ searchParams: Promise.resolve(q ?? {}) })).title;
 const ES_RULES = /\b(tú|tu cuenta|tienes|puedes|quieres|elige|escribe|ingresa)\b|televisor|prueba gratuita|desconectad|programación|Inténtelo|Ingrese|tuvo contacto/i;
 const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
-const numbers = (s: string) => (s.match(/\d+/g) ?? []).sort();
+const numbers = (s: string): string[] => [...(s.match(/\d+/g) ?? [])].sort();
 
 beforeEach(() => { cookieLocale = undefined; });
 
