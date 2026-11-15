@@ -4,6 +4,8 @@
  */
 export const SCREENS_CHANGED = "pekko:screens-changed";
 const CHANNEL = "pekko-screens";
+/** Gother #109 low: the window event already covers this tab, so channel messages from this tab are skipped. */
+const TAB_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 /** Writes that change what screens show, which TV is paired, or group membership. */
 export function changesScreens(path: string, method: string | undefined): boolean {
@@ -23,7 +25,7 @@ export function announceScreensChanged() {
   window.dispatchEvent(new Event(SCREENS_CHANGED));
   try {
     const channel = new BroadcastChannel(CHANNEL);
-    channel.postMessage(Date.now());
+    channel.postMessage({ tab: TAB_ID, at: Date.now() });
     channel.close();
   } catch { /* BroadcastChannel unavailable: this tab still refreshed */ }
 }
@@ -35,7 +37,7 @@ export function onScreensChanged(listener: () => void): () => void {
   let channel: BroadcastChannel | null = null;
   try {
     channel = new BroadcastChannel(CHANNEL);
-    channel.onmessage = () => listener();
+    channel.onmessage = (event: MessageEvent) => { if ((event?.data as { tab?: string } | null)?.tab !== TAB_ID) listener(); };
   } catch { channel = null; }
   return () => { window.removeEventListener(SCREENS_CHANGED, listener); channel?.close(); };
 }

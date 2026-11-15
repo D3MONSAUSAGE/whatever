@@ -139,3 +139,49 @@ describe("U2-05-F1: the Media grid shows the new name right after a rename", () 
     expect(makeT("en")("media.renamed", { name: "QA Burger Hero.jpg" })).toBe("Renamed to QA Burger Hero.jpg");
   });
 });
+
+describe("Gother #109 fold-ins", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("MEDIUM: a just-unpaired screen (recent heartbeat, no TV) isn't counted online in the list, group headers or overview", async () => {
+    const { onlineNow } = await import("@/lib/sync-line");
+    const { MyScreens } = await import("@/components/my-screens");
+    expect(onlineNow({ connected: false, online: true })).toBe(false);
+    expect(onlineNow({ connected: true, online: true })).toBe(true);
+    const displays = [tv("a", "QA Bar TV 2", null, { connected: false, online: true } as Partial<DisplayItem>), tv("b", "Patio", null)];
+    const Screens = MyScreens as (props: { fixture: { displays: DisplayItem[]; groups: never[] } }) => ReturnType<typeof MyScreens>;
+    const html = wrap("en", h(Screens, { fixture: { displays, groups: [] } }));
+    expect(html).toMatch(/1 online/);
+    expect(html).not.toMatch(/2 online/);
+    for (const f of ["components/my-screens.tsx", "components/overview-screen.tsx"]) {
+      expect(readFileSync(f, "utf8")).not.toMatch(/filter\(\((display|item)\) => \1\.online\)/);
+    }
+  });
+  it("low 1: the same tab hears a change once (its own channel message is skipped); other tabs still hear it", () => {
+    const win = new EventTarget();
+    const channels: { onmessage: ((e: { data: unknown }) => void) | null }[] = [];
+    class FakeChannel {
+      onmessage: ((e: { data: unknown }) => void) | null = null;
+      constructor() { channels.push(this); }
+      postMessage(data: unknown) { for (const c of channels) if (c !== this) c.onmessage?.({ data }); }
+      close() { const i = channels.indexOf(this); if (i >= 0) channels.splice(i, 1); }
+    }
+    vi.stubGlobal("window", win);
+    vi.stubGlobal("BroadcastChannel", FakeChannel);
+    const heard = vi.fn();
+    const off = onScreensChanged(heard);
+    announceScreensChanged();
+    expect(heard).toHaveBeenCalledTimes(1); // window event only; own-tab channel echo skipped
+    channels[0]!.onmessage?.({ data: { tab: "another-tab" } });
+    expect(heard).toHaveBeenCalledTimes(2);
+    off();
+  });
+  it("low 2: replaceNotes speaks the UI language", async () => {
+    const { replaceNotes, screenChoices } = await import("@/lib/show-on-screens");
+    const choices = screenChoices([tv("d2", "QA Bar TV 2", { id: "loop", name: "QA Mixed Loop" }), tv("d3", "Patio TV", null)], "board");
+    expect(replaceNotes(choices, ["d2"], makeT("es"))).toEqual(["Reemplaza QA Mixed Loop en QA Bar TV 2."]);
+    expect(replaceNotes(choices, ["d3"], makeT("es"))).toEqual(["Patio TV todavía no tiene nada asignado."]);
+    expect(replaceNotes(choices, [], makeT("es"))).toEqual(["Al marcar una pantalla, se reemplaza lo que tiene asignado."]);
+    expect(replaceNotes(choices, ["d2"])).toEqual(["Replaces QA Mixed Loop on QA Bar TV 2."]); // English unchanged
+    expect(readFileSync("components/show-on-screens.tsx", "utf8")).toContain("replaceNotes(choices, picked, t)");
+  });
+});

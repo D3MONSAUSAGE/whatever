@@ -43,7 +43,7 @@ describe("E2b: Show on which screen? after saving a classic board", () => {
     expect(boards).toMatch(/afterClassicSave\(\{ created, fromScreen, tickedScreens: saved\.tickedScreens/); // E2b-F1: new boards only
     const card = readFileSync("components/show-on-screens.tsx", "utf8");
     expect(card).toMatch(/if \(!targets\.length \|\| busy\) return;/);
-    expect(card).toMatch(/replaceNotes\(choices, picked\)/);
+    expect(card).toMatch(/replaceNotes\(choices, picked, t\)/);
     expect(card).not.toMatch(/This replaces what a ticked screen is set to show\./);
     // Layout boards still use the per-screen layout assign route.
     expect(card).toMatch(/\/api\/layout-studio\/assign/);

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { api, useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
 import { contentLabel, heartbeatText, OfflineAlert, Status } from "@/components/tv";
 import { useT } from "@/lib/i18n/client";
-import { syncLine } from "@/lib/sync-line";
+import { onlineNow, syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
 import { GroupPublish } from "@/components/group-publish";
 import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit } from "@/components/ui";
@@ -23,7 +23,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   const displays = fixture ? { data: fixture.displays, error: null as string | null } : liveDisplays;
   const groups = fixture ? { data: fixture.groups ?? [], error: null as string | null } : liveGroups;
   const list = displays.data ?? [];
-  const onlineCount = list.filter((display) => display.online).length;
+  const onlineCount = list.filter(onlineNow).length;
   const offlineCount = list.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">
@@ -243,7 +243,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
         <ul className="grid gap-3">
           {groups.data.map((group) => {
             const members = (displays.data ?? []).filter((display) => group.displayIds.includes(display.id));
-            const online = members.filter((display) => display.online).length;
+            const online = members.filter(onlineNow).length;
             return (
               <li key={group.id}>
                 <Link href={`/dashboard/screens/groups/${group.id}`} className="card block p-4 min-h-11">
@@ -288,7 +288,7 @@ export function GroupWorkspace({ id }: { id: string }) {
   if (!groups.data || !displays.data) return <LoadState error={groups.error || displays.error} label="Loading this group…" />;
   if (!group) return <EmptyState title="That group is not in this account"><Link href="/dashboard/screens/groups" className="underline font-semibold">Back to groups</Link>.</EmptyState>;
   const members = displays.data.filter((display) => group.displayIds.includes(display.id));
-  const online = members.filter((display) => display.online).length;
+  const online = members.filter(onlineNow).length;
   const offline = members.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">

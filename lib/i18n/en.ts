@@ -343,6 +343,9 @@ export const en = {
   "menuBoards.updatedOn": "Menu updated. It refreshes on {screens} within a minute.",
   "menuBoards.updatedNoScreen": "Menu updated. It isn't on a screen yet. Add it from My Screens or Schedules.",
   "showOnScreens.replacesHere": "Replaces {current} on this screen",
+  "showOnScreens.tickNote": "Ticking a screen replaces what it's set to show.",
+  "showOnScreens.replacesOn": "Replaces {current} on {screen}.",
+  "showOnScreens.nothingYet": "{screen} isn't set to show anything yet.",
   "media.renamed": "Renamed to {name}",
 } as const;
 

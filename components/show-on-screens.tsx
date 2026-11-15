@@ -84,7 +84,7 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, loadin
       {loading ? <p className="show-on-screens-lede" role="status">Loading your screens…</p> : choices.length ? (
         <>
         <div className="show-on-screens-warn" aria-live="polite" data-testid="show-on-screens-warn">
-          {replaceNotes(choices, picked).map((note) => <p key={note}>{note}</p>)}
+          {replaceNotes(choices, picked, t).map((note) => <p key={note}>{note}</p>)}
         </div>
         <fieldset className="show-on-screens-list">
           <legend className="sr-only">Screens</legend>

@@ -1,4 +1,5 @@
 import type { DisplayItem } from "@/lib/api";
+import { makeT, type T } from "@/lib/i18n";
 
 export type ScreenChoice = { id: string; name: string; status: string; showing: boolean; nowShowing: string | null };
 
@@ -26,12 +27,12 @@ export function screensToAssign(choices: ScreenChoice[], picked: string[]): stri
  * E2b: name what each ticked screen loses, e.g. "Replaces QA Mixed Loop on QA Bar TV 2."
  * Before anything is ticked, one general line explains it.
  */
-export function replaceNotes(choices: ScreenChoice[], picked: string[]): string[] {
+export function replaceNotes(choices: ScreenChoice[], picked: string[], t: T = makeT("en")): string[] {
   const ticked = choices.filter((choice) => !choice.showing && picked.includes(choice.id));
-  if (!ticked.length) return ["Ticking a screen replaces what it's set to show."];
+  if (!ticked.length) return [t("showOnScreens.tickNote")];
   return ticked.map((choice) => choice.nowShowing
-    ? `Replaces ${choice.nowShowing} on ${choice.name}.`
-    : `${choice.name} isn't set to show anything yet.`);
+    ? t("showOnScreens.replacesOn", { current: choice.nowShowing, screen: choice.name })
+    : t("showOnScreens.nothingYet", { screen: choice.name }));
 }
 
 /**

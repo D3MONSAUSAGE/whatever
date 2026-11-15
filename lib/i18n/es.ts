@@ -334,5 +334,8 @@ export const es: Record<MessageKey, string> = {
   "menuBoards.updatedOn": "Menú actualizado. Se actualiza en {screens} en un minuto.",
   "menuBoards.updatedNoScreen": "Menú actualizado. Todavía no está en ninguna pantalla. Agréguelo desde Mis pantallas u Horarios.",
   "showOnScreens.replacesHere": "Reemplaza {current} en esta pantalla",
+  "showOnScreens.tickNote": "Al marcar una pantalla, se reemplaza lo que tiene asignado.",
+  "showOnScreens.replacesOn": "Reemplaza {current} en {screen}.",
+  "showOnScreens.nothingYet": "{screen} todavía no tiene nada asignado.",
   "media.renamed": "Nombre cambiado a {name}",
 };
