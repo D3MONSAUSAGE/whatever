@@ -3,6 +3,9 @@
  * the server rules and the TV's resolution order (lib/server/schedule.ts compareRules) are unchanged.
  */
 import { formatClock12 } from "@/lib/clock";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 
 export type RuleLike = {
   id?: string;
@@ -21,7 +24,7 @@ export type RuleLike = {
 
 export type GroupLike = { id: string; displayIds: string[] };
 
-const DAY = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_KEYS = ["", "day.mon", "day.tue", "day.wed", "day.thu", "day.fri", "day.sat", "day.sun"] as const;
 const WEEK = 7 * 1440;
 
 export function minutesOf(time: string): number | null {
@@ -45,8 +48,8 @@ export function savedOvernightOk(startTime: string, endTime: string): boolean {
   return isOvernight(startTime.slice(0, 5), endTime.slice(0, 5));
 }
 
-export function overnightMessage(startTime: string, endTime: string): string {
-  return `This runs overnight: it starts at ${formatClock12(startTime)} and ends at ${formatClock12(endTime)} the next day. While it runs it replaces anything else on that screen.`;
+export function overnightMessage(startTime: string, endTime: string, t: T = EN): string {
+  return t("sched.overnight", { start: formatClock12(startTime), end: formatClock12(endTime) });
 }
 
 /** Local calendar date (YYYY-MM-DD) in the browser. */
@@ -62,8 +65,8 @@ export function isPastRange(endsOn: string | null, today = todayLocal()): boolea
   return Boolean(endsOn) && (endsOn as string) < today;
 }
 
-export function pastRangeMessage(endsOn: string): string {
-  return `This rule ends on ${endsOn}, which has already passed, so it will never play. Change the dates or leave "Ends on" empty.`;
+export function pastRangeMessage(endsOn: string, t: T = EN): string {
+  return t("sched.pastRange", { date: endsOn });
 }
 
 /** Weekly [start, end) minute spans, Monday 00:00 = 0, wrapped at the end of Sunday. */
@@ -114,32 +117,32 @@ export function overlapDays(a: RuleLike, b: RuleLike): number[] {
  * Which rule plays where they overlap, using the TV's order: a screen rule beats a group rule,
  * then higher priority, then the most recently updated (a new rule counts as newest).
  */
-export function winner(a: RuleLike, b: RuleLike): { rule: RuleLike; reason: string } {
+export function winner(a: RuleLike, b: RuleLike, t: T = EN): { rule: RuleLike; reason: string } {
   const aScreen = Boolean(a.displayId);
   const bScreen = Boolean(b.displayId);
-  if (aScreen !== bScreen) return { rule: aScreen ? a : b, reason: "a rule for one screen beats a group rule" };
+  if (aScreen !== bScreen) return { rule: aScreen ? a : b, reason: t("sched.whyScreen") };
   if (a.priority !== b.priority) {
     const high = a.priority > b.priority ? a : b;
     const low = high === a ? b : a;
-    return { rule: high, reason: `it has priority ${high.priority} and the other has ${low.priority}` };
+    return { rule: high, reason: t("sched.whyPriority", { high: high.priority, low: low.priority }) };
   }
   const aTime = a.updatedAt ? Date.parse(a.updatedAt) : Number.POSITIVE_INFINITY;
   const bTime = b.updatedAt ? Date.parse(b.updatedAt) : Number.POSITIVE_INFINITY;
-  if (aTime !== bTime) return { rule: aTime > bTime ? a : b, reason: "both have the same priority and it was changed most recently" };
+  if (aTime !== bTime) return { rule: aTime > bTime ? a : b, reason: t("sched.whyRecent") };
   const aId = a.id ?? "";
   const bId = b.id ?? "";
-  return { rule: aId <= bId ? a : b, reason: "both have the same priority and were changed at the same time" };
+  return { rule: aId <= bId ? a : b, reason: t("sched.whySameTime") };
 }
 
-export function dayNames(days: number[]): string {
-  if (days.length === 7) return "every day";
-  return days.map((day) => DAY[day]).join(", ");
+export function dayNames(days: number[], t: T = EN): string {
+  if (days.length === 7) return t("sched.everyDay");
+  return days.map((day) => t(DAY_KEYS[day] || "day.mon")).join(", ");
 }
 
 export type Overlap = { other: RuleLike; days: number[]; winsHere: boolean; message: string };
 
 /** Overlaps between a (draft or saved) rule and the other enabled rules, with who wins. */
-export function findOverlaps(rule: RuleLike, others: RuleLike[], groups: GroupLike[], today = todayLocal()): Overlap[] {
+export function findOverlaps(rule: RuleLike, others: RuleLike[], groups: GroupLike[], today = todayLocal(), t: T = EN): Overlap[] {
   const out: Overlap[] = [];
   // A rule whose dates have all passed never plays, so it neither wins nor loses an overlap (QA retest 2, B2-04 note).
   if (isPastRange(rule.endsOn ?? null, today)) return out;
@@ -150,12 +153,11 @@ export function findOverlaps(rule: RuleLike, others: RuleLike[], groups: GroupLi
     if (!sameScreens(rule, other, groups)) continue;
     const days = overlapDays(rule, other);
     if (!days.length) continue;
-    const win = winner(rule, other);
+    const win = winner(rule, other, t);
     const winsHere = win.rule === rule;
-    const self = rule.id ? `“${rule.name}”` : "This rule";
-    const message = winsHere
-      ? `Overlaps “${other.name}” (${formatClock12(other.startTime)}–${formatClock12(other.endTime)}) on ${dayNames(days)}. ${self} plays there because ${win.reason}.`
-      : `Overlaps “${other.name}” (${formatClock12(other.startTime)}–${formatClock12(other.endTime)}) on ${dayNames(days)}. “${other.name}” plays there instead because ${win.reason}.`;
+    const self = rule.id ? `“${rule.name}”` : t("sched.thisRule");
+    const vars = { other: other.name, start: formatClock12(other.startTime), end: formatClock12(other.endTime), days: dayNames(days, t), self, reason: win.reason };
+    const message = winsHere ? t("sched.overlapWins", vars) : t("sched.overlapLoses", vars);
     out.push({ other, days, winsHere, message });
   }
   return out;

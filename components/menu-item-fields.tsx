@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 import { charCount, ITEM_NAME_REQUIRED, needsName, priceHint } from "@/lib/menu-fields";
 import { MENU_LIMITS } from "@/lib/menu-templates";
 
@@ -31,18 +34,19 @@ export function ItemNotes({ item, idBase, showNameError }: { item: Item; idBase:
 
 /** "Sections 2 of 4 · Items 14 of 24", shown above the sections so limits are known up front (QA B1-04). */
 export function MenuLimits({ sections, items, maxSections, maxItems, columns }: { sections: number; items: number; maxSections: number; maxItems: number; columns?: boolean }) {
+  const t = useT();
   return (
     <p className="menu-limits" data-testid="menu-limits">
-      {columns ? null : <>Sections {sections} of {maxSections} · </>}Items {items} of {maxItems}
-      {columns ? null : <> · up to {MENU_LIMITS.itemsPerSection} per section</>}
+      {columns ? null : <>{t("mif.sections", { sections, maxSections })} · </>}{t("mif.items", { items, maxItems })}
+      {columns ? null : <> · {t("mif.perSection", { n: MENU_LIMITS.itemsPerSection })}</>}
     </p>
   );
 }
 
 /** Accessible name for one move button, e.g. Move "Fish Tacos" up (item 2 of 5). */
-export function orderLabel(kind: "item" | "section", name: string, index: number, count: number, dir: -1 | 1): string {
-  const shown = name.trim() ? `“${name.trim()}”` : `unnamed ${kind}`;
-  return `Move ${shown} ${dir < 0 ? "up" : "down"} (${kind} ${index + 1} of ${count})`;
+export function orderLabel(kind: "item" | "section", name: string, index: number, count: number, dir: -1 | 1, t: T = EN): string {
+  const shown = name.trim() ? `“${name.trim()}”` : t(kind === "item" ? "mif.unnamedItem" : "mif.unnamedSection");
+  return t(dir < 0 ? "mif.moveUp" : "mif.moveDown", { name: shown, kind: t(`mif.kind.${kind}`), n: index + 1, count });
 }
 
 /** After a move, which button keeps focus: the same direction on the moved row, or the other one once it reaches an end. */
@@ -66,6 +70,7 @@ export function OrderButtons({ kind, name, scope, index, count, onMove, classNam
   onMove: (dir: -1 | 1) => void;
   className?: string;
 }) {
+  const t = useT();
   if (count < 2) return null;
   const move = (dir: -1 | 1) => {
     onMove(dir);
@@ -76,12 +81,12 @@ export function OrderButtons({ kind, name, scope, index, count, onMove, classNam
     });
   };
   const button = (dir: -1 | 1) => (
-    <button type="button" className="order-btn" aria-label={orderLabel(kind, name, index, count, dir)}
+    <button type="button" className="order-btn" aria-label={orderLabel(kind, name, index, count, dir, t)}
       data-order-scope={scope} data-order-index={index} data-order-dir={dir}
-      disabled={dir < 0 ? index === 0 : index === count - 1} onClick={() => move(dir)}>{dir < 0 ? "↑ Up" : "↓ Down"}</button>
+      disabled={dir < 0 ? index === 0 : index === count - 1} onClick={() => move(dir)}>{dir < 0 ? t("mif.up") : t("mif.down")}</button>
   );
   return (
-    <div className={className} role="group" aria-label={`Order of ${kind} ${index + 1}`}>
+    <div className={className} role="group" aria-label={t("mif.order", { kind: t(`mif.kind.${kind}`), n: index + 1 })}>
       {button(-1)}
       {button(1)}
     </div>

@@ -1,3 +1,7 @@
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
+
 /**
  * E3: upload a logo or photo straight from Brand Kit or the classic editor.
  * Only JPG and PNG are offered, because only those appear in the logo and photo
@@ -14,25 +18,25 @@ export type DirectUploadState =
   | { phase: "error"; message: string };
 
 /** Reject files the logo/photo pickers could not list, before anything is sent. */
-export function artUploadError(file: Pick<File, "type" | "name">): string | null {
+export function artUploadError(file: Pick<File, "type" | "name">, t: T = EN): string | null {
   if (!(ART_UPLOAD_TYPES as readonly string[]).includes(file.type) || !/\.(png|jpe?g)$/i.test(file.name)) {
-    return "Choose a JPG or PNG image.";
+    return t("diu.badType");
   }
   return null;
 }
 
-export function directUploadStatus(state: DirectUploadState, what: "logo" | "photo"): string {
+export function directUploadStatus(state: DirectUploadState, what: "logo" | "photo", t: T = EN): string {
   switch (state.phase) {
     case "busy":
-      return `Uploading ${state.name}… ${Math.round(state.progress)}%`;
+      return t("diu.progress", { name: state.name, pct: Math.round(state.progress) });
     case "done":
       return what === "logo"
-        ? `Uploaded ${state.name} to Media and selected. Click Save brand to apply.`
-        : `Uploaded ${state.name} to Media and selected. Save the board to apply.`;
+        ? t("diu.doneBrand", { name: state.name })
+        : t("diu.doneBoard", { name: state.name });
     case "kept":
       return what === "logo"
-        ? `Selected ${state.name} from your library. Click Save brand to apply.`
-        : `Selected ${state.name} from your library. Save the board to apply.`;
+        ? t("diu.keptBrand", { name: state.name })
+        : t("diu.keptBoard", { name: state.name });
     case "error":
       return state.message;
     default:

@@ -1,4 +1,5 @@
 "use client";
+import { useLocale, useT } from "@/lib/i18n/client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -32,6 +33,7 @@ export type BrandKitFixture = {
 };
 
 export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
+  const t = useT();
   const liveBrand = useApi<Brand>(fixture ? null : "/api/brand");
   const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
   const brand = fixture?.brand ?? liveBrand.data;
@@ -62,6 +64,8 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
     }
   }, [form, businessName, nameFromBusiness]);
 
+  const { locale } = useLocale();
+
   async function save() {
     if (!brand || !form || fixture) return;
     const payload = brandSavePayload(brand, form);
@@ -77,10 +81,10 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
       await liveBrand.reload();
       setForm(prefillBrandForm(payload.body));
       setSavedOnce(true);
-      toast.show("Brand saved. New menus and boards can use it. Existing boards are left unchanged.");
-      setSaveResult({ ok: true, text: `Brand saved at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.` });
+      toast.show(t("bk.saved"));
+      setSaveResult({ ok: true, text: t("bk.savedAt", { time: new Date().toLocaleTimeString(locale === "es" ? "es" : [], { hour: "numeric", minute: "2-digit" }) }) });
     } catch (err) {
-      const message = (err as Error)?.message || "Couldn't save your brand. Try again.";
+      const message = (err as Error)?.message || t("bk.saveFailed");
       toast.show(message, true);
       setSaveResult({ ok: false, text: message });
     } finally {
@@ -91,17 +95,17 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   return (
     <section className="min-w-0 pb-28 lg:pb-0">
       <PageHeader
-        title="Brand Kit"
-        eyebrow="Account"
+        title={t("bk.title")}
+        eyebrow={t("bk.eyebrow")}
         icon={<IconGear />}
-        lede="Your business details, logo, colours, and fonts. New menus and boards can use these same values. Saving does not change boards you already have."
+        lede={t("bk.lede")}
       />
       {!brand ? (
-        <LoadState error={error} label="Loading your brand…" />
+        <LoadState error={error} label={t("bk.loading")} />
       ) : !brand.available ? (
-        <p className="text-muted" role="status">Branding isn't available yet. Try again after the next update.</p>
+        <p className="text-muted" role="status">{t("bk.unavailable")}</p>
       ) : !form ? (
-        <LoadState label="Loading your brand…" />
+        <LoadState label={t("bk.loading")} />
       ) : (
         <BrandEditor
           nameFromBusiness={nameFromBusiness && !savedOnce}
@@ -140,6 +144,7 @@ function BrandEditor({
   busy: "save" | null;
   onSave: () => void;
 }) {
+  const t = useT();
   const valid = Boolean(normalizeHex(form.primaryColor) && normalizeHex(form.accentColor));
   const colour = (key: "primaryColor" | "accentColor" | "textColor" | "backgroundColor", label: string, optional = false) => {
     const fallback = key === "textColor" ? "#1a1a1a" : key === "backgroundColor" ? "#f7f3ea" : DEFAULT_BRAND[key === "accentColor" ? "accentColor" : "primaryColor"];
@@ -150,7 +155,7 @@ function BrandEditor({
         <span className="flex gap-2 items-center">
           <input
             type="color"
-            aria-label={`${label} picker`}
+            aria-label={t("bk.pickerFor", { label })}
             className="h-10 w-12 rounded border border-line"
             value={normalizeHex(raw) ?? fallback}
             onChange={(e) => setForm({ ...form, [key]: e.target.value })}
@@ -160,12 +165,12 @@ function BrandEditor({
             aria-label={label}
             value={raw}
             maxLength={7}
-            placeholder={optional ? "Default" : undefined}
+            placeholder={optional ? t("bk.colorDefault") : undefined}
             onChange={(e) => setForm({ ...form, [key]: e.target.value })}
           />
           {optional && raw ? (
             <button type="button" className="btn btn-quiet text-sm" onClick={() => setForm({ ...form, [key]: null })}>
-              Clear
+              {t("bk.clear")}
             </button>
           ) : null}
         </span>
@@ -180,7 +185,7 @@ function BrandEditor({
   const headingFamily = fontFamilyName(form.headingFont);
   const bodyFamily = fontFamilyName(form.bodyFont);
   const logoSrc = logo?.url ?? logo?.thumbnailUrl ?? "";
-  const title = form.displayName?.trim() || "Your menu";
+  const title = form.displayName?.trim() || t("bk.previewTitle");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const phoneCheck = parsePhone(form.phone ?? "");
   const phoneError = phoneCheck.ok || !phoneTouched ? null : phoneCheck.error;
@@ -193,35 +198,35 @@ function BrandEditor({
       `}</style>
       <section className="card flex flex-col gap-6 p-5 md:p-6" aria-labelledby="brand-heading" id="brand">
         <div>
-          <h2 id="brand-heading" className="text-lg font-semibold">Your brand</h2>
+          <h2 id="brand-heading" className="text-lg font-semibold">{t("bk.yourBrand")}</h2>
           <p className="text-sm text-muted mt-1">
             {custom
-              ? "These go on new menu boards and promos that use your brand. Saving does not change boards you already have."
-              : "Using built-in colours. Set your business details, logo, colours, and fonts, then save. New menus can use them; existing boards stay as they are."}
+              ? t("bk.customNote")
+              : t("bk.builtInNote")}
           </p>
         </div>
 
         <div className="grid gap-3">
-          <h3 className="text-sm font-semibold">Business</h3>
+          <h3 className="text-sm font-semibold">{t("bk.business")}</h3>
           <label className="grid gap-1">
-            <span className="form-label">Display name</span>
+            <span className="form-label">{t("bk.displayName")}</span>
             <input
               className="field"
-              aria-label="Display name"
+              aria-label={t("bk.displayName")}
               value={form.displayName ?? ""}
               maxLength={DISPLAY_NAME_MAX}
               autoComplete="organization"
-              placeholder="Your business"
+              placeholder={t("bk.yourBusiness")}
               onChange={(e) => setForm({ ...form, displayName: e.target.value || null })}
             />
-            {nameFromBusiness ? <span className="text-xs text-muted">Filled in from your business name. Change it if your screens should show something else, then save.</span> : null}
+            {nameFromBusiness ? <span className="text-xs text-muted">{t("bk.fromBusiness")}</span> : null}
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1">
-              <span className="form-label">Phone</span>
+              <span className="form-label">{t("bk.phone")}</span>
               <input
                 className="field"
-                aria-label="Phone"
+                aria-label={t("bk.phone")}
                 type="tel"
                 value={form.phone ?? ""}
                 maxLength={PHONE_MAX}
@@ -234,10 +239,10 @@ function BrandEditor({
               {phoneError ? <span id="brand-phone-error" role="alert" className="text-xs text-danger">{phoneError}</span> : null}
             </label>
             <label className="grid gap-1">
-              <span className="form-label">Website</span>
+              <span className="form-label">{t("bk.website")}</span>
               <input
                 className="field"
-                aria-label="Website"
+                aria-label={t("bk.website")}
                 type="url"
                 value={form.website ?? ""}
                 maxLength={WEBSITE_MAX}
@@ -250,7 +255,7 @@ function BrandEditor({
         </div>
 
         <div className="grid gap-3">
-          <h3 className="text-sm font-semibold">Logo</h3>
+          <h3 className="text-sm font-semibold">{t("bk.logo")}</h3>
           {logoSrc ? (
             <div className="flex items-center gap-3">
               <img src={logoSrc} alt="" className="size-14 rounded-lg object-contain border border-line bg-paper" />
@@ -258,9 +263,9 @@ function BrandEditor({
             </div>
           ) : null}
           <label className="grid gap-1">
-            <span className="form-label">Logo</span>
+            <span className="form-label">{t("bk.logo")}</span>
             <select className="field min-w-56" value={form.logoMediaId ?? ""} onChange={(e) => setForm({ ...form, logoMediaId: e.target.value || null })}>
-              <option value="">No logo</option>
+              <option value="">{t("bk.noLogo")}</option>
               {images.map((m) => (
                 <option key={m.id} value={m.id}>{m.fileName}</option>
               ))}
@@ -272,47 +277,47 @@ function BrandEditor({
             disabled={!onLogoUploaded}
             onUploaded={async (id) => { await onLogoUploaded?.(id); }}
           />
-          {!images.length ? <p className="text-xs text-muted">No logos yet. Upload one here or in Media.</p> : null}
+          {!images.length ? <p className="text-xs text-muted">{t("bk.noLogos")}</p> : null}
         </div>
 
         <div className="grid gap-3">
-          <h3 className="text-sm font-semibold">Colours</h3>
+          <h3 className="text-sm font-semibold">{t("bk.colours")}</h3>
           <div className="flex flex-wrap gap-4 items-end">
-            {colour("primaryColor", "Main colour")}
-            {colour("accentColor", "Highlight colour")}
-            {colour("textColor", "Text colour", true)}
-            {colour("backgroundColor", "Background colour", true)}
+            {colour("primaryColor", t("bk.main"))}
+            {colour("accentColor", t("bk.highlight"))}
+            {colour("textColor", t("bk.text"), true)}
+            {colour("backgroundColor", t("bk.background"), true)}
           </div>
-          {!valid ? <p className="text-sm text-danger" role="alert">Use colours like #0066ff.</p> : null}
+          {!valid ? <p className="text-sm text-danger" role="alert">{t("bk.colourHint")}</p> : null}
         </div>
 
         <div className="grid gap-3">
-          <h3 className="text-sm font-semibold">Fonts</h3>
-          <p className="text-xs text-muted">The same font files are drawn into published boards. New boards use these; existing boards keep their font.</p>
+          <h3 className="text-sm font-semibold">{t("bk.fonts")}</h3>
+          <p className="text-xs text-muted">{t("bk.fontsNote")}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1">
-              <span className="form-label">Heading</span>
+              <span className="form-label">{t("bk.heading")}</span>
               <select
                 className="field"
-                aria-label="Heading font"
+                aria-label={t("bk.headingFont")}
                 value={form.headingFont ?? ""}
                 onChange={(e) => setForm({ ...form, headingFont: (e.target.value || null) as BrandFont | null })}
               >
-                <option value="">Default</option>
+                <option value="">{t("bk.fontDefault")}</option>
                 {FONT_OPTIONS.map((opt) => (
                   <option key={opt.id} value={opt.id} style={{ fontFamily: opt.family }}>{opt.label}</option>
                 ))}
               </select>
             </label>
             <label className="grid gap-1">
-              <span className="form-label">Body</span>
+              <span className="form-label">{t("bk.body")}</span>
               <select
                 className="field"
-                aria-label="Body font"
+                aria-label={t("bk.bodyFont")}
                 value={form.bodyFont ?? ""}
                 onChange={(e) => setForm({ ...form, bodyFont: (e.target.value || null) as BrandFont | null })}
               >
-                <option value="">Default</option>
+                <option value="">{t("bk.fontDefault")}</option>
                 {FONT_OPTIONS.map((opt) => (
                   <option key={opt.id} value={opt.id} style={{ fontFamily: opt.family }}>{opt.label}</option>
                 ))}
@@ -323,9 +328,9 @@ function BrandEditor({
 
       </section>
 
-      <aside className="card p-5 md:p-6" aria-label="Brand preview">
-        <h2 className="text-lg font-semibold">Preview</h2>
-        <p className="text-sm text-muted mt-1 mb-4">A live look at your brand. This is not a published board.</p>
+      <aside className="card p-5 md:p-6" aria-label={t("bk.previewAria")}>
+        <h2 className="text-lg font-semibold">{t("bk.preview")}</h2>
+        <p className="text-sm text-muted mt-1 mb-4">{t("bk.previewNote")}</p>
         <div
           className="overflow-hidden rounded-xl border border-line shadow-sm flex flex-col"
           style={{ aspectRatio: "16 / 9", background: backgroundColor, color: textColor }}
@@ -343,7 +348,7 @@ function BrandEditor({
           </div>
           <div className="grid gap-3 px-4 py-3 flex-1 min-h-0" style={{ fontFamily: bodyFamily, color: textColor }}>
             <div className="flex items-center justify-between gap-3">
-              <span className="font-medium">Featured item</span>
+              <span className="font-medium">{t("bk.featured")}</span>
               <span
                 className="rounded-full px-2.5 py-0.5 text-sm font-semibold"
                 style={{ background: accent, color: "#1a1a1a", fontFamily: bodyFamily }}
@@ -352,7 +357,7 @@ function BrandEditor({
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span>House special</span>
+              <span>{t("bk.special")}</span>
               <span
                 className="rounded-full px-2.5 py-0.5 text-sm font-semibold"
                 style={{ background: accent, color: "#1a1a1a", fontFamily: bodyFamily }}
@@ -371,7 +376,7 @@ function BrandEditor({
       </aside>
 
         <div className="lg:col-start-1">
-          <button type="button" className="btn btn-primary min-h-11" disabled={!valid || busy !== null} onClick={onSave}>{busy === "save" ? "Saving…" : "Save brand"}</button>
+          <button type="button" className="btn btn-primary min-h-11" disabled={!valid || busy !== null} onClick={onSave}>{busy === "save" ? t("bk.saving") : t("bk.save")}</button>
           <p className={`mt-2 text-sm ${saveResult && !saveResult.ok ? "text-danger" : "text-muted"}`} role={saveResult && !saveResult.ok ? "alert" : "status"} aria-live="polite" data-testid="brand-save-result">
             {saveResult?.text ?? ""}
           </p>
@@ -388,6 +393,7 @@ export function BrandSummary({
   fixture?: BrandKitFixture;
   id?: string;
 }) {
+  const t = useT();
   const liveBrand = useApi<Brand>(fixture ? null : "/api/brand");
   const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
   const brand = fixture?.brand ?? liveBrand.data;
@@ -412,15 +418,15 @@ export function BrandSummary({
           <span className="size-7 rounded-full border border-line" style={{ background: highlight }} />
         </span>
         <div className="min-w-0">
-          <h2 id="brand-summary-heading" className="font-semibold">Your brand</h2>
+          <h2 id="brand-summary-heading" className="font-semibold">{t("bk.yourBrand")}</h2>
           <p className="text-sm text-muted truncate">
             {brand.custom
               ? [name, logo?.fileName, main, highlight].filter(Boolean).join(" · ")
-              : "Using built-in colours. Set your logo and colours in Brand Kit."}
+              : t("bk.summaryBuiltIn")}
           </p>
         </div>
       </div>
-      <Link href="/dashboard/account/brand-kit" className="btn btn-quiet shrink-0">Edit in Brand Kit</Link>
+      <Link href="/dashboard/account/brand-kit" className="btn btn-quiet shrink-0">{t("bk.edit")}</Link>
     </section>
   );
 }

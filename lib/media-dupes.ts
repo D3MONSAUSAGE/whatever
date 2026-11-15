@@ -1,4 +1,7 @@
 import type { MediaItem } from "@/lib/api";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 
 /**
  * QA B1-10 retest: a video picked in the Media library that is already there (same file name and size).
@@ -29,22 +32,21 @@ export function sameLibraryImage(items: MediaItem[] | null | undefined, file: { 
   return [...hits].sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))[0];
 }
 
-export function duplicateImageMessage(name: string): string {
-  return `“${name}” is already in your library. Uploading again makes a second copy with the same name.`;
+export function duplicateImageMessage(name: string, t: T = EN): string {
+  return t("dup.image", { name });
 }
 
-export function duplicateMessage(names: string[]): string {
-  const list = names.length === 1 ? `“${names[0]}” is` : `${names.length} of these videos are`;
-  return `${list} already in your library with the same name and size. Uploading again makes a second copy.`;
+export function duplicateMessage(names: string[], t: T = EN): string {
+  return names.length === 1 ? t("dup.videoOne", { name: names[0] }) : t("dup.videoMany", { count: names.length });
 }
 
 /**
  * QA U1-04e: images picked on the Media page that are already in the library (same file name;
  * images are re-encoded, so size can't be compared). Same rule as the editor and Brand Kit check.
  */
-export function duplicateImagesMessage(names: string[]): string {
-  if (names.length === 1) return duplicateImageMessage(names[0]);
-  return `${names.length} of these images are already in your library with the same name. Uploading again makes second copies.`;
+export function duplicateImagesMessage(names: string[], t: T = EN): string {
+  if (names.length === 1) return duplicateImageMessage(names[0], t);
+  return t("dup.imageMany", { count: names.length });
 }
 
 /** How long the duplicate check may take before the upload goes ahead as normal (Gother PR94 low). */

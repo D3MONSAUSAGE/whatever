@@ -1,4 +1,7 @@
 import { MAX_VIDEO_MB } from "@/lib/mp4";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 
 export type FileUploadKind = "image" | "video" | "document";
 
@@ -39,8 +42,8 @@ export const FILE_UPLOAD: Record<FileUploadKind, FileUploadMeta> = {
   },
 };
 
-export function selectedFilename(files: File[]): string {
+export function selectedFilename(files: File[], t: T = EN): string {
   if (!files.length) return "";
   if (files.length === 1) return files[0].name;
-  return `${files[0].name} and ${files.length - 1} more`;
+  return t("fu.more", { name: files[0].name, count: files.length - 1 });
 }

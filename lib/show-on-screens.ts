@@ -4,13 +4,13 @@ import { makeT, type T } from "@/lib/i18n";
 export type ScreenChoice = { id: string; name: string; status: string; showing: boolean; nowShowing: string | null };
 
 /** Screens offered after Publish (E2). Only paired screens; each says whether it already shows this board. */
-export function screenChoices(displays: DisplayItem[] | null | undefined, playlistId: string | null): ScreenChoice[] {
+export function screenChoices(displays: DisplayItem[] | null | undefined, playlistId: string | null, t: T = makeT("en")): ScreenChoice[] {
   return (displays ?? [])
     .filter((display) => display.connected)
     .map((display) => ({
       id: display.id,
       name: display.name,
-      status: display.online ? "Online" : "Offline",
+      status: display.online ? t("ed.online") : t("ed.offline"),
       showing: Boolean(playlistId && display.playlist?.id === playlistId),
       nowShowing: display.playlist?.name ?? display.media?.fileName ?? null,
     }))
