@@ -37,7 +37,7 @@ describe("U1-04d: same-name check for direct logo/photo uploads", () => {
 describe("U1-04c: preview never silently drops a selected photo", () => {
   it("the preview route answers 503 instead of drawing a photo-less board", () => {
     const src = readFileSync("app/api/menus/preview/route.ts", "utf8");
-    expect(src).toMatch(/if \(content\.value\.photoMediaId && !art\.photo\) return fail\([^)]*, 503\)/);
+    expect(src).toMatch(/if \(content\.value\.photoMediaId && !art\.photo\) return json\(\{ error: [^}]*\}, 503, \{ "Retry-After": "2" \}\)/);
   });
 
   const hasBrowser = (() => { try { return existsSync(chromium.executablePath()); } catch { return false; } })();

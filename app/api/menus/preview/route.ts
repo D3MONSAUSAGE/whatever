@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
-import { enforceLimit, fail, readJson } from "@/lib/server/http";
+import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { isMenuTemplate, parseMenuContent } from "@/lib/menu-templates";
 import { renderMenuPng } from "@/lib/server/menu-render";
 import { artFor } from "@/lib/server/brand";
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const art = await artFor(admin.accountId, content.value);
   // QA U1-04c: never draw a photo-less preview for a board that has a photo selected. The photo
   // passed the check above, so a missing image here means it could not be read yet; say so.
-  if (content.value.photoMediaId && !art.photo) return fail("Couldn't load the photo. Try again in a moment, or pick another photo.", 503);
+  if (content.value.photoMediaId && !art.photo) return json({ error: "Couldn't load the photo. Try again in a moment, or pick another photo." }, 503, { "Retry-After": "2" });
   const png = renderMenuPng(body.template, content.value, art);
   return new Response(Buffer.from(png), { status: 200, headers: { "content-type": "image/png", "cache-control": "no-store" } });
 }
