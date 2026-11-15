@@ -212,6 +212,9 @@ export const en = {
   "error.title": "Something went wrong",
   "error.body": "This page hit a problem. Your screens keep playing. Try again, and if it keeps happening, tell support.",
   "error.bodyCode": "This page hit a problem. Your screens keep playing. Try again, and if it keeps happening, tell support the code {code}.",
+  "globalError.title": "Pekko is having trouble",
+  "globalError.body": "Your screens keep playing. Try again in a moment.",
+  "globalError.code": " Code: {code}",
 
   // Auth
   "auth.legalNav": "Legal",
