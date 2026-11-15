@@ -9,7 +9,7 @@ import { useLocale } from "@/lib/i18n/client";
 import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader, LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
-import { MENU_TEMPLATES, sampleMenu } from "@/lib/menu-templates";
+import { sampleMenu } from "@/lib/menu-templates";
 import { artImages, seedClassicMenu, type Brand } from "@/lib/brand-kit";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { LayoutStudio } from "@/components/layout-studio";
@@ -21,11 +21,11 @@ import {
   LAYOUT_OPTIONS,
   classifyBoardContent,
   layoutOptionById,
-  layoutOptionForTemplate,
   parseUnifiedSearch,
   type LayoutOption,
 } from "@/lib/menu-board-unify";
 import { makeT, type T } from "@/lib/i18n";
+import { boardKindLabel } from "@/lib/menu-board-label";
 
 export type { Brand };
 export { artImages };
@@ -69,16 +69,6 @@ const EN: T = makeT("en");
 function newClassicDraft(displayIds: string[] = [], brand?: Brand | null, t: T = EN): ClassicDraft {
   const content = brand ? seedClassicMenu(sampleMenu(), brand) : sampleMenu();
   return { id: null, name: t("mb.defaultName"), template: "classic", content, displayIds };
-}
-
-function boardKindLabel(menu: MenuBoard, t: T): string {
-  const classified = classifyBoardContent(menu.template, menu.content);
-  if (classified.kind === "layout") return t(`lo.${layoutOptionForTemplate(classified.document.template).id}.name`);
-  if (classified.kind === "classic") {
-    const tpl = MENU_TEMPLATES.find((item) => item.id === classified.template);
-    return tpl ? t(`tpl.${tpl.id}.name`) : t("mb.kindMenu");
-  }
-  return t("mb.kindBoard");
 }
 
 function openClassified(menu: MenuBoard, screenId: string | null): View | null {
@@ -318,7 +308,7 @@ export function MenuBoards({
               </div>
               <div className="p-4">
                 <p className="font-semibold break-words">{menu.name}</p>
-                <p className="text-sm text-muted">{boardKindLabel(menu, t)} · {t("mb.updated", { ago: timeAgo(menu.updatedAt, t) })}</p>
+                <p className="text-sm text-muted">{boardKindLabel(menu.template, menu.content, t)} · {t("mb.updated", { ago: timeAgo(menu.updatedAt, t) })}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button className="btn btn-quiet" onClick={() => editMenu(menu)}>{t("ed.edit")}</button>
                   <button className="btn btn-quiet text-danger" onClick={() => remove(menu)}>{t("ed.delete")}</button>
