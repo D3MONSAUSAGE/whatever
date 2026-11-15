@@ -77,11 +77,11 @@ describe("/account-deletion: Spanish courtesy translation", () => {
 
 describe("/account-deletion branch scope", () => {
   it("touches only the deletion page, its Spanish component, the contact block operator prop and its tests", () => {
-    // Explicit range: this branch's own changes on top of #116's head (690924a). CI checks out one commit
+    // Explicit range: this branch's own changes on top of main after #116 (906fe67). CI checks out one commit
     // (no history), where the range can't be resolved; the guard then skips, like the I18N-3 scope guard.
     let files: string[] = [];
     try {
-      files = execSync("git diff --name-only 690924a HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
+      files = execSync("git diff --name-only 906fe67 HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
     } catch {
       return;
     }
