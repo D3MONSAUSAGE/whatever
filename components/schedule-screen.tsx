@@ -17,7 +17,7 @@ import {
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconCalendar } from "@/components/icons";
-import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader , LimitNote, atLimit, useRequiredMessage } from "@/components/ui";
 import { formatClock12 } from "@/lib/clock";
 import { ScheduleViews } from "@/components/schedule-views";
 import { orderedZones } from "@/lib/time-zones";
@@ -247,6 +247,7 @@ function Locations({
   onDelete: (location: LocationItem) => void;
 }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("America/Los_Angeles");
   return (
@@ -254,7 +255,7 @@ function Locations({
       <h2 className="text-lg font-semibold mb-3">{t("ss.locations")}</h2>
       <form className="card p-4 grid gap-3 mb-3" onSubmit={(event) => { event.preventDefault(); onCreate(name, timezone); setName(""); }}>
         <label className="text-sm font-semibold">{t("ss.locationName")}
-          <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
+          <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required {...requiredMsg} maxLength={80} />
         </label>
         <TimezoneField value={timezone} onChange={setTimezone} />
         <LimitNote count={locations?.length} max={50} noun="locations" nounKey="ss.noun.locations" />
@@ -297,11 +298,12 @@ function LocationRow({ location, onSave, onDelete }: { location: LocationItem; o
 
 function TimezoneField({ value, onChange, label: labelIn }: { value: string; onChange: (value: string) => void; label?: string }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const label = labelIn ?? t("ss.timezone");
   const listId = `timezones-${label.replace(/\s+/g, "-")}`;
   return (
     <label className="text-sm font-semibold">{t("ss.timezone")}
-      <input className="field mt-1" list={listId} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} required />
+      <input className="field mt-1" list={listId} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} required {...requiredMsg} />
       <datalist id={listId}>
         {ZONES.map((zone) => <option key={zone} value={zone} />)}
       </datalist>
@@ -320,6 +322,7 @@ function Groups({
   onDelete: (group: ScreenGroupItem) => void;
 }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   return (
@@ -327,7 +330,7 @@ function Groups({
       <h2 className="text-lg font-semibold mb-3">{t("ss.groups")}</h2>
       <form className="card p-4 grid gap-3 mb-3" onSubmit={(event) => { event.preventDefault(); onCreate(name, picked); setName(""); setPicked([]); }}>
         <label className="text-sm font-semibold">{t("ss.groupName")}
-          <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
+          <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required {...requiredMsg} maxLength={80} />
         </label>
         <DisplayChecks displays={displays} picked={picked} onChange={setPicked} legend={t("ss.newGroupScreens")} />
         <LimitNote count={groups?.length} max={100} noun="screen groups" nounKey="groups.limitNoun" />
@@ -409,6 +412,7 @@ function Rules({
   onDelete: (schedule: ScheduleItem) => void;
 }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const [name, setName] = useState("");
   const [playlistId, setPlaylistId] = useState("");
   const [target, setTarget] = useState<"display" | "group">("display");
@@ -466,10 +470,10 @@ function Rules({
         }}
       >
         <label className="text-sm font-semibold">{t("ss.scheduleName")}
-          <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
+          <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required {...requiredMsg} maxLength={80} />
         </label>
         <label className="text-sm font-semibold" htmlFor="schedule-playlist">{t("ss.playlist")}</label>
-        <select id="schedule-playlist" className="field" aria-label={t("ss.playlist")} value={playlistId} onChange={(event) => setPlaylistId(event.target.value)} required>
+        <select id="schedule-playlist" className="field" aria-label={t("ss.playlist")} value={playlistId} onChange={(event) => setPlaylistId(event.target.value)} required {...requiredMsg}>
           <option value="">{t("ss.choosePlaylist")}</option>
           {playlists.map((playlist) => (
             <option key={playlist.id} value={playlist.id}>{playlist.name}{playlist.publishedAt ? "" : ` ${t("sa2.notPublished")}`}</option>
@@ -489,14 +493,14 @@ function Rules({
         </fieldset>
         {target === "display" ? (
           <label className="text-sm font-semibold">{t("ss.screen")}
-            <select className="field mt-1" aria-label={t("ss.screen")} value={displayId} onChange={(event) => setDisplayId(event.target.value)} required>
+            <select className="field mt-1" aria-label={t("ss.screen")} value={displayId} onChange={(event) => setDisplayId(event.target.value)} required {...requiredMsg}>
               <option value="">{t("ss.chooseScreen")}</option>
               {displays.map((display) => <option key={display.id} value={display.id}>{display.name}</option>)}
             </select>
           </label>
         ) : (
           <label className="text-sm font-semibold">{t("ss.group")}
-            <select className="field mt-1" aria-label={t("ss.group")} value={groupId} onChange={(event) => setGroupId(event.target.value)} required>
+            <select className="field mt-1" aria-label={t("ss.group")} value={groupId} onChange={(event) => setGroupId(event.target.value)} required {...requiredMsg}>
               <option value="">{t("ss.chooseGroup")}</option>
               {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
@@ -523,10 +527,10 @@ function Rules({
         </fieldset>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-semibold">{t("ss.startTime")}
-            <input className="field mt-1" type="time" step={60} value={startTime} onChange={(event) => setStartTime(event.target.value)} required />
+            <input className="field mt-1" type="time" step={60} value={startTime} onChange={(event) => setStartTime(event.target.value)} required {...requiredMsg} />
           </label>
           <label className="text-sm font-semibold">{t("ss.endTime")}
-            <input className="field mt-1" type="time" step={60} value={endTime} onChange={(event) => { setEndTime(event.target.value); setUntilMidnight(false); }} required disabled={untilMidnight} />
+            <input className="field mt-1" type="time" step={60} value={endTime} onChange={(event) => { setEndTime(event.target.value); setUntilMidnight(false); }} required {...requiredMsg} disabled={untilMidnight} />
           </label>
         </div>
         <label className="flex items-center gap-2 min-h-11 text-sm">

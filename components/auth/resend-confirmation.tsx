@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n/client";
 import type { MessageKey, Vars } from "@/lib/i18n/index";
 import { authErrorKey } from "@/components/auth-frame";
 import { safeDashboardNext } from "@/lib/safe-next";
+import { useRequiredMessage } from "@/components/ui";
 
 const COOLDOWN_S = 60;
 /** sessionStorage key: when the next resend is allowed (ms since epoch). A refresh can't skip the wait. */
@@ -41,6 +42,7 @@ function startWait(): number {
  */
 export function ResendConfirmation({ next }: { next?: string }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
@@ -81,7 +83,7 @@ export function ResendConfirmation({ next }: { next?: string }) {
     <form onSubmit={send} className="grid gap-3" data-testid="confirm-resend" name="resend-confirmation">
       <p className="text-sm text-muted">{t("auth.confirmResendLede")}</p>
       <label htmlFor="confirm-resend-email" className="sr-only">{t("common.email")}</label>
-      <input id="confirm-resend-email" name="email" className="field" type="email" autoComplete="email" inputMode="email" required
+      <input id="confirm-resend-email" name="email" className="field" type="email" autoComplete="email" inputMode="email" required {...requiredMsg}
         placeholder={t("common.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
       <button className="btn btn-primary w-full" disabled={busy || wait > 0}>
         {busy ? t("auth.sending") : wait > 0 ? t("auth.resendWait") : t("auth.resend")}

@@ -6,6 +6,7 @@ import { DAY_PARTS } from "@/lib/menu-templates";
 import { useConfirm } from "@/components/confirm";
 import { dayPartSources, DAY_PART_PRIORITY } from "@/lib/day-part-sources";
 import { findOverlaps, isOvernight, overnightMessage, type RuleLike } from "@/lib/schedule-checks";
+import { useRequiredMessage } from "@/components/ui";
 
 type MenuLite = { id: string; name: string; playlistId?: string | null };
 type Part = { enabled: boolean; label: string; start: string; end: string; source: string };
@@ -21,6 +22,7 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
   onSubmit: (body: Record<string, unknown>) => Promise<boolean>;
 }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const menus = useApi<{ menus: MenuLite[] }>(preview ? null : "/api/menus");
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState("");
@@ -78,7 +80,7 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
       {open ? (
         <form className="mt-4 grid gap-4" onSubmit={submit} aria-label={t("dp.aria")}>
           <label className="grid gap-1 max-w-sm"><span className="form-label">{t("dp.target")}</span>
-            <select className="field" value={target} onChange={(e) => setTarget(e.target.value)} required>
+            <select className="field" value={target} onChange={(e) => setTarget(e.target.value)} required {...requiredMsg}>
               <option value="">{t("ed.choose")}</option>
               {groups.length ? <optgroup label={t("ed.groups")}>{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}</optgroup> : null}
               <optgroup label={t("ed.screens")}>{displays.map((d) => <option key={d.id} value={`display:${d.id}`}>{d.name}</option>)}</optgroup>

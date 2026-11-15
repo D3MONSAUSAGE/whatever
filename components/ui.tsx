@@ -136,23 +136,37 @@ export function LimitNote({ count, max, noun, nounKey }: { count: number | null 
 }
 
 /**
- * R12-10: a required field's empty-field message in the UI language. English keeps the browser's own
- * message (no change); Spanish gets "Complete este campo." Validation itself is unchanged: the field
- * stays `required`, and the custom message is cleared on the next input.
+ * R12-10: a form field's native validation message in the UI language. English keeps the browser's own
+ * messages (no change); Spanish gets "Complete este campo." for an empty required field, plus the email
+ * and minimum-length messages. Validation itself is unchanged (same required/type/minLength), and the
+ * custom message is cleared on the next input so the browser re-checks the new value.
  */
 export function useRequiredMessage() {
   const { t, locale } = useLocale();
   return {
     onInvalid: (event: React.FormEvent<HTMLInputElement | HTMLSelectElement>) => {
       const el = event.currentTarget;
-      const message = requiredMessageFor(locale, el.validity.valueMissing, t);
+      const minLength = el instanceof HTMLInputElement ? el.minLength : -1;
+      const message = validityMessageFor(locale, el.validity, minLength, t);
       if (message) el.setCustomValidity(message);
     },
     onInput: (event: React.FormEvent<HTMLInputElement | HTMLSelectElement>) => event.currentTarget.setCustomValidity(""),
   };
 }
 
+type ValidityLike = Pick<ValidityState, "valueMissing"> & Partial<Pick<ValidityState, "typeMismatch" | "tooShort">>;
+type ValidityKey = "common.required" | "common.invalidEmail" | "common.tooShort";
+
 /** The custom empty-field message, or null to keep the browser's own (English, or a non-empty field). */
 export function requiredMessageFor(locale: string, valueMissing: boolean, t: (key: "common.required") => string): string | null {
   return locale === "es" && valueMissing ? t("common.required") : null;
+}
+
+/** Spanish message for the first failing native check we cover, or null to keep the browser's own. */
+export function validityMessageFor(locale: string, v: ValidityLike, minLength: number, t: (key: ValidityKey, vars?: Record<string, string | number>) => string): string | null {
+  if (locale !== "es") return null;
+  if (v.valueMissing) return t("common.required");
+  if (v.typeMismatch) return t("common.invalidEmail");
+  if (v.tooShort && minLength > 0) return t("common.tooShort", { n: minLength });
+  return null;
 }
