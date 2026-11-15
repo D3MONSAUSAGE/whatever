@@ -211,11 +211,26 @@ function liveIo(now: string): DispatchIO {
   };
 }
 
+/**
+ * PR53 (d): accounts whose purge has started never get billing email. That is a deletion in progress,
+ * a purge that failed after its subscription was canceled, or one waiting to retry a billing stop.
+ * Null when the lookup fails, so the caller sends nothing rather than risk an odd email.
+ */
+export async function purgeHeldAccountIds(): Promise<Set<string> | null> {
+  const r = await db().from("account_deletion_requests").select("account_id")
+    .or("status.in.(processing,failed),and(status.eq.pending,error.not.is.null)");
+  if (r.error) return null;
+  return new Set(((r.data ?? []) as { account_id: string }[]).map((row) => String(row.account_id)));
+}
+
 async function listReminderAccounts(): Promise<ReminderAccount[]> {
   const listed = await db().from("accounts").select("id, owner_user_id, billing_transition_started_at").order("id").limit(REMINDER_ORG_LIMIT);
   if (listed.error || !listed.data) return [];
+  const held = await purgeHeldAccountIds();
+  if (!held) return [];
   const out: ReminderAccount[] = [];
   for (const account of listed.data) {
+    if (held.has(String(account.id))) continue;
     // Same entitlement the player and dashboard use (commercial rules when BILLING_ENFORCE=1).
     const ent = await loadEffectiveEntitlement(String(account.id));
     if (ent === "error" || !ent) continue;
