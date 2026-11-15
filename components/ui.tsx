@@ -147,7 +147,8 @@ export function useRequiredMessage() {
     onInvalid: (event: React.FormEvent<HTMLInputElement | HTMLSelectElement>) => {
       const el = event.currentTarget;
       const minLength = el instanceof HTMLInputElement ? el.minLength : -1;
-      const message = validityMessageFor(locale, el.validity, minLength, t);
+      const inputType = el instanceof HTMLInputElement ? el.type : undefined;
+      const message = validityMessageFor(locale, el.validity, minLength, t, inputType);
       if (message) el.setCustomValidity(message);
     },
     onInput: (event: React.FormEvent<HTMLInputElement | HTMLSelectElement>) => event.currentTarget.setCustomValidity(""),
@@ -163,10 +164,11 @@ export function requiredMessageFor(locale: string, valueMissing: boolean, t: (ke
 }
 
 /** Spanish message for the first failing native check we cover, or null to keep the browser's own. */
-export function validityMessageFor(locale: string, v: ValidityLike, minLength: number, t: (key: ValidityKey, vars?: Record<string, string | number>) => string): string | null {
+export function validityMessageFor(locale: string, v: ValidityLike, minLength: number, t: (key: ValidityKey, vars?: Record<string, string | number>) => string, inputType?: string): string | null {
   if (locale !== "es") return null;
   if (v.valueMissing) return t("common.required");
-  if (v.typeMismatch) return t("common.invalidEmail");
+  // Only email fields get the email copy; any other typeMismatch keeps the browser's own message.
+  if (v.typeMismatch) return inputType === "email" ? t("common.invalidEmail") : null;
   if (v.tooShort && minLength > 0) return t("common.tooShort", { n: minLength });
   return null;
 }
