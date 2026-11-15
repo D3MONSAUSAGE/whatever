@@ -110,9 +110,35 @@ describe.each(PAIRS)("E6 fix: Brand Kit %s headings / %s body on new boards", (h
 });
 
 describe("E6-F5 toast", () => {
-  it("doesn't claim a new classic board is in a playlist", () => {
+  it("doesn't claim a new classic board is in a playlist; the toasts and Studio strings come from the dictionary", async () => {
     const src = readFileSync("components/classic-editor.tsx", "utf8");
     expect(src).not.toContain("It's in your media and playlists");
-    expect(src).toContain("Add it to a playlist or a screen when you're ready.");
+    expect(src).toContain('t("classic.savedCreated")');
+    const { en } = await import("@/lib/i18n/en");
+    const { es } = await import("@/lib/i18n/es");
+    expect(en["classic.savedCreated"]).toBe("Menu board created. It's saved in Menu Boards and Media. Add it to a playlist or a screen when you're ready.");
+    for (const key of ["classic.savedUpdated", "classic.savedSent", "classic.savedCreated", "studio.bodyFont", "studio.bodyFontSame", "studio.bodyFontHelp"] as const) {
+      expect(es[key]).toBeTruthy();
+      expect(es[key]).not.toBe(en[key]);
+    }
+    expect(es["classic.savedCreated"]).toContain("Agréguelo"); // usted
+    const studio = readFileSync("components/layout-studio.tsx", "utf8");
+    expect(studio).not.toContain(">Body text font");
+    expect(studio).not.toContain("Same as the font above");
   });
+});
+
+describe("Gother #107 HIGH: the Studio PNG the TV gets draws the body font", () => {
+  it("renderLayoutPng loads the separate body face, so the PNG differs from bodyFont unset", async () => {
+    const { renderLayoutPng, fontsFor } = await import("@/lib/server/layout-render");
+    const base = seedBrand(sampleLayout("two-column"), { headingFont: "bebas-neue" });
+    const withBody = { ...base, bodyFont: "montserrat" as const };
+    expect(fontsFor(withBody.font, withBody.bodyFont).some((f) => /Montserrat/.test(f))).toBe(true);
+    expect(fontsFor(base.font)).toEqual(fontsFor(base.font, undefined)); // unchanged for docs without bodyFont
+    expect(sha(renderLayoutPng(withBody))).not.toBe(sha(renderLayoutPng(base)));
+    for (const [h, b] of PAIRS.filter(([h, b]) => QA_PAIRS.has(`${h}/${b}`))) {
+      const doc = seedBrand(sampleLayout("two-column"), { headingFont: h, bodyFont: b });
+      expect(sha(renderLayoutPng(doc))).not.toBe(sha(renderLayoutPng({ ...doc, bodyFont: undefined })));
+    }
+  }, 60000);
 });

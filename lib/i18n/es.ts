@@ -307,4 +307,11 @@ export const es: Record<MessageKey, string> = {
   "apiError.rate_limited": "Demasiados intentos. Espere unos minutos y vuelva a intentarlo.",
   "apiError.unavailable": "Esto no está disponible en este momento. Intente de nuevo en un momento.",
   "apiError.server_error": "Algo salió mal. Intente de nuevo.",
+  // E6 fix: Studio body font and the classic save toasts.
+  "studio.bodyFont": "Fuente del texto",
+  "studio.bodyFontSame": "La misma fuente de arriba",
+  "studio.bodyFontHelp": "Los nombres de los productos, los precios, las descripciones y el pie usan la fuente del texto.",
+  "classic.savedUpdated": "Menú actualizado. Las pantallas que lo muestran se actualizan en un minuto.",
+  "classic.savedSent": "Menú digital creado y enviado a sus pantallas",
+  "classic.savedCreated": "Menú digital creado. Está guardado en Menús y Archivos. Agréguelo a una lista de reproducción o a una pantalla cuando quiera.",
 };

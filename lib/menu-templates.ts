@@ -109,6 +109,22 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
   return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand, ...fonts } };
 }
 
+/**
+ * PATCH merge for fonts (protects Android +13, which doesn't send them): a font key that is
+ * absent from the incoming content keeps the stored value; an explicit null or "" clears it.
+ */
+export function keepStoredFonts(incoming: unknown, parsed: MenuContent, stored: unknown): MenuContent {
+  const raw = incoming && typeof incoming === "object" ? (incoming as Record<string, unknown>) : {};
+  const old = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
+  const next: MenuContent = { ...parsed };
+  for (const key of ["headingFont", "bodyFont"] as const) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const value = old[key];
+    if (isBoardFont(value)) next[key] = value;
+  }
+  return next;
+}
+
 export const DAY_PARTS = [
   { key: "breakfast", label: "Breakfast", start: "06:00", end: "11:00" },
   { key: "lunch", label: "Lunch", start: "11:00", end: "17:00" }, // meets Dinner at 5 PM

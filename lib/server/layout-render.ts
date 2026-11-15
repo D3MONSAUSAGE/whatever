@@ -33,9 +33,13 @@ export async function prepareBoardPhoto(bytes: Uint8Array, mime: string): Promis
 // an E6 face is added only for boards that use it.
 const BASE_FONTS = ["inter", "noto-serif"].flatMap((id) => boardFont(id as "inter").files.map((face) => face.file));
 const fontPath = (file: string) => join(process.cwd(), "assets", "fonts", file);
-function fontsFor(font: LayoutDocument["font"]): string[] {
-  const extra = BASE_FONTS.includes(boardFont(font).files[0].file) ? [] : boardFont(font).files.map((face) => face.file);
-  return [...BASE_FONTS, ...extra].map(fontPath);
+/** Heading face plus, when set, the separate body face (E6-F2). Docs without bodyFont load exactly as before. */
+export function fontsFor(font: LayoutDocument["font"], bodyFont?: LayoutDocument["bodyFont"]): string[] {
+  const files = [...BASE_FONTS];
+  for (const id of bodyFont && bodyFont !== font ? [font, bodyFont] : [font]) {
+    for (const face of boardFont(id).files) if (!files.includes(face.file)) files.push(face.file);
+  }
+  return files.map(fontPath);
 }
 
 /** Whole-board PNG. The selected bundled face and the assigned photo are drawn into this file. */
@@ -44,7 +48,7 @@ export function renderLayoutPng(doc: LayoutDocument, image?: { bytes: Uint8Array
     ? `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`
     : null;
   const resvg = new Resvg(layoutSvg(doc, { imageHref: href }), {
-    font: { fontFiles: fontsFor(doc.font), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
+    font: { fontFiles: fontsFor(doc.font, doc.bodyFont), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
     fitTo: { mode: "original" },
   });
   return Buffer.from(resvg.render().asPng());
