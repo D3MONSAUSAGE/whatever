@@ -28,7 +28,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
         <li><strong>Screens.</strong> For each paired screen: when it last checked in, what it reported playing, playback errors, offline periods, and a device token stored only as a hash. Nothing is collected about people walking past a screen.</li>
         <li><strong>First-party activity.</strong> Records of publishes, screen-content changes, pairing and removal, schedule changes, and uploads or deletions. Also hourly screen uptime and confirmed playback. Product milestones for the account record trial started, first screen paired, first publish, plan change, cancellation, how many screens were paired during the trial, and trial expired. Those milestone rows are not shown in your activity list.</li>
         <li><strong>Plan and billing.</strong> Plan, trial dates, subscription status, the current paid period, and Stripe customer and subscription identifiers when a paid subscription exists. Pekko does not store card numbers.</li>
-        <li><strong>Mobile push.</strong> If you use the Pekko app and the device allows notifications, a push token for that device.</li>
+        <li><strong>Mobile push.</strong> If you use the Pekko app and the device allows notifications, a push token for that device. To deliver notifications, Google&apos;s Firebase software in the app also creates a Firebase installation ID on the device and shares it with Google; Pekko does not store or use that ID.</li>
         <li><strong>Abuse limits and logs.</strong> Pairing attempts are limited using the request IP address as the rate-limit key. That key can remain in the rate-limit table; this application does not set a separate destruction date for it. Vercel error logs written by this app include the method, path, and a short message. They do not include headers, cookies, or request bodies.</li>
       </ul>
 
@@ -53,7 +53,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
         <li><strong>Vercel</strong> hosts the website and API.</li>
         <li><strong>Stripe</strong> processes paid subscriptions when a paid plan is started, under standard Stripe Billing. Pekko is the seller. Publishing this policy does not enable charges.</li>
         <li><strong>Resend</strong> sends transactional service and billing email. The verified pekkotv.com sending domain reports region us-east-1. That is the sending region, not a promise that every Resend system stays there. The support address below receives mail on that domain. Use that address, not the billing sender, for privacy and support.</li>
-        <li><strong>Google Firebase Cloud Messaging</strong> delivers mobile push notifications when a device token is registered and the device allows notifications.</li>
+        <li><strong>Google Firebase Cloud Messaging</strong> delivers mobile push notifications when a device token is registered and the device allows notifications. It receives the push token, the Firebase installation ID and the notification content.</li>
       </ul>
       <p>No exclusive residency or cross-border-transfer assurance is made. A reported project or sending region is not a guarantee that all processing stays in that region.</p>
 
@@ -64,7 +64,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       <h2 className="font-semibold text-lg">Choices</h2>
       <ul className="list-disc pl-5 grid gap-1">
         <li>Update the display name, business name, and password in Settings. The account email is shown there.</li>
-        <li>Allow or refuse mobile notifications on the device. A push token is stored only when notifications are used.</li>
+        <li>Allow or refuse mobile notifications on the device, or turn push alerts off in Pekko Settings. A push token is stored only when notifications are used.</li>
         <li>Cancel a subscription from the billing portal Stripe provides after a paid plan exists. Cancellation stops the next renewal.</li>
         <li>Choose which screens stay active when a plan includes fewer screens. The others pause. Content is kept.</li>
         <li>Request deletion, or cancel a pending deletion, as described above.</li>
