@@ -8,7 +8,12 @@
 - Why pg_cron: Vercel Hobby crons run at most once a day. pg_cron is included free with Supabase and costs one small query a minute. The daily Vercel cron (`/api/cron/orphan-uploads`) also runs the check as a safety net.
 
 ## In the app
-- Banner on every dashboard page while there are unread alerts; `/dashboard/alerts` lists all; Settings → "Screen alerts" for on/off, minutes, and email.
+- Banner on every dashboard page while there are unread alerts; `/dashboard/alerts` lists all; Settings → "Screen alerts" for on/off, minutes, email and phone notifications (push, `alert_push_enabled`).
+
+## Push (FCM)
+- Phones register with `POST /api/devices` and remove themselves on sign-out with `DELETE /api/devices/:token` (or `DELETE /api/devices {token}`). These contracts are unchanged.
+- `POST /api/session/sign-out {scope:"global"}` (web "Sign out of all devices") deletes all of the caller's `push_devices` rows before the Supabase global sign-out. `{scope:"local", token}` deletes that one token; `{scope:"local"}` without a token removes nothing.
+- `POST /api/push/test` with body `{}`: signed-in only, sends `data: {type:"test"}` (Android channel `screen_alerts`) to the caller's own devices, 5 per hour per user, never writes `alerts`. Replies `{devices, sent, failed}`; tokens FCM reports as gone are pruned like normal delivery. 503 when push isn't configured (Preview has no FCM).
 - Stored in `public.alerts` (RLS on, no policies; server-only). Deleted after 90 days by the daily cron (`alerts_purge`).
 
 ## Email (inactive until configured)
@@ -21,7 +26,7 @@ Pluggable provider in `lib/server/email.ts`. Nothing is sent until these Vercel 
 | `ALERT_EMAIL_FROM` | `Pekko <alerts@your-verified-domain>` |
 
 - Emails go to the account owner's sign-in email when the account has email alerts on (default on).
-- While no provider is configured, pending emails are marked `skipped`, so switching email on later never sends a backlog. Alerts older than 6 h are never emailed.
+- While no provider is configured, pending emails are marked `skipped`, so switching email on later never sends a backlog. Alerts older than 30 minutes are never emailed or pushed (`DELIVERY_MAX_AGE_MS` in `lib/server/alerts.ts`); they are marked `skipped`.
 - Each alert is claimed before sending (attempt counter) so parallel runs can't send twice; it's marked `failed` after 3 attempts.
 - Delivery runs from `GET /api/cron/alert-emails` (Bearer `CRON_SECRET`; `?dryRun=1` changes nothing) and once a day from the existing cron.
 

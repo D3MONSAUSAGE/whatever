@@ -11,7 +11,8 @@ export type PushMessage = {
   body: string;
   data:
     | { type: "screen_offline" | "screen_online"; alertId: string; screenId: string }
-    | { type: "trial_reminder"; alertId: string; daysLeft?: string };
+    | { type: "trial_reminder"; alertId: string; daysLeft?: string }
+    | { type: "test"; alertId?: never };
 };
 /** `invalidToken`: FCM said the token is gone (UNREGISTERED / 404 / bad token); the device row is deleted. */
 export type PushResult = { ok: true } | { ok: false; invalidToken?: boolean; error: string };
@@ -65,7 +66,7 @@ export function fcmSender(sa: ServiceAccount, fetchImpl: typeof fetch = fetch): 
   return {
     name: "fcm",
     async send(m) {
-      const tag = "screenId" in m.data ? m.data.screenId : "trial_reminder";
+      const tag = "screenId" in m.data ? m.data.screenId : m.data.type === "test" ? "test" : "trial_reminder";
       let bearer: string;
       try { bearer = await accessToken(); } catch (e) { return { ok: false, error: (e as Error).message }; }
       const r = await fetchImpl(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(sa.project_id)}/messages:send`, {

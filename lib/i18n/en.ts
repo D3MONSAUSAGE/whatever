@@ -789,6 +789,9 @@ export const en = {
   "alerts.save": "Save",
   "alerts.alsoEmail": "Also email me at",
   "alerts.emailOff": "Email alerts aren't switched on for Pekko yet. Alerts still appear here in the dashboard.",
+  "alerts.alsoPush": "Send notifications to my phones with the Pekko app",
+  "alerts.pushHint": "Applies to every phone signed in to this account.",
+  "alerts.pushOff": "Phone notifications aren't switched on for Pekko yet. Alerts still appear here in the dashboard.",
 
   // I18N-2: publish to a screen group
   "gp.none": "None",

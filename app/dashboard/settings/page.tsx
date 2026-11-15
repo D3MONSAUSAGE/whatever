@@ -93,6 +93,8 @@ export default function Settings() {
     });
     if (!ok) return;
     setSignOutBusy(true);
+    // Remove this login's phone push tokens while the session is still valid. Never blocks the sign-out.
+    await api("/api/session/sign-out", { method: "POST", body: JSON.stringify({ scope: "global" }) }).catch(() => undefined);
     const { error } = await getSupabase().auth.signOut({ scope: "global" });
     setSignOutBusy(false);
     if (error) toast.show(friendlyAuthError(error.message, t), true);
