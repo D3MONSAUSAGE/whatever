@@ -10,6 +10,7 @@ export type DirectUploadState =
   | { phase: "idle" }
   | { phase: "busy"; name: string; progress: number }
   | { phase: "done"; name: string }
+  | { phase: "kept"; name: string }
   | { phase: "error"; message: string };
 
 /** Reject files the logo/photo pickers could not list, before anything is sent. */
@@ -28,6 +29,10 @@ export function directUploadStatus(state: DirectUploadState, what: "logo" | "pho
       return what === "logo"
         ? `Uploaded ${state.name} to Media and selected. Click Save brand to apply.`
         : `Uploaded ${state.name} to Media and selected. Save the board to apply.`;
+    case "kept":
+      return what === "logo"
+        ? `Selected ${state.name} from your library. Click Save brand to apply.`
+        : `Selected ${state.name} from your library. Save the board to apply.`;
     case "error":
       return state.message;
     default:

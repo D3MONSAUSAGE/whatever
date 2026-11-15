@@ -22,6 +22,10 @@ export type ClassicDraft = {
   imageUrl?: string | null;
 };
 
+/** QA U1-04c: retries when the preview reports the photo isn't readable yet (503). */
+export const PHOTO_RETRY_LIMIT = 2;
+export const PHOTO_RETRY_MS = 1200;
+
 type ClassicStep = "preview" | "content" | "photo" | "style" | "publish";
 
 const STEP_LABEL: Record<ClassicStep, string> = {
@@ -74,6 +78,8 @@ export function ClassicEditor({
   const [previewRetry, setPreviewRetry] = useState(0);
   // Up/Down moves refresh the preview at once instead of after the typing debounce (QA retest 3 low).
   const refreshNow = useRef(false);
+  // QA U1-04c: a photo that is not readable yet gets a couple of quiet retries before the error shows.
+  const photoRetries = useRef(0);
   const latest = useRef({ draft, setDraft });
   latest.current = { draft, setDraft };
   const baseline = useRef({ name: draft.name, template: draft.template, content: draft.content, displayIds: draft.displayIds });
@@ -122,6 +128,11 @@ export function ClassicEditor({
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
+          if (!cancelled && res.status === 503 && photoRetries.current < PHOTO_RETRY_LIMIT) {
+            photoRetries.current += 1;
+            window.setTimeout(() => { refreshNow.current = true; setPreviewRetry((n) => n + 1); }, PHOTO_RETRY_MS);
+            return;
+          }
           if (!cancelled) {
             setPreviewError(body.error || "Preview unavailable.");
             setPreviewLoading(false);
@@ -136,6 +147,7 @@ export function ClassicEditor({
         }
         if (last.current) URL.revokeObjectURL(last.current);
         last.current = url;
+        photoRetries.current = 0;
         setPreview(url);
         setPreviewError(null);
         setPreviewLoading(false);
@@ -363,6 +375,7 @@ export function ClassicEditor({
       </label>
       <DirectImageUpload
         what="photo"
+        library={images}
         disabled={readOnly || !onImageUploaded}
         onUploaded={async (id) => {
           await onImageUploaded?.();
@@ -370,6 +383,10 @@ export function ClassicEditor({
           const { draft: current, setDraft: apply } = latest.current;
           apply({ ...current, content: { ...current.content, photoMediaId: id } });
           setRegion("photo");
+          // QA U1-04c: redraw the board with the new photo right away (also when the id was already selected).
+          photoRetries.current = 0;
+          refreshNow.current = true;
+          setPreviewRetry((n) => n + 1);
         }}
       />
     </details>

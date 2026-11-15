@@ -2,6 +2,9 @@
 
 import { useRef, useState } from "react";
 import { uploadArtImage } from "@/components/uploads";
+import type { MediaItem } from "@/lib/api";
+import { useConfirm } from "@/components/confirm";
+import { duplicateImageMessage, sameLibraryImage } from "@/lib/media-dupes";
 import { ART_UPLOAD_ACCEPT, artUploadError, directUploadStatus, openFilePicker, type DirectUploadState } from "@/lib/direct-upload";
 
 /**
@@ -13,13 +16,18 @@ export function DirectImageUpload({
   onUploaded,
   disabled,
   upload = uploadArtImage,
+  library,
 }: {
   what: "logo" | "photo";
+  /** Called with the new media id, or with the existing one when the owner keeps the copy already in Media. */
   onUploaded: (id: string) => Promise<void> | void;
   disabled?: boolean;
   upload?: typeof uploadArtImage;
+  /** The logo/photo choices already in Media, for the "Already in your library" check (QA U1-04d). */
+  library?: MediaItem[];
 }) {
   const [state, setState] = useState<DirectUploadState>({ phase: "idle" });
+  const confirm = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = state.phase === "busy";
   const status = directUploadStatus(state, what);
@@ -31,6 +39,25 @@ export function DirectImageUpload({
     if (invalid) {
       setState({ phase: "error", message: invalid });
       return;
+    }
+    // Same choice the Media page gives (QA B1-10): keep the one already there, or upload a copy.
+    const existing = sameLibraryImage(library, file);
+    if (existing) {
+      const copy = await confirm.ask({
+        title: "Already in your library",
+        body: duplicateImageMessage(file.name),
+        confirmLabel: "Upload a copy anyway",
+        cancelLabel: "Keep the one I have",
+      });
+      if (!copy) {
+        try {
+          await onUploaded(existing.id);
+          setState({ phase: "kept", name: existing.fileName });
+        } catch (err) {
+          setState({ phase: "error", message: (err as Error).message || "Something went wrong. Try again." });
+        }
+        return;
+      }
     }
     setState({ phase: "busy", name: file.name, progress: 0 });
     try {
@@ -69,6 +96,7 @@ export function DirectImageUpload({
           void onFiles(files);
         }}
       />
+      {confirm.node}
       <p className="text-xs text-muted">JPG or PNG, 15 MB or smaller. It's also saved in Media.</p>
       <p
         className={`text-sm ${state.phase === "error" ? "text-danger" : "text-muted"}`}
