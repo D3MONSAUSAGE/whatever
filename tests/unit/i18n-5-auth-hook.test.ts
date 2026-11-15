@@ -89,6 +89,25 @@ describe("I18N-5 English parity with today's templates", () => {
   it("an empty redirect_to falls back to the site URL, like Supabase", () => {
     expect(supabaseConfirmationUrl({ type: "magiclink", tokenHash: H, redirectTo: "", siteUrl: "https://pekkotv.com", supabaseUrl: SB })).toBe(`${SB}/auth/v1/verify?token=${H}&type=magiclink&redirect_to=https://pekkotv.com`);
   });
+  it("Gother LOW 1: token, type and redirect_to are query-encoded; a normal link is unchanged", () => {
+    const url = supabaseConfirmationUrl({ type: "signup", tokenHash: "a&b=c#d e", redirectTo: "https://pekkotv.com/x?next=/y&z=1#frag", siteUrl: "", supabaseUrl: SB });
+    const q = new URL(url).searchParams;
+    expect([...q.keys()]).toEqual(["token", "type", "redirect_to"]);
+    expect(q.get("token")).toBe("a&b=c#d e");
+    expect(q.get("type")).toBe("signup");
+    expect(q.get("redirect_to")).toBe("https://pekkotv.com/x?next=/y&z=1#frag");
+    expect(url).toContain("redirect_to=https://pekkotv.com/x%3Fnext%3D/y%26z%3D1%23frag");
+    expect(supabaseConfirmationUrl({ type: "recovery", tokenHash: H, redirectTo: "https://pekkotv.com/reset-password", siteUrl: "", supabaseUrl: SB }))
+      .toBe(`${SB}/auth/v1/verify?token=${H}&type=recovery&redirect_to=https://pekkotv.com/reset-password`);
+  });
+  it("Gother LOW 2: CR/LF in the reauthentication token never reaches the subject", () => {
+    for (const locale of ["en", "es"] as const) {
+      const r = renderAuthEmail({ ...base, locale, type: "reauthentication", token: "12\r\n3456\nBcc: x@evil.test" });
+      expect(r.subject).not.toMatch(/[\r\n]/);
+      expect(r.subject).toContain("123456");
+    }
+    expect(renderAuthEmail({ ...base, locale: "en", type: "reauthentication" }).subject).toBe(renderAuthEmail({ ...base, locale: "en", type: "reauthentication", token: "123456" }).subject);
+  });
   it("customer-typed addresses are HTML-escaped, never inserted raw", () => {
     const c = renderAuthEmail({ ...base, type: "email_change", locale: "en", newEmail: "x\"<b>@example.com" });
     expect(c.html).toContain("x&#34;&lt;b&gt;@example.com");

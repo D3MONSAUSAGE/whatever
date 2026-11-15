@@ -49,7 +49,21 @@ export type LinkInput = {
 /** Supabase's {{ .ConfirmationURL }}: …/auth/v1/verify?token=<token_hash>&type=<type>&redirect_to=<redirect>. */
 export function supabaseConfirmationUrl(i: LinkInput): string {
   const redirect = i.redirectTo || i.siteUrl;
-  return `${i.supabaseUrl.replace(/\/+$/, "")}/auth/v1/verify?token=${i.tokenHash}&type=${i.type}&redirect_to=${redirect}`;
+  return `${i.supabaseUrl.replace(/\/+$/, "")}/auth/v1/verify?token=${encodeURIComponent(i.tokenHash)}&type=${encodeURIComponent(i.type)}&redirect_to=${encodeRedirect(redirect)}`;
+}
+
+/**
+ * encodeURIComponent for redirect_to, then ":" and "/" put back. Both are legal in a query value (RFC 3986),
+ * so a normal redirect (https://pekkotv.com/reset-password) stays byte-identical to the link Supabase
+ * delivers today, while "&", "#", "?", "=", spaces and CR/LF can no longer add or cut query parameters.
+ */
+export function encodeRedirect(v: string): string {
+  return encodeURIComponent(v).replace(/%3A/gi, ":").replace(/%2F/gi, "/");
+}
+
+/** A token that goes into a subject line: CR/LF removed so it can never start a new header line. */
+export function subjectSafe(v: string): string {
+  return v.replace(/[\r\n]+/g, "");
 }
 
 /** The B2-07 branded link used by the live Reset Password template (href already escaped). */
@@ -188,7 +202,7 @@ export function renderAuthEmail(i: RenderInput): Rendered {
   const copy = (i.locale === "es" ? ES : EN)[i.type];
   const href = hrefFor(i);
   return {
-    subject: copy.subject.replace("{{token}}", i.token),
+    subject: copy.subject.replace("{{token}}", subjectSafe(i.token)),
     html: copy.html(href, { email: i.email, newEmail: i.newEmail, token: i.token }),
   };
 }
