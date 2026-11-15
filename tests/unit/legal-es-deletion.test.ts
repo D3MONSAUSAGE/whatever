@@ -77,7 +77,14 @@ describe("/account-deletion: Spanish courtesy translation", () => {
 
 describe("/account-deletion branch scope", () => {
   it("touches only the deletion page, its Spanish component, the contact block operator prop and its tests", () => {
-    const files = execSync('git log --no-merges --format= --name-only --grep="^Legal ES deletion: " HEAD', { encoding: "utf8" }).split("\n").filter(Boolean);
+    // Explicit range: this branch's own changes on top of #116's head (690924a). CI checks out one commit
+    // (no history), where the range can't be resolved; the guard then skips, like the I18N-3 scope guard.
+    let files: string[] = [];
+    try {
+      files = execSync("git diff --name-only 690924a HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
+    } catch {
+      return;
+    }
     const allowed = /^(app\/account-deletion\/page\.tsx|components\/legal\/account-deletion-es\.tsx|components\/contact-block\.tsx|tests\/unit\/legal-es-deletion\.test\.ts|tests\/unit\/helpers\/deletion-markup\.ts|tests\/fixtures\/account-deletion-en\.golden\.json)$/;
     for (const f of new Set(files)) expect(f).toMatch(allowed);
   });
