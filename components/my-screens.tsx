@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api, useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
-import { contentLabel, heartbeatLabel, OfflineAlert, Status } from "@/components/tv";
-import { syncLine } from "@/lib/sync-line";
+import { contentLabel, heartbeatText, OfflineAlert, Status } from "@/components/tv";
+import { useT } from "@/lib/i18n/client";
+import { onlineNow, syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
 import { GroupPublish } from "@/components/group-publish";
 import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit } from "@/components/ui";
@@ -16,12 +17,13 @@ import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
 
 export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; groups?: ScreenGroupItem[] } } = {}) {
+  const t = useT();
   const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
   const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
   const displays = fixture ? { data: fixture.displays, error: null as string | null } : liveDisplays;
   const groups = fixture ? { data: fixture.groups ?? [], error: null as string | null } : liveGroups;
   const list = displays.data ?? [];
-  const onlineCount = list.filter((display) => display.online).length;
+  const onlineCount = list.filter(onlineNow).length;
   const offlineCount = list.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">
@@ -62,7 +64,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
                       <Status display={display} />
                     </div>
                     <p className="text-sm mt-2 truncate">{contentLabel(display)}</p>
-                    <p className="text-xs text-muted mt-1">{display.location?.name ?? "No location"} · {heartbeatLabel(display.lastSeenAt)}</p>
+                    <p className="text-xs text-muted mt-1">{display.location?.name ?? "No location"} · {heartbeatText(display, t)}</p>
                   </Link>
                   <AssignedThumb display={display} />
                 </div>
@@ -104,6 +106,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   library?: ScreenLibrary;
   initialPanel?: "upload" | "change" | "create" | "playlist" | "schedule" | null;
 }) {
+  const t = useT();
   const displays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
   const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(fixture ? null : `/api/displays/${id}/timeline`, 10_000);
   const confirm = useConfirm();
@@ -142,12 +145,12 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
           <h2 className="font-semibold">What's playing</h2>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Status display={display} />
-            <span className="text-sm">{nowPlaying(contentLabel(display), display.currentSchedule ? { name: display.currentSchedule.name, playlistName: display.currentSchedule.playlistName, untilLabel: clockLabel(display.currentSchedule.until) } : null)}</span>
+            <span className="text-sm" data-testid="now-playing">{!display.connected && (display.media || display.playlist) ? t("screen.setToShow", { name: contentLabel(display) }) : nowPlaying(contentLabel(display), display.currentSchedule ? { name: display.currentSchedule.name, playlistName: display.currentSchedule.playlistName, untilLabel: clockLabel(display.currentSchedule.until) } : null)}</span>
           </div>
-          <p className="text-sm text-muted mt-2"><time dateTime={display.lastSeenAt ?? undefined}>{heartbeatLabel(display.lastSeenAt)}</time></p>
+          <p className="text-sm text-muted mt-2" data-testid="heartbeat"><time dateTime={display.connected ? display.lastSeenAt ?? undefined : undefined}>{heartbeatText(display, t)}</time></p>
           {next ? <p className="text-sm mt-3">Next change: {next.label}{next.at ? ` · ${new Date(next.at).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true })}` : ""}</p> : <p className="text-sm mt-3 text-muted">No scheduled change in the next few days.</p>}
           <p className="text-sm mt-3" data-testid="sync-state">
-            {syncLine(display)}
+            {display.connected ? syncLine(display) : t("screen.noTvPlaying")}
           </p>
           {display.connected && !display.online ? (
             <p className="text-sm mt-3">This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.</p>
@@ -177,7 +180,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
   startCreating?: boolean;
 }) {
   const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
-  const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays");
+  const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
   const groups = fixture ? { data: fixture.groups, error: null as string | null, reload: async () => {} } : liveGroups;
   const displays = fixture ? { data: fixture.displays, error: null as string | null, reload: async () => {} } : liveDisplays;
   const toast = useToast();
@@ -240,7 +243,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
         <ul className="grid gap-3">
           {groups.data.map((group) => {
             const members = (displays.data ?? []).filter((display) => group.displayIds.includes(display.id));
-            const online = members.filter((display) => display.online).length;
+            const online = members.filter(onlineNow).length;
             return (
               <li key={group.id}>
                 <Link href={`/dashboard/screens/groups/${group.id}`} className="card block p-4 min-h-11">
@@ -285,7 +288,7 @@ export function GroupWorkspace({ id }: { id: string }) {
   if (!groups.data || !displays.data) return <LoadState error={groups.error || displays.error} label="Loading this group…" />;
   if (!group) return <EmptyState title="That group is not in this account"><Link href="/dashboard/screens/groups" className="underline font-semibold">Back to groups</Link>.</EmptyState>;
   const members = displays.data.filter((display) => group.displayIds.includes(display.id));
-  const online = members.filter((display) => display.online).length;
+  const online = members.filter(onlineNow).length;
   const offline = members.filter((display) => display.connected && !display.online).length;
   return (
     <section className="min-w-0 overflow-x-hidden">

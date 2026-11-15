@@ -1,4 +1,5 @@
 "use client";
+import { onlineNow } from "@/lib/sync-line";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useApi, type OnboardingState, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
@@ -86,7 +87,7 @@ function OverviewBody({
   origin: string;
   fixture: boolean;
 }) {
-  const online = displayData.filter((item) => item.online).length;
+  const online = displayData.filter(onlineNow).length;
   const offline = offlineScreens(displayData).length;
   const published = displayData.some((item) => item.media || item.playlist);
   const setupFixture: OnboardingState | undefined = fixture ? fixtureSetup(displayData, mediaCount, playlistCount ?? 0, published) : undefined;

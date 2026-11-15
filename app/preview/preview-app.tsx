@@ -11,6 +11,8 @@ import type { AccountStudio } from "@/lib/layout-account";
 import { sampleLayout } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
+import { ShowOnScreens } from "@/components/show-on-screens";
+import { SHOW_ON_SCREENS_STYLES } from "@/lib/show-on-screens";
 import { ContentHub } from "@/components/content-hub";
 import { MenuBoards, type MenuFixture } from "@/components/menu-boards";
 import { PromoSlides, type Promo } from "@/components/promo-slides";
@@ -151,7 +153,11 @@ export function PreviewApp() {
   const panelParam = params.get("panel");
   const panel = panelParam === "change" || panelParam === "upload" || panelParam === "create" || panelParam === "playlist" || panelParam === "schedule" ? panelParam : null;
   const workspaceId = params.get("id") === "screen-bar" || params.get("id") === "screen-patio" ? params.get("id")! : "screen-front";
-  const workspaceDisplay = displays.find((item) => item.id === workspaceId) ?? displays[0];
+  const foundDisplay = displays.find((item) => item.id === workspaceId) ?? displays[0];
+  // E5-F2: ?unpaired=1 shows the screen right after its TV was unpaired (last heartbeat and playback still recent).
+  const workspaceDisplay = params.get("unpaired") === "1"
+    ? { ...foundDisplay, connected: false, online: false, lastSeenAt: new Date().toISOString(), reportedState: "playing" as const, playingAt: new Date().toISOString() }
+    : foundDisplay;
   const path = screen === "workspace" ? `/dashboard/screens/${workspaceId}` : previewPath(screen);
   const overview = empty
     ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
@@ -183,6 +189,12 @@ export function PreviewApp() {
       {screen === "promos" ? <PromoSlides fixture={promoFixture} /> : null}
       {screen === "promo-edit" ? <PromoSlides fixture={{ ...promoFixture, startEditing: true }} /> : null}
       {screen === "brand-kit" ? <BrandKit fixture={brandFixture} /> : null}
+      {screen === "show-on-screens" ? (
+        <>
+          <style>{SHOW_ON_SCREENS_STYLES}</style>
+          <ShowOnScreens boardId="menu-dinner" boardName="Dinner menu" playlistId="pl-board" displays={displays} preview onDone={() => {}} onSkip={() => {}} />
+        </>
+      ) : null}
       {screen === "account" ? <AccountPreview /> : null}
       {screen === "screens" ? <MyScreensPreview /> : null}
       {screen === "groups" ? <ScreenGroups fixture={empty ? { groups: [], displays } : demoGroups} startCreating={params.get("creating") === "1"} /> : null}

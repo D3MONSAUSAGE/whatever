@@ -230,7 +230,7 @@ describe("server-derived online status and preview fixtures", () => {
     expect(screens).toContain("This screen is offline. You can still change content; the TV updates when it comes back online.");
     expect(screens).toContain("This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.");
     expect(screens).toContain("display.connected && !display.online");
-    expect(screens).toContain("heartbeatLabel(display.lastSeenAt)");
+    expect(screens).toContain("heartbeatText(display, t)"); // E5-F2: no heartbeat claim without a TV
     expect(screens).toContain("<Status display={display} />");
   });
 });

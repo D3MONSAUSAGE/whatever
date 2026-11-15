@@ -139,7 +139,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
             <li key={display.id}>
               <ScreenCard display={display} actions={
                 <>
-                  {display.reportedState && display.reportedState !== "unknown" ? (
+                  {display.connected && display.reportedState && display.reportedState !== "unknown" ? (
                     <p className="w-full text-xs text-muted" data-testid="sync-state">
                       {syncLine(display)}
                     </p>

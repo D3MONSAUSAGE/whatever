@@ -27,3 +27,8 @@ function ago(iso: string) {
   if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
   return `${Math.round(seconds / 86400)} days ago`;
 }
+
+/** Gother #109 MEDIUM: a just-unpaired screen keeps a recent last_seen_at, so "online" counts need a connected TV too. */
+export function onlineNow(display: { connected: boolean; online: boolean }) {
+  return display.connected && display.online;
+}

@@ -1,4 +1,5 @@
 import type { DisplayItem } from "@/lib/api";
+import { makeT, type T } from "@/lib/i18n";
 
 export type ScreenChoice = { id: string; name: string; status: string; showing: boolean; nowShowing: string | null };
 
@@ -26,12 +27,12 @@ export function screensToAssign(choices: ScreenChoice[], picked: string[]): stri
  * E2b: name what each ticked screen loses, e.g. "Replaces QA Mixed Loop on QA Bar TV 2."
  * Before anything is ticked, one general line explains it.
  */
-export function replaceNotes(choices: ScreenChoice[], picked: string[]): string[] {
+export function replaceNotes(choices: ScreenChoice[], picked: string[], t: T = makeT("en")): string[] {
   const ticked = choices.filter((choice) => !choice.showing && picked.includes(choice.id));
-  if (!ticked.length) return ["Ticking a screen replaces what it's set to show."];
+  if (!ticked.length) return [t("showOnScreens.tickNote")];
   return ticked.map((choice) => choice.nowShowing
-    ? `Replaces ${choice.nowShowing} on ${choice.name}.`
-    : `${choice.name} isn't set to show anything yet.`);
+    ? t("showOnScreens.replacesOn", { current: choice.nowShowing, screen: choice.name })
+    : t("showOnScreens.nothingYet", { screen: choice.name }));
 }
 
 /**
@@ -46,6 +47,32 @@ export function shouldOfferScreens(input: {
 }): boolean {
   if (input.fromScreen || input.tickedScreens > 0 || !input.playlistId) return false;
   return !(input.displays ?? []).some((display) => display.connected && display.playlist?.id === input.playlistId);
+}
+
+/**
+ * E2b-F1: after saving a classic board. The screen picker is offered only right after a NEW board
+ * is created (and only when it's on no screen). Saving an existing board never shows the picker;
+ * the toast names the screens it updates, or says it isn't on a screen yet.
+ */
+export function afterClassicSave(input: {
+  created: boolean;
+  fromScreen: boolean;
+  tickedScreens: number;
+  playlistId: string | null | undefined;
+  displays: DisplayItem[] | null | undefined;
+}): { kind: "picker" } | { kind: "updated"; screens: string[] } | { kind: "none" } {
+  if (input.created) return shouldOfferScreens(input) ? { kind: "picker" } : { kind: "none" };
+  if (input.fromScreen || !input.playlistId) return { kind: "none" };
+  const screens = (input.displays ?? [])
+    .filter((display) => display.connected && display.playlist?.id === input.playlistId)
+    .map((display) => display.name)
+    .sort((a, b) => a.localeCompare(b));
+  return { kind: "updated", screens };
+}
+
+/** "QA Bar TV", "QA Bar TV and Patio", "A, B and C" in the UI language. */
+export function screenList(names: string[], locale: string): string {
+  try { return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(names); } catch { return names.join(", "); }
 }
 
 export const SHOW_ON_SCREENS_STYLES = `

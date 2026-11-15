@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { api, timeAgo, useApi, type DisplayItem, type MediaItem } from "@/lib/api";
 import { useToast } from "@/components/toast";
 import { ShowOnScreens } from "@/components/show-on-screens";
-import { SHOW_ON_SCREENS_STYLES, shouldOfferScreens } from "@/lib/show-on-screens";
+import { SHOW_ON_SCREENS_STYLES, afterClassicSave, screenList } from "@/lib/show-on-screens";
+import { useLocale } from "@/lib/i18n/client";
 import { useConfirm } from "@/components/confirm";
 import { EmptyState, LoadState, PageHeader, LimitNote, atLimit } from "@/components/ui";
 import { IconImage } from "@/components/icons";
@@ -139,6 +140,7 @@ export function MenuBoards({
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(started.pendingBoardId);
   const [selectedLayout, setSelectedLayout] = useState<LayoutOption | null>(null);
   const toast = useToast();
+  const { locale, t } = useLocale();
   // E2b: "Show on which screen?" after saving a classic board that isn't on any screen yet.
   const [pickClassic, setPickClassic] = useState<{ id: string; name: string; playlistId: string } | null>(null);
   const confirm = useConfirm();
@@ -233,12 +235,19 @@ export function MenuBoards({
           onSaved={async (message, saved) => {
             setPickClassic(null); // Gother #100 low: never bring back a previous board's picker.
             const fromScreen = Boolean(view.screenId);
+            const created = !view.draft.id;
             setView({ mode: "list" });
             await menus.reload();
-            toast.show(message);
-            if (!saved || fixture) return;
+            if (!saved || fixture) { toast.show(message); return; }
             const fresh = await api<DisplayItem[]>("/api/displays").catch(() => displays.data ?? []);
-            if (shouldOfferScreens({ fromScreen, tickedScreens: saved.tickedScreens, playlistId: saved.playlistId, displays: fresh }) && saved.playlistId) {
+            const next = afterClassicSave({ created, fromScreen, tickedScreens: saved.tickedScreens, playlistId: saved.playlistId, displays: fresh });
+            if (next.kind === "updated") {
+              // E2b-F1: an existing board never brings back the picker; say where it updates instead.
+              toast.show(next.screens.length ? t("menuBoards.updatedOn", { screens: screenList(next.screens, locale) }) : t("menuBoards.updatedNoScreen"));
+              return;
+            }
+            toast.show(message);
+            if (next.kind === "picker" && saved.playlistId) {
               setPickClassic({ id: saved.id, name: saved.name || "This board", playlistId: saved.playlistId });
               void liveDisplays.reload();
             }
