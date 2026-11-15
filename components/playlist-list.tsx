@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -7,8 +8,10 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconList } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
+import { makeT, type T } from "@/lib/i18n";
 
 export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary[]; pathOverride?: string }) {
+  const t = useT();
   const live = useApi<PlaylistSummary[]>(fixture ? null : "/api/playlists");
   const data = fixture ?? live.data;
   const error = fixture ? null : live.error;
@@ -38,15 +41,15 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
 
   async function remove(playlist: PlaylistSummary) {
     const ok = await confirm.ask({
-      title: "Delete this playlist?",
-      body: `Delete “${playlist.name}”? TVs showing it will switch to “No content assigned”.`,
-      confirmLabel: "Delete playlist",
+      title: t("pl.delTitle"),
+      body: t("pl.delBody", { name: playlist.name }),
+      confirmLabel: t("pl.delConfirm"),
       danger: true,
     });
     if (ok !== true) return;
     try {
       await api(`/api/playlists/${playlist.id}`, { method: "DELETE" });
-      toast.show("Deleted");
+      toast.show(t("pl.deleted"));
       reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -57,7 +60,7 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
     setWorkingId(playlist.id);
     try {
       const detail = await api<PlaylistDetail>(`/api/playlists/${playlist.id}`);
-      const copyName = `Copy of ${detail.name}`.slice(0, 80);
+      const copyName = t("pl.copyOf", { name: detail.name }).slice(0, 80);
       const created = await api<{ id: string }>("/api/playlists", {
         method: "POST",
         body: JSON.stringify({ name: copyName }),
@@ -76,7 +79,7 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
         await api(`/api/playlists/${created.id}`, { method: "DELETE" }).catch(() => undefined);
         throw err;
       }
-      toast.show("Duplicated as a draft");
+      toast.show(t("pl.duplicated"));
       await reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -87,33 +90,33 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
 
   return (
     <section data-preview-path={pathOverride}>
-      <PageHeader title="Playlists" icon={<IconList />} lede="A playlist loops images and video on one or more screens. Saving a draft does not change a screen." />
+      <PageHeader title={t("pl.title")} icon={<IconList />} lede={t("pl.lede")} />
       <form id="new-playlist" onSubmit={create} className="card p-4 md:p-5 mb-8">
-        <h2 className="font-semibold">New playlist</h2>
-        <p className="text-sm text-muted mb-4">Name it, add slides, then publish when you want the TVs to change.</p>
+        <h2 className="font-semibold">{t("pl.new")}</h2>
+        <p className="text-sm text-muted mb-4">{t("pl.newLede")}</p>
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-          <input className="field" required maxLength={80} placeholder="Name, like Lunch specials" aria-label="Playlist name"
+          <input className="field" required maxLength={80} placeholder={t("pl.namePh")} aria-label={t("pl.nameAria")}
             value={name} onChange={(event) => setName(event.target.value)} />
-          <button className="btn btn-primary" disabled={creating}>{creating ? "Creating…" : "Create playlist"}</button>
+          <button className="btn btn-primary" disabled={creating}>{creating ? t("pl.creating") : t("pl.create")}</button>
         </div>
       </form>
 
       {!data ? (
-        <LoadState error={error} label="Loading…" />
+        <LoadState error={error} />
       ) : data.length === 0 ? (
-        <EmptyState title="No playlists yet">Create one, add images or video from your library, then publish it to a screen.</EmptyState>
+        <EmptyState title={t("pl.emptyTitle")}>{t("pl.emptyBody")}</EmptyState>
       ) : (
         <>
         {data.length >= SEARCH_FROM ? (
-          <input className="field mb-3" type="search" aria-label="Search playlists" placeholder="Search playlists" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="field mb-3" type="search" aria-label={t("pl.searchAria")} placeholder={t("pl.searchAria")} value={search} onChange={(e) => setSearch(e.target.value)} />
         ) : null}
-        {byName(data, search).length === 0 ? <EmptyState title="No playlists match that search">Try another name, or clear the search.</EmptyState> : null}
+        {byName(data, search).length === 0 ? <EmptyState title={t("pl.noMatchTitle")}>{t("pl.noMatchBody")}</EmptyState> : null}
         <ul className="grid gap-3">
           {byName(data, search).map((playlist) => {
             const screens = playlist.displayNames?.length
               ? playlist.displayNames.join(", ")
               : playlist.displayCount
-                ? `${playlist.displayCount} ${playlist.displayCount === 1 ? "screen" : "screens"}`
+                ? t(playlist.displayCount === 1 ? "pl.screenOne" : "pl.screenMany", { n: playlist.displayCount })
                 : "";
             return (
               <li key={playlist.id} className="card p-4 flex flex-col gap-3 lg:flex-row lg:items-center min-w-0">
@@ -124,16 +127,16 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
                   <span className="min-w-0">
                     <span className="font-semibold block truncate">{playlist.name}</span>
                     <span className="text-sm text-muted block truncate">
-                      {playlist.slideCount} {playlist.slideCount === 1 ? "slide" : "slides"}
-                      {screens ? ` · on ${screens}` : ""}
+                      {t(playlist.slideCount === 1 ? "pl.slideOne" : "pl.slideMany", { n: playlist.slideCount })}
+                      {screens ? ` · ${t("pl.on", { screens })}` : ""}
                     </span>
                   </span>
                 </Link>
                 <div className="flex flex-wrap gap-2">
-                  <span className={statusClass(playlist)}>{statusLabel(playlist)}</span>
-                  <Link href={`/dashboard/playlists/${playlist.id}`} className="btn btn-quiet">Edit</Link>
-                  <button type="button" className="btn btn-quiet" disabled={workingId === playlist.id} onClick={() => duplicate(playlist)}>Duplicate</button>
-                  <button type="button" className="btn btn-quiet text-danger" onClick={() => remove(playlist)}>Delete</button>
+                  <span className={statusClass(playlist)}>{statusLabel(playlist, t)}</span>
+                  <Link href={`/dashboard/playlists/${playlist.id}`} className="btn btn-quiet">{t("ed.edit")}</Link>
+                  <button type="button" className="btn btn-quiet" disabled={workingId === playlist.id} onClick={() => duplicate(playlist)}>{t("pl.duplicate")}</button>
+                  <button type="button" className="btn btn-quiet text-danger" onClick={() => remove(playlist)}>{t("ed.delete")}</button>
                 </div>
               </li>
             );
@@ -151,14 +154,14 @@ export default function PlaylistsPage() {
   return <Playlists />;
 }
 
-function statusLabel(playlist: PlaylistSummary) {
-  if (!playlist.publishedAt) return "Draft";
-  if (new Date(playlist.updatedAt).getTime() > new Date(playlist.publishedAt).getTime() + 1000) return "Unpublished changes";
-  return "Published";
+function statusLabel(playlist: PlaylistSummary, t: T) {
+  if (!playlist.publishedAt) return t("pl.draft");
+  if (new Date(playlist.updatedAt).getTime() > new Date(playlist.publishedAt).getTime() + 1000) return t("pl.unpublished");
+  return t("pl.published");
 }
 
 function statusClass(playlist: PlaylistSummary) {
-  const label = statusLabel(playlist);
+  const label = statusLabel(playlist, makeT("en"));
   if (label === "Published") return "badge badge-live";
   if (label === "Unpublished changes") return "badge badge-warn";
   return "badge";

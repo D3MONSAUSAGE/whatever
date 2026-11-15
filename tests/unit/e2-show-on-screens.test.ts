@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import { screenChoices, screensToAssign } from "@/lib/show-on-screens";
 import type { DisplayItem } from "@/lib/api";
@@ -26,7 +27,8 @@ describe("E2: optional Show on which screen? after Publish", () => {
   it("uses the existing assignment route only on the user's click, and Publish never auto-assigns", () => {
     const comp = readFileSync("components/show-on-screens.tsx", "utf8");
     expect(comp).toMatch(/\/api\/layout-studio\/assign/);
-    expect(comp).toMatch(/Not now/);
+    expect(comp).toContain('t("sos.notNow")'); // I18N-3
+    expect(en["sos.notNow"]).toBe("Not now");
     const studio = readFileSync("components/layout-studio.tsx", "utf8");
     const publishBranch = studio.slice(studio.indexOf("} else if (board?.playlistId) {"), studio.indexOf("} else {", studio.indexOf("} else if (board?.playlistId) {")));
     expect(publishBranch).toMatch(/setPickFor/);
@@ -45,9 +47,11 @@ describe("E2: optional Show on which screen? after Publish", () => {
     expect(comp).toMatch(/\/dashboard\/screens\/add/);
     expect(comp).toMatch(/headingRef\.current\?\.focus\(\)/);
     expect(comp).toMatch(/event\.key === "Escape"/);
-    expect(comp).toMatch(/Set to show this board/);
+    expect(comp).toContain('t("sos.showing")'); // I18N-3
+    expect(en["sos.showing"]).toBe("Set to show this board");
     expect(comp).not.toMatch(/Already showing this board/);
-    expect(comp).toMatch(/Loading your screens/);
+    expect(comp).toContain('t("sos.loading")');
+    expect(en["sos.loading"]).toBe("Loading your screens…");
     expect(readFileSync("components/menu-boards.tsx", "utf8")).toMatch(/displays=\{displays\.data \?\? null\}/);
   });
 });

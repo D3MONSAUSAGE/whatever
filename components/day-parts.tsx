@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useApi, type DisplayItem, type PlaylistSummary, type ScheduleItem, type ScreenGroupItem } from "@/lib/api";
 import { DAY_PARTS } from "@/lib/menu-templates";
 import { useConfirm } from "@/components/confirm";
-import { dayPartSources, DAY_PART_PRIORITY, PUBLISH_BOARD_FIRST } from "@/lib/day-part-sources";
+import { dayPartSources, DAY_PART_PRIORITY } from "@/lib/day-part-sources";
 import { findOverlaps, isOvernight, overnightMessage, type RuleLike } from "@/lib/schedule-checks";
 
 type MenuLite = { id: string; name: string; playlistId?: string | null };

@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import { useMemo, useState } from "react";
 import { IconImage, IconList, IconTv } from "@/components/icons";
@@ -10,6 +11,7 @@ import {
   type PickerCategory,
   type PickerEntry,
 } from "@/lib/content-picker";
+import type { MessageKey } from "@/lib/i18n";
 
 export function ContentPicker({
   entries,
@@ -30,6 +32,7 @@ export function ContentPicker({
   onPublishPicture: (id: string) => void;
   onPublish: (entry: PickerEntry) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState<PickerCategory>(initialCategory);
   const [selected, setSelected] = useState(initialSelected);
@@ -40,17 +43,17 @@ export function ContentPicker({
   return (
     <div className="grid min-w-0 gap-3">
       <label className="text-sm font-semibold">
-        Search
+        {t("cp.search")}
         <input
           className="field mt-1"
           type="search"
-          aria-label="Search content"
-          placeholder="Search by file name"
+          aria-label={t("cp.searchAria")}
+          placeholder={t("cp.searchPh")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
-      <div role="group" aria-label="Content type" className="flex flex-wrap gap-2">
+      <div role="group" aria-label={t("cp.typeAria")} className="flex flex-wrap gap-2">
         {PICKER_FILTERS.map((filter) => {
           const on = category === filter.id;
           return (
@@ -61,13 +64,13 @@ export function ContentPicker({
               aria-pressed={on}
               onClick={() => setCategory(filter.id)}
             >
-              {filter.label}
+              {t(`cp.filter.${filter.id}`)}
             </button>
           );
         })}
       </div>
       {shown.length === 0 ? (
-        <p className="text-sm text-muted">{emptyCopy(category, searching, layoutsUnavailable)}</p>
+        <p className="text-sm text-muted">{t(emptyCopy(category, searching, layoutsUnavailable))}</p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {shown.map((entry) => {
@@ -78,7 +81,7 @@ export function ContentPicker({
                   type="button"
                   disabled={busy}
                   aria-pressed={entry.action === "select" ? on : undefined}
-                  aria-label={`${entry.fileName}, ${pickerTypeLabel(entry.category)}`}
+                  aria-label={`${entry.fileName}, ${t(`cp.type.${entry.category}`)}`}
                   className={`w-full overflow-hidden rounded-xl border bg-white text-left ${on ? "border-primary ring-2 ring-primary" : "border-line"} hover:border-primary focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary`}
                   onClick={() => {
                     if (entry.action === "select") setSelected(pictureSelection(selected, entry.id));
@@ -93,9 +96,9 @@ export function ContentPicker({
                     )}
                   </span>
                   <span className="grid gap-1 p-2">
-                    <span className="badge w-fit">{pickerTypeLabel(entry.category)}</span>
+                    <span className="badge w-fit">{t(`cp.type.${entry.category}`)}</span>
                     <span className="truncate text-sm font-semibold">{entry.fileName}</span>
-                    {on ? <span className="text-xs font-semibold text-primary">Selected</span> : null}
+                    {on ? <span className="text-xs font-semibold text-primary">{t("cp.selected")}</span> : null}
                   </span>
                 </button>
               </li>
@@ -110,23 +113,23 @@ export function ContentPicker({
           disabled={busy || !chosen}
           onClick={() => chosen && onPublishPicture(chosen.id)}
         >
-          Publish to TV
+          {t("cp.publish")}
         </button>
-        {chosen ? <span className="text-sm text-muted truncate">Selected: {chosen.fileName}</span> : <span className="text-sm text-muted">Select a picture, then publish it. Other types publish when you choose them.</span>}
+        {chosen ? <span className="text-sm text-muted truncate">{t("cp.selectedName", { name: chosen.fileName })}</span> : <span className="text-sm text-muted">{t("cp.hint")}</span>}
       </div>
     </div>
   );
 }
 
-function emptyCopy(category: PickerCategory, searching: boolean, layoutsUnavailable: boolean) {
-  if (searching) return "No files match that search.";
-  if (category === "picture") return "No pictures yet.";
-  if (category === "video") return "No videos yet. A single picture is the only file a screen can play on its own.";
-  if (category === "presentation") return "No presentations yet.";
-  if (category === "playlist") return "No playlists yet.";
-  if (category === "menu") return "No menus yet.";
-  if (category === "layout") return layoutsUnavailable ? "Layouts are not available on this account." : "No layouts yet. Create one, then publish it from Menu boards.";
-  return "Nothing to publish yet.";
+function emptyCopy(category: PickerCategory, searching: boolean, layoutsUnavailable: boolean): MessageKey {
+  if (searching) return "cp.noMatch";
+  if (category === "picture") return "cp.noPictures";
+  if (category === "video") return "cp.noVideos";
+  if (category === "presentation") return "cp.noPresentations";
+  if (category === "playlist") return "cp.noPlaylists";
+  if (category === "menu") return "cp.noMenus";
+  if (category === "layout") return layoutsUnavailable ? "cp.noLayoutsAccount" : "cp.noLayouts";
+  return "cp.nothing";
 }
 
 function TypeMark({ category }: { category: PickerEntry["category"] }) {

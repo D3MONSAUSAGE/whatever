@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import type { DisplayItem } from "@/lib/api";
 import { replaceNotes, screenChoices, shouldOfferScreens } from "@/lib/show-on-screens";
@@ -56,8 +57,10 @@ describe("Brand Kit: a save always leaves a visible result (QA r7)", () => {
   it("shows a persistent success or error line next to Save brand, never only a toast", () => {
     const kit = readFileSync("components/brand-kit.tsx", "utf8");
     expect(kit).toMatch(/data-testid="brand-save-result"/);
-    expect(kit).toMatch(/setSaveResult\(\{ ok: true, text: `Brand saved at/);
-    expect(kit).toMatch(/const message = \(err as Error\)\?\.message \|\| "Couldn't save your brand\. Try again\.";[\s\S]*?setSaveResult\(\{ ok: false, text: message \}\)/);
+    expect(kit).toMatch(/setSaveResult\(\{ ok: true, text: t\("bk\.savedAt"/); // I18N-3
+    expect(en["bk.savedAt"]).toBe("Brand saved at {time}.");
+    expect(kit).toMatch(/const message = \(err as Error\)\?\.message \|\| t\("bk\.saveFailed"\);[\s\S]*?setSaveResult\(\{ ok: false, text: message \}\)/);
+    expect(en["bk.saveFailed"]).toBe("Couldn't save your brand. Try again.");
     expect(kit).toMatch(/setSaveResult\(\{ ok: false, text: payload\.error \}\)/);
   });
 });

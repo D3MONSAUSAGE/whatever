@@ -206,8 +206,10 @@ describe("web Brand Kit and Account hub (no bulk apply)", () => {
     expect(kit).not.toContain("Apply to all menus and promos");
     expect(kit).not.toContain("/api/brand/apply");
     expect(kit).not.toContain("applyAll");
-    expect(kit).toContain("Save brand");
-    expect(kit).toContain("aria-label=\"Brand preview\"");
+    expect(kit).toContain('t("bk.save")'); // I18N-3
+    expect(en["bk.save"]).toBe("Save brand");
+    expect(kit).toContain('aria-label={t("bk.previewAria")}');
+    expect(en["bk.previewAria"]).toBe("Brand preview");
     expect(layout).not.toContain("/api/brand/apply");
     expect(classic).not.toContain("/api/brand/apply");
     expect(layout).toContain(">Apply brand<");
