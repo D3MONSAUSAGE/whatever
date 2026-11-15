@@ -1891,6 +1891,13 @@ export const en = {
   "toast.dismiss": "Dismiss",
   "toast.open": "Open",
   "common.required": "Please fill out this field.",
+  // R13-01: player error sentences shown on the dashboard (the player itself is unchanged).
+  "perr.stalled": "This video stalled.",
+  "perr.cantPlay": "This video can't play on this TV.",
+  "perr.noStart": "This video did not start in time.",
+  "perr.autoplay": "This video was blocked from autoplaying.",
+  "perr.slideSkipped": "A slide did not load and was skipped.",
+  "perr.boardStill": "The video in this board did not start. The still image is showing.",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -1865,7 +1865,7 @@ export const es: Record<MessageKey, string> = {
   "lo.two-column.blurb": "Dos columnas de menú que se editan por separado en un mismo diseño 16:9.",
   "lo.menu-promo.name": "Menú + imagen o video promocional",
   "lo.menu-promo.blurb": "Un menú junto a un área promocional.",
-  "lo.two-menu-promo.name": "Dos menús + promoción",
+  "lo.two-menu-promo.name": "Menú de dos columnas + promoción",
   "lo.two-menu-promo.blurb": "Dos columnas de menú y un área promocional, aproximadamente 35% / 35% / 30%.",
   "lo.triple-column.name": "Tres columnas",
   "lo.triple-column.blurb": "Tres columnas de texto del menú. Puede poner una foto detrás del diseño.",
@@ -1880,4 +1880,11 @@ export const es: Record<MessageKey, string> = {
   "toast.dismiss": "Cerrar",
   "toast.open": "Abrir",
   "common.required": "Complete este campo.",
+  // R13-01: player error sentences shown on the dashboard (the player itself is unchanged).
+  "perr.stalled": "Este video se detuvo.",
+  "perr.cantPlay": "Este video no se puede reproducir en esta TV.",
+  "perr.noStart": "Este video no empezó a tiempo.",
+  "perr.autoplay": "La TV bloqueó la reproducción automática de este video.",
+  "perr.slideSkipped": "Una diapositiva no cargó y se omitió.",
+  "perr.boardStill": "El video de este diseño no empezó. Se muestra la imagen fija.",
 };

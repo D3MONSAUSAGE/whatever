@@ -47,11 +47,11 @@ export function stillUrl(fileName?: string | null, url?: string | null): string 
   return url;
 }
 
-function assignedName(display: DisplayItem): string {
+function assignedName(display: DisplayItem, t: T): string {
   if (display.media) return display.media.fileName;
   if (display.playlist) return display.playlist.name;
-  if (!display.connected) return "Waiting for the TV to finish pairing";
-  return "No content assigned";
+  if (!display.connected) return t("tv.waitingPairing");
+  return t("tv.noContent");
 }
 
 /**
@@ -62,8 +62,9 @@ function assignedName(display: DisplayItem): string {
  * A presentation playlist's first item is often the PPTX itself (the API signs
  * storage_path, not thumbnail_path, for non-video media); that URL is not a still.
  */
-export function assignedContentPreview(display: DisplayItem): AssignedPreview {
-  const name = assignedName(display);
+export function assignedContentPreview(display: DisplayItem, t: T = EN): AssignedPreview {
+  // R13-02: the status names (not customer names) follow the UI language; English is unchanged.
+  const name = assignedName(display, t);
   if (display.boardPreviewUrl) {
     // Rendered menu-board PNGs come from the menus pipeline. Keep a signed path
     // even when it has no extension, but never use a video or PPTX as an <img>.
