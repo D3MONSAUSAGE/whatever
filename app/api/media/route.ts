@@ -7,6 +7,7 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { usageByMedia } from "@/lib/server/media-usage";
 import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
 import { enforceLimit, fail, json } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 const MEDIA_COLUMNS = "id, file_name, storage_path, size_bytes, created_at";
 const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path, source_media_id, slide_index`;
@@ -33,7 +34,7 @@ async function loadMediaRows(accountId: string, columns: string, plainColumns: s
 const isMenuFile = (name: string) => name.endsWith("(menu).png");
 const isPromoFile = (name: string) => name.endsWith("(promo).png");
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const query = parseListQuery(req);
@@ -152,7 +153,7 @@ export async function GET(req: Request) {
   });
   if (!page) return json(items);
   return json({ items, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
-}
+});
 
 type GroupMeta = {
   processing_status?: string | null;
@@ -181,7 +182,7 @@ type MediaRow = {
   slide_index?: number | null;
 };
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -232,4 +233,4 @@ export async function POST(req: Request) {
     return fail("Upload failed. Try again.", 500);
   }
   return json({ id }, 201);
-}
+});

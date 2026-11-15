@@ -6,12 +6,13 @@ import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
 import { replaceMembers } from "../members";
 import { parseDisplayIds } from "@/lib/server/screen-groups";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -56,9 +57,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   if (!("name" in body) && !("displayIds" in body)) return fail("Nothing to update.", 400);
   return json({ ok: true });
-}
+});
 
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -70,4 +71,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
   }
   if (!(deleted.data ?? []).length) return fail("Screen group not found.", 404);
   return json({ ok: true });
-}
+});

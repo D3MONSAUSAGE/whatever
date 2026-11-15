@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { en } from "@/lib/i18n/en";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { existsSync, readFileSync } from "node:fs";
@@ -211,14 +212,13 @@ describe("web Brand Kit and Account hub (no bulk apply)", () => {
     expect(classic).not.toContain("/api/brand/apply");
     expect(layout).toContain(">Apply brand<");
     expect(layout).toContain("{!menuId ? (");
-    expect(account).toContain("Contact support");
+    expect(en["acct.support.action"]).toBe("Contact support"); // I18N-2: card copy lives in the dictionary
     expect(account).not.toContain("Open support");
     expect(account).not.toContain("ContactBlock");
     expect(account).not.toContain("ManageBilling");
     expect(account).toContain("btn btn-primary min-h-11 mt-auto");
-    for (const action of ["Open settings", "Open Brand Kit", "Open billing", "Contact support"]) {
-      expect(account).toContain(action);
-    }
+    expect(account).toContain("t(`acct.${card.id}.action`)");
+    expect(["settings", "brand", "billing", "support"].map((id) => en[`acct.${id}.action` as keyof typeof en])).toEqual(["Open settings", "Open Brand Kit", "Open billing", "Contact support"]);
   });
 });
 

@@ -4,12 +4,13 @@ import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
 import { signAll } from "@/lib/server/paging";
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Layout boards only. Classic menus stay on GET /api/menus. */
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   if (!layoutStudioEnabled()) return fail("Not found", 404);
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -44,4 +45,4 @@ export async function GET(req: Request) {
       };
     }),
   });
-}
+});

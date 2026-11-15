@@ -4,6 +4,7 @@ import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS } from "@/lib/server/limits";
 import { PROMOS_UNAVAILABLE, PROMO_COLUMNS, attachPromo, detachPromo, isMissingSchema, type PromoRow } from "@/lib/server/promos";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ async function load(accountId: string, id: string) {
 }
 
 /** One tap: add the promo to a menu board (always on, or between its dates). */
-export async function POST(req: Request, { params }: Ctx) {
+export const POST = withLocalizedErrors(async function POST(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -32,10 +33,10 @@ export async function POST(req: Request, { params }: Ctx) {
   const r = await attachPromo(admin.accountId, found.row, body.menuId);
   if (!("ok" in r)) return fail(r.error, r.status);
   return json({ mode: r.mode, screens: r.screens });
-}
+});
 
 /** One tap: take the promo off its menu. The menu itself keeps playing. */
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -44,4 +45,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (found.error) return found.error;
   if (!(await detachPromo(admin.accountId, found.row))) return fail("Couldn't take the promo off the menu. If it's the only slide left, add something else first.", 500);
   return json({ ok: true });
-}
+});

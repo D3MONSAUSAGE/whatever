@@ -6,13 +6,14 @@ import {
   DAY, buildUptime, coverageStart, expectedFor, isErr, isOnline, loadDisplays, locationZones, offlineHistory, playbackStatus, uptimeDaily,
 } from "@/lib/server/analytics";
 import { analyticsFail } from "@/lib/server/analytics-routes";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(req: Request, { params }: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -65,4 +66,4 @@ export async function GET(req: Request, { params }: Ctx) {
       history: ((events.data ?? []) as { version: number; at: string }[]).map((x) => ({ version: Number(x.version), at: x.at })),
     },
   });
-}
+});

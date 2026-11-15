@@ -7,6 +7,7 @@ import { CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE, CREATE_WIND
 import { parseScheduleBody, type ScheduleDraft } from "@/lib/server/schedule";
 import { assertTarget } from "@/lib/server/schedule-target";
 import { DAY_PART_PRIORITY } from "@/lib/day-part-sources";
+import { withLocalizedErrors } from "@/lib/server/locale";
 const DAY_PART_MAX = 6;
 const MAX_SCHEDULES = 200;
 
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
  * Breakfast / lunch / dinner in one step. Each part becomes an ordinary row in
  * the existing schedules table. A part can name a playlist or a menu board.
  */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -66,4 +67,4 @@ export async function POST(req: Request) {
   }))).select("id");
   if (inserted.error) return isMissingSchema(inserted.error) ? fail(SCHEDULES_UNAVAILABLE_TEXT, 503) : fail("Couldn't add the schedule.", 500);
   return json({ ids: (inserted.data ?? []).map((r) => r.id) }, 201);
-}
+});

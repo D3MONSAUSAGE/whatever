@@ -18,6 +18,7 @@ import { completeGroupedUpload, deckErrorMessage, readCompleteOptions } from "@/
 import { UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { normalizePlaybackMode, normalizePlaylistName } from "@/lib/server/validate";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export const maxDuration = 300;
 
 const PPTX_COMPLETE_MAX_PER_USER = 10;
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
   if (format?.ext === "pdf") return fail(GROUPS_UNAVAILABLE, 503);
   if (!(await presentationSchemaReady())) return fail(PRESENTATION_UNAVAILABLE, 503);
   return completeLegacyPptx(admin.accountId, mediaId, body);
-}
+});
 
 /** Pre-0019 behavior: one image per slide and an optional per-slide playlist. */
 async function completeLegacyPptx(accountId: string, mediaId: string, body: Record<string, unknown>) {

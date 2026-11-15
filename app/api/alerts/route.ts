@@ -3,12 +3,13 @@ import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { ALERTS_UNAVAILABLE, toAlert, type AlertRow } from "@/lib/server/alerts";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Alerts feed, newest first. ?limit=1..100 (default 20) &before=ISO &unread=1
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const params = new URL(req.url).searchParams;
@@ -35,4 +36,4 @@ export async function GET(req: Request) {
     unread: unread.count ?? 0,
     nextBefore: rows.length > limit ? page[page.length - 1].at : null,
   });
-}
+});

@@ -5,12 +5,13 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { onboardingState } from "@/lib/server/onboarding";
 import { maybeSendWelcome } from "@/lib/server/welcome-email";
 import { after } from "next/server";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Shared setup progress for the website and the mobile app. Derived from real data.
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const state = await onboardingState(admin.accountId, admin.email);
@@ -19,10 +20,10 @@ export async function GET(req: Request) {
   const welcome = () => maybeSendWelcome(admin).then(() => undefined);
   try { after(welcome); } catch { void welcome(); }
   return json(state);
-}
+});
 
 // { dismissed: boolean } hides or shows the tracker; { confirmBusiness: true } completes the business step.
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -41,4 +42,4 @@ export async function POST(req: Request) {
   const state = await onboardingState(admin.accountId, admin.email);
   if (state === "error") return fail("Couldn't load your setup progress.", 500);
   return json(state);
-}
+});

@@ -9,12 +9,13 @@ import { GROUPS_UNAVAILABLE, deckFormat, groupSourcePath, presentationGroupsRead
 import { deckErrorMessage } from "@/lib/server/presentation-upload";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Hands the browser a signed upload URL for a .pptx or PDF (body never hits this function). */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const groups = await presentationGroupsReady();
@@ -52,4 +53,4 @@ export async function POST(req: Request) {
     signedUrl: signed.data.signedUrl,
     mimeType: format.mime,
   }, 201);
-}
+});

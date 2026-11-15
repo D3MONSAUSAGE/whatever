@@ -1,4 +1,5 @@
 import { en, es, type MessageKey } from "@/lib/i18n/index";
+import { apiMessageEs } from "@/lib/i18n/api-messages";
 import { localeFromAcceptLanguage, toLocale, type Locale } from "@/lib/i18n/locales";
 
 /**
@@ -60,6 +61,12 @@ export function messageFor(code: string, englishMessage: string, locale: Locale)
   return locale === "es" ? es[key] : en[key];
 }
 
+/** Text for a generic-code message in the given locale; null when the exact English text isn't known. */
+export function textForMessage(englishMessage: string, locale: Locale): string | null {
+  if (locale === "en") return englishMessage;
+  return apiMessageEs(englishMessage);
+}
+
 export function requestLocale(req: Request): Locale {
   return localeFromAcceptLanguage(req.headers.get("accept-language"));
 }
@@ -77,14 +84,17 @@ export async function localizeError(req: Request, res: Response, accountLocale?:
   try { body = await res.clone().json(); } catch { return res; }
   if (!body || typeof body !== "object") return res;
   const { error, code } = body as { error?: unknown; code?: unknown };
-  if (typeof error !== "string" || typeof code !== "string" || !isSpecificCode(code)) return res;
+  if (typeof error !== "string" || typeof code !== "string") return res;
+  // The catalog text for the code first; otherwise an exact known message (I18N-2). The code never changes.
+  const known = (isSpecificCode(code) && messageFor(code, error, "es") !== null) || apiMessageEs(error) !== null;
+  if (!known) return res;
   let locale: Locale | null = null;
   if (accountLocale) {
     try { locale = await accountLocale(req); } catch { locale = null; }
   }
   locale = toLocale(locale ?? requestLocale(req));
   if (locale === "en") return res;
-  const text = messageFor(code, error, locale);
+  const text = messageFor(code, error, locale) ?? textForMessage(error, locale);
   if (!text) return res;
   const headers = new Headers(res.headers);
   headers.delete("content-length");

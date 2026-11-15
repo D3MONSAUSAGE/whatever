@@ -5,11 +5,12 @@ import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
 import { fetchAll, inChunks, matches, pageOf, parseListQuery } from "@/lib/server/paging";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -106,7 +107,7 @@ export async function GET(req: Request) {
     }));
   if (!page) return json(out);
   return json({ items: out, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
-}
+});
 
 async function draftThumbnails(accountId: string, mediaIds: string[]) {
   const ids = [...new Set(mediaIds)];
@@ -142,7 +143,7 @@ async function draftThumbnails(accountId: string, mediaIds: string[]) {
   return result;
 }
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -168,4 +169,4 @@ export async function POST(req: Request) {
     return fail("Couldn't create the playlist.", 500);
   }
   return json({ id: data.id }, 201);
-}
+});

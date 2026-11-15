@@ -2,6 +2,7 @@ import { fail, json, readJson } from "@/lib/server/http";
 import { requireAdmin } from "@/lib/server/auth";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
 import { loadLayoutStudio, saveLayoutForAccount } from "@/lib/server/layout-boards";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,17 +11,17 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /** Account load. Refuses before any database call unless LAYOUT_STUDIO is exactly "1". */
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   if (!layoutStudioEnabled()) return fail("Not found", 404);
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const loaded = await loadLayoutStudio(admin.accountId);
   if (loaded.status !== 200) return fail(loaded.error, loaded.status);
   return json({ boards: loaded.boards, legacy: loaded.legacy, library: loaded.library });
-}
+});
 
 /** Account save. Refuses before any database call unless LAYOUT_STUDIO is exactly "1". */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (!layoutStudioEnabled()) return fail("Not found", 404);
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -41,4 +42,4 @@ export async function POST(req: Request) {
     const message = err instanceof Error && err.message.startsWith("Couldn't") ? err.message : "Couldn't save the board.";
     return fail(message, 500);
   }
-}
+});

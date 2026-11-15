@@ -6,13 +6,14 @@ import { CREATE_GROUP_MAX_PER_USER, CREATE_GROUP_RATE_MESSAGE, CREATE_WINDOW_SEC
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { replaceMembers } from "./members";
 import { parseDisplayIds } from "@/lib/server/screen-groups";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_GROUPS = 100;
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const groups = await db()
@@ -45,9 +46,9 @@ export async function GET(req: Request) {
     displayIds: byGroup.get(String(group.id)) ?? [],
     updatedAt: group.updated_at,
   })));
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -87,4 +88,4 @@ export async function POST(req: Request) {
     if (saved === "error") return fail("Couldn't add the group.", 500);
   }
   return json({ id: inserted.data.id }, 201);
-}
+});

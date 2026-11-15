@@ -5,6 +5,7 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { ALERTS_UNAVAILABLE, THRESHOLD_MAX, THRESHOLD_MIN } from "@/lib/server/alerts";
 import { emailProvider } from "@/lib/server/email";
 import { pushSender } from "@/lib/server/push";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,16 +32,16 @@ function schemaFail(error: { message: string; code?: string }) {
   return fail(missing ? ALERTS_UNAVAILABLE : "Couldn't load alert settings.", missing ? 503 : 500);
 }
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const r = await load(admin.accountId, admin.email);
   if ("error" in r && r.error) return schemaFail(r.error);
   return json(r.prefs);
-}
+});
 
 // { enabled?: boolean, thresholdMinutes?: 2..1440, emailEnabled?: boolean, pushEnabled?: boolean }
-export async function PATCH(req: Request) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -70,4 +71,4 @@ export async function PATCH(req: Request) {
   const r = await load(admin.accountId, admin.email);
   if ("error" in r && r.error) return schemaFail(r.error);
   return json(r.prefs);
-}
+});

@@ -3,20 +3,21 @@ import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { checkArtMedia, getBrand, putBrand } from "@/lib/server/brand";
 import { parseBrandPut } from "@/lib/brand-kit";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const brand = await getBrand(admin.accountId);
   if (brand === "error") return fail("Couldn't load your brand.", 500);
   return json(brand);
-}
+});
 
 /** Save the account's brand. Column-only merge: a present null clears, an absent key is left untouched. An empty {} is 400 (Android +13 always sends {primaryColor, accentColor, logoMediaId}). Existing menus change when "Apply to all menus" runs. */
-export async function PUT(req: Request) {
+export const PUT = withLocalizedErrors(async function PUT(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -34,4 +35,4 @@ export async function PUT(req: Request) {
   const saved = await putBrand(admin.accountId, body);
   if (!saved.ok) return fail(saved.error, saved.status);
   return json(saved.brand);
-}
+});

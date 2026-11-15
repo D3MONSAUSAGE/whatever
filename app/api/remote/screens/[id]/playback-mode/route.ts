@@ -5,6 +5,7 @@ import { normalizePlaybackMode } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { displayAccess, loadRemoteScreen } from "@/lib/server/remote";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * Returns the updated screen state. Updates that playlist's published mode
  * (every screen on the same playlist picks up the change).
  */
-export async function POST(req: Request, { params }: Ctx) {
+export const POST = withLocalizedErrors(async function POST(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -47,4 +48,4 @@ export async function POST(req: Request, { params }: Ctx) {
   const loaded = await loadRemoteScreen(admin.accountId, id);
   if (!loaded.ok) return fail("Couldn't load screen state.", 500);
   return json({ ok: true, playbackMode: mode, screen: loaded.screen });
-}
+});

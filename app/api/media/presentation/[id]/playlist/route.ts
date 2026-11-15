@@ -7,6 +7,7 @@ import { createGroupPlaylist } from "@/lib/server/presentation-upload";
 import { PLAYLIST_MAX_ITEMS } from "@/lib/server/limits";
 import { normalizePlaybackMode, normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
  * Without `asGroup: true` this matches the original upload: a published playlist
  * with one item per slide. The website sends `asGroup: true` for one draft item.
  */
-export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+export const POST = withLocalizedErrors(async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const groups = await presentationGroupsReady();
@@ -66,7 +67,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const created = await createGroupPlaylist(admin.accountId, id, name, playbackMode, duration);
   if (!created) return fail("Couldn't create a playlist from that presentation.", 400);
   return json({ id: created, playbackMode, asGroup: true }, 201);
-}
+});
 
 async function appendGroup(accountId: string, playlistId: string, mediaId: string, durationMs: number) {
   const playlist = await db().from("playlists").select("id").eq("id", playlistId).eq("account_id", accountId).maybeSingle();

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { en } from "@/lib/i18n/en";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -227,8 +228,11 @@ describe("server-derived online status and preview fixtures", () => {
     expect(preview).toContain('id: "screen-bar"');
     expect(preview).toContain("online: false");
     const screens = readFileSync("components/my-screens.tsx", "utf8");
-    expect(screens).toContain("This screen is offline. You can still change content; the TV updates when it comes back online.");
-    expect(screens).toContain("This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.");
+    // I18N-2: copy lives in the dictionary.
+    expect(screens).toContain('t("screens.offlineCard")');
+    expect(screens).toContain('t("screens.offlineHelp")');
+    expect(en["screens.offlineCard"]).toBe("This screen is offline. You can still change content; the TV updates when it comes back online.");
+    expect(en["screens.offlineHelp"]).toBe("This screen is offline. Check that the TV is on, joined to Wi-Fi, and still open on the Pekko player.");
     expect(screens).toContain("display.connected && !display.online");
     expect(screens).toContain("heartbeatText(display, t)"); // E5-F2: no heartbeat claim without a TV
     expect(screens).toContain("<Status display={display} />");
@@ -259,12 +263,12 @@ describe("publish copy for offline targets across every leftover toast", () => {
     const displays = readFileSync("components/displays-screen.tsx", "utf8");
     const group = readFileSync("components/group-publish.tsx", "utf8");
     const studio = readFileSync("components/layout-studio.tsx", "utf8");
-    expect(displays).toContain("publishSavedCopyForTargets(targets)");
-    expect(displays).toContain("publishTimingCopy(display)");
-    expect(displays).toContain("publishSavedCopy(display)");
+    expect(displays).toContain("publishSavedCopyForTargets(targets, t)"); // I18N-2: helpers take the translator
+    expect(displays).toContain("publishTimingCopy(display, t)");
+    expect(displays).toContain("publishSavedCopy(display, t)");
     expect(displays).not.toContain("TV updates within ~30 s");
     expect(displays).not.toContain("The TV updates within about 10 seconds.");
-    expect(group).toContain("publishSavedCopyForTargets(targets)");
+    expect(group).toContain("publishSavedCopyForTargets(targets, t)");
     expect(group).not.toContain("TVs update within about 30 seconds.");
     expect(studio).toContain("publishSavedCopy({");
     expect(studio).not.toContain("TV updates within ~30 s");

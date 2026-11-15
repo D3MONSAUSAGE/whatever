@@ -4,6 +4,7 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { isValidTimeZone, ruleFromRow, scheduleNow, type ScheduleRule } from "@/lib/server/schedule";
 import { upcomingAcrossScreens, type OverviewRule } from "@/lib/server/schedule-overview";
 import { fail, json } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const COLUMNS = "id, name, playlist_id, display_id, group_id, weekdays, start_minute, end_minute, starts_on, ends_on, priority, updated_at, enabled";
 
 /** Next 7 to 14 days for every screen, using buildTimeline. */
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const days = Number(new URL(req.url).searchParams.get("days") || "14");
@@ -60,4 +61,4 @@ export async function GET(req: Request) {
     until: until.toISOString(),
     items: upcomingAcrossScreens(screens, rules, names, from, until),
   });
-}
+});
