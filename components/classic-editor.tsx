@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { api, authToken, type DisplayItem, type MediaItem } from "@/lib/api";
 import { MENU_LIMITS, MENU_TEMPLATES, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
-import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/lib/menu-board-unify";
+import { classicPreviewHits, hasUnsavedEdits } from "@/lib/menu-board-unify";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
-import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
+import { StudioGuardedLink, useConfirmDiscard, useRegisterStudioLeave } from "@/components/studio-leave";
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
@@ -211,10 +211,10 @@ export function ClassicEditor({
     return hasUnsavedEdits(current, baseline.current);
   }
   useRegisterStudioLeave(isDirty);
+  const confirmDiscard = useConfirmDiscard();
 
   function requestClose() {
-    if (!confirmDiscardUnsaved(isDirty())) return;
-    setDraft(null);
+    confirmDiscard(isDirty(), () => setDraft(null));
   }
 
   function goPreview() {

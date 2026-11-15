@@ -109,9 +109,10 @@ export async function FaqList({ limit }: { limit?: number }) {
       {ids.map((id) => {
         const k = faqKeys(id);
         return (
-          <details key={id} className="card p-5 group" lang={englishOnly(k.a)}>
+          <details key={id} className="card p-5 group" data-testid={`faq-${id}`}>
             <summary className="font-semibold cursor-pointer">{t(k.q)}</summary>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{t(k.a, FAQ_VARS)}</p>
+            {/* Billing answers stay English (pending the reviewed courtesy translation); only the answer is marked en. */}
+            <p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a)}>{t(k.a, FAQ_VARS)}</p>
           </details>
         );
       })}

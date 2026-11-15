@@ -26,7 +26,7 @@ export const en = {
   "common.englishOnlyNote": "Billing details are shown in English.",
 
   // Brand
-  "brand.tagline": "making life simpler every day.",
+  "brand.tagline": "Digital signage made simple",
   "brand.homeLabel": "Pekko home",
   "brand.footerTagline": "Simple digital signage for your business.",
 
@@ -208,6 +208,7 @@ export const en = {
   // Error pages
   "error.notFoundTitle": "Page not found",
   "error.notFoundBody": "That page doesn't exist, or it moved.",
+  "error.goHome": "Go to the home page",
   "error.title": "Something went wrong",
   "error.body": "This page hit a problem. Your screens keep playing. Try again, and if it keeps happening, tell support.",
   "error.bodyCode": "This page hit a problem. Your screens keep playing. Try again, and if it keeps happening, tell support the code {code}.",
@@ -257,6 +258,8 @@ export const en = {
   "auth.linkType": "This kind of email link isn't used by Pekko. Sign in, or ask for a new password reset link.",
   "auth.linkIncomplete": "The link is incomplete. Open it straight from the email, or ask for a new one.",
   "auth.sendNewResetLink": "Send a new reset link",
+  "auth.confirmResendLede": "Confirmation links expire. Enter your email and we'll send a new one.",
+  "auth.confirmResendOr": "Trying to reset your password instead?",
   "auth.signInUnavailable": "Sign-in isn't available on this site right now.",
   "auth.checking": "Checking…",
   "auth.confirm.signup.title": "Confirm your email",
@@ -347,6 +350,12 @@ export const en = {
   "showOnScreens.replacesOn": "Replaces {current} on {screen}.",
   "showOnScreens.nothingYet": "{screen} isn't set to show anything yet.",
   "media.renamed": "Renamed to {name}",
+
+  // I18N-1F: menu editor leave guard (Classic and Studio). Spanish matches Android (Gother).
+  "leaveGuard.title": "Discard unsaved changes?",
+  "leaveGuard.body": "You have unsaved changes. If you leave this menu board, those edits will be lost.",
+  "leaveGuard.keepEditing": "Keep editing",
+  "leaveGuard.discard": "Discard changes",
 } as const;
 
 export type MessageKey = keyof typeof en;

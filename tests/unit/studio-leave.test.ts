@@ -15,6 +15,8 @@ describe("studio leave guard", () => {
     expect(source).toContain("useRegisterStudioLeave");
     expect(source).not.toContain("app/api");
     expect(source).toContain('target === "_blank"');
-    expect(source).toContain("useMemo(() => ({ register, allowLeave }), [register, allowLeave])");
+    expect(source).toContain("useMemo(() => ({ register, requestLeave, anyDirty, navigate, confirmDiscard })");
+    // I18N-1F: an in-app dialog through t(), not a raw English window.confirm.
+    expect(source).toContain("discardRequest(tRef.current)");
   });
 });

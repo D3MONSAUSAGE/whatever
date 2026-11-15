@@ -197,7 +197,8 @@ export function hasUnsavedEdits(current: unknown, baseline: unknown): boolean {
   return JSON.stringify(current) !== JSON.stringify(baseline);
 }
 
-export const DISCARD_UNSAVED_MESSAGE = "You have unsaved changes. If you leave this board, those edits will be lost.";
+/** English copy of the leave guard (the UI uses t("leaveGuard.body"); see components/studio-leave.tsx). */
+export const DISCARD_UNSAVED_MESSAGE = "You have unsaved changes. If you leave this menu board, those edits will be lost.";
 
 /**
  * A simple confirm before dropping unsaved edits. Returns true when it is safe to proceed.
