@@ -1775,6 +1775,14 @@ export const en = {
   "ptpl.happy.blurb": "Bold colour with a big price tag.",
   "ptpl.deal.blurb": "Bright and clean. Great for 2-for-1s and combos.",
   "ptpl.special.blurb": "Dark and elegant. Made for a photo of the dish.",
+
+  // I18N-3: Layout Studio panel titles
+  "ls.contentText": "Content & text",
+  "ls.imagesVideo": "Images & video",
+
+  // I18N-3: Schedules page, more
+  "ss.newGroupScreens": "Screens in this new group",
+  "ss.endMidnight": "End at midnight (24:00)",
 } as const;
 
 export type MessageKey = keyof typeof en;

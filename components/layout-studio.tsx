@@ -903,11 +903,11 @@ export function LayoutStudio({
               <ZonePicker template={template} frame={frame} zone={zone} onSelect={openZone} />
             </details>
             <details className="studio-panel" open>
-              <summary className="studio-panel-summary">Content &amp; text</summary>
+              <summary className="studio-panel-summary">{t("ls.contentText")}</summary>
               <BoardText draft={draft} update={update} />
             </details>
             <details className="studio-panel">
-              <summary className="studio-panel-summary">Images &amp; video</summary>
+              <summary className="studio-panel-summary">{t("ls.imagesVideo")}</summary>
               <p className="zone-help">{t("ls.selectMediaBoard")}</p>
             </details>
           </div>

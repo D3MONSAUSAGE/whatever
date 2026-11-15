@@ -329,7 +329,7 @@ function Groups({
         <label className="text-sm font-semibold">{t("ss.groupName")}
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
         </label>
-        <DisplayChecks displays={displays} picked={picked} onChange={setPicked} legend="Screens in this new group" />
+        <DisplayChecks displays={displays} picked={picked} onChange={setPicked} legend={t("ss.newGroupScreens")} />
         <LimitNote count={groups?.length} max={100} noun="screen groups" />
         <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(groups?.length, 100)}>{t("ss.createGroup")}</button>
       </form>
@@ -531,7 +531,7 @@ function Rules({
         </div>
         <label className="flex items-center gap-2 min-h-11 text-sm">
           <input type="checkbox" checked={untilMidnight} onChange={(event) => setUntilMidnight(event.target.checked)} />
-          End at midnight (24:00)
+          {t("ss.endMidnight")}
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-semibold">{t("ss.startsOn")}

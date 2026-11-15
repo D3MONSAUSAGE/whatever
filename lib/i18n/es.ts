@@ -1764,4 +1764,12 @@ export const es: Record<MessageKey, string> = {
   "ptpl.happy.blurb": "Color intenso con un precio grande.",
   "ptpl.deal.blurb": "Luminosa y limpia. Ideal para 2x1 y combos.",
   "ptpl.special.blurb": "Oscura y elegante. Hecha para una foto del platillo.",
+
+  // I18N-3: Layout Studio panel titles
+  "ls.contentText": "Contenido y texto",
+  "ls.imagesVideo": "Imágenes y video",
+
+  // I18N-3: Schedules page, more
+  "ss.newGroupScreens": "Pantallas de este grupo nuevo",
+  "ss.endMidnight": "Terminar a la medianoche (24:00)",
 };
