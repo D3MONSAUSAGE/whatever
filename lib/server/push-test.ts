@@ -24,10 +24,11 @@ export function testPushFor(locale: Locale): Omit<PushMessage, "token"> {
  */
 export async function sendTestPush(admin: Admin, body: Record<string, unknown>, senderOverride?: PushSender | null) {
   if (Object.keys(body).length) return fail("Send an empty JSON body {}.", 400);
-  const limited = await enforceLimit(`push-test:${admin.userId}`, 3600, PUSH_TEST_MAX_PER_HOUR, PUSH_TEST_LIMITED);
-  if (limited) return limited;
+  // Gother #127 LOW: check push is configured before counting the attempt, so a 503 never uses up a slot.
   const sender = senderOverride === undefined ? pushSender() : senderOverride;
   if (!sender) return fail(PUSH_UNAVAILABLE, 503);
+  const limited = await enforceLimit(`push-test:${admin.userId}`, 3600, PUSH_TEST_MAX_PER_HOUR, PUSH_TEST_LIMITED);
+  if (limited) return limited;
   const r = await db().from("push_devices").select("id, token").eq("user_id", admin.userId);
   if (r.error) return isMissingSchema(r.error) ? fail(PUSH_UNAVAILABLE, 503) : fail("Couldn't send a test notification.", 500);
   const devices = (r.data ?? []) as { id: string; token: string }[];

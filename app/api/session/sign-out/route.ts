@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST /api/session/sign-out, called BEFORE the Supabase sign-out (needs the session).
+// It only clears push devices; it does NOT end the session. The client must still sign out.
 // {scope:"global"} deletes all of the caller's push_devices rows. {scope:"local", token} deletes that token only;
 // {scope:"local"} with no token removes nothing. DELETE /api/devices(/:token) is unchanged and still works.
 export const POST = withLocalizedErrors(async function POST(req: Request) {
