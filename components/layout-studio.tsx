@@ -786,7 +786,6 @@ export function LayoutStudio({
 
   function renderStage(interactive: boolean) {
     return (
-      <>
       <Stage
         svg={previewMarkup}
         video={showZone ? videoBox : null}
@@ -796,12 +795,6 @@ export function LayoutStudio({
         active={zone}
         onHit={interactive ? openZone : () => undefined}
       />
-      {clipped.length ? (
-        <p className="note-warn text-sm" role="status" data-testid="clipped-names" style={{ marginTop: 8 }}>
-          {t("ls.clippedNames", { names: clipped.map((name) => `“${name}”`).join(", ") })}
-        </p>
-      ) : null}
-      </>
     );
   }
   const editorPlacement = zoneEditorPlacement(zone, studioBp);
@@ -1025,6 +1018,11 @@ export function LayoutStudio({
           <div className="studio-canvas-stage">
             {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
           </div>
+          {(studioBp !== "phone" || step === "preview") && clipped.length ? (
+            <p className="note-warn text-sm" role="status" data-testid="clipped-names" style={{ marginTop: 8 }}>
+              {t("ls.clippedNames", { names: clipped.map((name) => `“${name}”`).join(", ") })}
+            </p>
+          ) : null}
           {studioBp !== "phone" ? (
             <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label={t("ls.areaControls")} tabIndex={0}>
               {editorPlacement === "canvas"
