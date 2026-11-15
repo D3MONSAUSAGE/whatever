@@ -85,7 +85,7 @@ describe("published legal pages", () => {
     expect(joined).not.toContain("docs/legal");
     expect(readFileSync("components/site/site-footer.tsx", "utf8")).toContain('"/terms#billing"');
     expect(readFileSync("app/login/page.tsx", "utf8")).toContain('data-testid="signup-legal"');
-    expect(readFileSync("app/dashboard/billing/page.tsx", "utf8")).toContain("<BillingDisclosure");
+    expect(readFileSync("app/dashboard/billing/page.tsx", "utf8")).toMatch(/<(Localized)?BillingDisclosure/);
     expect(readFileSync("components/site/sections.tsx", "utf8")).toContain("<BillingDisclosure");
     expect(readFileSync("lib/legal.ts", "utf8")).not.toMatch(/STRIPE_LIVE_ENABLED|BILLING_ENFORCE|BILLING_REMINDERS|process\.env/);
   });

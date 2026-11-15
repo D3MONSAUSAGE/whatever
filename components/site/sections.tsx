@@ -79,11 +79,12 @@ export async function PricingCards({ testPrefix = "plan", canBuy }: { testPrefix
 }
 
 /**
- * Trial and billing terms. English only until the reviewed Spanish courtesy translation lands
- * (Francisco t278: batch (c)/(d), with "the English version governs"). Spanish visitors see a note.
+ * Trial and billing terms. Spanish visitors get the approved courtesy translation (TrialDetailsEs),
+ * whose disclosure carries the "the English version governs" notice. English output is unchanged.
  */
 export async function TrialDetails() {
   const locale = await getLocale();
+  if (locale === "es") return <TrialDetailsEs />;
   const t = await getT();
   return (
     <div className="mt-8 card p-6 text-sm grid gap-2" data-testid="trial-details" lang="en">
@@ -93,6 +94,19 @@ export async function TrialDetails() {
       <p>When the trial ends, your screens keep playing for 3 more days. If you don&apos;t choose a plan, they pause. Your content and settings are kept, and choosing a plan turns them back on.</p>
       <p>Prices are in US dollars, billed monthly. Taxes may apply. These pages do not set a tax rate.</p>
       <BillingDisclosure />
+    </div>
+  );
+}
+
+/** Spanish courtesy translation of TrialDetails (locale "es" only). Days and screens come from the same constants. */
+function TrialDetailsEs() {
+  return (
+    <div className="mt-8 card p-6 text-sm grid gap-2" data-testid="trial-details" lang="es">
+      <h3 className="font-semibold text-base">Cómo funciona la prueba</h3>
+      <p>Su prueba de {TRIAL.days} días comienza cuando crea su cuenta e incluye todas las funciones en hasta {TRIAL.screens} pantallas, la experiencia completa de Multi-screen. No le pedimos tarjeta.</p>
+      <p>Cuando termina la prueba, sus pantallas siguen reproduciendo durante 3 días más. Si no selecciona un plan, se pausan. Su contenido y configuración se conservan, y al seleccionar un plan se vuelven a activar.</p>
+      <p>Los precios están en dólares estadounidenses y se facturan mensualmente. Pueden aplicarse impuestos. Estas páginas no fijan una tasa de impuestos.</p>
+      <BillingDisclosure locale="es" />
     </div>
   );
 }
@@ -111,7 +125,7 @@ export async function FaqList({ limit }: { limit?: number }) {
         return (
           <details key={id} className="card p-5 group" data-testid={`faq-${id}`}>
             <summary className="font-semibold cursor-pointer">{t(k.q)}</summary>
-            {/* Billing answers stay English (pending the reviewed courtesy translation); only the answer is marked en. */}
+            {/* Answers still listed in ENGLISH_ONLY are marked lang="en" (none since the approved courtesy translation). */}
             <p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a)}>{t(k.a, FAQ_VARS)}</p>
           </details>
         );

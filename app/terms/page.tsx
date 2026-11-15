@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
+import { TermsEs } from "@/components/legal/terms-es";
+import { showSpanishLegal, type LegalSearch } from "@/lib/legal-locale";
 import { LEGAL_ADDRESS, LEGAL_OPERATOR, LEGAL_OWNERSHIP, LEGAL_UPDATED, REFUND_POLICY, SUPPORT_EMAIL } from "@/lib/legal";
 import { PLANS, TRIAL } from "@/lib/plans";
 import { PAYMENT_GRACE_DAYS, PLAYBACK_GRACE_DAYS, TRANSITION_DAYS, TRIAL_DAYS } from "@/lib/server/entitlements";
 
-export const metadata: Metadata = { title: "Terms of Service · Pekko" };
+export async function generateMetadata({ searchParams }: { searchParams?: LegalSearch } = {}): Promise<Metadata> {
+  return { title: (await showSpanishLegal(searchParams)) ? "Términos del servicio · Pekko" : "Terms of Service · Pekko" };
+}
 
-export default function Terms() {
+export default async function Terms({ searchParams }: { searchParams?: LegalSearch } = {}) {
+  if (await showSpanishLegal(searchParams)) return <TermsEs />;
   const prices = PLANS.map((plan) => `${plan.name} $${plan.price} for ${plan.screens} screen${plan.screens === 1 ? "" : "s"}`).join(", ");
   return (
     <LegalPage title="Terms of Service" updated={LEGAL_UPDATED}>
