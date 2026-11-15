@@ -3,7 +3,7 @@ import { Fragment, type ReactNode } from "react";
 type Renderers = Record<string, (chunk: ReactNode) => ReactNode>;
 
 const DEFAULTS: Renderers = {
-  b: (c) => <b>{c}</b>,
+  b: (c) => <strong>{c}</strong>,
   em: (c) => <em>{c}</em>,
 };
 
