@@ -1,3 +1,7 @@
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
+
 /** Success toast lifetime for a finished upload. Errors are not on this timer. */
 export const UPLOAD_SUCCESS_TOAST_MS = 5_000;
 
@@ -26,7 +30,7 @@ export function armToastTimer(
   return schedule(dismiss, ms);
 }
 
-export function uploadSuccessCopy(count: number, kind: "image" | "video" | "presentation") {
-  if (kind === "presentation") return count === 1 ? "Presentation uploaded" : `Uploaded ${count} presentations`;
-  return count === 1 ? "Uploaded" : `Uploaded ${count} files`;
+export function uploadSuccessCopy(count: number, kind: "image" | "video" | "presentation", t: T = EN) {
+  if (kind === "presentation") return count === 1 ? t("up.presUploaded") : t("up.presMany", { count });
+  return count === 1 ? t("up.uploaded") : t("up.filesMany", { count });
 }

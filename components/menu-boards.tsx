@@ -25,6 +25,7 @@ import {
   parseUnifiedSearch,
   type LayoutOption,
 } from "@/lib/menu-board-unify";
+import { makeT, type T } from "@/lib/i18n";
 
 export type { Brand };
 export { artImages };
@@ -63,18 +64,20 @@ export type MenuFixture = {
   studio?: AccountStudio;
 };
 
-function newClassicDraft(displayIds: string[] = [], brand?: Brand | null): ClassicDraft {
+const EN: T = makeT("en");
+
+function newClassicDraft(displayIds: string[] = [], brand?: Brand | null, t: T = EN): ClassicDraft {
   const content = brand ? seedClassicMenu(sampleMenu(), brand) : sampleMenu();
-  return { id: null, name: "Lunch menu", template: "classic", content, displayIds };
+  return { id: null, name: t("mb.defaultName"), template: "classic", content, displayIds };
 }
 
-function boardKindLabel(menu: MenuBoard): string {
+function boardKindLabel(menu: MenuBoard, t: T): string {
   const classified = classifyBoardContent(menu.template, menu.content);
   if (classified.kind === "layout") return layoutOptionForTemplate(classified.document.template).name;
   if (classified.kind === "classic") {
-    return MENU_TEMPLATES.find((t) => t.id === classified.template)?.name ?? "Menu";
+    return MENU_TEMPLATES.find((t) => t.id === classified.template)?.name ?? t("mb.kindMenu");
   }
-  return "Menu board";
+  return t("mb.kindBoard");
 }
 
 function openClassified(menu: MenuBoard, screenId: string | null): View | null {
@@ -88,7 +91,7 @@ function openClassified(menu: MenuBoard, screenId: string | null): View | null {
   return null;
 }
 
-function initialView(fixture?: MenuFixture, search?: Record<string, string | string[] | undefined | null>): { view: View; pendingBoardId: string | null } {
+function initialView(fixture?: MenuFixture, search?: Record<string, string | string[] | undefined | null>, t: T = EN): { view: View; pendingBoardId: string | null } {
   if (fixture?.startMenuId) {
     const menu = fixture.menus.find((item) => item.id === fixture.startMenuId);
     if (menu) {
@@ -96,7 +99,7 @@ function initialView(fixture?: MenuFixture, search?: Record<string, string | str
       if (next) return { view: next, pendingBoardId: null };
     }
   }
-  if (fixture?.startEditing) return { view: { mode: "classic", draft: newClassicDraft(), screenId: null }, pendingBoardId: null };
+  if (fixture?.startEditing) return { view: { mode: "classic", draft: newClassicDraft([], null, t), screenId: null }, pendingBoardId: null };
   if (fixture?.startLayout) {
     return {
       view: { mode: "layout", boardId: fixture.startBoardId ?? null, template: fixture.startLayout, screenId: null, zone: fixture.startZone },
@@ -111,7 +114,7 @@ function initialView(fixture?: MenuFixture, search?: Record<string, string | str
   }
   if (parsed.layout) {
     const option = layoutOptionById(parsed.layout);
-    if (option?.kind === "classic") return { view: { mode: "classic", draft: newClassicDraft(screenId ? [screenId] : []), screenId }, pendingBoardId: null };
+    if (option?.kind === "classic") return { view: { mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], null, t), screenId }, pendingBoardId: null };
     if (option?.layoutTemplate) return { view: { mode: "layout", boardId: null, template: option.layoutTemplate, screenId }, pendingBoardId: null };
   }
   if (parsed.isNew) return { view: { mode: "pick-layout", screenId }, pendingBoardId: null };
@@ -135,12 +138,12 @@ export function MenuBoards({
   const menus = fixture ? { data: { menus: fixture.menus, available: fixture.available !== false }, error: null, reload: async () => {} } : liveMenus;
   const displays = fixture ? { data: fixture.displays ?? [] } : liveDisplays;
   const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
-  const started = initialView(fixture, initialSearch);
+  const { locale, t } = useLocale();
+  const started = initialView(fixture, initialSearch, t);
   const [view, setView] = useState<View>(started.view);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(started.pendingBoardId);
   const [selectedLayout, setSelectedLayout] = useState<LayoutOption | null>(null);
   const toast = useToast();
-  const { locale, t } = useLocale();
   // E2b: "Show on which screen?" after saving a classic board that isn't on any screen yet.
   const [pickClassic, setPickClassic] = useState<{ id: string; name: string; playlistId: string } | null>(null);
   const confirm = useConfirm();
@@ -157,12 +160,12 @@ export function MenuBoards({
 
   function startNew() {
     if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
-    else setView({ mode: "classic", draft: newClassicDraft([], kit), screenId: null });
+    else setView({ mode: "classic", draft: newClassicDraft([], kit, t), screenId: null });
   }
 
   function pickOption(option: LayoutOption, screenId: string | null) {
     if (option.kind === "classic") {
-      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], kit), screenId });
+      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], kit, t), screenId });
       return;
     }
     if (option.layoutTemplate) {
@@ -173,21 +176,21 @@ export function MenuBoards({
   function editMenu(menu: MenuBoard) {
     const next = openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
     if (next) setView(next);
-    else toast.show("This board could not be opened.", true);
+    else toast.show(t("mb.cantOpen"), true);
   }
 
   async function remove(menu: MenuBoard) {
     const ok = await confirm.ask({
-      title: "Delete this menu board?",
-      body: `Delete “${menu.name}”? Screens keep showing its last image until you change them. The image and playlist stay in your library.`,
-      confirmLabel: "Delete",
+      title: t("mb.delTitle"),
+      body: t("mb.delBody", { name: menu.name }),
+      confirmLabel: t("ed.delete"),
       danger: true,
     });
     if (!ok) return;
     try {
       await api(`/api/menus/${menu.id}`, { method: "DELETE" });
       await menus.reload();
-      toast.show("Menu board deleted");
+      toast.show(t("mb.deleted"));
     } catch (err) {
       toast.show((err as Error).message, true);
     }
@@ -200,16 +203,16 @@ export function MenuBoards({
       {draftOpen ? null : (
         <>
           <PageHeader
-            title="Menu boards"
-            eyebrow="Menu Boards"
+            title={t("mb.title")}
+            eyebrow={t("mb.eyebrow")}
             icon={<IconImage />}
-            lede="Pick a layout, fill each area, and Pekko makes a full-screen slide. Every menu board you already have stays in this list, and you can edit it any time."
-            action={<button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>New menu board</button>}
+            lede={t("mb.lede")}
+            action={<button type="button" className="btn btn-primary" onClick={startNew} disabled={atLimit(menus.data?.menus.length, 100)}>{t("mb.new")}</button>}
           />
           <p className="text-sm text-muted mb-4">
-            <Link href="/dashboard/schedule#day-parts" className="font-semibold text-primary underline underline-offset-4">Breakfast, lunch &amp; dinner times</Link>
+            <Link href="/dashboard/schedule#day-parts" className="font-semibold text-primary underline underline-offset-4">{t("mb.dayParts")}</Link>
             {" · "}
-            <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</Link>
+            <Link href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">{t("mb.brandKit")}</Link>
           </p>
         </>
       )}
@@ -296,28 +299,28 @@ export function MenuBoards({
         </>
       ) : null}
 
-      <LimitNote count={menus.data?.menus.length} max={100} noun="menu boards" />
+      <LimitNote count={menus.data?.menus.length} max={100} noun="menu boards" nounKey="mb.noun" />
       {menus.data && menus.error ? <p className="text-danger" role="alert">{menus.error}</p> : null}
       {!menus.data ? <LoadState error={menus.error} /> : null}
       {menus.data && !menus.data.available ? (
-        <EmptyState title="Menu boards are on their way">They switch on with the next update. Your other media works as usual.</EmptyState>
+        <EmptyState title={t("mb.soonTitle")}>{t("mb.soonBody")}</EmptyState>
       ) : null}
       {menus.data?.available && menus.data.menus.length === 0 && !draftOpen ? (
-        <EmptyState title="No menu boards yet">Choose “New menu board” to make your first one in about a minute.</EmptyState>
+        <EmptyState title={t("mb.emptyTitle")}>{t("mb.emptyBody")}</EmptyState>
       ) : null}
       {menus.data?.menus.length && view.mode === "list" ? (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Menu boards" data-testid="unify-list">
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("mb.title")} data-testid="unify-list">
           {menus.data.menus.map((menu) => (
             <li key={menu.id} className="card overflow-hidden">
               <div className="relative aspect-video bg-ink">
-                {menu.imageUrl ? <img src={menu.imageUrl} alt={`${menu.name} preview`} referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-contain" /> : null}
+                {menu.imageUrl ? <img src={menu.imageUrl} alt={t("mb.previewAlt", { name: menu.name })} referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-contain" /> : null}
               </div>
               <div className="p-4">
                 <p className="font-semibold break-words">{menu.name}</p>
-                <p className="text-sm text-muted">{boardKindLabel(menu)} · updated {timeAgo(menu.updatedAt)}</p>
+                <p className="text-sm text-muted">{boardKindLabel(menu, t)} · {t("mb.updated", { ago: timeAgo(menu.updatedAt, t) })}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="btn btn-quiet" onClick={() => editMenu(menu)}>Edit</button>
-                  <button className="btn btn-quiet text-danger" onClick={() => remove(menu)}>Delete</button>
+                  <button className="btn btn-quiet" onClick={() => editMenu(menu)}>{t("ed.edit")}</button>
+                  <button className="btn btn-quiet text-danger" onClick={() => remove(menu)}>{t("ed.delete")}</button>
                 </div>
               </div>
             </li>

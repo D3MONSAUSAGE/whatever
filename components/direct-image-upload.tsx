@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import { useRef, useState } from "react";
 import { uploadArtImage } from "@/components/uploads";
@@ -23,19 +24,20 @@ export function DirectImageUpload({
   onUploaded: (id: string) => Promise<void> | void;
   disabled?: boolean;
   upload?: typeof uploadArtImage;
-  /** The logo/photo choices already in Media, for the "Already in your library" check (QA U1-04d). */
+  /** The logo/photo choices already in Media, for the t("diu.dupTitle") check (QA U1-04d). */
   library?: MediaItem[];
 }) {
+  const t = useT();
   const [state, setState] = useState<DirectUploadState>({ phase: "idle" });
   const confirm = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
   const busy = state.phase === "busy";
-  const status = directUploadStatus(state, what);
+  const status = directUploadStatus(state, what, t);
 
   async function onFiles(files: File[]) {
     const file = files[0];
     if (!file || busy) return;
-    const invalid = artUploadError(file);
+    const invalid = artUploadError(file, t);
     if (invalid) {
       setState({ phase: "error", message: invalid });
       return;
@@ -44,28 +46,28 @@ export function DirectImageUpload({
     const existing = sameLibraryImage(library, file);
     if (existing) {
       const copy = await confirm.ask({
-        title: "Already in your library",
-        body: duplicateImageMessage(file.name),
-        confirmLabel: "Upload a copy anyway",
-        cancelLabel: "Keep the one I have",
+        title: t("diu.dupTitle"),
+        body: duplicateImageMessage(file.name, t),
+        confirmLabel: t("diu.dupCopy"),
+        cancelLabel: t("diu.dupKeep"),
       });
       if (!copy) {
         try {
           await onUploaded(existing.id);
           setState({ phase: "kept", name: existing.fileName });
         } catch (err) {
-          setState({ phase: "error", message: (err as Error).message || "Something went wrong. Try again." });
+          setState({ phase: "error", message: (err as Error).message || t("common.somethingWrong") });
         }
         return;
       }
     }
     setState({ phase: "busy", name: file.name, progress: 0 });
     try {
-      const id = await upload(file, (progress) => setState({ phase: "busy", name: file.name, progress }));
+      const id = await upload(file, (progress) => setState({ phase: "busy", name: file.name, progress }), t);
       await onUploaded(id);
       setState({ phase: "done", name: file.name });
     } catch (err) {
-      setState({ phase: "error", message: (err as Error).message || "Something went wrong. Try again." });
+      setState({ phase: "error", message: (err as Error).message || t("common.somethingWrong") });
     }
   }
 
@@ -79,7 +81,7 @@ export function DirectImageUpload({
         aria-busy={busy || undefined}
         onClick={() => openFilePicker(inputRef.current)}
       >
-        {busy ? "Uploading…" : what === "logo" ? "Upload a logo" : "Upload a photo"}
+        {busy ? t("ed.uploading") : what === "logo" ? t("diu.logo") : t("diu.photo")}
       </button>
       <input
         ref={inputRef}
@@ -97,7 +99,7 @@ export function DirectImageUpload({
         }}
       />
       {confirm.node}
-      <p className="text-xs text-muted">JPG or PNG, 15 MB or smaller. It's also saved in Media.</p>
+      <p className="text-xs text-muted">{t("diu.hint")}</p>
       <p
         className={`text-sm ${state.phase === "error" ? "text-danger" : "text-muted"}`}
         role={state.phase === "error" ? "alert" : "status"}

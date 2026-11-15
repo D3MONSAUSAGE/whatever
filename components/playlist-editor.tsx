@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +22,7 @@ type Slide = {
 };
 
 export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
+  const t = useT();
   const params = useParams<{ id: string }>();
   const id = seed?.id ?? params.id;
   const live = useApi<PlaylistDetail>(seed ? null : `/api/playlists/${id}`);
@@ -35,7 +37,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [chosen, setChosen] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState(false);
-  // Ticks in "Add images" survive Close, in the order they were ticked (QA U2-02).
+  // Ticks in t("pe.addImages") survive Close, in the order they were ticked (QA U2-02).
   const [addPicks, setAddPicks] = useState<string[]>([]);
   const [previewing, setPreviewing] = useState(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -124,9 +126,9 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   }
 
   function invalidTiming(body: ReturnType<typeof payload>) {
-    if (!body.name) return "Give the playlist a name.";
+    if (!body.name) return t("pe.needName");
     if (!Number.isInteger(body.defaultDurationMs) || body.defaultDurationMs < 1000 || body.defaultDurationMs > 600000) {
-      return "Default duration must be between 1 and 600 seconds.";
+      return t("pe.badDefault");
     }
     for (let index = 0; index < body.items.length; index++) {
       const item = body.items[index];
@@ -134,10 +136,10 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
       if (item.durationMs === null) continue;
       if (slide?.kind === "presentation") {
         if (!Number.isInteger(item.durationMs) || item.durationMs < 3000 || item.durationMs > 3_600_000) {
-          return "Each presentation stays between 3 and 3600 seconds per slide.";
+          return t("pe.badPres");
         }
       } else if (!Number.isInteger(item.durationMs) || item.durationMs < 1000 || item.durationMs > 600000) {
-        return "Each slide must be between 1 and 600 seconds, or left blank to use the default.";
+        return t("pe.badSlide");
       }
     }
     return null;
@@ -153,7 +155,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
     setBusy("Saving…");
     try {
       await api(`/api/playlists/${id}`, { method: "PATCH", body: JSON.stringify(body) });
-      toast.show("Draft saved");
+      toast.show(t("pe.draftSaved"));
       await playlist.reload();
       return true;
     } catch (err) {
@@ -166,14 +168,14 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
 
   async function publish() {
     const displayIds = Object.entries(chosen).filter(([, on]) => on).map(([displayId]) => displayId);
-    if (!slides.length) return toast.show("Add at least one image or video.", true);
-    if (!displayIds.length) return toast.show("Choose at least one TV.", true);
+    if (!slides.length) return toast.show(t("pe.addOne"), true);
+    if (!displayIds.length) return toast.show(t("pe.chooseTv"), true);
     const saved = await save();
     if (!saved) return;
     setBusy("Publishing…");
     try {
       await api(`/api/playlists/${id}/publish`, { method: "POST", body: JSON.stringify({ displayIds }) });
-      toast.show("Published. Screens playing this playlist update when they're online.");
+      toast.show(t("pe.published"));
       await playlist.reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -186,14 +188,14 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
     const body = payload();
     const problem = invalidTiming(body);
     if (problem) return toast.show(problem, true);
-    const copyName = `Copy of ${body.name}`.slice(0, 80);
+    const copyName = t("pe.copyOf", { name: body.name }).slice(0, 80);
     setBusy("Duplicating…");
     let createdId = "";
     try {
       const created = await api<{ id: string }>("/api/playlists", { method: "POST", body: JSON.stringify({ name: copyName }) });
       createdId = created.id;
       await api(`/api/playlists/${created.id}`, { method: "PATCH", body: JSON.stringify({ ...body, name: copyName }) });
-      toast.show("Duplicated as a draft");
+      toast.show(t("pe.duplicated"));
       router.push(`/dashboard/playlists/${created.id}`);
     } catch (err) {
       if (createdId) await api(`/api/playlists/${createdId}`, { method: "DELETE" }).catch(() => undefined);
@@ -206,9 +208,9 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   async function remove() {
     if (!playlist.data) return;
     const ok = await confirm.ask({
-      title: "Delete this playlist?",
-      body: `Delete “${playlist.data.name}”? TVs showing it will switch to “No content assigned”.`,
-      confirmLabel: "Delete playlist",
+      title: t("pe.delTitle"),
+      body: t("pe.delBody", { name: playlist.data.name }),
+      confirmLabel: t("pe.del"),
       danger: true,
     });
     if (ok !== true) return;
@@ -240,45 +242,45 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
 
   return (
     <section>
-      <p className="text-sm mb-3"><Link href="/dashboard/playlists" className="underline">Playlists</Link></p>
-      <PageHeader title="Edit playlist" eyebrow="Playlists" icon={<IconList />} lede="Drafts never change a screen. Publish to send this order to every screen that plays it." />
+      <p className="text-sm mb-3"><Link href="/dashboard/playlists" className="underline">{t("pe.playlists")}</Link></p>
+      <PageHeader title={t("pe.title")} eyebrow={t("pe.playlists")} icon={<IconList />} lede={t("pe.lede")} />
       <div className="mb-4 flex flex-wrap gap-2">
-        <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>Duplicate</button>
-        <button type="button" className="btn btn-quiet text-danger" onClick={remove}>Delete</button>
+        <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>{t("pe.duplicate")}</button>
+        <button type="button" className="btn btn-quiet text-danger" onClick={remove}>{t("ed.delete")}</button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="grid gap-6">
           <div className="card p-4 grid gap-4">
             <label className="grid gap-1">
-              <span className="text-sm font-medium">Name</span>
-              <input className="field" maxLength={80} aria-label="Playlist name" value={name} onChange={(event) => setName(event.target.value)} />
+              <span className="text-sm font-medium">{t("pe.name")}</span>
+              <input className="field" maxLength={80} aria-label={t("pe.nameAria")} value={name} onChange={(event) => setName(event.target.value)} />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1">
-                <span className="text-sm font-medium">Default seconds</span>
-                <input className="field" type="number" min={1} max={600} inputMode="numeric" aria-label="Default seconds"
+                <span className="text-sm font-medium">{t("pe.defaultSecs")}</span>
+                <input className="field" type="number" min={1} max={600} inputMode="numeric" aria-label={t("pe.defaultSecs")}
                   value={defaultSeconds} onChange={(event) => setDefaultSeconds(event.target.value)}
                   disabled={playbackMode === "manual"} />
               </label>
               <label className="grid gap-1">
-                <span className="text-sm font-medium">Transition</span>
-                <select className="field" aria-label="Transition" value={transition} onChange={(event) => setTransition(event.target.value as "none" | "fade")}>
-                  <option value="none">None</option>
-                  <option value="fade">Fade</option>
+                <span className="text-sm font-medium">{t("pe.transition")}</span>
+                <select className="field" aria-label={t("pe.transition")} value={transition} onChange={(event) => setTransition(event.target.value as "none" | "fade")}>
+                  <option value="none">{t("pe.none")}</option>
+                  <option value="fade">{t("pe.fade")}</option>
                 </select>
               </label>
               <label className="grid gap-1 sm:col-span-2">
-                <span className="text-sm font-medium">Playback</span>
-                <select className="field" aria-label="Playback" value={playbackMode}
+                <span className="text-sm font-medium">{t("pe.playback")}</span>
+                <select className="field" aria-label={t("pe.playback")} value={playbackMode}
                   onChange={(event) => setPlaybackMode(event.target.value as "auto" | "manual")}>
-                  <option value="auto">Automatic</option>
-                  <option value="manual">Manual slideshow</option>
+                  <option value="auto">{t("pe.auto")}</option>
+                  <option value="manual">{t("pe.manual")}</option>
                 </select>
                 <span className="text-xs text-muted mt-1">
                   {playbackMode === "manual"
-                    ? "Screens show one slide until someone advances with on-screen controls or left/right keys. Image timing is ignored. Videos play once, then hold until the next advance."
-                    : "Screens advance each slide on its own using the durations above."}
+                    ? t("pe.manualNote")
+                    : t("pe.autoNote")}
                 </span>
               </label>
             </div>
@@ -286,16 +288,16 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
 
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <h2 className="font-semibold">Slides</h2>
+              <h2 className="font-semibold">{t("pe.slides")}</h2>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-quiet" disabled={!slides.length} onClick={() => setPreviewing(true)}>Full preview</button>
-                <button type="button" className="btn btn-primary" disabled={atLimit(slides.length, MAX_SLIDES)} onClick={() => setAdding(true)}>Add images</button>
+                <button type="button" className="btn btn-quiet" disabled={!slides.length} onClick={() => setPreviewing(true)}>{t("pe.fullPreview")}</button>
+                <button type="button" className="btn btn-primary" disabled={atLimit(slides.length, MAX_SLIDES)} onClick={() => setAdding(true)}>{t("pe.addImages")}</button>
               </div>
             </div>
-            <div className="mb-3"><LimitNote count={slides.length} max={MAX_SLIDES} noun="slides in a playlist" /></div>
-            <p className="text-sm text-muted mb-3">Drag a slide to reorder. On a phone, use Up and Down. Estimated length {formatClock(estimatedMs)}.</p>
+            <div className="mb-3"><LimitNote count={slides.length} max={MAX_SLIDES} noun="slides in a playlist" nounKey="pe.noun" /></div>
+            <p className="text-sm text-muted mb-3">{t("pe.estimated", { length: formatClock(estimatedMs) })}</p>
             {slides.length === 0 ? (
-              <p className="text-sm text-muted">Nothing in this playlist yet. Add images or videos from your library.</p>
+              <p className="text-sm text-muted">{t("pe.empty")}</p>
             ) : (
               <ol className="grid gap-3">
                 {slides.map((slide, index) => (
@@ -318,33 +320,33 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
                       )}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{index + 1}. {slide.fileName}{slide.kind === "presentation" ? ` · ${slide.slideCount ?? slide.parts?.length ?? 0} slides` : ""}</p>
+                      <p className="font-medium truncate">{index + 1}. {slide.fileName}{slide.kind === "presentation" ? ` · ${t("pe.presSlides", { n: slide.slideCount ?? slide.parts?.length ?? 0 })}` : ""}</p>
                       {slide.kind === "video" ? (
-                        <p className="mt-2 text-sm text-muted">Plays until the end{slide.mediaDurationMs ? ` (${Math.round(slide.mediaDurationMs / 1000)}s)` : ""}.</p>
+                        <p className="mt-2 text-sm text-muted">{t("pe.untilEnd", { secs: slide.mediaDurationMs ? ` (${Math.round(slide.mediaDurationMs / 1000)} s)` : "" })}</p>
                       ) : (
                         <label className="mt-2 grid gap-1">
-                          <span className="text-xs text-muted">{slide.kind === "presentation" ? "Seconds for each slide (blank uses the playlist default). Slides with their own time keep it." : "Seconds (blank uses the default)"}</span>
+                          <span className="text-xs text-muted">{slide.kind === "presentation" ? t("pe.presSecs") : t("pe.secs")}</span>
                           <input className="field" type="number" min={slide.kind === "presentation" ? 3 : 1} max={slide.kind === "presentation" ? 3600 : 600} inputMode="numeric"
-                            aria-label={`Seconds for ${slide.fileName}`} placeholder={defaultSeconds || "10"}
+                            aria-label={t("pe.secsFor", { name: slide.fileName })} placeholder={defaultSeconds || "10"}
                             value={slide.seconds}
                             onChange={(event) => setSlides(slides.map((row, i) => i === index ? { ...row, seconds: event.target.value } : row))} />
                         </label>
                       )}
                       <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <div className="slide-order inline-flex items-center gap-1 rounded-xl border border-line p-1" role="group" aria-label={`Order of ${slide.fileName}`}>
-                        <button type="button" className="btn btn-quiet cursor-grab" draggable aria-label={`Drag ${slide.fileName}`}
+                        <div className="slide-order inline-flex items-center gap-1 rounded-xl border border-line p-1" role="group" aria-label={t("pe.orderOf", { name: slide.fileName })}>
+                        <button type="button" className="btn btn-quiet cursor-grab" draggable aria-label={t("pe.dragName", { name: slide.fileName })}
                           onDragStart={(event) => {
                             event.dataTransfer.effectAllowed = "move";
                             event.dataTransfer.setData("text/plain", String(index));
                             dragRef.current = index;
                             setDragFrom(index);
                           }}
-                          onDragEnd={() => { dragRef.current = null; setDragFrom(null); }}>Drag</button>
-                        <button type="button" className="btn btn-quiet min-w-16" aria-label={`Move ${slide.fileName} up`} disabled={index === 0} onClick={() => move(index, -1)}>Up</button>
-                        <button type="button" className="btn btn-quiet" aria-label={`Move ${slide.fileName} down`} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>Down</button>
+                          onDragEnd={() => { dragRef.current = null; setDragFrom(null); }}>{t("pe.drag")}</button>
+                        <button type="button" className="btn btn-quiet min-w-16" aria-label={t("pe.moveUp", { name: slide.fileName })} disabled={index === 0} onClick={() => move(index, -1)}>{t("pe.up")}</button>
+                        <button type="button" className="btn btn-quiet" aria-label={t("pe.moveDown", { name: slide.fileName })} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>{t("pe.down")}</button>
                         </div>
-                        <button type="button" className="btn btn-quiet text-danger ml-auto" aria-label={`Remove ${slide.fileName}`}
-                          onClick={() => setSlides(slides.filter((_, i) => i !== index))}>Remove</button>
+                        <button type="button" className="btn btn-quiet text-danger ml-auto" aria-label={t("pe.removeName", { name: slide.fileName })}
+                          onClick={() => setSlides(slides.filter((_, i) => i !== index))}>{t("pe.remove")}</button>
                       </div>
                     </div>
                   </li>
@@ -354,15 +356,15 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
           </div>
 
           <div className="card p-4">
-            <h2 className="font-semibold mb-1">Publish</h2>
-            <p className="text-sm text-muted mb-3">Choose one or more screens. Online screens switch shortly after you publish; offline screens update when they reconnect. A single image published later replaces this playlist on that screen.</p>
+            <h2 className="font-semibold mb-1">{t("pe.publish")}</h2>
+            <p className="text-sm text-muted mb-3">{t("pe.publishNote")}</p>
             <p className="text-sm mb-4">
               {using.length
-                ? <>On {using.map((display) => display.name).join(", ")}.</>
-                : "Not on a screen yet."}
+                ? <>{t("pe.on", { names: using.map((display) => display.name).join(", ") })}</>
+                : t("pe.notOnScreen")}
             </p>
             {playlist.data.displays.length === 0 ? (
-              <p className="text-sm text-muted">Connect a TV first: My Screens → Add screen.</p>
+              <p className="text-sm text-muted">{t("pe.connectFirst")}</p>
             ) : (
               <ul className="grid gap-2 mb-4">
                 {playlist.data.displays.map((display) => (
@@ -377,25 +379,25 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
               </ul>
             )}
             <div className="flex flex-col sm:flex-row gap-2">
-              <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={save}>{busy === "Saving…" ? "Saving…" : "Save draft"}</button>
-              <button type="button" className="btn btn-primary" disabled={!!busy} onClick={publish}>{busy === "Publishing…" ? "Publishing…" : "Publish"}</button>
+              <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={save}>{busy === "Saving…" ? t("ed.saving") : t("pe.saveDraft")}</button>
+              <button type="button" className="btn btn-primary" disabled={!!busy} onClick={publish}>{busy === "Publishing…" ? t("ls.publishing") : t("pe.publish")}</button>
             </div>
           </div>
         </div>
 
         <div className="order-first lg:order-none">
-          <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label="Slideshow preview" />
+          <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label={t("pe.slideshowPreview")} />
         </div>
       </div>
 
       {previewing && (
         <div className="fixed inset-0 z-50 bg-ink/80 flex items-center justify-center p-4" onClick={() => setPreviewing(false)}>
-          <div role="dialog" aria-label="Full playlist preview" className="bg-paper w-full max-w-4xl rounded-2xl p-4 md:p-5" onClick={(event) => event.stopPropagation()}>
+          <div role="dialog" aria-label={t("pe.fullAria")} className="bg-paper w-full max-w-4xl rounded-2xl p-4 md:p-5" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Full preview</h2>
-              <button type="button" className="btn btn-quiet" onClick={() => setPreviewing(false)}>Close</button>
+              <h2 className="font-semibold">{t("pe.fullPreview")}</h2>
+              <button type="button" className="btn btn-quiet" onClick={() => setPreviewing(false)}>{t("pe.close")}</button>
             </div>
-            <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label="Full playlist preview" large />
+            <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label={t("pe.fullAria")} large />
           </div>
         </div>
       )}
@@ -408,7 +410,7 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
           onClose={() => setAdding(false)}
           onAdd={(picked) => {
             const room = MAX_SLIDES - slides.length;
-            if (picked.length > room) toast.show(`A playlist holds up to ${MAX_SLIDES} slides, so only the first ${Math.max(0, room)} were added.`);
+            if (picked.length > room) toast.show(t("pe.cap", { max: MAX_SLIDES, n: Math.max(0, room) }));
             setSlides(slides.concat(picked.slice(0, Math.max(0, room))));
             setAddPicks([]);
             setAdding(false);
@@ -435,6 +437,7 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
   label: string;
   large?: boolean;
 }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [slides, playbackMode]);
   useEffect(() => {
@@ -461,10 +464,10 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
   }
   return (
     <div aria-label={label}>
-      {!large && <h2 className="font-semibold mb-2">Preview</h2>}
+      {!large && <h2 className="font-semibold mb-2">{t("pe.preview")}</h2>}
       <div className={`relative aspect-video bg-black rounded-md overflow-hidden border border-ink ${large ? "max-h-[70dvh]" : ""}`}>
         {slides.length === 0 ? (
-          <p className="absolute inset-0 grid place-items-center text-sm text-white/70 px-4 text-center">Add images or videos to preview the loop.</p>
+          <p className="absolute inset-0 grid place-items-center text-sm text-white/70 px-4 text-center">{t("pe.previewEmpty")}</p>
         ) : slides.map((slide, i) => slide.kind === "video" ? (
           <video key={`${slide.url}-${i}`} src={i === index ? slide.url : undefined} poster={slide.thumbnailUrl || undefined}
             muted playsInline autoPlay={i === index} preload={i === index ? "auto" : "none"}
@@ -479,13 +482,13 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
             }}
             className={`absolute inset-0 size-full object-contain ${i === index ? "opacity-100" : "opacity-0"}`} />
         ) : (
-          <img key={`${slide.url}-${i}`} src={slide.url} alt={i === index ? `Preview slide ${i + 1} of ${slides.length}, ${slide.fileName}` : ""}
+          <img key={`${slide.url}-${i}`} src={slide.url} alt={i === index ? t("pe.previewAlt", { n: i + 1, count: slides.length, name: slide.fileName }) : ""}
             className={`absolute inset-0 size-full object-contain motion-reduce:transition-none ${transition === "fade" ? "transition-opacity duration-700" : ""} ${i === index ? "opacity-100" : "opacity-0"}`} />
         ))}
         {playbackMode === "manual" && slides.length > 0 ? (
           <div className="absolute inset-x-0 bottom-2 flex items-center justify-center gap-2">
-            <button type="button" className="btn btn-quiet bg-black/50 text-white border-white/20" aria-label="Previous slide" onClick={() => step(-1)}>Previous</button>
-            <button type="button" className="btn btn-quiet bg-black/50 text-white border-white/20" aria-label="Next slide" onClick={() => step(1)}>Next</button>
+            <button type="button" className="btn btn-quiet bg-black/50 text-white border-white/20" aria-label={t("pe.prevAria")} onClick={() => step(-1)}>{t("pe.previous")}</button>
+            <button type="button" className="btn btn-quiet bg-black/50 text-white border-white/20" aria-label={t("pe.nextAria")} onClick={() => step(1)}>{t("pe.next")}</button>
           </div>
         ) : null}
       </div>
@@ -501,6 +504,7 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
   onClose: () => void;
   onAdd: (slides: Slide[]) => void;
 }) {
+  const t = useT();
   const media = useApi<MediaItem[]>("/api/media");
   const picked: Record<string, boolean> = Object.fromEntries(picks.map((id) => [id, true]));
   const setPicked = (next: Record<string, boolean>) => setPicks(togglePicks(picks, next));
@@ -515,15 +519,15 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
   }
   return (
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label="Add images" className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+      <div role="dialog" aria-label={t("pe.addImages")} className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Add images</h2>
-          <button type="button" className="btn btn-quiet px-3" onClick={onClose}>Close</button>
+          <h2 className="text-lg font-semibold">{t("pe.addImages")}</h2>
+          <button type="button" className="btn btn-quiet px-3" onClick={onClose}>{t("pe.close")}</button>
         </div>
-        <p className="text-sm text-muted mb-3">Tick images in the order you want them to play. Closing keeps your ticks.</p>
+        <p className="text-sm text-muted mb-3">{t("pe.tickNote")}</p>
         {!media.data ? <p className="text-muted">{media.error || "Loading…"}</p> : rows.length === 0 ? (
-          <p className="text-muted">Upload an image in Media first.</p>
+          <p className="text-muted">{t("pe.uploadFirst")}</p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {rows.map((item) => (
@@ -531,9 +535,9 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
                 <label className="block">
                   <span className="block aspect-video bg-black rounded-md overflow-hidden">
                     {item.kind === "video" ? (
-                      item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">Video</span>
+                      item.thumbnailUrl ? <img src={item.thumbnailUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">{t("pe.video")}</span>
                     ) : item.kind === "presentation" ? (
-                      item.coverUrl ? <img src={item.coverUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">Presentation</span>
+                      item.coverUrl ? <img src={item.coverUrl} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white/70">{t("pe.presentation")}</span>
                     ) : (
                       item.url && <img src={item.url} alt="" className="size-full object-contain" />
                     )}
@@ -542,11 +546,11 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
                     <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]}
                       onChange={(event) => setPicked({ ...picked, [item.id]: event.target.checked })} />
                     <span className="truncate">{item.fileName}{item.kind === "presentation" ? ` (${item.slideCount ?? 0})` : ""}</span>
-                    {picked[item.id] ? <span className="badge ml-auto" aria-label={`Number ${picks.indexOf(item.id) + 1} in order`}>{picks.indexOf(item.id) + 1}</span> : null}
+                    {picked[item.id] ? <span className="badge ml-auto" aria-label={t("pe.numberN", { n: picks.indexOf(item.id) + 1 })}>{picks.indexOf(item.id) + 1}</span> : null}
                   </span>
                 </label>
                 {item.kind === "presentation" ? (
-                  <button type="button" className="text-sm text-primary underline mt-1" onClick={() => void showSlides(item.id)}>Choose individual slides</button>
+                  <button type="button" className="text-sm text-primary underline mt-1" onClick={() => void showSlides(item.id)}>{t("pe.chooseSlides")}</button>
                 ) : null}
                 {openDeck === item.id ? (
                   <ul className="mt-2 grid gap-1">
@@ -599,7 +603,7 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
               seconds: "",
             }];
           }));
-        }}>{picks.length ? `Add ${picks.length} selected` : "Add selected"}</button>
+        }}>{picks.length ? t("pe.addN", { n: picks.length }) : t("pe.addSelected")}</button>
         </div>
       </div>
     </div>

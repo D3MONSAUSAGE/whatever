@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import { layoutThumbnailSrc } from "@/lib/layout-thumbnails";
 import { layoutUsesPromoArea, PROMO_AREA_HINT, type LayoutOption } from "@/lib/menu-board-unify";
@@ -16,15 +17,16 @@ export function LayoutGallery({
   onContinue: (option: LayoutOption) => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const selected = options.find((item) => item.id === selectedId) ?? null;
 
   return (
     <div className="card p-4 md:p-6 mb-6" data-testid="layout-picker">
-      <h2 className="text-lg font-semibold">Choose a layout</h2>
+      <h2 className="text-lg font-semibold">{t("lg.title")}</h2>
       <p className="text-sm text-muted mt-1">
-        Your existing boards keep the layout they already have. Select a layout for a new board, then Continue to start editing.
+        {t("lg.lede")}
       </p>
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-4" aria-label="Menu board layouts">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-4" aria-label={t("lg.aria")}>
         {options.map((option) => {
           const pressed = selectedId === option.id;
           return (
@@ -62,11 +64,11 @@ export function LayoutGallery({
           data-testid="layout-continue"
           onClick={() => { if (selected) onContinue(selected); }}
         >
-          Continue
+          {t("ed.continue")}
         </button>
-        <button type="button" className="btn btn-quiet min-h-11" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-quiet min-h-11" onClick={onCancel}>{t("ed.cancel")}</button>
         <p className="text-sm text-muted self-center">
-          {selected ? `Next: edit “${selected.name}”.` : "Select a layout to continue."}
+          {selected ? t("lg.next", { name: selected.name }) : t("lg.pick")}
         </p>
       </div>
     </div>

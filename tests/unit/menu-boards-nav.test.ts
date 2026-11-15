@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { en } from "@/lib/i18n/en";
 import { MAIN_NAV, MENU_BOARDS_HREF, isContentPath, isMainNavActive, isMenuBoardsPath } from "@/lib/content-nav";
 
 const active = (path: string) => MAIN_NAV.filter((item) => isMainNavActive(item.href, path)).map((item) => item.label);
@@ -59,7 +60,8 @@ describe("Menu Boards in the main navigation (t248u)", () => {
     // Icons are keyed by href, so reordering MAIN_NAV can't mismatch them.
     expect(shell).toContain('"/dashboard/media/menus": IconGrid');
     for (const item of MAIN_NAV) expect(shell).toContain(`"${item.href}": Icon`);
-    expect(readFileSync("components/menu-boards.tsx", "utf8")).toContain('eyebrow="Menu Boards"');
+    expect(readFileSync("components/menu-boards.tsx", "utf8")).toContain('eyebrow={t("mb.eyebrow")}'); // I18N-3
+    expect(en["mb.eyebrow"]).toBe("Menu Boards");
   });
 
   it("styles Brand Kit as a proper sub-item of Account, not a bare text line or a new section", () => {

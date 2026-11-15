@@ -1,3 +1,4 @@
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { zoneEditorPlacement } from "@/lib/layout-studio-editor";
@@ -117,14 +118,16 @@ describe("t244u fix 3: selected media controls under the board", () => {
     // Switching areas remounts the under-board editor so it always matches the selected area.
     expect(src).toContain('key={editorPlacement === "canvas" ? `canvas-${zone}` : "left"}');
     // The under-board region is a named, keyboard-focusable scroll area.
-    expect(src).toContain('role="region" aria-label="Selected area controls" tabIndex={0}');
+    expect(src).toContain('role="region" aria-label={t("ls.areaControls")} tabIndex={0}');
+    expect(en["ls.areaControls"]).toBe("Selected area controls");
   });
 
   it("does not repeat photo fit and position in the left Style panel (one place, under the board)", () => {
     const src = readFileSync("components/layout-studio.tsx", "utf8");
     expect(src).not.toContain('aria-label="Photo fit"');
-    expect([...src.matchAll(/aria-label="Photo position"/g)]).toHaveLength(1);
-    expect([...src.matchAll(/aria-label="How the media fits"/g)]).toHaveLength(1);
+    expect([...src.matchAll(/aria-label=\{t\("ls\.photoPosition"\)\}/g)]).toHaveLength(1);
+    expect([...src.matchAll(/aria-label=\{t\("ls\.howFits"\)\}/g)]).toHaveLength(1);
+    expect(src).not.toContain('aria-label={t("ls.photoFit")}');
   });
 
   it("the classic editor shows its Photo controls under the board, and in the stacked column only on phones", () => {
@@ -132,6 +135,7 @@ describe("t244u fix 3: selected media controls under the board", () => {
     expect([...src.matchAll(/\{photoPanel\}/g)]).toHaveLength(2);
     expect(src).toMatch(/studioBp === "phone" \? \([\s\S]{0,160}\{photoPanel\}/);
     expect(src).toMatch(/studioBp !== "phone" \? \([\s\S]{0,160}studio-canvas-tools[\s\S]{0,220}\{photoPanel\}/);
-    expect(src).toContain('role="region" aria-label="Photo controls" tabIndex={0}');
+    expect(src).toContain('role="region" aria-label={t("ce.photoControls")} tabIndex={0}');
+    expect(en["ce.photoControls"]).toBe("Photo controls");
   });
 });

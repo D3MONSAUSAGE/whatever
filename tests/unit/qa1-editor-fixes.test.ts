@@ -1,3 +1,4 @@
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
@@ -94,7 +95,8 @@ describe("B1-04 limits up front, removable sections, emptied sections do not cou
   });
   it("studio offers Remove section and shows the counters", () => {
     const studio = readFileSync("components/layout-studio.tsx", "utf8");
-    expect(studio).toContain("Remove section");
+    expect(studio).toContain('t("ls.removeSection")');
+    expect(en["ls.removeSection"]).toBe("Remove section");
     expect(studio).toContain("<MenuLimits");
     expect(readFileSync("components/classic-editor.tsx", "utf8")).toContain("<MenuLimits");
   });
@@ -149,7 +151,8 @@ describe("U1-04a / U1-05 / U1-10", () => {
   it("classic photo area opens the photo controls under the board", () => {
     const classic = readFileSync("components/classic-editor.tsx", "utf8");
     expect(classic).toContain("photoPanelRef.current.open = true");
-    expect(classic).toContain("Add a photo");
+    expect(classic).toContain('t("ce.addPhoto")');
+    expect(en["ce.addPhoto"]).toBe("Add a photo");
   });
   it("description counter is shown", () => {
     expect(readFileSync("components/menu-item-fields.tsx", "utf8")).toContain("charCount(item.description, MENU_LIMITS.description)");

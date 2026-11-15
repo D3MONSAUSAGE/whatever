@@ -1,4 +1,6 @@
 "use client";
+import { useLocale, useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, type PlaylistSummary, type PresentationDetail } from "@/lib/api";
@@ -11,6 +13,8 @@ import { getSupabase } from "@/lib/supabase-browser";
 import { assetPathFromUrl, rememberSlideSrc, type SlideSrcScope } from "@/lib/slide-src-cache";
 
 export function PresentationDetailView({ id, fixture }: { id?: string; fixture?: PresentationDetail }) {
+  const t = useT();
+  const { locale } = useLocale();
   const [data, setData] = useState<PresentationDetail | null>(fixture ?? null);
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState("10");
@@ -79,7 +83,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
         body: JSON.stringify({ defaultDurationMs, slides }),
       });
       setData(next);
-      toast.show("Saved");
+      toast.show(t("pd.saved"));
     } catch (err) {
       toast.show((err as Error).message, true);
     }
@@ -89,7 +93,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
     if (!data) return;
     const ids = data.slides.filter((slide) => picked[slide.id]).map((slide) => slide.id);
     if (!ids.length) {
-      toast.show("Select at least one slide.", true);
+      toast.show(t("pd.selectOne"), true);
       return;
     }
     if (!lists) {
@@ -97,7 +101,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
     }
     const target = playlistId;
     if (!target) {
-      toast.show("Choose a playlist first.", true);
+      toast.show(t("pd.chooseFirst"), true);
       return;
     }
     try {
@@ -116,7 +120,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
           items,
         }),
       });
-      toast.show("Slides added to the playlist draft");
+      toast.show(t("pd.added"));
       setPicked({});
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -125,13 +129,13 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
 
   async function remove() {
     if (!data) return;
-    const names = formatNameList(data.usedIn.map((playlist) => playlist.name));
+    const names = formatNameList(data.usedIn.map((playlist) => playlist.name), locale);
     const ok = await confirm.ask({
-      title: "Delete this presentation?",
+      title: t("pd.delTitle"),
       body: data.usedIn.length
-        ? `Delete “${data.fileName}”? It will be removed from ${names}, including slides added on their own.`
-        : `Delete “${data.fileName}” and its slides?`,
-      confirmLabel: "Delete presentation",
+        ? t("pd.delUsed", { name: data.fileName, names })
+        : t("pd.delBody", { name: data.fileName }),
+      confirmLabel: t("pd.del"),
       danger: true,
     });
     if (ok !== true) return;
@@ -145,8 +149,8 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
   const stageSrc = current ? slideSrc(viewer, current.url, "full") : null;
   return (
     <section className="min-w-0 overflow-x-hidden" data-presentation-detail="">
-      <PageHeader title={data.fileName} icon={<IconImage />} lede={`${data.slideCount} slides · uploaded ${data.createdAt ? new Date(data.createdAt).toLocaleDateString() : ""} · ${statusLabel(data.processingStatus)}`}
-        action={<Link href="/dashboard/media" className="btn btn-primary">Back to library</Link>}
+      <PageHeader title={data.fileName} icon={<IconImage />} lede={t("pd.lede", { count: data.slideCount, date: data.createdAt ? new Date(data.createdAt).toLocaleDateString(locale === "es" ? "es" : undefined) : "", status: statusLabel(data.processingStatus, t) })}
+        action={<Link href="/dashboard/media" className="btn btn-primary">{t("pd.back")}</Link>}
       />
       {data.processingError ? <p className="mb-4 text-sm text-danger">{data.processingError}</p> : null}
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -156,28 +160,28 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
             {stageSrc ? (
               <img src={stageSrc} alt="" onLoad={() => setStageReady(true)} className={`max-h-[70vh] w-auto max-w-full object-contain ${stageReady ? "" : "opacity-0"}`} />
             ) : (
-              <p className="grid min-h-48 place-items-center text-sm text-white/70">No preview yet</p>
+              <p className="grid min-h-48 place-items-center text-sm text-white/70">{t("pd.noPreview")}</p>
             )}
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <button type="button" className="btn min-h-12 min-w-12 px-4" aria-label="Previous slide" onClick={() => setPreview((index) => (index - 1 + count) % Math.max(count, 1))}>Prev</button>
-            <p className="min-w-0 flex-1 text-center text-sm">{count ? `Slide ${preview + 1} of ${count}` : "Processing"}</p>
-            <button type="button" className="btn min-h-12 min-w-12 px-4" aria-label="Next slide" onClick={() => setPreview((index) => (index + 1) % Math.max(count, 1))}>Next</button>
+            <button type="button" className="btn min-h-12 min-w-12 px-4" aria-label={t("pd.prevAria")} onClick={() => setPreview((index) => (index - 1 + count) % Math.max(count, 1))}>{t("pd.prev")}</button>
+            <p className="min-w-0 flex-1 text-center text-sm">{count ? t("pd.slideOf", { n: preview + 1, count }) : t("pd.processing")}</p>
+            <button type="button" className="btn min-h-12 min-w-12 px-4" aria-label={t("pd.nextAria")} onClick={() => setPreview((index) => (index + 1) % Math.max(count, 1))}>{t("pd.next")}</button>
           </div>
           <p className="mt-2 min-w-0 break-words text-sm [overflow-wrap:anywhere]" title={current?.fileName ?? ""}>{current?.fileName ?? ""}</p>
           <label className="mt-4 grid w-full max-w-xs gap-1">
-            <span className="text-sm">Default seconds for each slide</span>
-            <input className="field w-full" type="number" min={3} max={3600} aria-label="Default seconds" value={seconds} onChange={(event) => setSeconds(event.target.value)} />
+            <span className="text-sm">{t("pd.defaultSecs")}</span>
+            <input className="field w-full" type="number" min={3} max={3600} aria-label={t("pd.defaultSecsAria")} value={seconds} onChange={(event) => setSeconds(event.target.value)} />
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="btn btn-primary" onClick={() => void save()}>Save times</button>
-            <button type="button" className="btn btn-quiet text-danger" onClick={() => void remove()}>Delete</button>
+            <button type="button" className="btn btn-primary" onClick={() => void save()}>{t("pd.saveTimes")}</button>
+            <button type="button" className="btn btn-quiet text-danger" onClick={() => void remove()}>{t("ed.delete")}</button>
           </div>
-          <div className="mt-4 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Slides">
+          <div className="mt-4 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label={t("pd.slides")}>
             {data.slides.map((slide, index) => {
               const thumb = slideSrc(viewer, slide.thumbnailUrl ?? null, "thumb");
               return (
-                <button key={slide.id} type="button" aria-label={`Show slide ${index + 1}`} aria-current={index === preview} className={`h-16 w-16 shrink-0 overflow-hidden rounded border bg-black ${index === preview ? "border-primary" : "border-ink"}`} onClick={() => setPreview(index)}>
+                <button key={slide.id} type="button" aria-label={t("pd.showSlide", { n: index + 1 })} aria-current={index === preview} className={`h-16 w-16 shrink-0 overflow-hidden rounded border bg-black ${index === preview ? "border-primary" : "border-ink"}`} onClick={() => setPreview(index)}>
                   {thumb ? <img src={thumb} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-xs text-white">{index + 1}</span>}
                 </button>
               );
@@ -185,31 +189,31 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
           </div>
         </div>
         <div className="min-w-0">
-          <h2 className="font-semibold mb-2">Slide times</h2>
+          <h2 className="font-semibold mb-2">{t("pd.slideTimes")}</h2>
           <ul className="grid gap-3">
             {data.slides.map((slide, index) => (
               <li key={slide.id} className="card min-w-0 p-3">
                 <p className="min-w-0 break-words font-medium [overflow-wrap:anywhere]" title={slide.fileName}>{index + 1}. {slide.fileName}</p>
                 <p className="text-xs text-muted">{slide.width && slide.height ? `${slide.width}×${slide.height}` : ""}</p>
                 <label className="mt-2 grid gap-1">
-                  <span className="text-xs text-muted">Seconds (blank uses the default)</span>
-                  <input className="field w-full" type="number" min={3} max={3600} aria-label={`Seconds for slide ${index + 1}`} value={overrides[slide.id] ?? ""}
+                  <span className="text-xs text-muted">{t("pd.secsBlank")}</span>
+                  <input className="field w-full" type="number" min={3} max={3600} aria-label={t("pd.secsFor", { n: index + 1 })} value={overrides[slide.id] ?? ""}
                     onChange={(event) => setOverrides({ ...overrides, [slide.id]: event.target.value })} />
                 </label>
                 <label className="mt-2 flex min-w-0 items-center gap-2 text-sm">
-                  <input type="checkbox" className="size-4 shrink-0" checked={!!picked[slide.id]} aria-label={`Select ${slide.fileName}`}
+                  <input type="checkbox" className="size-4 shrink-0" checked={!!picked[slide.id]} aria-label={t("pd.select", { name: slide.fileName })}
                     onChange={(event) => setPicked({ ...picked, [slide.id]: event.target.checked })} />
-                  <span className="min-w-0">Use this slide on its own</span>
+                  <span className="min-w-0">{t("pd.onItsOwn")}</span>
                 </label>
               </li>
             ))}
           </ul>
           <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
-            <select className="field w-full max-w-full sm:max-w-xs" aria-label="Playlist for selected slides" value={playlistId} onFocus={() => { if (!lists) void api<PlaylistSummary[]>("/api/playlists").then(setLists).catch(() => undefined); }} onChange={(event) => setPlaylistId(event.target.value)}>
-              <option value="">Choose a playlist</option>
+            <select className="field w-full max-w-full sm:max-w-xs" aria-label={t("pd.playlistAria")} value={playlistId} onFocus={() => { if (!lists) void api<PlaylistSummary[]>("/api/playlists").then(setLists).catch(() => undefined); }} onChange={(event) => setPlaylistId(event.target.value)}>
+              <option value="">{t("pd.choosePlaylist")}</option>
               {(lists ?? []).map((playlist) => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
             </select>
-            <button type="button" className="btn btn-quiet" onClick={() => void addPicked()}>Add selected slides</button>
+            <button type="button" className="btn btn-quiet" onClick={() => void addPicked()}>{t("pd.addSelected")}</button>
           </div>
         </div>
       </div>
@@ -220,10 +224,11 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
 }
 
 function PresentationSkeleton({ error }: { error: string | null }) {
-  if (error) return <LoadState error={error} label="Loading presentation…" />;
+  const t = useT();
+  if (error) return <LoadState error={error} label={t("pd.loading")} />;
   return (
     <section className="min-w-0" data-presentation-detail="" aria-busy="true">
-      <p className="sr-only">Loading presentation…</p>
+      <p className="sr-only">{t("pd.loading")}</p>
       <div className="mb-6 h-28 animate-pulse rounded-2xl bg-ink/10" />
       <div className="mx-auto h-64 max-h-[70vh] w-full max-w-3xl animate-pulse rounded-md bg-ink/10" />
       <div className="mt-3 h-12 animate-pulse rounded-md bg-ink/10" />
@@ -236,9 +241,9 @@ function slideSrc(viewer: SlideSrcScope | null, fresh: string | null, kind: "ful
   return rememberSlideSrc(viewer, assetPathFromUrl(fresh), kind, fresh);
 }
 
-function statusLabel(status: string) {
-  if (status === "processing") return "Processing";
-  if (status === "failed") return "Failed";
-  if (status === "pending") return "Waiting";
-  return "Ready";
+function statusLabel(status: string, t: T) {
+  if (status === "processing") return t("pd.processing");
+  if (status === "failed") return t("pd.failed");
+  if (status === "pending") return t("pd.waiting");
+  return t("pd.ready");
 }

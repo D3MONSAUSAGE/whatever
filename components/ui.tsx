@@ -95,8 +95,10 @@ export function LoadingBlock({ label }: { label?: string }) {
   );
 }
 
-export function formatNameList(names: string[]) {
+export function formatNameList(names: string[], locale?: string) {
   if (names.length <= 1) return names[0] ?? "";
+  // I18N-3: Spanish joins with "y" and no serial comma; English output is unchanged.
+  if (locale === "es") return new Intl.ListFormat("es", { type: "conjunction" }).format(names);
   if (names.length === 2) return `${names[0]} and ${names[1]}`;
   return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }

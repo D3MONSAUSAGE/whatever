@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatDuration, formatSize, type MediaItem, type PlaylistSummary } from "@/lib/api";
@@ -89,6 +89,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   const reload = live.reload;
   const toast = useToast();
   const t = useT();
+  const { locale } = useLocale();
   const confirm = useConfirm();
   const [checking, setChecking] = useState(false);
 
@@ -115,17 +116,17 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
     if (!dupes.length) { uploads.enqueue(files, kind); return; }
     const names = dupes.map((file) => file.name);
     const copy = await confirm.ask({
-      title: "Already in your library",
-      body: kind === "video" ? duplicateMessage(names) : duplicateImagesMessage(names),
-      confirmLabel: "Upload a copy anyway",
-      cancelLabel: "Keep the one I have",
+      title: t("ml.dupTitle"),
+      body: kind === "video" ? duplicateMessage(names, t) : duplicateImagesMessage(names, t),
+      confirmLabel: t("diu.dupCopy"),
+      cancelLabel: t("diu.dupKeep"),
     });
     if (copy) { uploads.enqueue(files, kind); return; }
     const fresh = files.filter((file) => !dupes.includes(file));
     if (fresh.length) uploads.enqueue(fresh, kind);
     setQuery(dupes[0].name);
     const what = kind === "video" ? (dupes.length === 1 ? "video" : "videos") : (dupes.length === 1 ? "image" : "images");
-    toast.show(`Kept the ${what} already in your library.`);
+    toast.show(t(`ml.kept.${what}`));
   }
   const wasBusy = useRef(false);
   const [renaming, setRenaming] = useState<MediaItem | null>(null);
@@ -149,19 +150,19 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   async function remove(item: MediaItem) {
     const used = item.usedIn ?? [];
     if (item.kind === "presentation") {
-      const names = formatNameList(used.map((playlist) => playlist.name));
+      const names = formatNameList(used.map((playlist) => playlist.name), locale);
       const ok = await confirm.ask({
-        title: "Delete this presentation?",
+        title: t("ml.delPresTitle"),
         body: used.length
-          ? `Delete “${item.fileName}” and its ${item.slideCount ?? ""} slides? It will be removed from ${names}. Screens drop it the next time they check in.`
-          : `Delete “${item.fileName}” and its slides? This cannot be undone.`,
-        confirmLabel: "Delete presentation",
+          ? t("ml.delPresUsed", { name: item.fileName, count: item.slideCount ?? "", names })
+          : t("ml.delPresBody", { name: item.fileName }),
+        confirmLabel: t("ml.delPres"),
         danger: true,
       });
       if (ok !== true) return;
       try {
         await api(`/api/media/${item.id}?detach=1`, { method: "DELETE" });
-        toast.show("Deleted");
+        toast.show(t("ml.deleted"));
         reload();
       } catch (err) {
         toast.show((err as Error).message, true);
@@ -169,36 +170,36 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
       return;
     }
     if (used.length) {
-      const names = formatNameList(used.map((playlist) => playlist.name));
+      const names = formatNameList(used.map((playlist) => playlist.name), locale);
       await confirm.ask({
-        title: "This file is in a playlist",
-        body: `“${item.fileName}” is used by ${names}. Remove it from ${used.length === 1 ? "that playlist" : "those playlists"} and publish again before deleting it. The file stays in the library until then.`,
-        cancelLabel: "Close",
+        title: t("ml.inPlaylistTitle"),
+        body: t(used.length === 1 ? "ml.usedBy" : "ml.usedByMany", { name: item.fileName, names }),
+        cancelLabel: t("ml.close"),
       });
       return;
     }
     const ok = await confirm.ask({
-      title: "Delete this file?",
-      body: `Delete “${item.fileName}”? Any TV showing it will switch to “No content assigned”.`,
-      confirmLabel: "Delete file",
+      title: t("ml.delFileTitle"),
+      body: t("ml.delFileBody", { name: item.fileName }),
+      confirmLabel: t("ml.delFile"),
       danger: true,
     });
     if (ok !== true) return;
     try {
       await api(`/api/media/${item.id}`, { method: "DELETE" });
-      toast.show("Deleted");
+      toast.show(t("ml.deleted"));
       reload();
     } catch (err) {
       const message = (err as Error).message;
       if (/playlist/i.test(message)) {
-        await confirm.ask({ title: "This file is in a playlist", body: message, cancelLabel: "Close" });
+        await confirm.ask({ title: t("ml.inPlaylistTitle"), body: message, cancelLabel: t("ml.close") });
       } else toast.show(message, true);
     }
   }
 
   return (
     <section>
-      <PageHeader title="Media library" icon={<IconImage />} lede="Pictures, video, and documents in your library." />
+      <PageHeader title={t("ml.title")} icon={<IconImage />} lede={t("ml.lede")} />
       <div className="mb-6 grid grid-cols-3 gap-3" data-testid="media-uploads">
         <FileUploadControl kind="image" multiple disabled={uploads.busy || checking} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy || checking ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadChecked(files, "image")} />
         <FileUploadControl kind="video" multiple disabled={uploads.busy || checking} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy || checking ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadChecked(files, "video")} />
@@ -211,17 +212,17 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
       )}
 
       {!data ? (
-        <LoadState error={error} label="Loading…" />
+        <LoadState error={error} />
       ) : libraryEmpty ? (
-        <EmptyState title="No images yet">
-          Upload a JPG, PNG, WebP, H.264 MP4, PowerPoint (.pptx), or PDF. Menus exported from Canva at 1920 × 1080 work well.
+        <EmptyState title={t("ml.emptyTitle")}>
+          {t("ml.emptyBody")}
         </EmptyState>
       ) : (
         <>
           <div className="grid gap-3 mb-4 lg:grid-cols-[minmax(0,1fr)_11rem_11rem_auto_auto] lg:items-center">
-            <input className="field" type="search" aria-label="Search media" placeholder="Search files" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <input className="field" type="search" aria-label={t("ml.searchAria")} placeholder={t("ml.searchPh")} value={query} onChange={(event) => setQuery(event.target.value)} />
             {!fixture ? (
-              <select className="field" aria-label="Show" value={kind} onChange={(event) => {
+              <select className="field" aria-label={t("ml.show")} value={kind} onChange={(event) => {
                 const next = event.target.value as KindKey;
                 setKind(next);
                 const nextParams = new URLSearchParams(window.location.search);
@@ -230,34 +231,34 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
                 const q = nextParams.toString();
                 router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
               }}>
-                <option value="">All files</option>
-                <option value="image">Images</option>
-                <option value="video">Videos</option>
-                <option value="presentation">Presentations</option>
-                <option value="upload">My uploads</option>
-                <option value="menu">Menu boards</option>
-                <option value="promo">Promotions</option>
+                <option value="">{t("ml.allFiles")}</option>
+                <option value="image">{t("ml.images")}</option>
+                <option value="video">{t("ml.videos")}</option>
+                <option value="presentation">{t("ml.presentations")}</option>
+                <option value="upload">{t("ml.myUploads")}</option>
+                <option value="menu">{t("ml.menuBoards")}</option>
+                <option value="promo">{t("ml.promotions")}</option>
               </select>
             ) : null}
-            <select className="field" aria-label="Sort media" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="name">Name</option>
-              <option value="size">Size</option>
-              <option value="duration">Duration</option>
+            <select className="field" aria-label={t("ml.sortAria")} value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
+              <option value="newest">{t("ml.newest")}</option>
+              <option value="oldest">{t("ml.oldest")}</option>
+              <option value="name">{t("ml.name")}</option>
+              <option value="size">{t("ml.size")}</option>
+              <option value="duration">{t("ml.duration")}</option>
             </select>
             {!fixture ? (
               <label className="flex items-center gap-2 text-sm whitespace-nowrap">
-                <input type="checkbox" checked={unused} onChange={(event) => setUnused(event.target.checked)} /> Not in a playlist
+                <input type="checkbox" checked={unused} onChange={(event) => setUnused(event.target.checked)} /> {t("ml.unused")}
               </label>
             ) : null}
-            <div className="flex gap-2" role="group" aria-label="Layout">
-              <button type="button" className={`btn ${view === "grid" ? "btn-pressed" : "btn-quiet"}`} aria-pressed={view === "grid"} onClick={() => setView("grid")}>Grid</button>
-              <button type="button" className={`btn ${view === "list" ? "btn-pressed" : "btn-quiet"}`} aria-pressed={view === "list"} onClick={() => setView("list")}>List</button>
+            <div className="flex gap-2" role="group" aria-label={t("ml.layoutAria")}>
+              <button type="button" className={`btn ${view === "grid" ? "btn-pressed" : "btn-quiet"}`} aria-pressed={view === "grid"} onClick={() => setView("grid")}>{t("ml.grid")}</button>
+              <button type="button" className={`btn ${view === "list" ? "btn-pressed" : "btn-quiet"}`} aria-pressed={view === "list"} onClick={() => setView("list")}>{t("ml.list")}</button>
             </div>
           </div>
           {visible.length === 0 ? (
-            <EmptyState title="No files match that search">Try another name, or clear the search and filters.</EmptyState>
+            <EmptyState title={t("ml.noMatch")}>{t("ml.noMatchBody")}</EmptyState>
           ) : view === "grid" ? (
             <ul data-media-library="" className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {visible.map((item) => (
@@ -287,10 +288,10 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
           )}
           {!fixture && live.page ? (
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted" data-testid="media-count">
-              <span>Showing {visible.length} of {live.page.total} file{live.page.total === 1 ? "" : "s"}</span>
+              <span>{t(live.page.total === 1 ? "ml.showingOne" : "ml.showing", { shown: visible.length, total: live.page.total })}</span>
               {live.page.nextOffset !== null ? (
                 <button type="button" className="btn btn-quiet" disabled={live.loadingMore} onClick={() => void live.loadMore()}>
-                  {live.loadingMore ? "Loading…" : "Load more"}
+                  {live.loadingMore ? t("common.loading") : t("ml.loadMore")}
                 </button>
               ) : null}
             </div>
@@ -298,7 +299,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
         </>
       )}
       {renaming ? <RenameDialog item={renaming} onClose={() => setRenaming(null)} onSaved={(fileName) => { setRenaming(null); live.patchItem(renaming.id, { fileName }); toast.show(t("media.renamed", { name: fileName })); void reload(); }} /> : null}
-      {adding ? <AddToPlaylist item={adding} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); toast.show("Added to playlist"); reload(); }} /> : null}
+      {adding ? <AddToPlaylist item={adding} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); toast.show(t("ml.added")); reload(); }} /> : null}
       {toast.node}
       {confirm.node}
     </section>
@@ -317,6 +318,7 @@ export default function MediaPage() {
 }
 
 function Thumb({ item }: { item: MediaItem }) {
+  const t = useT();
   const poster = item.thumbnailUrl || undefined;
   if (item.kind === "video") {
     return <video poster={poster} src={item.url || undefined} muted playsInline preload="none" controls className="block aspect-video w-full bg-black object-contain" />;
@@ -325,8 +327,8 @@ function Thumb({ item }: { item: MediaItem }) {
     const cover = item.thumbnailUrl || item.coverUrl;
     return (
       <Link href={`/dashboard/media/presentations/${item.id}`} className="relative block aspect-video w-full overflow-hidden bg-black" data-presentation-card="">
-        {cover ? <img src={cover} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-sm text-white">Presentation</span>}
-        <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">Presentation</span>
+        {cover ? <img src={cover} alt="" className="size-full object-contain" /> : <span className="grid size-full place-items-center text-sm text-white">{t("ml.presentation")}</span>}
+        <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">{t("ml.presentation")}</span>
       </Link>
     );
   }
@@ -338,46 +340,50 @@ function Thumb({ item }: { item: MediaItem }) {
 }
 
 function Meta({ item }: { item: MediaItem }) {
-  const when = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "";
-  const status = item.processingStatus === "processing" ? "Processing" : item.processingStatus === "failed" ? "Failed" : item.kind === "presentation" ? "Ready" : "";
+  const t = useT();
+  const { locale } = useLocale();
+  const when = item.createdAt ? new Date(item.createdAt).toLocaleDateString(locale === "es" ? "es" : undefined) : "";
+  const status = item.processingStatus === "processing" ? t("ml.processing") : item.processingStatus === "failed" ? t("ml.failed") : item.kind === "presentation" ? t("ml.ready") : "";
   return (
     <p className="text-xs text-muted flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="badge">{item.kind === "video" ? "Video" : item.kind === "presentation" ? "Presentation" : item.slideIndex != null ? `Slide ${(item.slideIndex ?? 0) + 1}` : "Image"}</span>
+      <span className="badge">{item.kind === "video" ? t("ml.video") : item.kind === "presentation" ? t("ml.presentation") : item.slideIndex != null ? t("ml.slideN", { n: (item.slideIndex ?? 0) + 1 }) : t("ml.image")}</span>
       {item.kind === "presentation" ? (
-        <span>{item.slideCount ?? 0} slides · {Math.round((item.defaultDurationMs ?? 10000) / 1000)}s each{status ? ` · ${status}` : ""}{when ? ` · ${when}` : ""}</span>
+        <span>{t("ml.slidesEach", { count: item.slideCount ?? 0, secs: Math.round((item.defaultDurationMs ?? 10000) / 1000) })}{status ? ` · ${status}` : ""}{when ? ` · ${when}` : ""}</span>
       ) : (
         <span>
           {item.kind === "video" && item.durationMs ? `${formatDuration(item.durationMs)} · ` : ""}
           {formatSize(item.sizeBytes)}
         </span>
       )}
-      {item.usedIn && item.usedIn.length > 0 ? <span>In {formatNameList(item.usedIn.map((playlist) => playlist.name))}</span> : null}
+      {item.usedIn && item.usedIn.length > 0 ? <span>{t("ml.in", { names: formatNameList(item.usedIn.map((playlist) => playlist.name), locale) })}</span> : null}
     </p>
   );
 }
 
 function ItemActions({ item, onDelete, onRename, onAdd }: { item: MediaItem; onDelete: () => void; onRename: () => void; onAdd: () => void }) {
+  const t = useT();
   if (item.kind !== "presentation") {
     return (
       <div className="mt-auto flex flex-wrap gap-2">
-        <button type="button" className="btn btn-quiet" onClick={onRename} aria-label={`Rename ${item.fileName}`}>Rename</button>
-        <button type="button" className="btn btn-quiet text-danger" onClick={onDelete}>Delete</button>
+        <button type="button" className="btn btn-quiet" onClick={onRename} aria-label={t("ml.renameAria", { name: item.fileName })}>{t("ml.rename")}</button>
+        <button type="button" className="btn btn-quiet text-danger" onClick={onDelete}>{t("ed.delete")}</button>
       </div>
     );
   }
   return (
     <div className="mt-auto flex flex-wrap gap-2">
-      <Link href={`/dashboard/media/presentations/${item.id}`} className="btn btn-quiet">Preview</Link>
-      <button type="button" className="btn btn-quiet" onClick={onRename}>Rename</button>
-      <button type="button" className="btn btn-quiet" onClick={onAdd} disabled={item.processingStatus === "processing" || item.processingStatus === "failed"}>Add to playlist</button>
-      <button type="button" className="btn btn-quiet text-danger" onClick={onDelete}>Delete</button>
+      <Link href={`/dashboard/media/presentations/${item.id}`} className="btn btn-quiet">{t("ed.preview")}</Link>
+      <button type="button" className="btn btn-quiet" onClick={onRename}>{t("ml.rename")}</button>
+      <button type="button" className="btn btn-quiet" onClick={onAdd} disabled={item.processingStatus === "processing" || item.processingStatus === "failed"}>{t("ml.addToPlaylist")}</button>
+      <button type="button" className="btn btn-quiet text-danger" onClick={onDelete}>{t("ed.delete")}</button>
     </div>
   );
 }
 
 function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: () => void; onSaved: (fileName: string) => void }) {
+  const t = useT();
   const presentation = item.kind === "presentation";
-  const noun = presentation ? "presentation" : "file";
+
   const [name, setName] = useState(item.fileName);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -385,7 +391,7 @@ function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: ()
     if (busy) return;
     // U2-05: files keep their extension and storage path; only the name shown in Pekko changes.
     const checked = presentation ? null : mediaRename(item.fileName, name);
-    if (checked && !checked.ok) { setError(checked.error); return; }
+    if (checked && !checked.ok) { setError(t("ml.nameRequired")); return; }
     setBusy(true);
     setError(null);
     try {
@@ -393,22 +399,22 @@ function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: ()
       const res = await api<{ fileName?: string; name?: string }>(presentation ? `/api/media/presentation/${item.id}` : `/api/media/${item.id}`, { method: "PATCH", body: JSON.stringify({ name: wanted }) });
       onSaved(res.fileName ?? res.name ?? wanted);
     } catch (err) {
-      setError((err as Error).message || "Couldn't rename that file. Try again.");
+      setError((err as Error).message || t("ml.renameFailed"));
     } finally {
       setBusy(false);
     }
   }
   return (
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={`Rename ${noun}`} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-3">Rename {noun}</h2>
-        <input className="field" aria-label={presentation ? "Presentation name" : "File name"} value={name} maxLength={200} autoFocus
+      <div role="dialog" aria-modal="true" aria-label={presentation ? t("ml.renamePres") : t("ml.renameFile")} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-3">{presentation ? t("ml.renamePres") : t("ml.renameFile")}</h2>
+        <input className="field" aria-label={presentation ? t("ml.presName") : t("ml.fileName")} value={name} maxLength={200} autoFocus
           onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void save(); if (event.key === "Escape") onClose(); }} />
-        {presentation ? null : <p className="text-xs text-muted mt-1">Only the name shown in Pekko changes. Screens and playlists keep using this file.</p>}
+        {presentation ? null : <p className="text-xs text-muted mt-1">{t("ml.renameNote")}</p>}
         {error ? <p className="text-sm text-danger mt-2" role="alert">{error}</p> : null}
         <div className="mt-4 flex gap-2">
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
-          <button type="button" className="btn btn-quiet" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? t("ed.saving") : t("ml.save")}</button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>{t("ed.cancel")}</button>
         </div>
       </div>
     </div>
@@ -416,6 +422,7 @@ function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: ()
 }
 
 function AddToPlaylist({ item, onClose, onAdded }: { item: MediaItem; onClose: () => void; onAdded: () => void }) {
+  const t = useT();
   const [lists, setLists] = useState<PlaylistSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playlistId, setPlaylistId] = useState("");
@@ -435,17 +442,17 @@ function AddToPlaylist({ item, onClose, onAdded }: { item: MediaItem; onClose: (
   }
   return (
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label="Add presentation to playlist" className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-3">Add to playlist</h2>
-        <p className="text-sm text-muted mb-3">The presentation is one item. Screens play its slides in order, then continue.</p>
-        <select className="field" aria-label="Playlist" value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
-          <option value="">New playlist</option>
+      <div role="dialog" aria-label={t("ml.addPresAria")} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-3">{t("ml.addToPlaylist")}</h2>
+        <p className="text-sm text-muted mb-3">{t("ml.presentationOneItem")}</p>
+        <select className="field" aria-label={t("ml.playlist")} value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
+          <option value="">{t("ml.newPlaylist")}</option>
           {(lists ?? []).map((playlist) => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
         </select>
         {error ? <p className="text-sm text-danger mt-2">{error}</p> : null}
         <div className="mt-4 flex gap-2">
-          <button type="button" className="btn btn-primary" onClick={() => void add()}>Add</button>
-          <button type="button" className="btn btn-quiet" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={() => void add()}>{t("ml.add")}</button>
+          <button type="button" className="btn btn-quiet" onClick={onClose}>{t("ed.cancel")}</button>
         </div>
       </div>
     </div>

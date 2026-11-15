@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -24,6 +25,7 @@ function ContentNavInner({ pathOverride }: { pathOverride?: string }) {
 }
 
 function ContentNavList({ current }: { current: string | null }) {
+  const t = useT();
   const listRef = useRef<HTMLUListElement>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
 
@@ -35,7 +37,7 @@ function ContentNavList({ current }: { current: string | null }) {
   }, [current]);
 
   return (
-    <nav aria-label="Content" className="content-nav">
+    <nav aria-label={t("cnav.aria")} className="content-nav">
       <ul ref={listRef} className="content-nav-list">
         {CONTENT_TABS.map((tab) => {
           const active = tab.id === current;
@@ -47,7 +49,7 @@ function ContentNavList({ current }: { current: string | null }) {
                 aria-current={active ? "page" : undefined}
                 className="content-nav-link"
               >
-                {tab.label}
+                {t(`hub.${tab.id}.title`)}
               </Link>
             </li>
           );

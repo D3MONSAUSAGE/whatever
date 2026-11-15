@@ -228,7 +228,8 @@ describe("remaining in-app Layout Studio links and copy", () => {
     expect(screens).not.toContain("/dashboard/media/layout-studio?screen=");
     expect(screens).not.toContain("open Layout Studio");
     const picker = readFileSync("components/content-picker.tsx", "utf8");
-    expect(picker).toContain("publish it from Menu boards.");
+    expect(picker).toContain('"cp.noLayouts"'); // I18N-3
+    expect(en["cp.noLayouts"]).toContain("publish it from Menu boards.");
     expect(picker).not.toContain("publish it from Layout Studio");
   });
 });
@@ -243,7 +244,7 @@ describe("embedded editor leave paths", () => {
     expect(studio).toContain("if (alreadyConfirmed) { startFreshBoard(); return; }");
     expect(studio).toContain("confirmDiscard(studioIsDirty(), startFreshBoard)");
     // The Menu boards in-editor link also goes through requestLeave, not a raw navigation.
-    const leaveLink = studio.slice(studio.indexOf(">Menu boards</a>") - 400, studio.indexOf(">Menu boards</a>"));
+    const leaveLink = studio.slice(studio.indexOf('>{t("ls.menuBoards")}</a>') - 400, studio.indexOf('>{t("ls.menuBoards")}</a>'));
     expect(leaveLink).toContain("requestLeave");
     expect(leaveLink).toContain("preventDefault");
   });

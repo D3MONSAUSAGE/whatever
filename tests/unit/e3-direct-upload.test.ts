@@ -1,3 +1,4 @@
+import { en } from "@/lib/i18n/en";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { artImages } from "@/lib/brand-kit";
@@ -27,7 +28,7 @@ describe("E3: upload a logo or photo from the editor", () => {
   it("reuses the Media page pipeline: same checks, 15 MB limit and /api/media endpoint", () => {
     const uploads = readFileSync("components/uploads.tsx", "utf8");
     expect(uploads).toMatch(/const MAX = 15 \* 1024 \* 1024;/);
-    expect(uploads).toMatch(/export async function uploadArtImage[\s\S]*?await uploadImage\(file, onProgress\)/);
+    expect(uploads).toMatch(/export async function uploadArtImage[\s\S]*?await uploadImage\(file, onProgress, t\)/);
     expect(uploads).toMatch(/return uploadForm\("\/api\/media", form, token/);
     const comp = readFileSync("components/direct-image-upload.tsx", "utf8");
     expect(comp).toMatch(/upload = uploadArtImage/);
@@ -52,8 +53,10 @@ describe("E3: upload a logo or photo from the editor", () => {
     expect(classic).toMatch(/signal: abort\.signal/);
     expect(classic.match(/abort\.abort\(\);/g)).toHaveLength(2);
     // A failed refresh over an existing preview says so and offers a retry (Gother low 2).
-    expect(classic).toMatch(/Preview didn&apos;t update\./);
+    expect(classic).toContain('t("ed.previewStale")'); // I18N-3: copy lives in the dictionary
+    expect(en["ed.previewStale"]).toBe("Preview didn't update.");
     expect(classic).toMatch(/setPreviewRetry\(\(n\) => n \+ 1\)/);
-    expect(classic).toMatch(/Updating preview…/);
+    expect(classic).toContain('t("ed.updatingPreview")');
+    expect(en["ed.updatingPreview"]).toBe("Updating preview…");
   });
 });

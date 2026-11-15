@@ -1,9 +1,10 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 import { useState } from "react";
 import { useApi, type DisplayItem, type PlaylistSummary, type ScheduleItem, type ScreenGroupItem } from "@/lib/api";
 import { DAY_PARTS } from "@/lib/menu-templates";
 import { useConfirm } from "@/components/confirm";
-import { dayPartSources, DAY_PART_PRIORITY, PUBLISH_BOARD_FIRST } from "@/lib/day-part-sources";
+import { dayPartSources, DAY_PART_PRIORITY } from "@/lib/day-part-sources";
 import { findOverlaps, isOvernight, overnightMessage, type RuleLike } from "@/lib/schedule-checks";
 
 type MenuLite = { id: string; name: string; playlistId?: string | null };
@@ -19,10 +20,11 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
   preview?: boolean;
   onSubmit: (body: Record<string, unknown>) => Promise<boolean>;
 }) {
+  const t = useT();
   const menus = useApi<{ menus: MenuLite[] }>(preview ? null : "/api/menus");
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState("");
-  const [parts, setParts] = useState<Part[]>(DAY_PARTS.map((p) => ({ enabled: true, label: p.label, start: p.start, end: p.end, source: "" })));
+  const [parts, setParts] = useState<Part[]>(DAY_PARTS.map((p) => ({ enabled: true, label: t(`dp.${p.key}`), start: p.start, end: p.end, source: "" })));
   const [busy, setBusy] = useState(false);
   // QA B2-01 / B2-05: boards that were never published can't play yet, and a published board's
   // own playlist is listed once (as the board), not again under Playlists.
@@ -39,14 +41,14 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
     };
   }
   const chosen = parts.filter((p) => p.enabled);
-  const warnings = target ? chosen.flatMap((part) => findOverlaps(asRule(part), schedules, groups).map((item) => `${part.label}: ${item.message}`)) : [];
+  const warnings = target ? chosen.flatMap((part) => findOverlaps(asRule(part), schedules, groups, undefined, t).map((item) => `${part.label}: ${item.message}`)) : [];
   const overnightParts = chosen.filter((part) => isOvernight(part.start, part.end));
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     for (const part of overnightParts) {
       if (!ask) break;
-      const ok = await ask({ title: `${part.label} runs overnight`, body: overnightMessage(part.start, part.end), confirmLabel: "Yes, run overnight" });
+      const ok = await ask({ title: t("dp.runsOvernight", { part: part.label }), body: overnightMessage(part.start, part.end, t), confirmLabel: t("dp.yesOvernight") });
       if (ok !== true) return;
     }
     const body = {
@@ -68,18 +70,18 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
     <div id="day-parts" className="card p-4 md:p-6 mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Breakfast, lunch &amp; dinner</h2>
-          <p className="text-sm text-muted max-w-xl">Pick what plays at each time of day. Pekko adds one schedule rule per part, every day, in the screen's local time.</p>
+          <h2 className="text-lg font-semibold">{t("dp.title")}</h2>
+          <p className="text-sm text-muted max-w-xl">{t("dp.lede")}</p>
         </div>
-        {!open ? <button className="btn btn-primary" onClick={() => setOpen(true)}>Set up times of day</button> : null}
+        {!open ? <button className="btn btn-primary" onClick={() => setOpen(true)}>{t("dp.open")}</button> : null}
       </div>
       {open ? (
-        <form className="mt-4 grid gap-4" onSubmit={submit} aria-label="Times of day">
-          <label className="grid gap-1 max-w-sm"><span className="form-label">Screen or group</span>
+        <form className="mt-4 grid gap-4" onSubmit={submit} aria-label={t("dp.aria")}>
+          <label className="grid gap-1 max-w-sm"><span className="form-label">{t("dp.target")}</span>
             <select className="field" value={target} onChange={(e) => setTarget(e.target.value)} required>
-              <option value="">Choose…</option>
-              {groups.length ? <optgroup label="Groups">{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}</optgroup> : null}
-              <optgroup label="Screens">{displays.map((d) => <option key={d.id} value={`display:${d.id}`}>{d.name}</option>)}</optgroup>
+              <option value="">{t("ed.choose")}</option>
+              {groups.length ? <optgroup label={t("ed.groups")}>{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}</optgroup> : null}
+              <optgroup label={t("ed.screens")}>{displays.map((d) => <option key={d.id} value={`display:${d.id}`}>{d.name}</option>)}</optgroup>
             </select>
           </label>
           <div className="grid gap-3">
@@ -90,40 +92,40 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
                   <label className="flex items-center gap-2 font-medium">
                     <input type="checkbox" checked={part.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> {part.label}
                   </label>
-                  <label className="grid gap-1"><span className="form-label">Starts</span>
-                    <input className="field" type="time" aria-label={`${part.label} starts`} value={part.start} disabled={!part.enabled} onChange={(e) => set({ start: e.target.value })} /></label>
-                  <label className="grid gap-1"><span className="form-label">Ends</span>
-                    <input className="field" type="time" aria-label={`${part.label} ends`} value={part.end} disabled={!part.enabled} onChange={(e) => set({ end: e.target.value })} /></label>
-                  <label className="grid gap-1"><span className="form-label">Shows</span>
-                    <select className="field" aria-label={`${part.label} shows`} value={part.source} disabled={!part.enabled} onChange={(e) => set({ source: e.target.value })}>
-                      <option value="">Choose…</option>
+                  <label className="grid gap-1"><span className="form-label">{t("dp.starts")}</span>
+                    <input className="field" type="time" aria-label={t("dp.startsAria", { part: part.label })} value={part.start} disabled={!part.enabled} onChange={(e) => set({ start: e.target.value })} /></label>
+                  <label className="grid gap-1"><span className="form-label">{t("dp.ends")}</span>
+                    <input className="field" type="time" aria-label={t("dp.endsAria", { part: part.label })} value={part.end} disabled={!part.enabled} onChange={(e) => set({ end: e.target.value })} /></label>
+                  <label className="grid gap-1"><span className="form-label">{t("dp.shows")}</span>
+                    <select className="field" aria-label={t("dp.showsAria", { part: part.label })} value={part.source} disabled={!part.enabled} onChange={(e) => set({ source: e.target.value })}>
+                      <option value="">{t("ed.choose")}</option>
                       {sources.boards.length ? (
-                        <optgroup label="Menu boards">
+                        <optgroup label={t("ed.menuBoards")}>
                           {sources.boards.map((m) => (
-                            <option key={m.id} value={`menu:${m.id}`} disabled={!m.ready}>{m.ready ? m.name : `${m.name} (publish this board first)`}</option>
+                            <option key={m.id} value={`menu:${m.id}`} disabled={!m.ready}>{m.ready ? m.name : t("dp.publishFirst", { name: m.name })}</option>
                           ))}
                         </optgroup>
                       ) : null}
-                      {sources.playlists.length ? <optgroup label="Playlists">{sources.playlists.map((p) => <option key={p.id} value={`playlist:${p.id}`}>{p.name}</option>)}</optgroup> : null}
+                      {sources.playlists.length ? <optgroup label={t("ed.playlists")}>{sources.playlists.map((p) => <option key={p.id} value={`playlist:${p.id}`}>{p.name}</option>)}</optgroup> : null}
                     </select>
                   </label>
                 </fieldset>
               );
             })}
           </div>
-          {sources.boards.some((m) => !m.ready) ? <p className="text-xs text-muted">{PUBLISH_BOARD_FIRST}</p> : null}
+          {sources.boards.some((m) => !m.ready) ? <p className="text-xs text-muted">{t("dp.publishFirstNote")}</p> : null}
           {overnightParts.length ? (
-            <p className="note-warn text-sm" role="status">{overnightParts.map((part) => `${part.label}: ${overnightMessage(part.start, part.end)}`).join(" ")}</p>
+            <p className="note-warn text-sm" role="status">{overnightParts.map((part) => `${part.label}: ${overnightMessage(part.start, part.end, t)}`).join(" ")}</p>
           ) : null}
           {warnings.length ? (
             <div className="note-warn text-sm grid gap-1" role="status" data-testid="day-part-overlaps">
               {warnings.map((text) => <p key={text}>{text}</p>)}
             </div>
           ) : null}
-          <p className="text-xs text-muted">Outside these times the screen shows its usual content. Times of day are saved with priority {DAY_PART_PRIORITY}, so they win over rules added below with priority 0. You can pause or delete each rule below.</p>
+          <p className="text-xs text-muted">{t("dp.footer", { priority: DAY_PART_PRIORITY })}</p>
           <div className="flex gap-2">
-            <button className="btn btn-primary" disabled={!ready || busy}>{busy ? "Adding…" : "Add schedule"}</button>
-            <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" disabled={!ready || busy}>{busy ? t("dp.adding") : t("dp.add")}</button>
+            <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>{t("ed.cancel")}</button>
           </div>
         </form>
       ) : null}

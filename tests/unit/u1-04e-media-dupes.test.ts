@@ -1,3 +1,4 @@
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { MediaItem } from "@/lib/api";
@@ -32,9 +33,10 @@ describe("U1-04e: duplicate check on the Media page covers images", () => {
     expect(src).toContain('onFiles={(files) => void uploadChecked(files, "image")}');
     expect(src).toContain('onFiles={(files) => void uploadChecked(files, "video")}');
     expect(src).not.toContain('uploads.enqueue(files, "image")');
-    expect(src).toContain('title: "Already in your library"');
-    expect(src).toContain('confirmLabel: "Upload a copy anyway"');
-    expect(src).toContain('cancelLabel: "Keep the one I have"');
+    expect(src).toContain('title: t("ml.dupTitle")'); // I18N-3
+    expect(src).toContain('confirmLabel: t("diu.dupCopy")');
+    expect(src).toContain('cancelLabel: t("diu.dupKeep")');
+    expect(en["ml.dupTitle"]).toBe("Already in your library");
     // Gother low 2: all three upload buttons are disabled while the duplicate check or its prompt is open.
     expect(src.match(/disabled=\{uploads\.busy \|\| checking\}/g)?.length).toBe(3);
     expect(src).toMatch(/setChecking\(true\);\s*try \{ await checkThenUpload/);
