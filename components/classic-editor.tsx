@@ -8,7 +8,7 @@ import { classicPreviewHits, hasUnsavedEdits } from "@/lib/menu-board-unify";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useConfirmDiscard, useRegisterStudioLeave } from "@/components/studio-leave";
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
-import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
+import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
 import { DirectImageUpload } from "@/components/direct-image-upload";
 
@@ -359,7 +359,7 @@ export function ClassicEditor({
 
   const photoPanel = (
     <details ref={photoPanelRef} className="studio-panel" open={step === "photo" || hasPhoto}>
-      <summary className="studio-panel-summary">Photo</summary>
+      <summary className="studio-panel-summary">{t("ed.step.photo")}</summary>
       {region === "photo" ? editingLabel : null}
       <label className="grid gap-1"><span className="form-label">{t("ce.photoOptional")}</span>
         <select ref={photoSelectRef} className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>

@@ -5,7 +5,7 @@ import { useT } from "@/lib/i18n/client";
 import { makeT, type T } from "@/lib/i18n";
 
 const EN: T = makeT("en");
-import { charCount, ITEM_NAME_REQUIRED, needsName, priceHint } from "@/lib/menu-fields";
+import { charCount, needsName, priceHint } from "@/lib/menu-fields";
 import { MENU_LIMITS } from "@/lib/menu-templates";
 
 type Item = { name: string; price: string; description: string };
