@@ -176,7 +176,7 @@ export function ClassicEditor({
       abort.abort();
       window.clearTimeout(timer);
     };
-  }, [draft.template, draft.content, readOnly, previewSrc, previewRetry]);
+  }, [draft.template, draft.content, readOnly, previewSrc, previewRetry, t]);
 
   useEffect(() => () => {
     if (last.current) URL.revokeObjectURL(last.current);

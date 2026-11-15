@@ -98,7 +98,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
     } else if (files.length === 1) toast.show(firstError, true, { durationMs: null });
     else toast.show(t("up.failedSome", { failed, total: files.length, error: firstError }), true, { durationMs: null });
     setBusy(false);
-  }, [patch, toast]);
+  }, [patch, toast, t]);
 
   const recent = useRef(new Map<string, number>());
   const dismiss = useCallback((key: string) => {

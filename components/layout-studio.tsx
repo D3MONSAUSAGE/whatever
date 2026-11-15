@@ -234,7 +234,7 @@ export function LayoutStudio({
       }
       if (loaded.published) setPublished(loaded.published);
     } catch { /* a bad draft is ignored */ }
-  }, [accountMode, fixture, scope]);
+  }, [accountMode, fixture, scope, t]);
 
 
   useEffect(() => {
