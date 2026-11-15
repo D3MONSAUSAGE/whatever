@@ -23,7 +23,7 @@ export function PrivacyEs() {
         <li><strong>Pantallas.</strong> Para cada pantalla vinculada: cuándo se reportó por última vez, lo que informó que estaba reproduciendo, errores de reproducción, períodos sin conexión y un token del dispositivo que se almacena solo como hash. No se recopila nada sobre las personas que pasan frente a una pantalla.</li>
         <li><strong>Actividad propia (de primera parte).</strong> Registros de publicaciones, cambios del contenido de las pantallas, vinculación y eliminación de pantallas, cambios de horarios, y cargas o eliminaciones. También el tiempo de actividad por hora de las pantallas y la reproducción confirmada. Los hitos del producto de la cuenta registran el inicio de la prueba, la primera pantalla vinculada, la primera publicación, el cambio de plan, la cancelación, cuántas pantallas se vincularon durante la prueba y el vencimiento de la prueba. Esas filas de hitos no se muestran en su lista de actividad.</li>
         <li><strong>Plan y facturación.</strong> Plan, fechas de la prueba, estado de la suscripción, el período pagado actual y los identificadores de cliente y de suscripción de Stripe cuando existe una suscripción de pago. Pekko no almacena números de tarjeta.</li>
-        <li><strong>Notificaciones push móviles.</strong> Si usa la app de Pekko y el dispositivo permite notificaciones, un token push de ese dispositivo.</li>
+        <li><strong>Notificaciones push móviles.</strong> Si usa la app de Pekko y el dispositivo permite notificaciones, un token push de ese dispositivo. Para entregar las notificaciones, el software Firebase de Google incluido en la app también crea un ID de instalación de Firebase en el dispositivo y lo comparte con Google; Pekko no almacena ni usa ese ID.</li>
         <li><strong>Límites contra el abuso y registros.</strong> Los intentos de vinculación se limitan usando la dirección IP de la solicitud como clave del límite de frecuencia. Esa clave puede permanecer en la tabla de límites de frecuencia; esta aplicación no fija una fecha de destrucción aparte para ella. Los registros de errores de Vercel generados por esta aplicación incluyen el método, la ruta y un mensaje breve. No incluyen encabezados, cookies ni cuerpos de las solicitudes.</li>
       </ul>
 
@@ -48,7 +48,7 @@ export function PrivacyEs() {
         <li><strong>Vercel</strong> aloja el sitio web y la API.</li>
         <li><strong>Stripe</strong> procesa las suscripciones de pago cuando se inicia un plan de pago, conforme a Stripe Billing estándar. Pekko es el vendedor. La publicación de esta política no activa cargos.</li>
         <li><strong>Resend</strong> envía correos transaccionales del servicio y de facturación. El dominio de envío verificado pekkotv.com reporta la región us-east-1. Esa es la región de envío, no una promesa de que todos los sistemas de Resend permanezcan allí. La dirección de soporte que aparece abajo recibe correo en ese dominio. Use esa dirección, no el remitente de facturación, para asuntos de privacidad y soporte.</li>
-        <li><strong>Google Firebase Cloud Messaging</strong> entrega las notificaciones push móviles cuando se registra un token de dispositivo y el dispositivo permite notificaciones.</li>
+        <li><strong>Google Firebase Cloud Messaging</strong> entrega las notificaciones push móviles cuando se registra un token de dispositivo y el dispositivo permite notificaciones. Recibe el token push, el ID de instalación de Firebase y el contenido de la notificación.</li>
       </ul>
       <p>No se ofrece ninguna garantía de residencia exclusiva de los datos ni de transferencia internacional. Una región reportada de proyecto o de envío no garantiza que todo el procesamiento permanezca en esa región.</p>
 
@@ -59,7 +59,7 @@ export function PrivacyEs() {
       <h2 className="font-semibold text-lg">Opciones</h2>
       <ul className="list-disc pl-5 grid gap-1">
         <li>Actualice el nombre visible, el nombre del negocio y la contraseña en Configuración. El correo de la cuenta se muestra allí.</li>
-        <li>Permita o rechace las notificaciones móviles en el dispositivo. Un token push se almacena solo cuando se usan notificaciones.</li>
+        <li>Permita o rechace las notificaciones móviles en el dispositivo, o desactive las alertas push en Configuración de Pekko. Un token push se almacena solo cuando se usan notificaciones.</li>
         <li>Cancele una suscripción desde el portal de facturación que proporciona Stripe una vez que exista un plan de pago. La cancelación detiene la siguiente renovación.</li>
         <li>Decida qué pantallas siguen activas cuando un plan incluye menos pantallas. Las demás se pausan. El contenido se conserva.</li>
         <li>Solicite la eliminación, o cancele una eliminación pendiente, como se describe arriba.</li>
