@@ -2,6 +2,7 @@
 import { useCallback, useContext, useEffect, useRef, useState, createContext, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { armToastTimer } from "@/lib/upload-notice";
+import { useT } from "@/lib/i18n/client";
 
 type ToastOptions = { durationMs?: number | null; href?: string; hrefLabel?: string };
 type ToastMessage = { text: string; error?: boolean; href?: string; hrefLabel?: string };
@@ -91,6 +92,7 @@ function useLocalToast(): ToastApi {
 }
 
 export function ToastView({ message, onDismiss }: { message: ToastMessage; onDismiss: () => void }) {
+  const t = useT();
   return (
     <div
       role={message.error ? "alert" : "status"}
@@ -100,9 +102,9 @@ export function ToastView({ message, onDismiss }: { message: ToastMessage; onDis
     >
       <p className="flex-1 leading-relaxed">
         {message.text}
-        {message.href ? <> <a className="underline underline-offset-2" href={message.href}>{message.hrefLabel || "Open"}</a></> : null}
+        {message.href ? <> <a className="underline underline-offset-2" href={message.href}>{message.hrefLabel || t("toast.open")}</a></> : null}
       </p>
-      <button type="button" className="shrink-0 underline underline-offset-2" onClick={onDismiss}>Dismiss</button>
+      <button type="button" className="shrink-0 underline underline-offset-2" onClick={onDismiss}>{t("toast.dismiss")}</button>
     </div>
   );
 }

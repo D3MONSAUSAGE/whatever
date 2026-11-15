@@ -33,7 +33,8 @@ describe("I18N-1 dictionaries", () => {
     for (const k of ENGLISH_ONLY) expect(es[k]).toBe(en[k]);
     const same = (Object.keys(en) as (keyof typeof en)[]).filter((k) => es[k] === en[k] && !ENGLISH_ONLY.includes(k));
     // Words that are the same in both languages.
-    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video", "ptpl.happy.name"].sort());
+    // R12-06: "Happy hour" is now "Hora feliz" in Spanish, so ptpl.happy.name left this list.
+    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video"].sort());
   });
 
   it("uses formal usted (no tú forms) and never translates Pekko", () => {

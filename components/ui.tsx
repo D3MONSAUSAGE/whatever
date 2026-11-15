@@ -1,6 +1,6 @@
 "use client";
 import { LogoMark, WaveBackdrop } from "@/components/brand";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
 
 /**
@@ -133,4 +133,26 @@ export function LimitNote({ count, max, noun, nounKey }: { count: number | null 
         : t("ui.limitUsed", { count, max, noun: word })}
     </p>
   );
+}
+
+/**
+ * R12-10: a required field's empty-field message in the UI language. English keeps the browser's own
+ * message (no change); Spanish gets "Complete este campo." Validation itself is unchanged: the field
+ * stays `required`, and the custom message is cleared on the next input.
+ */
+export function useRequiredMessage() {
+  const { t, locale } = useLocale();
+  return {
+    onInvalid: (event: React.FormEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const el = event.currentTarget;
+      const message = requiredMessageFor(locale, el.validity.valueMissing, t);
+      if (message) el.setCustomValidity(message);
+    },
+    onInput: (event: React.FormEvent<HTMLInputElement | HTMLSelectElement>) => event.currentTarget.setCustomValidity(""),
+  };
+}
+
+/** The custom empty-field message, or null to keep the browser's own (English, or a non-empty field). */
+export function requiredMessageFor(locale: string, valueMissing: boolean, t: (key: "common.required") => string): string | null {
+  return locale === "es" && valueMissing ? t("common.required") : null;
 }

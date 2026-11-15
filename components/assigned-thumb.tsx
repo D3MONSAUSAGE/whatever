@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import type { DisplayItem } from "@/lib/api";
-import { assignedContentPreview, assignedKindLabel } from "@/lib/assigned-content";
+import { assignedCaption, assignedContentPreview, assignedKindLabel } from "@/lib/assigned-content";
+import { useT } from "@/lib/i18n/client";
 
 /** Small 16:9 assigned-content preview. Never presented as a live TV image. A broken or expired still falls back to the typed placeholder — the browser broken-image icon is never shown. */
 export function AssignedThumb({ display, size = "card" }: { display: DisplayItem; size?: "card" | "large" }) {
+  const t = useT();
   const preview = assignedContentPreview(display);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = preview.src && preview.src !== failedSrc ? preview.src : null;
@@ -29,13 +31,13 @@ export function AssignedThumb({ display, size = "card" }: { display: DisplayItem
         ) : (
           <span className="assigned-thumb-fallback" data-testid="assigned-thumb-fallback">
             <span className="assigned-thumb-icon">{iconFor(preview.kind)}</span>
-            <span className="assigned-thumb-kind">{assignedKindLabel(preview.kind)}</span>
+            <span className="assigned-thumb-kind">{assignedKindLabel(preview.kind, t)}</span>
           </span>
         )}
       </div>
       <figcaption className="assigned-thumb-caption">
-        {preview.kind !== "empty" ? <span className="assigned-thumb-label">{preview.label}</span> : null}
-        <span className="assigned-thumb-sr sr-only">{assignedKindLabel(preview.kind)}{preview.name ? `: ${preview.name}` : ""}</span>
+        {preview.kind !== "empty" ? <span className="assigned-thumb-label">{assignedCaption(preview.label, t)}</span> : null}
+        <span className="assigned-thumb-sr sr-only">{assignedKindLabel(preview.kind, t)}{preview.name ? `: ${preview.name}` : ""}</span>
       </figcaption>
       <style>{`
         .assigned-thumb { margin: 0; flex: 0 0 auto; width: 128px; min-width: 112px; }

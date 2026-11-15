@@ -400,7 +400,7 @@ export function ClassicEditor({
                 <span className="h-6 flex-1 rounded" style={{ background: tpl.swatch[0], border: "1px solid #d5e2f2" }} />
                 <span className="h-6 w-8 rounded" style={{ background: tpl.swatch[1] }} />
               </span>
-              <span className="font-medium block">{tpl.name}</span>
+              <span className="font-medium block">{t(`tpl.${tpl.id}.name`)}</span>
               <span className="text-xs text-muted">{t(`tpl.${tpl.id}.blurb`)}</span>
             </label>
           ))}

@@ -424,7 +424,7 @@ function Rules({
   const selected = playlists.find((playlist) => playlist.id === playlistId);
   const effectiveEnd = untilMidnight ? "24:00" : endTime;
   const draft: RuleLike = {
-    name: name || "This rule",
+    name: name || t("sched.thisRule"),
     displayId: target === "display" ? displayId || null : null,
     groupId: target === "group" ? groupId || null : null,
     weekdays, startTime, endTime: effectiveEnd, startsOn: startsOn || null, endsOn: endsOn || null,
@@ -472,7 +472,7 @@ function Rules({
         <select id="schedule-playlist" className="field" aria-label={t("ss.playlist")} value={playlistId} onChange={(event) => setPlaylistId(event.target.value)} required>
           <option value="">{t("ss.choosePlaylist")}</option>
           {playlists.map((playlist) => (
-            <option key={playlist.id} value={playlist.id}>{playlist.name}{playlist.publishedAt ? "" : " (not published)"}</option>
+            <option key={playlist.id} value={playlist.id}>{playlist.name}{playlist.publishedAt ? "" : ` ${t("sa2.notPublished")}`}</option>
           ))}
         </select>
         {playlistId ? (

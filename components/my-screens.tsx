@@ -8,7 +8,7 @@ import { useT } from "@/lib/i18n/client";
 import { onlineNow, syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
 import { GroupPublish } from "@/components/group-publish";
-import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit } from "@/components/ui";
+import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit, useRequiredMessage } from "@/components/ui";
 import { AssignedThumb } from "@/components/assigned-thumb";
 import { ScreenActions, type ScreenLibrary } from "@/components/screen-actions";
 import { ReconnectTv } from "@/components/reconnect-tv";
@@ -183,6 +183,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
   const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
   const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const groups = fixture ? { data: fixture.groups, error: null as string | null, reload: async () => {} } : liveGroups;
   const displays = fixture ? { data: fixture.displays, error: null as string | null, reload: async () => {} } : liveDisplays;
   const toast = useToast();
@@ -225,7 +226,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
           <h2 className="font-semibold">{t("groups.new")}</h2>
           <p className="text-sm text-muted">{t("groups.newHelp")}</p>
           <label className="text-sm font-semibold">{t("groups.name")}
-            <input className="field mt-1" aria-label={t("groups.name")} value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} placeholder={t("groups.namePlaceholder")} />
+            <input className="field mt-1" aria-label={t("groups.name")} value={name} onChange={(event) => setName(event.target.value)} required {...requiredMsg} maxLength={80} placeholder={t("groups.namePlaceholder")} />
           </label>
           {displays.data ? <GroupMembers displays={displays.data} picked={picked} onChange={setPicked} /> : <p className="text-sm text-muted">{t("screens.loading")}</p>}
           <LimitNote count={groups.data?.length} max={100} noun="screen groups" nounKey="groups.limitNoun" />

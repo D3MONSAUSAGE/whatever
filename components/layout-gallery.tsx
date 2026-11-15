@@ -2,7 +2,7 @@
 import { useT } from "@/lib/i18n/client";
 
 import { layoutThumbnailSrc } from "@/lib/layout-thumbnails";
-import { layoutUsesPromoArea, PROMO_AREA_HINT, type LayoutOption } from "@/lib/menu-board-unify";
+import { layoutUsesPromoArea, type LayoutOption } from "@/lib/menu-board-unify";
 
 export function LayoutGallery({
   options,
@@ -46,10 +46,10 @@ export function LayoutGallery({
                 <div className="aspect-video rounded-lg overflow-hidden bg-ink/5 mb-3" aria-hidden>
                   <img src={layoutThumbnailSrc(option.id)} alt="" className="w-full h-full object-contain" />
                 </div>
-                <span className="font-medium block">{option.name}</span>
-                <span className="text-sm text-muted block mt-1">{option.blurb}</span>
+                <span className="font-medium block">{t(`lo.${option.id}.name`)}</span>
+                <span className="text-sm text-muted block mt-1">{t(`lo.${option.id}.blurb`)}</span>
                 {layoutUsesPromoArea(option.id) ? (
-                  <span className="text-sm text-muted block mt-1">{PROMO_AREA_HINT}</span>
+                  <span className="text-sm text-muted block mt-1">{t("lo.promoHint")}</span>
                 ) : null}
               </button>
             </li>
@@ -68,7 +68,7 @@ export function LayoutGallery({
         </button>
         <button type="button" className="btn btn-quiet min-h-11" onClick={onCancel}>{t("ed.cancel")}</button>
         <p className="text-sm text-muted self-center">
-          {selected ? t("lg.next", { name: selected.name }) : t("lg.pick")}
+          {selected ? t("lg.next", { name: t(`lo.${selected.id}.name`) }) : t("lg.pick")}
         </p>
       </div>
     </div>

@@ -80,8 +80,9 @@ export function boardAfterReload(studio: AccountStudio, menuId: string | null, o
 }
 
 /** A new board starts empty. The name is separate from the sample menu title. */
-export function freshBoard(existingCount: number, requested?: string | null): { name: string; document: LayoutDocument } {
-  const fallback = `Untitled board ${Math.max(0, existingCount) + 1}`;
+/** `baseName` is the UI-language word ("Untitled board" / "Menú sin nombre"); only used at creation, never to rename. */
+export function freshBoard(existingCount: number, requested?: string | null, baseName = "Untitled board"): { name: string; document: LayoutDocument } {
+  const fallback = `${baseName} ${Math.max(0, existingCount) + 1}`;
   const name = (requested ?? fallback).trim().slice(0, 80) || fallback;
   return {
     name,

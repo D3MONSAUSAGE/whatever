@@ -196,7 +196,7 @@ export function LayoutStudio({
     if (!prev || sameStudioScope(prev, scope)) return;
     if (accountMode) {
       if (origin && scope && !sameStudioScope(origin, scope)) {
-        const created = freshBoard(account?.boards.length ?? 0);
+        const created = freshBoard(account?.boards.length ?? 0, undefined, t("ls.untitled"));
         applyFresh(created, scope);
         setNote(t("ls.switched"));
       }
@@ -211,7 +211,7 @@ export function LayoutStudio({
         setVideoOn(next.draft.videoOn);
         setOrigin(scope);
       } else {
-        applyFresh(freshBoard(0), scope);
+        applyFresh(freshBoard(0, undefined, t("ls.untitled")), scope);
       }
       setPublished(next.published);
     } catch { /* private mode */ }
@@ -261,7 +261,7 @@ export function LayoutStudio({
           videoOn: nextVideoOn,
         });
       } else {
-        const created = initialTemplate ? { name: freshBoard(fixture.boards.length).name, document: sampleLayout(initialTemplate) } : freshBoard(fixture.boards.length);
+        const created = initialTemplate ? { name: freshBoard(fixture.boards.length, undefined, t("ls.untitled")).name, document: sampleLayout(initialTemplate) } : freshBoard(fixture.boards.length, undefined, t("ls.untitled"));
         const seeded = seedBrand(created.document, brand?.brand);
         setMenuId(null);
         setBoardName(created.name);
@@ -289,18 +289,18 @@ export function LayoutStudio({
         const loaded = readAccountStudio(body);
         if (!loaded) { setNote(t("ls.cantRead")); return; }
         setAccount(loaded);
-        const result = signedInPreviewLoad(loaded, null);
+        const result = signedInPreviewLoad(loaded, null, t("ls.untitled"));
         // Read scope from a ref so a slow resolveStudioScope cannot leave origin null.
         const currentScope = scopeRef.current;
         const preferred = initialBoardId ? loaded.boards.find((item) => item.id === initialBoardId) : null;
         if (preferred) {
           adoptBoard(preferred, loaded, false, currentScope);
         } else if (initialTemplate && !initialBoardId) {
-          applyFresh({ name: freshBoard(loaded.boards.length).name, document: sampleLayout(initialTemplate) }, currentScope);
+          applyFresh({ name: freshBoard(loaded.boards.length, undefined, t("ls.untitled")).name, document: sampleLayout(initialTemplate) }, currentScope);
         } else if (result.kind === "board" && result.board) {
           adoptBoard(result.board, loaded, false, currentScope);
         } else {
-          applyFresh(result.fresh ?? freshBoard(0), currentScope);
+          applyFresh(result.fresh ?? freshBoard(0, undefined, t("ls.untitled")), currentScope);
         }
         setNote("");
       }).catch((err: Error) => { if (!cancel) setNote(err.message); });
@@ -320,13 +320,13 @@ export function LayoutStudio({
       if (!loaded || cancel) return;
       setSessionToken(token);
       setAccount(loaded);
-      const result = signedInPreviewLoad(loaded, null);
+      const result = signedInPreviewLoad(loaded, null, t("ls.untitled"));
       if (result.kind === "board" && result.board) {
         adoptBoard(result.board, loaded, true);
         if (nextScope) setOrigin(nextScope);
       } else {
         // No board on this account: never keep a previous org's draft on screen.
-        applyFresh(result.fresh ?? freshBoard(0), nextScope);
+        applyFresh(result.fresh ?? freshBoard(0, undefined, t("ls.untitled")), nextScope);
       }
       setNote("");
     }).catch(() => { /* no session: the browser preview stays local */ });
@@ -380,7 +380,7 @@ export function LayoutStudio({
   }
 
   function startFreshBoard() {
-    const created = freshBoard(account?.boards.length ?? 0, window.prompt("Name this board", freshBoard(account?.boards.length ?? 0).name));
+    const created = freshBoard(account?.boards.length ?? 0, window.prompt(t("ls.namePrompt"), freshBoard(account?.boards.length ?? 0, undefined, t("ls.untitled")).name), t("ls.untitled"));
     applyFresh(created, scopeRef.current);
     setNote("");
   }
@@ -583,7 +583,7 @@ export function LayoutStudio({
     const guard = saveAccountGuard(currentOrigin, currentScope);
     if (!guard.allow) {
       if (guard.resetToFresh) {
-        applyFresh(freshBoard(account?.boards.length ?? 0), currentScope);
+        applyFresh(freshBoard(account?.boards.length ?? 0, undefined, t("ls.untitled")), currentScope);
       }
       setNote(guard.message);
       return;
@@ -871,7 +871,7 @@ export function LayoutStudio({
             <div className="board-bar">
               <select aria-label={t("ls.switch")} className="board-switch" value={menuId ?? ""} onChange={(event) => selectBoard(event.target.value)}>
                 {menuId ? null : <option value="">{boardName || t("ls.untitled")}</option>}
-                {account.boards.map((board) => <option key={board.id} value={board.id}>{board.id === menuId ? boardChoice({ ...board, name: boardName || board.name }, locale) : boardChoice(board, locale)}</option>)}
+                {account.boards.map((board) => <option key={board.id} value={board.id}>{board.id === menuId ? boardChoice({ ...board, name: boardName || board.name }, locale, t) : boardChoice(board, locale, t)}</option>)}
               </select>
               <button type="button" className="btn btn-quiet board-new" onClick={() => newBoard()}>{t("ls.newBoard")}</button>
             </div>
@@ -1060,10 +1060,10 @@ function columnTemplate(template: LayoutTemplate) {
 
 
 function TemplatePicker({ template, onChoose }: { template: LayoutTemplate; onChoose: (id: LayoutTemplate) => void }) {
+  const t = useT();
   return (
     <div className="template-thumbs" role="list">
       {TEMPLATES.map((id) => {
-        const spec = templateSpec(id);
         const selected = id === template;
         return (
           <button
@@ -1072,14 +1072,14 @@ function TemplatePicker({ template, onChoose }: { template: LayoutTemplate; onCh
             role="listitem"
             className="template-thumb"
             aria-pressed={selected}
-            aria-label={spec.name}
+            aria-label={t(`lt.${id}.name`)}
             onClick={() => onChoose(id)}
           >
             <span className="template-thumb-frame">
               <img src={studioTemplateThumbnailSrc(id)} alt="" />
               {selected ? <span className="template-thumb-check" aria-hidden="true">✓</span> : null}
             </span>
-            <span className="template-thumb-name">{spec.name}</span>
+            <span className="template-thumb-name">{t(`lt.${id}.name`)}</span>
           </button>
         );
       })}
@@ -1418,8 +1418,8 @@ function enlargePreviewText(svg: string) {
   return svg.replace(/font-size="([\d.]+)"/g, (_match, size) => `font-size="${Math.round(Number(size) * 1.12)}"`);
 }
 
-function boardChoice(board: AccountBoard, locale: string = "en") {
-  const layout = templateSpec(board.document.template).name;
+function boardChoice(board: AccountBoard, locale: string, t: T) {
+  const layout = t(`lt.${board.document.template}.name`);
   const when = board.updatedAt ? new Intl.DateTimeFormat(locale === "es" ? "es" : "en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(board.updatedAt)) : "";
   return [board.name, layout, when].filter(Boolean).join(" · ");
 }

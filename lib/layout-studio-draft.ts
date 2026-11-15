@@ -185,14 +185,14 @@ export function editorStateAfterScopeChange(storage: Pick<Storage, "getItem">, n
  * When the signed-in preview has no board for this account, start a fresh one.
  * Never keep a previous org's document on screen.
  */
-export function signedInPreviewLoad(studio: AccountStudio, menuId: string | null): {
+export function signedInPreviewLoad(studio: AccountStudio, menuId: string | null, baseName?: string): {
   kind: "board" | "fresh";
   board: ReturnType<typeof boardAfterReload>;
   fresh?: ReturnType<typeof freshBoard>;
 } {
   const board = boardAfterReload(studio, menuId);
   if (board) return { kind: "board", board };
-  return { kind: "fresh", board: null, fresh: freshBoard(studio.boards.length) };
+  return { kind: "fresh", board: null, fresh: freshBoard(studio.boards.length, undefined, baseName) };
 }
 
 export type SaveAccountGuard = { allow: true } | { allow: false; resetToFresh: boolean; message: string };
