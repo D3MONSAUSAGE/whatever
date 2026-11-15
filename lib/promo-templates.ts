@@ -1,5 +1,8 @@
 /** Shared (client + server) promo-slide definitions and validation (M12). */
 import type { MenuTemplate } from "./menu-templates";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 
 export type PromoTemplate = "happy" | "deal" | "special";
 export type PromoContent = {
@@ -36,9 +39,9 @@ export function promoBase(template: PromoTemplate): MenuTemplate {
  * deal is never published by accident. Saved promos keep whatever they already say.
  */
 const PLACEHOLDER = /^\[.*\]$/;
-const FIELD_NAMES: Record<string, string> = { headline: "headline", subheadline: "subheadline", price: "price", details: "details", footer: "bottom line" };
-export function placeholderFields(content: PromoContent): string[] {
-  return (Object.keys(FIELD_NAMES) as (keyof PromoContent)[]).filter((key) => typeof content[key] === "string" && PLACEHOLDER.test((content[key] as string).trim())).map((key) => FIELD_NAMES[key as string]);
+const FIELD_NAMES = { headline: "promo.field.headline", subheadline: "promo.field.subheadline", price: "promo.field.price", details: "promo.field.details", footer: "promo.field.footer" } as const;
+export function placeholderFields(content: PromoContent, t: T = EN): string[] {
+  return (Object.keys(FIELD_NAMES) as (keyof typeof FIELD_NAMES)[]).filter((key) => typeof content[key] === "string" && PLACEHOLDER.test((content[key] as string).trim())).map((key) => t(FIELD_NAMES[key]));
 }
 
 export function samplePromo(template: PromoTemplate = "happy"): PromoContent {
