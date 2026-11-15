@@ -9,9 +9,9 @@ export function sameLibraryVideo(items: MediaItem[] | null | undefined, file: { 
   return items.find((item) => (item.kind ?? "video") === "video" && item.fileName === file.name && item.sizeBytes === file.size) ?? null;
 }
 
-/** The library search URL used to look for one file name among this account's videos (read only, existing API). */
-export function libraryLookupUrl(name: string): string {
-  const p = new URLSearchParams({ limit: "48", offset: "0", sort: "newest", grouped: "1", kind: "video", q: name });
+/** The library search URL used to look for one file name among this account's videos or images (read only, existing API). */
+export function libraryLookupUrl(name: string, kind: "video" | "image" = "video"): string {
+  const p = new URLSearchParams({ limit: "48", offset: "0", sort: "newest", grouped: "1", kind, q: name });
   return `/api/media?${p}`;
 }
 
@@ -36,6 +36,15 @@ export function duplicateImageMessage(name: string): string {
 export function duplicateMessage(names: string[]): string {
   const list = names.length === 1 ? `“${names[0]}” is` : `${names.length} of these videos are`;
   return `${list} already in your library with the same name and size. Uploading again makes a second copy.`;
+}
+
+/**
+ * QA U1-04e: images picked on the Media page that are already in the library (same file name;
+ * images are re-encoded, so size can't be compared). Same rule as the editor and Brand Kit check.
+ */
+export function duplicateImagesMessage(names: string[]): string {
+  if (names.length === 1) return duplicateImageMessage(names[0]);
+  return `${names.length} of these images are already in your library with the same name. Uploading again makes second copies.`;
 }
 
 /** How long the duplicate check may take before the upload goes ahead as normal (Gother PR94 low). */
