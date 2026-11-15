@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { AuthFrame, friendlyAuthError, isRecoveryUrl, MIN_PASSWORD } from "@/components/auth-frame";
@@ -26,11 +26,19 @@ function Login() {
   const [pending, setPending] = useState<string | null>(null);
   const [resendWait, setResendWait] = useState(0);
   const [resending, setResending] = useState(false);
+  // Screen readers hear one polite message when the wait ends, not a per-second countdown (Gother #104 low 3).
+  const [announce, setAnnounce] = useState("");
+  const wasWaiting = useRef(false);
 
   useEffect(() => {
     if (resendWait <= 0) return;
     const t = setTimeout(() => setResendWait((n) => n - 1), 1000);
     return () => clearTimeout(t);
+  }, [resendWait]);
+
+  useEffect(() => {
+    if (resendWait > 0) { wasWaiting.current = true; setAnnounce(""); }
+    else if (wasWaiting.current) { wasWaiting.current = false; setAnnounce("You can send a new confirmation email now."); }
   }, [resendWait]);
 
   useEffect(() => {
@@ -54,7 +62,8 @@ function Login() {
         ? await getSupabase().auth.signInWithPassword({ email, password })
         : await getSupabase().auth.signUp({ email, password, options: { emailRedirectTo: confirmRedirect() } });
       if (res.error) {
-        if (needsConfirmation(res.error)) { setPending(email.trim()); return setNote({ text: "Confirm your email first. Open the link we sent you, or send a new one below.", error: true }); }
+        // Gother #104 low 2: an unconfirmed sign-in starts the same 60 s wait as sign-up.
+        if (needsConfirmation(res.error)) { setPending(email.trim()); setResendWait(RESEND_COOLDOWN_S); return setNote({ text: "Confirm your email first. Open the link we sent you, or send a new one below.", error: true }); }
         return setNote({ text: friendlyAuthError(res.error.message), error: true });
       }
       if (res.data.session) return router.replace(nextPath());
@@ -117,9 +126,10 @@ function Login() {
       {note && <p role={note.error ? "alert" : "status"} className={`mt-4 ${note.error ? "note-error" : "note-ok"}`}>{note.text}</p>}
       {pending ? (
         <button type="button" className="btn btn-quiet w-full mt-3" data-testid="resend-confirmation" onClick={resend} disabled={resending || resendWait > 0}>
-          {resending ? "Sending…" : resendWait > 0 ? `Resend confirmation email (${resendWait}s)` : "Resend confirmation email"}
+          {resending ? "Sending…" : resendWait > 0 ? "Resend confirmation email (wait a minute)" : "Resend confirmation email"}
         </button>
       ) : null}
+      <p className="sr-only" aria-live="polite" data-testid="resend-announce">{announce}</p>
     </AuthFrame>
   );
 }

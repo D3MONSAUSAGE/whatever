@@ -99,9 +99,14 @@ describe("E4: sign-up confirmation keeps ?next= and can be resent", () => {
 
       const resend = page.getByTestId("resend-confirmation");
       expect(await resend.isDisabled()).toBe(true);
-      expect(await resend.textContent()).toMatch(/\(60s\)/);
+      expect(await resend.textContent()).toBe("Resend confirmation email (wait a minute)");
+      expect(await page.getByTestId("resend-announce").textContent()).toBe("");
+      await page.clock.runFor(30_000);
+      expect(await resend.textContent()).toBe("Resend confirmation email (wait a minute)"); // static, no per-second label
       for (let i = 0; i < 61; i++) { await page.clock.runFor(1000); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null)))); }
       await expect.poll(() => resend.isDisabled()).toBe(false);
+      expect(await resend.textContent()).toBe("Resend confirmation email");
+      expect(await page.getByTestId("resend-announce").textContent()).toBe("You can send a new confirmation email now.");
       await resend.click();
       await expect.poll(async () => (await calls()).length).toBe(2);
       expect((await calls())[1]).toEqual(["resend", { type: "signup", email: "new@example.com", options: { emailRedirectTo: "https://pekkotv.test/dashboard/screens?add=1" } }]);
@@ -114,7 +119,12 @@ describe("E4: sign-up confirmation keeps ?next= and can be resent", () => {
       await page.getByLabel("Password").fill("correct-horse-1");
       await page.getByRole("button", { name: "Sign in" }).click();
       await expect.poll(() => page.getByRole("alert").textContent()).toContain("Confirm your email first");
-      await page.getByTestId("resend-confirmation").click();
+      const again = page.getByTestId("resend-confirmation");
+      expect(await again.isDisabled()).toBe(true); // unconfirmed sign-in starts the 60 s wait too
+      expect(await again.textContent()).toBe("Resend confirmation email (wait a minute)");
+      for (let i = 0; i < 61; i++) { await page.clock.runFor(1000); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null)))); }
+      await expect.poll(() => again.isDisabled()).toBe(false);
+      await again.click();
       await expect.poll(async () => (await calls()).at(-1)?.[0]).toBe("resend");
       expect((await calls()).at(-1)?.[1]).toEqual({ type: "signup", email: "later@example.com", options: { emailRedirectTo: "https://pekkotv.test/dashboard" } });
     } finally {
