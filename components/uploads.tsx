@@ -1,10 +1,14 @@
 "use client";
+import { useT } from "@/lib/i18n/client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api, authToken, uploadForm } from "@/lib/api";
 import { prepareImage } from "@/lib/prepare-image";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { useToast } from "@/components/toast";
 import { UPLOAD_SUCCESS_TOAST_MS, bannerJobs, uploadSuccessCopy } from "@/lib/upload-notice";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX = 15 * 1024 * 1024;
@@ -38,6 +42,7 @@ export function useUploads() {
 
 /** Uploads live for the whole dashboard visit, so opening another page does not drop them. */
 export function UploadsProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [jobs, setJobs] = useState<UploadJob[]>([]);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -53,7 +58,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       name: file.name,
       progress: 0,
       state: "queued",
-      detail: "Waiting",
+      detail: t("up.waiting"),
     }));
     setJobs(queue);
     setBusy(true);
@@ -64,19 +69,19 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       const file = files[index];
       const key = queue[index].key;
       const detail =
-        kind === "image" ? "Preparing image…"
-        : kind === "video" ? "Checking video…"
-        : "Checking presentation…";
+        kind === "image" ? t("up.prepImage")
+        : kind === "video" ? t("up.checkVideo")
+        : t("up.checkPres");
       patch(key, { state: "active", detail });
       try {
-        if (kind === "image") await uploadImage(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
-        else if (kind === "video") await uploadVideo(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
+        if (kind === "image") await uploadImage(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }), t);
+        else if (kind === "video") await uploadVideo(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }), t);
         else {
-          const result = await uploadPresentation(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }));
+          const result = await uploadPresentation(file, (progress, d) => patch(key, { progress, detail: d, state: "active" }), t);
           patch(key, { playlistId: result.playlistId });
           if (result.playlistId) playlistHref = `/dashboard/playlists/${result.playlistId}`;
         }
-        patch(key, { state: "done", progress: 100, detail: "Uploaded" });
+        patch(key, { state: "done", progress: 100, detail: t("up.uploaded") });
       } catch (err) {
         failed += 1;
         const message = (err as Error).message;
@@ -85,13 +90,13 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       }
     }
     if (failed === 0) {
-      toast.show(uploadSuccessCopy(files.length, kind), false, {
+      toast.show(uploadSuccessCopy(files.length, kind, t), false, {
         durationMs: UPLOAD_SUCCESS_TOAST_MS,
         href: playlistHref,
-        hrefLabel: playlistHref ? "Open playlist" : undefined,
+        hrefLabel: playlistHref ? t("up.openPlaylist") : undefined,
       });
     } else if (files.length === 1) toast.show(firstError, true, { durationMs: null });
-    else toast.show(`${failed} of ${files.length} files could not be uploaded. ${firstError}`, true, { durationMs: null });
+    else toast.show(t("up.failedSome", { failed, total: files.length, error: firstError }), true, { durationMs: null });
     setBusy(false);
   }, [patch, toast]);
 
@@ -133,14 +138,15 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function UploadProgress({ jobs: jobsOverride, onDismiss }: { jobs?: UploadJob[]; onDismiss?: (key: string) => void } = {}) {
+  const t = useT();
   const uploads = useUploads();
   const jobs = bannerJobs(jobsOverride ?? uploads.jobs);
   const dismiss = onDismiss ?? uploads.dismiss;
   if (!jobs.length) return null;
   const active = jobs.some((job) => job.state === "queued" || job.state === "active");
   return (
-    <ul className="card mb-6 divide-y divide-line" aria-label="Upload progress">
-      {active ? <li className="px-4 py-2 text-xs text-muted">Uploads keep going if you open another page. Leaving the site stops them. Presentation conversion can take a minute.</li> : null}
+    <ul className="card mb-6 divide-y divide-line" aria-label={t("up.aria")}>
+      {active ? <li className="px-4 py-2 text-xs text-muted">{t("up.note")}</li> : null}
       {jobs.map((job) => (
         <li key={job.key} className="px-4 py-3">
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -155,7 +161,7 @@ export function UploadProgress({ jobs: jobsOverride, onDismiss }: { jobs?: Uploa
           {job.state === "error" ? (
             <>
               <p role="alert" className="text-sm text-danger mt-2">{job.detail}</p>
-              <button type="button" className="btn btn-quiet min-h-11 mt-2" onClick={() => dismiss(job.key)}>Dismiss</button>
+              <button type="button" className="btn btn-quiet min-h-11 mt-2" onClick={() => dismiss(job.key)}>{t("up.dismiss")}</button>
             </>
           ) : null}
         </li>
@@ -164,17 +170,17 @@ export function UploadProgress({ jobs: jobsOverride, onDismiss }: { jobs?: Uploa
   );
 }
 
-async function uploadImage(file: File, onProgress: (progress: number, detail: string) => void) {
-  if (!TYPES.includes(file.type)) throw new Error("Choose a JPG, PNG, or WebP image.");
-  if (file.size > MAX) throw new Error("Images must be 15 MB or smaller.");
-  onProgress(5, "Preparing image…");
+async function uploadImage(file: File, onProgress: (progress: number, detail: string) => void, t: T = EN) {
+  if (!TYPES.includes(file.type)) throw new Error(t("up.badImage"));
+  if (file.size > MAX) throw new Error(t("up.imageTooBig"));
+  onProgress(5, t("up.prepImage"));
   const blob = await prepareImage(file);
-  onProgress(15, "Uploading…");
+  onProgress(15, t("ed.uploading"));
   const form = new FormData();
   form.append("file", blob, "image.jpg");
   form.append("name", file.name);
   const token = await authToken();
-  return uploadForm("/api/media", form, token, (progress) => onProgress(Math.max(15, progress), "Uploading…"));
+  return uploadForm("/api/media", form, token, (progress) => onProgress(Math.max(15, progress), t("ed.uploading")));
 }
 
 /**
@@ -182,22 +188,22 @@ async function uploadImage(file: File, onProgress: (progress: number, detail: st
  * 15 MB limit and /api/media endpoint as the Media page; it only also returns the new id
  * so the editor can select it.
  */
-export async function uploadArtImage(file: File, onProgress: (progress: number, detail: string) => void): Promise<string> {
-  const result = await uploadImage(file, onProgress);
-  if (!result?.id) throw new Error("Something went wrong. Try again.");
+export async function uploadArtImage(file: File, onProgress: (progress: number, detail: string) => void, t: T = EN): Promise<string> {
+  const result = await uploadImage(file, onProgress, t);
+  if (!result?.id) throw new Error(t("common.somethingWrong"));
   return result.id;
 }
 
-async function uploadVideo(file: File, onProgress: (progress: number, detail: string) => void) {
-  onProgress(0, "Checking video…");
+async function uploadVideo(file: File, onProgress: (progress: number, detail: string) => void, t: T = EN) {
+  onProgress(0, t("up.checkVideo"));
   const prepared = await prepareVideo(file);
-  onProgress(5, "Uploading video…");
+  onProgress(5, t("up.uploadingVideo"));
   const signed = await api<{ mediaId: string; signedUrl: string; token: string }>("/api/media/upload", {
     method: "POST",
     body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
   });
-  await uploadToSignedUrl(signed.signedUrl, file, (progress) => onProgress(Math.max(5, Math.min(90, progress)), "Uploading video…"), file.name, signed.token);
-  onProgress(92, "Saving…");
+  await uploadToSignedUrl(signed.signedUrl, file, (progress) => onProgress(Math.max(5, Math.min(90, progress)), t("up.uploadingVideo")), file.name, signed.token);
+  onProgress(92, t("ed.saving"));
   const thumbnailBase64 = await blobToBase64(prepared.thumbnail);
   await api("/api/media/upload/complete", {
     method: "POST",
@@ -210,31 +216,31 @@ async function uploadVideo(file: File, onProgress: (progress: number, detail: st
       thumbnailBase64,
     }),
   });
-  onProgress(100, "Uploaded");
+  onProgress(100, t("up.uploaded"));
 }
 
-async function uploadPresentation(file: File, onProgress: (progress: number, detail: string) => void) {
+async function uploadPresentation(file: File, onProgress: (progress: number, detail: string) => void, t: T = EN) {
   const name = file.name || "presentation.pptx";
   const pdf = /\.pdf$/i.test(name);
-  if (!pdf && !/\.pptx$/i.test(name)) throw new Error("Upload a .pptx PowerPoint file or a PDF. Older .ppt files aren't supported yet.");
-  if (/\.pptm$/i.test(name)) throw new Error("Macro-enabled PowerPoint files (.pptm) aren't supported. Save as .pptx without macros.");
-  if (file.size > PPTX_MAX) throw new Error("Presentation files must be 50 MB or smaller.");
-  if (file.size <= 0) throw new Error("That file is empty.");
+  if (!pdf && !/\.pptx$/i.test(name)) throw new Error(t("up.badPres"));
+  if (/\.pptm$/i.test(name)) throw new Error(t("up.macro"));
+  if (file.size > PPTX_MAX) throw new Error(t("up.presTooBig"));
+  if (file.size <= 0) throw new Error(t("up.empty"));
 
-  onProgress(5, "Starting upload…");
+  onProgress(5, t("up.starting"));
   const signed = await api<{ mediaId: string; signedUrl: string }>("/api/media/presentation", {
     method: "POST",
     body: JSON.stringify({ fileName: name, sizeBytes: file.size }),
   });
-  onProgress(10, pdf ? "Uploading PDF…" : "Uploading PowerPoint…");
+  onProgress(10, pdf ? t("up.uploadingPdf") : t("up.uploadingPptx"));
   await uploadToSignedUrl(
     signed.signedUrl,
     file,
-    (progress) => onProgress(Math.max(10, Math.min(55, 10 + progress * 0.45)), pdf ? "Uploading PDF…" : "Uploading PowerPoint…"),
+    (progress) => onProgress(Math.max(10, Math.min(55, 10 + progress * 0.45)), pdf ? t("up.uploadingPdf") : t("up.uploadingPptx")),
     name,
   );
-  onProgress(60, "Converting slides…");
-  const done = await finishPresentation(signed.mediaId, name, onProgress);
+  onProgress(60, t("up.converting"));
+  const done = await finishPresentation(signed.mediaId, name, onProgress, t);
   onProgress(100, done.slideCount === 1 ? "1 slide ready" : `${done.slideCount} slides ready`);
   return { playlistId: done.playlistId };
 }
@@ -243,6 +249,7 @@ async function finishPresentation(
   mediaId: string,
   fileName: string,
   onProgress: (progress: number, detail: string) => void,
+  t: T = EN,
 ) {
   const token = await authToken();
   let stop = false;
@@ -261,9 +268,9 @@ async function finishPresentation(
           return;
         }
         const percent = total > 0 ? 60 + Math.round(35 * Math.min(1, done / total)) : 64;
-        onProgress(percent, total > 0 ? `Saving slide ${Math.min(done + 1, total)} of ${total}` : "Converting slides…");
+        onProgress(percent, total > 0 ? t("up.savingSlide", { n: Math.min(done + 1, total), total }) : t("up.converting"));
       } catch {
-        onProgress(64, "Converting slides…");
+        onProgress(64, t("up.converting"));
       }
     }
   })();
@@ -284,11 +291,11 @@ async function finishPresentation(
         await new Promise((resolve) => setTimeout(resolve, 1500));
         continue;
       }
-      throw new Error(payload.error || "Couldn't convert that presentation.");
+      throw new Error(payload.error || t("up.convertFailed"));
     }
   } finally {
     stop = true;
     await watch.catch(() => undefined);
   }
-  throw new Error("Couldn't convert that presentation.");
+  throw new Error(t("up.convertFailed"));
 }

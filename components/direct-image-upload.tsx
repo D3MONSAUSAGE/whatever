@@ -63,7 +63,7 @@ export function DirectImageUpload({
     }
     setState({ phase: "busy", name: file.name, progress: 0 });
     try {
-      const id = await upload(file, (progress) => setState({ phase: "busy", name: file.name, progress }));
+      const id = await upload(file, (progress) => setState({ phase: "busy", name: file.name, progress }), t);
       await onUploaded(id);
       setState({ phase: "done", name: file.name });
     } catch (err) {
