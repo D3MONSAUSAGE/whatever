@@ -2,10 +2,14 @@
 import { useEffect } from "react";
 import { ErrorView } from "@/components/error-view";
 import { useT } from "@/lib/i18n/client";
+import { reloadOnceOnChunkErrorInBrowser } from "@/lib/chunk-reload";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const t = useT();
-  useEffect(() => { console.error("Pekko page error", error.digest ?? "", error.message); }, [error]);
+  useEffect(() => {
+    console.error("Pekko page error", error.digest ?? "", error.message);
+    reloadOnceOnChunkErrorInBrowser(error); // R14-01: dashboard chunk skew after a deploy, once per build
+  }, [error]);
   return (
     <ErrorView
       title={t("error.title")}
