@@ -19,6 +19,7 @@ export type Store = {
   display_playback: Row[];
   display_commands: Row[];
   menus: Row[];
+  push_devices: Row[];
   objects: Map<string, Uint8Array>;
   /** Missing key means "uploaded now". Null means the storage listing has no created_at. */
   objectTimes: Map<string, string | null>;
@@ -28,7 +29,7 @@ export type Store = {
 const TABLE_NAMES = [
   "accounts", "locations", "media", "displays", "playlists", "playlist_items",
   "pairing_sessions", "rate_limits", "screen_groups", "screen_group_members", "schedules", "promos",
-  "display_playback", "display_commands", "menus",
+  "display_playback", "display_commands", "menus", "push_devices",
 ] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
@@ -954,6 +955,7 @@ export function createFakeDb() {
     display_playback: [],
     display_commands: [],
     menus: [],
+    push_devices: [],
     objects: new Map(),
     objectTimes: new Map(),
     users: new Map(),

@@ -263,5 +263,7 @@ export type AlertFeed = { alerts: AlertItem[]; unread: number; nextBefore: strin
 export type AlertPrefs = {
   enabled: boolean; thresholdMinutes: number;
   email: { enabled: boolean; available: boolean; address: string };
+  /** Phone (FCM) notifications. Absent from servers before push-hardening. */
+  push?: { enabled: boolean; available: boolean };
   limits: { minMinutes: number; maxMinutes: number };
 };

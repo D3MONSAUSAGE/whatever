@@ -777,6 +777,9 @@ export const es: Record<MessageKey, string> = {
   "alerts.save": "Guardar",
   "alerts.alsoEmail": "Enviarme también un correo a",
   "alerts.emailOff": "Las alertas por correo todavía no están activadas en Pekko. Las alertas siguen apareciendo aquí en el panel.",
+  "alerts.alsoPush": "Enviar notificaciones a mis teléfonos con la app de Pekko",
+  "alerts.pushHint": "Aplica a todos los teléfonos con sesión iniciada en esta cuenta.",
+  "alerts.pushOff": "Las notificaciones al teléfono todavía no están activadas en Pekko. Las alertas siguen apareciendo aquí en el panel.",
 
   // I18N-2: publish to a screen group
   "gp.none": "Ninguna",

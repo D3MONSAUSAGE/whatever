@@ -68,3 +68,18 @@ export async function unregisterDevice(admin: Admin, token: unknown) {
   if (r.error) return fail("Couldn't remove this device.", 500);
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
+
+/** Sign-out cleanup (additive). Global: every row of this login. Local: only the token the client sends, if any. */
+export async function signOutDevices(admin: Admin, body: Record<string, unknown>) {
+  const scope = body.scope === undefined ? "local" : body.scope;
+  if (scope !== "global" && scope !== "local") return fail("scope must be 'global' or 'local'.", 400);
+  let q;
+  if (scope === "global") q = db().from("push_devices").delete().eq("user_id", admin.userId).select("id");
+  else if (body.token === undefined || body.token === null || body.token === "") return json({ removed: 0 });
+  else if (!validToken(body.token)) return fail("token must be an FCM registration token.", 400);
+  else q = db().from("push_devices").delete().eq("token", body.token).eq("user_id", admin.userId).select("id");
+  const r = await q;
+  if (r.error && isMissingSchema(r.error)) return json({ removed: 0 });
+  if (r.error) return fail("Couldn't remove this device.", 500);
+  return json({ removed: (r.data ?? []).length });
+}

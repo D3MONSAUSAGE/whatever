@@ -119,7 +119,7 @@ export function AlertsScreen() {
   );
 }
 
-/** Settings card: on/off, threshold, email. */
+/** Settings card: on/off, threshold, email, phone notifications. */
 export function AlertSettings() {
   const prefs = useApi<AlertPrefs>("/api/alerts/preferences");
   const [minutes, setMinutes] = useState<string | null>(null);
@@ -160,6 +160,15 @@ export function AlertSettings() {
           {p.email.available ? null : <span className="block text-xs text-muted">{t("alerts.emailOff")}</span>}
         </span>
       </label>
+      {p.push ? (
+        <label className="flex items-start gap-3">
+          <input type="checkbox" className="size-5 mt-0.5" checked={p.push.enabled} disabled={busy || !p.enabled} onChange={(e) => save({ pushEnabled: e.target.checked })} />
+          <span>
+            {t("alerts.alsoPush")}
+            <span className="block text-xs text-muted">{p.push.available ? t("alerts.pushHint") : t("alerts.pushOff")}</span>
+          </span>
+        </label>
+      ) : null}
       {msg ? <p className="text-sm" role="status">{msg}</p> : null}
     </div>
   );
