@@ -9,7 +9,7 @@ import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import { seedFreshClassicIfClean, type Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice } from "@/lib/menu-fields";
-import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
+import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
 import { DirectImageUpload } from "@/components/direct-image-upload";
 
 export type ClassicSaved = { id: string; name: string; playlistId: string | null; tickedScreens: number };
@@ -76,6 +76,7 @@ export function ClassicEditor({
   const photoPanelRef = useRef<HTMLDetailsElement | null>(null);
   const photoSelectRef = useRef<HTMLSelectElement | null>(null);
   const [nameCheck, setNameCheck] = useState(false);
+  const cards = useOpenItem(); // MB-1: which product card is open
   const [previewBusy, setPreviewBusy] = useState(false);
   const [previewRetry, setPreviewRetry] = useState(0);
   // Up/Down moves refresh the preview at once instead of after the typing debounce (QA retest 3 low).
@@ -321,9 +322,9 @@ export function ClassicEditor({
             <div className="section-card-head">
               <h3 id={`classic-section-${si}`} className="section-card-legend">Section {si + 1}</h3>
               <OrderButtons className="section-order" kind="section" name={section.name} scope="classic-sections" index={si} count={c.sections.length}
-                onMove={(dir) => { refreshNow.current = true; update({ ...c, sections: moveSection(c.sections, si, dir) }); }} />
+                onMove={(dir) => { refreshNow.current = true; cards.sectionMoved(si, dir); update({ ...c, sections: moveSection(c.sections, si, dir) }); }} />
               <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`}
-                onClick={() => update({ ...c, sections: c.sections.filter((_, i) => i !== si) })}>Remove</button>
+                onClick={() => { cards.clear(); update({ ...c, sections: c.sections.filter((_, i) => i !== si) }); }}>Remove</button>
             </div>
             <input className="field" aria-label={`Section ${si + 1} name`} placeholder="e.g. Tacos" value={section.name} maxLength={MENU_LIMITS.sectionName}
               onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
@@ -332,25 +333,23 @@ export function ClassicEditor({
               const idBase = `classic-item-${si}-${ii}`;
               const nameInvalid = nameCheck && needsName(item);
               return (
-                <div key={ii} className="item-card">
+                <ProductCard key={ii} item={item} idBase={idBase} open={cards.isOpen(si, ii) || nameInvalid} onToggle={() => cards.toggle(si, ii)}
+                  removeLabel={`Remove item ${ii + 1} in section ${si + 1}`}
+                  onRemove={() => { cards.clear(); update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) }); }}
+                  order={<OrderButtons kind="item" name={item.name} scope={`classic-items-${si}`} index={ii} count={section.items.length} className="item-order product-order"
+                    onMove={(dir) => { refreshNow.current = true; cards.moved(si, ii, dir); update({ ...c, sections: moveItem(c.sections, si, ii, dir) }); }} />}>
                   <input id={`${idBase}-name`} className="item-name" aria-label={`Item ${ii + 1} in section ${si + 1}`} placeholder="Item name" value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })}
                     aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined} />
                   <input className="item-price" aria-label={`Price ${ii + 1} in section ${si + 1}`} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })}
                     onBlur={(e) => { const next = normalizePrice(e.target.value); if (next !== item.price) setItem({ price: next }); if (needsName({ ...item, price: next })) setNameCheck(true); }}
                     aria-describedby={`${idBase}-price-hint`} />
-                  <button type="button" className="item-remove" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
-                    onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>
-                    <span aria-hidden="true">×</span>
-                  </button>
                   <input className="item-desc" aria-label={`Description ${ii + 1} in section ${si + 1}`} placeholder="Short description (optional)" value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })}
                     onBlur={() => { if (needsName(item)) setNameCheck(true); }} aria-describedby={`${idBase}-desc-count`} />
                   <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
-                  <OrderButtons kind="item" name={item.name} scope={`classic-items-${si}`} index={ii} count={section.items.length}
-                    onMove={(dir) => { refreshNow.current = true; update({ ...c, sections: moveItem(c.sections, si, ii, dir) }); }} />
-                </div>
+                </ProductCard>
               );
             })}
-            <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(c.sections, si)} onClick={() => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>
+            <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(c.sections, si)} onClick={() => { cards.open(si, section.items.length); update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) }); }}>
               {canAddItem(c.sections, si) ? `Add item (${section.items.length} of ${MENU_LIMITS.itemsPerSection})` : section.items.length >= MENU_LIMITS.itemsPerSection ? `Section full (${MENU_LIMITS.itemsPerSection} items)` : `Menu full (${MENU_LIMITS.items} items)`}
             </button>
           </section>

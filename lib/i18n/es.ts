@@ -314,4 +314,13 @@ export const es: Record<MessageKey, string> = {
   "classic.savedUpdated": "Menú actualizado. Las pantallas que lo muestran se actualizan en un minuto.",
   "classic.savedSent": "Menú digital creado y enviado a sus pantallas",
   "classic.savedCreated": "Menú digital creado. Está guardado en Menús y Archivos. Agréguelo a una lista de reproducción o a una pantalla cuando quiera.",
+  "menuCard.unnamed": "Producto nuevo",
+  "menuCard.noPrice": "Sin precio",
+  "menuCard.edit": "Editar",
+  "menuCard.done": "Listo",
+  "menuCard.editLabel": "Editar {name}",
+  "menuCard.doneLabel": "Terminar de editar {name}",
+  "menuCard.nameLabel": "Nombre del producto",
+  "menuCard.priceLabel": "Precio",
+  "menuCard.descLabel": "Descripción",
 };

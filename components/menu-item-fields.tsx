@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { charCount, ITEM_NAME_REQUIRED, needsName, priceHint } from "@/lib/menu-fields";
 import { MENU_LIMITS } from "@/lib/menu-templates";
 
@@ -84,4 +86,119 @@ export function OrderButtons({ kind, name, scope, index, count, onMove, classNam
       {button(1)}
     </div>
   );
+}
+
+/**
+ * MB-1: one menu item shown as a product card (both editors). The summary row shows the item as typed:
+ * thumbnail on the left, name, description under it, and the price. Clicking the card (or Edit) opens the
+ * existing name / price / description fields underneath; every keystroke still goes straight into the draft,
+ * so the live TV preview keeps updating and Save/Publish work as before. Menu items have no photo of their
+ * own in the menu data, so the thumbnail is always a placeholder (the item's initial). Nothing about the
+ * stored menu or the TV layouts changes.
+ */
+/** Up to two initials from the item name ("Carne asada" → "CA"), for the placeholder tile. */
+export function itemInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+  const first = (w: string) => Array.from(w.replace(/^[^\p{L}\p{N}]+/u, ""))[0] ?? "";
+  return words.slice(0, 2).map(first).join("").toLocaleUpperCase();
+}
+
+/**
+ * The fixed square image slot on a product card. Shows an image when one is given (future MB-2),
+ * otherwise an initials tile, or a plate icon for an unnamed item. Same size either way, so an
+ * image can drop in later without changing the card layout.
+ */
+export function ProductThumb({ name, imageSrc = null }: { name: string; imageSrc?: string | null }) {
+  const initials = itemInitials(name);
+  if (imageSrc) {
+    return (
+      <span className="product-thumb has-image" aria-hidden="true">
+        <img src={imageSrc} alt="" loading="lazy" decoding="async" />
+      </span>
+    );
+  }
+  return (
+    <span className={`product-thumb${initials ? "" : " is-empty"}`} aria-hidden="true" data-testid="product-thumb">
+      {initials || (
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <circle cx="12" cy="13" r="6.5" /><path d="M3 6v5M5 6v5M4 11v8M20 6c-1.5 1-2 3-2 5h2v8" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
+export function ProductCard({ item, idBase, open, onToggle, onRemove, removeLabel, order, children, imageSrc = null }: {
+  item: { name: string; price: string; description: string };
+  /** Reserved for per-item images (MB-2). Nothing passes it today; menu items have no image field. */
+  imageSrc?: string | null;
+  idBase: string;
+  open: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+  removeLabel: string;
+  order: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const t = useT();
+  const name = item.name.trim();
+  const price = item.price.trim();
+  const desc = item.description.trim();
+  const shown = name || t("menuCard.unnamed");
+  const toggle = () => {
+    const opening = !open;
+    onToggle();
+    if (opening) requestAnimationFrame(() => document.getElementById(`${idBase}-name`)?.focus());
+  };
+  return (
+    <div className={`product-card${open ? " is-open" : ""}`} data-testid="product-card">
+      <div className="product-row">
+        <ProductThumb name={name} imageSrc={imageSrc} />
+        {/* The whole text area opens the card for mouse and touch; the Edit button is the keyboard control. */}
+        <div className="product-main" onClick={toggle}>
+          <span className={`product-name${name ? "" : " is-placeholder"}`}>{shown}</span>
+          {desc ? <span className="product-desc">{desc}</span> : null}
+        </div>
+        <span className={`product-price${price ? "" : " is-empty"}`} onClick={toggle}>{price || t("menuCard.noPrice")}</span>
+        <div className="product-actions">
+          <button type="button" className="product-edit" aria-expanded={open} aria-controls={`${idBase}-edit`}
+            aria-label={open ? t("menuCard.doneLabel", { name: shown }) : t("menuCard.editLabel", { name: shown })} onClick={toggle}>
+            {open ? t("menuCard.done") : t("menuCard.edit")}
+          </button>
+          <button type="button" className="item-remove" aria-label={removeLabel} onClick={onRemove}>
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+      </div>
+      {order}
+      {open ? <div className="item-card product-editor" id={`${idBase}-edit`}>{children}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Which product card is open, per editor. Index keys follow the item on moves and close on removes,
+ * so an open card never jumps to a different item.
+ */
+export function useOpenItem() {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const key = (si: number, ii: number) => `${si}:${ii}`;
+  return {
+    isOpen: (si: number, ii: number) => openKey === key(si, ii),
+    toggle: (si: number, ii: number) => setOpenKey((k) => (k === key(si, ii) ? null : key(si, ii))),
+    open: (si: number, ii: number) => setOpenKey(key(si, ii)),
+    moved: (si: number, ii: number, dir: -1 | 1) => setOpenKey((k) => {
+      if (k === key(si, ii)) return key(si, ii + dir);
+      if (k === key(si, ii + dir)) return key(si, ii);
+      return k;
+    }),
+    sectionMoved: (si: number, dir: -1 | 1) => setOpenKey((k) => {
+      if (!k) return k;
+      const [s, i] = k.split(":").map(Number);
+      if (s === si) return key(si + dir, i!);
+      if (s === si + dir) return key(si, i!);
+      return k;
+    }),
+    clear: () => setOpenKey(null),
+  };
 }

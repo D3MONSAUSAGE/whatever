@@ -31,7 +31,7 @@ import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
-import { ItemNotes, MenuLimits, OrderButtons } from "@/components/menu-item-fields";
+import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
 import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
@@ -1125,6 +1125,7 @@ function SelectedZoneEditor({
   setVideoOn: (on: boolean) => void;
   setNote: (note: string) => void;
 }) {
+  const cards = useOpenItem(); // MB-1: which product card is open
   const panel = editorPanelForZone(zone);
   if (panel === "none") {
     return <p className="studio-zone-hint">Select an area in the preview to edit it here.</p>;
@@ -1158,11 +1159,13 @@ function SelectedZoneEditor({
                       <span className="item-limit">{section.items.filter((item) => item.name.trim()).length} of {MENU_LIMITS.itemsPerSection} items</span>
                       <OrderButtons className="section-order" kind="section" name={section.name} scope="studio-sections" index={si} count={draft.sections.length}
                         onMove={(dir) => {
+                          cards.sectionMoved(si, dir);
                           update({ ...draft, sections: moveSection(draft.sections, si, dir) });
                           setSectionIndex(Math.max(0, Math.min(draft.sections.length - 1, si + dir)));
                         }} />
                       <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`} disabled={draft.sections.length <= 1}
                         onClick={() => {
+                          cards.clear();
                           update({ ...draft, sections: draft.sections.filter((_, i) => i !== si) });
                           setSectionIndex(Math.max(0, Math.min(si, draft.sections.length - 2)));
                         }}>Remove section</button>
@@ -1174,7 +1177,11 @@ function SelectedZoneEditor({
                     const idBase = `studio-item-${si}-${ii}`;
                     const nameInvalid = nameCheck && needsName(item);
                     return (
-                    <div key={ii} className="item-card">
+                    <ProductCard key={ii} item={item} idBase={idBase} open={cards.isOpen(si, ii) || nameInvalid} onToggle={() => cards.toggle(si, ii)}
+                      removeLabel={`Remove item ${ii + 1} in section ${si + 1}`}
+                      onRemove={() => { cards.clear(); update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) }); }}
+                      order={<OrderButtons kind="item" name={item.name} scope={`studio-items-${si}`} index={ii} count={section.items.length} className="item-order product-order"
+                        onMove={(dir) => { cards.moved(si, ii, dir); update({ ...draft, sections: moveItem(draft.sections, si, ii, dir) }); }} />}>
                       <input id={`${idBase}-name`} aria-label={`Item ${ii + 1} in section ${si + 1}`} className="item-name" style={field} placeholder="Item name" value={item.name} maxLength={MENU_LIMITS.itemName}
                         aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined}
                         onChange={(event) => setItem(draft, si, ii, { name: event.target.value }, update)} />
@@ -1182,20 +1189,14 @@ function SelectedZoneEditor({
                         aria-describedby={`${idBase}-price-hint`}
                         onBlur={(event) => { const next = normalizePrice(event.target.value); if (next !== item.price) setItem(draft, si, ii, { price: next }, update); if (needsName({ ...item, price: next })) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { price: event.target.value }, update)} />
-                      <button type="button" className="item-remove" aria-label={`Remove item ${ii + 1} in section ${si + 1}`}
-                        onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: s.items.filter((_, j) => j !== ii) } : s) })}>
-                        <span aria-hidden="true">×</span>
-                      </button>
                       <input aria-label={`Description ${ii + 1} in section ${si + 1}`} className="item-desc" style={field} placeholder="Description" value={item.description} maxLength={MENU_LIMITS.description}
                         aria-describedby={`${idBase}-desc-count`} onBlur={() => { if (needsName(item)) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { description: event.target.value }, update)} />
                       <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />
-                      <OrderButtons kind="item" name={item.name} scope={`studio-items-${si}`} index={ii} count={section.items.length}
-                        onMove={(dir) => update({ ...draft, sections: moveItem(draft.sections, si, ii, dir) })} />
-                    </div>
+                    </ProductCard>
                     );
                   })}
-                  <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(draft.sections, si)} onClick={() => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) })}>
+                  <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(draft.sections, si)} onClick={() => { cards.open(si, section.items.length); update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) }); }}>
                     {canAddItem(draft.sections, si) ? "Add item" : section.items.length >= MENU_LIMITS.itemsPerSection ? `Section full (${MENU_LIMITS.itemsPerSection} items)` : `Menu full (${MENU_LIMITS.items} items)`}
                   </button>
                   {template === "triple-column" && si === draft.sections.length - 1 ? (
