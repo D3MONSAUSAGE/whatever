@@ -1,0 +1,37 @@
+{
+ "files": {
+  "public/player.html": "35a01145306d847b7fd4a5fa3424f432ce3e2bfe8e643de627eda94a33211334",
+  "lib/server/layout-render.ts": "fab9e9eb8b1753b8e3a147634160dbc85efa549ac1ee91f26a3d0f83551fc5db",
+  "lib/server/menu-render.ts": "672decdb030490cdd8f1de0b6354fb7fbf1a5dcdb939f33e951d3e5b70e960a3",
+  "lib/server/promo-render.ts": "b217d94de7cbcb7d765b15cae1c651cae48c7fffe74819211f4030a6daf0a24f"
+ },
+ "outputs": {
+  "layoutSvg:menu-promo-67:0": "c906e1d96de39eaa0bee6ed19f28be44c87875cef4ef2442785dc10de541b579",
+  "layoutSvg:menu-promo-67:1": "b46d72fb3b4dfba446e1f404e4bb72e8931acfa403df5ff8adbe983bfd8ebbbc",
+  "layoutSvg:menu-promo-67:2": "6d6ee378a3cb56fddbe23083976614d6818193ffe2d3813430e1905fb99cb160",
+  "layoutSvg:triple-column:0": "196f27335eb13b6d04c3cdb794da28d7820ae60015923effd37fe0ef45d8100c",
+  "layoutSvg:triple-column:1": "275bb9f71b1c7d115f3f830ca4a53e8bcc1fb75d5d9aec6308aadc034ea813af",
+  "layoutSvg:triple-column:2": "93fb11bc50789ba2154cd6ce758bd048f741e17ad775f98f1753a4730c8b32dd",
+  "layoutSvg:split-50:0": "3c04951f9087d1f2556bdfea9a241ff24f94d0c1cc5c50b2e8559e197da400ed",
+  "layoutSvg:split-50:1": "8f71f77fb122acf5946f492c574e2f9830cc8c68a843f01e39ee1cc191d3d65f",
+  "layoutSvg:split-50:2": "36f293d89c82326cac4dfdfa29a751e8e0f0fe61b2c4f83648e101f535e5cb39",
+  "layoutSvg:menu-banner:0": "1803dd569a25c6a70bd3759654c4dc26bce3600ff702df4a611e5a637a807c60",
+  "layoutSvg:menu-banner:1": "79ff037d14367ebd7962cee603d19a3d7c21552e388a65a829a5b5d013072c19",
+  "layoutSvg:menu-banner:2": "5930633bc131252c4c060d90a67f4fcf239783da244e6916fce6bfedaf9433db",
+  "layoutSvg:signature:0": "2d5f52a8c8e5c4b05bb40078c9c34ce920234c8c2c92fc2fa40ff494a4e69927",
+  "layoutSvg:signature:1": "188d3421e5d1297d4ce3a90689335eb3171c8a0eef1f4df85de1586ffd17de6c",
+  "layoutSvg:signature:2": "7982dd20a9077b41ee7d2b535fbeb70d314deae53e08be5bb16dcccc9a1fa35e",
+  "layoutSvg:two-menu-promo:0": "77bb8456a0c8e3372f5f439f60fa0c9a25b1d41e1aa556000814c5396c7dcc1f",
+  "layoutSvg:two-menu-promo:1": "c8a640c1ca658b67c1205cefdf19ab4a40d1797a2c574aea28bec6396aba102b",
+  "layoutSvg:two-menu-promo:2": "9e1396e68c393ab16aa98a467f67ed93d5b8ab0f6c67498bf2a436255e105b19",
+  "layoutSvg:two-column:0": "f96c427c1dffa753d1f4bbe6c992a9b13f3b8722b36d72e5c0d14b9fd0bd1a06",
+  "layoutSvg:two-column:1": "bbd8d893bd10356005383f52c8735875313ce933f7e74529e85acf0bbbc89aaa",
+  "layoutSvg:two-column:2": "7e82bcaf81559bfcdf387d72dccffdde6c13b6f5bd19eae07a9dbf81c07f4519",
+  "menuSvg:classic": "614963b3eca5ba19a4626c045a465f9d6a853d5cbaec79830ef31fd56119b92d",
+  "menuSvg:fresh": "595da3a802e5e0bdc8a82f707d287ee4ddf0e0b10599c143c445ea4ae35182ed",
+  "menuSvg:bold": "c4b324efaffae1f36e2032c432783b66f30ba3d26cea52c6877fafca3520a912",
+  "promoSvg:happy": "6360ef2a8f0b097451ba3cd45287b1683bb97157200cde45d016dd4b1270eab6",
+  "promoSvg:deal": "d0759a5423fcc98195f76bc81c1048b777371721f7a8875a7b38dab191255130",
+  "promoSvg:special": "1eb66a34c8adbc14fe39f48325310f7a20bb9cd754bb16268740c13dd2b98077"
+ }
+}
