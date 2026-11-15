@@ -362,6 +362,13 @@ export const es: Record<MessageKey, string> = {
   "tv.onlineHint": "Una pantalla está en línea cuando el último contacto de su reproductor fue en los últimos {seconds} segundos.",
   "tv.waitingPairing": "Esperando a que la TV termine de vincularse",
   "tv.noContent": "Sin contenido asignado",
+  // R13-01: player error sentences shown on the dashboard (the player itself is unchanged).
+  "perr.stalled": "Este video se detuvo.",
+  "perr.cantPlay": "Este video no se puede reproducir en esta TV.",
+  "perr.noStart": "Este video no empezó a tiempo.",
+  "perr.autoplay": "La TV bloqueó la reproducción automática de este video.",
+  "perr.slideSkipped": "Una diapositiva no cargó y se omitió.",
+  "perr.boardStill": "El video de este diseño no empezó. Se muestra la imagen fija.",
   "tv.noHeartbeat": "Sin contacto todavía",
   "tv.lastHeartbeat": "Último contacto {ago}",
   "tv.previewWhat": "Ver lo que muestra {name}",
@@ -1880,11 +1887,4 @@ export const es: Record<MessageKey, string> = {
   "toast.dismiss": "Cerrar",
   "toast.open": "Abrir",
   "common.required": "Complete este campo.",
-  // R13-01: player error sentences shown on the dashboard (the player itself is unchanged).
-  "perr.stalled": "Este video se detuvo.",
-  "perr.cantPlay": "Este video no se puede reproducir en esta TV.",
-  "perr.noStart": "Este video no empezó a tiempo.",
-  "perr.autoplay": "La TV bloqueó la reproducción automática de este video.",
-  "perr.slideSkipped": "Una diapositiva no cargó y se omitió.",
-  "perr.boardStill": "El video de este diseño no empezó. Se muestra la imagen fija.",
 };
