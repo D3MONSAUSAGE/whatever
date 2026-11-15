@@ -1,5 +1,6 @@
 import { daysLeft, paymentGraceEndsAt, transitionEndsAt, trialEndsAt, type EntitlementRow } from "./entitlements";
 import { isValidTimeZone } from "./schedule";
+import type { Locale } from "@/lib/i18n/locales";
 import { sendTransactionalEmail, supabaseNoticeLedger, type NoticeLedger, type SendResult } from "./transactional-email";
 
 export type BillingNoticeKind =
@@ -29,9 +30,15 @@ export function reminderZone(tz?: string | null): string {
 }
 
 /** "Nov 22, 2026 at 7:07 PM PST": date and time with an explicit zone label. */
-export function formatWhen(iso: string, tz?: string | null): string {
+export function formatWhen(iso: string, tz?: string | null, locale: Locale = "en"): string {
   const timeZone = reminderZone(tz);
   const d = new Date(iso);
+  if (locale === "es") {
+    // I18N-4: "21 nov 2026 a las 7:07 p.m. PST". es-US keeps the 12-hour clock and the PST/CST label.
+    const esDate = d.toLocaleDateString("es-US", { month: "short", day: "numeric", year: "numeric", timeZone });
+    const esTime = d.toLocaleTimeString("es-US", { hour: "numeric", minute: "2-digit", timeZone, timeZoneName: "short" });
+    return `${esDate} a las ${esTime}`;
+  }
   const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
   const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone, timeZoneName: "short" });
   return `${date} at ${time}`;
@@ -41,8 +48,16 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 /** Remaining time, rounded down so the email never claims more time than is left. */
-export function remainingPhrase(deadline: string, now: string): string {
+export function remainingPhrase(deadline: string, now: string, locale: Locale = "en"): string {
   const ms = Date.parse(deadline) - Date.parse(now);
+  if (locale === "es") {
+    if (ms >= 2 * DAY) return `en ${Math.floor(ms / DAY)} días`;
+    if (ms >= DAY) return "en 1 día";
+    const esHours = Math.floor(ms / HOUR);
+    if (esHours >= 2) return `en ${esHours} horas`;
+    if (esHours === 1) return "en 1 hora";
+    return "en menos de una hora";
+  }
   if (ms >= 2 * DAY) return `in ${Math.floor(ms / DAY)} days`;
   if (ms >= DAY) return "in 1 day";
   const hours = Math.floor(ms / HOUR);
@@ -59,8 +74,9 @@ function notice(kind: BillingNoticeKind, deadline: string, subject: string, text
 export function billingTemplate(
   kind: "trial_ending_3" | "trial_ending_1" | "payment_failed" | "grace_ending_2" | "grace_ending_1" | "transition_14",
   deadline: string,
-  opts?: { now?: string; tz?: string | null },
+  opts?: { now?: string; tz?: string | null; locale?: Locale },
 ): BillingNotice {
+  if (opts?.locale === "es") return billingTemplateEs(kind, deadline, opts);
   const when = formatWhen(deadline, opts?.tz);
   const left = remainingPhrase(deadline, opts?.now ?? new Date().toISOString());
   switch (kind) {
@@ -80,12 +96,39 @@ export function billingTemplate(
 }
 
 /**
+ * I18N-4: Spanish reminders, same kind, deadline and facts as English. Wording is legally equivalent:
+ * "free trial" = "prueba gratis", "payment grace" = "período de gracia del pago", and every line keeps the
+ * same promise (content kept, screens paused or playing, the same date and time). No plan names or prices.
+ */
+function billingTemplateEs(
+  kind: Parameters<typeof billingTemplate>[0],
+  deadline: string,
+  opts: { now?: string; tz?: string | null },
+): BillingNotice {
+  const when = formatWhen(deadline, opts.tz, "es");
+  const left = remainingPhrase(deadline, opts.now ?? new Date().toISOString(), "es");
+  switch (kind) {
+    case "trial_ending_3":
+    case "trial_ending_1":
+      return notice(kind, deadline, `Su prueba gratis de Pekko termina ${left}`, `Su prueba gratis termina el ${when}. Elija un plan para mantener sus pantallas encendidas. Su contenido se conserva en cualquier caso.`);
+    case "payment_failed":
+      return notice(kind, deadline, "Pekko no pudo cobrar su pago", `No pudimos cobrar su último pago. Actualice su método de pago antes del ${when} para que sus pantallas sigan reproduciendo. Su contenido no se elimina.`);
+    case "grace_ending_2":
+    case "grace_ending_1":
+      return notice(kind, deadline, `Su período de gracia del pago de Pekko termina ${left}`, `Su período de gracia del pago termina el ${when}. Actualice su método de pago antes de esa fecha. Su contenido no se elimina.`);
+    case "transition_14":
+      return notice(kind, deadline, "Su acceso a Pekko continúa por 14 días", `Usted es uno de los primeros clientes de Pekko. Conserva acceso completo hasta el ${when}. Su contenido se conserva; no se elimina nada.`);
+  }
+}
+
+/**
  * Reminders derived only from server timestamps on the entitlement row.
  * Receipts are not included: Stripe sends those from its own email setting.
  */
-export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: string | null; enforced?: boolean; tz?: string | null }): BillingNotice[] {
+export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: string | null; enforced?: boolean; tz?: string | null; locale?: Locale }): BillingNotice[] {
   const notices: BillingNotice[] = [];
-  const at = { now: e.server_time, tz: opts?.tz ?? null };
+  const es = opts?.locale === "es";
+  const at = es ? { now: e.server_time, tz: opts?.tz ?? null, locale: "es" as const } : { now: e.server_time, tz: opts?.tz ?? null };
   const trialLeft = daysLeft(e.trial_ends_at, e.server_time);
   if (e.state === "trial" && e.trial_ends_at && trialLeft === 3) notices.push(billingTemplate("trial_ending_3", e.trial_ends_at, at));
   if (e.state === "trial" && e.trial_ends_at && trialLeft === 1) notices.push(billingTemplate("trial_ending_1", e.trial_ends_at, at));
@@ -95,10 +138,14 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
     notices.push(notice(
       "trial_ended",
       deadline,
-      "Your Pekko trial has ended",
-      e.state === "trial_grace" && e.playback_ends_at
-        ? `Your free trial has ended. Screens keep playing until ${formatWhen(e.playback_ends_at, opts?.tz)}. Your content is still saved.`
-        : "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on.",
+      es ? "Su prueba gratis de Pekko terminó" : "Your Pekko trial has ended",
+      es
+        ? (e.state === "trial_grace" && e.playback_ends_at
+          ? `Su prueba gratis terminó. Las pantallas siguen reproduciendo hasta el ${formatWhen(e.playback_ends_at, opts?.tz, "es")}. Su contenido sigue guardado.`
+          : "Su prueba gratis terminó y las pantallas están en pausa. Su contenido sigue guardado. Elija un plan para volver a encenderlas.")
+        : e.state === "trial_grace" && e.playback_ends_at
+          ? `Your free trial has ended. Screens keep playing until ${formatWhen(e.playback_ends_at, opts?.tz)}. Your content is still saved.`
+          : "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on.",
     ));
   }
   if (e.state === "past_due" && e.grace_ends_at) {
@@ -113,8 +160,10 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
       // Stable fallback (see trial_ended). This state also covers an unpaid subscription whose
       // payment grace ended, so the copy says "not active" rather than claiming it was canceled.
       e.current_period_end || e.grace_ends_at || "none",
-      "Your Pekko screens are paused",
-      "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on.",
+      es ? "Sus pantallas de Pekko están en pausa" : "Your Pekko screens are paused",
+      es
+        ? "Su suscripción no está activa, así que sus pantallas están en pausa. Su contenido y su configuración están guardados. Elija un plan o actualice su método de pago en Configuración → Plan y facturación para volver a encenderlas."
+        : "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on.",
     ));
   }
   const transitionEnd = opts?.transitionEndsAt ?? null;

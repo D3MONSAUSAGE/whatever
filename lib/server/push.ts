@@ -1,5 +1,7 @@
 import { createSign } from "node:crypto";
 import { db } from "@/lib/server/supabase";
+import { notificationLocale } from "@/lib/server/notification-locale";
+import type { Locale } from "@/lib/i18n/locales";
 import { EMAIL_STALE_MS, MAX_EMAIL_ATTEMPTS, type AlertRow } from "@/lib/server/alerts";
 
 /** One push message to one device token. */
@@ -88,8 +90,16 @@ export function fcmSender(sa: ServiceAccount, fetchImpl: typeof fetch = fetch): 
   };
 }
 
-export function pushFor(a: Pick<AlertRow, "id" | "kind" | "display_id" | "display_name">): Omit<PushMessage, "token"> {
+export function pushFor(a: Pick<AlertRow, "id" | "kind" | "display_id" | "display_name">, locale: Locale = "en"): Omit<PushMessage, "token"> {
   const offline = a.kind === "screen.offline";
+  if (locale === "es") {
+    // I18N-4: same data payload; only the visible title and body change. Screen names stay as typed.
+    return {
+      title: offline ? `"${a.display_name}" está sin conexión` : `"${a.display_name}" volvió a estar en línea`,
+      body: offline ? "Dejó de reportarse. Revise que la TV esté encendida y conectada." : "Su pantalla se está reportando de nuevo.",
+      data: { type: offline ? "screen_offline" : "screen_online", alertId: a.id, screenId: a.display_id ?? "" },
+    };
+  }
   return {
     title: offline ? `"${a.display_name}" is offline` : `"${a.display_name}" is back online`,
     body: offline ? "It stopped checking in. Check that the TV is on and connected." : "Your screen is checking in again.",
@@ -124,18 +134,19 @@ export async function deliverAlertPushes(opts: { dryRun: boolean; sender?: PushS
     .select("id, account_id, display_id, display_name, kind, at, offline_since, offline_seconds, read_at, email_status, push_attempts")
     .eq("push_status", "pending").order("at", { ascending: true }).limit(50);
   if (q.error) return { ...out, error: true };
-  const accounts = new Map<string, { enabled: boolean; devices: Device[] }>();
+  const accounts = new Map<string, { enabled: boolean; devices: Device[]; locale: Locale }>();
 
   for (const a of (q.data ?? []) as Pending[]) {
     const stale = now - Date.parse(a.at) > EMAIL_STALE_MS;
     let acct = accounts.get(a.account_id);
     if (!acct && sender && !stale) {
-      const [ac, dv] = await Promise.all([
+      const [ac, dv, locale] = await Promise.all([
         db().from("accounts").select("alerts_enabled, alert_push_enabled").eq("id", a.account_id).maybeSingle(),
         db().from("push_devices").select("id, token, notify_offline, notify_recovery").eq("account_id", a.account_id),
+        notificationLocale(a.account_id),
       ]);
       const flags = ac.data as { alerts_enabled?: boolean; alert_push_enabled?: boolean } | null;
-      acct = { enabled: Boolean(flags?.alerts_enabled && flags?.alert_push_enabled), devices: (dv.data ?? []) as Device[] };
+      acct = { enabled: Boolean(flags?.alerts_enabled && flags?.alert_push_enabled), devices: (dv.data ?? []) as Device[], locale };
       accounts.set(a.account_id, acct);
     }
     const targets = (acct?.enabled ? acct.devices : []).filter((d) => (a.kind === "screen.offline" ? d.notify_offline : d.notify_recovery));
@@ -150,7 +161,7 @@ export async function deliverAlertPushes(opts: { dryRun: boolean; sender?: PushS
       .or(`pushed_at.is.null,pushed_at.lt.${new Date(now - CLAIM_LEASE_MS).toISOString()}`).select("id");
     if (claim.error || !(claim.data ?? []).length) continue;
 
-    const msg = pushFor(a);
+    const msg = pushFor(a, acct!.locale);
     let delivered = 0;
     for (const d of targets) {
       const r = await sender.send({ ...msg, token: d.token });

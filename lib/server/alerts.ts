@@ -1,5 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { emailProvider, type EmailProvider } from "@/lib/server/email";
+import { notificationLocale } from "@/lib/server/notification-locale";
+import type { Locale } from "@/lib/i18n/locales";
 
 export const ALERTS_UNAVAILABLE = "Alerts aren't set up on this server yet.";
 export const THRESHOLD_MIN = 2;
@@ -31,7 +33,15 @@ export function toAlert(r: AlertRow) {
   };
 }
 
-export function formatAt(iso: string, timeZone: string) {
+export function formatAt(iso: string, timeZone: string, locale: Locale = "en") {
+  if (locale === "es") {
+    // I18N-4: "11 nov, 6:05 p.m. PST" (es-US keeps the 12-hour clock and the zone label).
+    try {
+      return new Intl.DateTimeFormat("es-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(iso));
+    } catch {
+      return new Intl.DateTimeFormat("es-US", { timeZone: "UTC", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(iso));
+    }
+  }
   try {
     return new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(iso));
   } catch {
@@ -44,7 +54,28 @@ function minutes(seconds: number) {
   return m < 120 ? `${m} min` : `${Math.round(m / 6) / 10} h`;
 }
 
-export function emailFor(a: Pick<AlertRow, "kind" | "display_name" | "offline_since" | "offline_seconds">, timeZone: string, appUrl: string) {
+/** Spanish uses a decimal comma: "2,5 h". */
+function minutesEs(seconds: number) {
+  return minutes(seconds).replace(".", ",");
+}
+
+/** I18N-4: Spanish alert emails. Screen names stay exactly as typed. */
+function emailForEs(a: Pick<AlertRow, "kind" | "display_name" | "offline_since" | "offline_seconds">, timeZone: string, appUrl: string) {
+  const since = formatAt(a.offline_since, timeZone, "es");
+  if (a.kind === "screen.offline") {
+    return {
+      subject: `Pekko: "${a.display_name}" está sin conexión`,
+      text: `Su pantalla "${a.display_name}" dejó de reportarse alrededor del ${since}.\n\nRevise que la TV esté encendida y conectada a internet. Su contenido está guardado en la TV, así que es posible que todavía lo esté mostrando.\n\nVer sus pantallas: ${appUrl}/dashboard/displays\nCambiar la configuración de alertas: ${appUrl}/dashboard/settings`,
+    };
+  }
+  return {
+    subject: `Pekko: "${a.display_name}" volvió a estar en línea`,
+    text: `Su pantalla "${a.display_name}" volvió a estar en línea después de unos ${minutesEs(a.offline_seconds ?? 0)} (sin conexión desde el ${since}).\n\nVer sus pantallas: ${appUrl}/dashboard/displays`,
+  };
+}
+
+export function emailFor(a: Pick<AlertRow, "kind" | "display_name" | "offline_since" | "offline_seconds">, timeZone: string, appUrl: string, locale: Locale = "en") {
+  if (locale === "es") return emailForEs(a, timeZone, appUrl);
   const since = formatAt(a.offline_since, timeZone);
   if (a.kind === "screen.offline") {
     return {
@@ -75,7 +106,7 @@ export async function deliverAlertEmails(opts: { dryRun: boolean; provider?: Ema
     .eq("email_status", "pending").order("at", { ascending: true }).limit(50);
   if (q.error) return { ...result, error: true };
   const rows = (q.data ?? []) as Pending[];
-  const owners = new Map<string, { email: string | null; tz: string }>();
+  const owners = new Map<string, { email: string | null; tz: string; locale: Locale }>();
 
   for (const a of rows) {
     const stale = now - Date.parse(a.at) > EMAIL_STALE_MS;
@@ -100,7 +131,7 @@ export async function deliverAlertEmails(opts: { dryRun: boolean; provider?: Ema
       .eq("id", a.id).eq("email_status", "pending").eq("email_attempts", a.email_attempts)
       .or(`emailed_at.is.null,emailed_at.lt.${new Date(now - CLAIM_LEASE_MS).toISOString()}`).select("id");
     if (claim.error || !(claim.data ?? []).length) continue;
-    const msg = emailFor(a, owner.tz, appUrl);
+    const msg = emailFor(a, owner.tz, appUrl, owner.locale);
     const sent = await provider.send({ to: owner.email, ...msg });
     if (sent.ok) {
       result.sent++;
@@ -113,7 +144,13 @@ export async function deliverAlertEmails(opts: { dryRun: boolean; provider?: Ema
   return result;
 }
 
-async function ownerOf(accountId: string): Promise<{ email: string | null; tz: string }> {
+async function ownerOf(accountId: string): Promise<{ email: string | null; tz: string; locale: Locale }> {
+  const found = await ownerContact(accountId);
+  // I18N-4: copy language only. Read separately so a missing locale column can't affect the recipient.
+  return { ...found, locale: await notificationLocale(accountId) };
+}
+
+async function ownerContact(accountId: string): Promise<{ email: string | null; tz: string }> {
   const acct = await db().from("accounts").select("owner_user_id").eq("id", accountId).maybeSingle();
   const loc = await db().from("locations").select("timezone").eq("account_id", accountId).order("created_at", { ascending: true }).limit(1);
   const tz = ((loc.data ?? [])[0] as { timezone?: string } | undefined)?.timezone || "UTC";

@@ -3,6 +3,8 @@ import {
   billingEnforced, loadEffectiveEntitlement, transitionEndsAt, type EntitlementRow, type PlanId,
 } from "./entitlements";
 import { db } from "./supabase";
+import { notificationLocale } from "./notification-locale";
+import type { Locale } from "@/lib/i18n/locales";
 import { emailProvider } from "./email";
 import { supabaseNoticeLedger, type NoticeClaim } from "./transactional-email";
 
@@ -28,6 +30,8 @@ export type ReminderAccount = {
   transition_started_at: string | null;
   /** First location timezone (IANA). Unset or "UTC" means Pacific time in emails. */
   timezone?: string | null;
+  /** I18N-4: accounts.locale for the email copy only. Unset means English. Never changes who, when, or the claim key. */
+  locale?: Locale;
 };
 
 export type PlannedReminder = BillingNotice & {
@@ -85,7 +89,7 @@ export function planOrgReminders(account: ReminderAccount, now: string): Planned
     can_add_screen: true,
     server_time: now,
   };
-  const planned: PlannedReminder[] = billingNotices(row, { enforced: false, tz: account.timezone ?? null }).map((notice) => ({
+  const planned: PlannedReminder[] = billingNotices(row, account.locale === "es" ? { enforced: false, tz: account.timezone ?? null, locale: "es" } : { enforced: false, tz: account.timezone ?? null }).map((notice) => ({
     ...notice,
     claimKey: billingNoticeKey(account.id, notice),
     transitionStart: null,
@@ -94,7 +98,7 @@ export function planOrgReminders(account: ReminderAccount, now: string): Planned
   if (account.plan === "grandfathered" && !account.transition_started_at && !billingEnforced()) {
     const end = transitionEndsAt(now);
     if (end) {
-      const notice = billingTemplate("transition_14", end, { now, tz: account.timezone ?? null });
+      const notice = billingTemplate("transition_14", end, account.locale === "es" ? { now, tz: account.timezone ?? null, locale: "es" } : { now, tz: account.timezone ?? null });
       planned.push({ ...notice, claimKey: transitionNoticeKey(account.id), transitionStart: now });
     }
   }
@@ -230,6 +234,7 @@ async function listReminderAccounts(): Promise<ReminderAccount[]> {
       current_period_end: ent.current_period_end,
       transition_started_at: account.billing_transition_started_at ? String(account.billing_transition_started_at) : null,
       timezone: ((loc.data ?? [])[0] as { timezone?: string } | undefined)?.timezone ?? null,
+      locale: await notificationLocale(String(account.id)),
     });
   }
   return out;
