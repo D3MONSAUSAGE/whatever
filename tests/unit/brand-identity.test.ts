@@ -21,7 +21,7 @@ import { sampleMenu } from "@/lib/menu-templates";
 import { hasUnsavedEdits } from "@/lib/menu-board-unify";
 
 const APPLY_SHA = "677e466cbf7eb6e3983f0a108c510d35e6a94736a0e0e30db3418777eb16bfc3";
-const PLAYER_SHA = "35a01145306d847b7fd4a5fa3424f432ce3e2bfe8e643de627eda94a33211334"; // E5 changed the player (on-TV unpair)
+const PLAYER_SHA = "378fa1f2696851af3a9ef65294d0436863b4ffa258661447c35d9ceaa266be4c"; // R14-02 changed the player (wake-up resume)
 
 const stored: BrandRecord = {
   primaryColor: "#c8102e",

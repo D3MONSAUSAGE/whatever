@@ -122,6 +122,8 @@
   var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0, zoneFit = null;
   // Polling: the server may send pollMs (older servers do not; then STATE_MS stays).
   var pollMs = STATE_MS, wakeAt = 0, catchupUntil = 0, catchupEvery = 0, ackedVersion = null;
+  // R14-02 wake-up: the shown playlist video's stall clock, a grace window after a wake, and the wake counter.
+  var stallReset = null, wakeGraceUntil = 0, wakeSeq = 0, wasHidden = false, presents = 0, WAKE_CHECK_MS = 8000;
 
   // ---- persistent media cache (only where the TV browser supports it; otherwise nothing changes)
   // Files are kept by mediaId, which never changes for an upload, so each file is
@@ -790,7 +792,8 @@
         if (nowT <= lastTime + 0.05) stuckFor += 2000;
         else stuckFor = 0;
         lastTime = nowT;
-        if (stuckFor >= failCap(item)) { failOnce('This video stalled.'); return; }
+        // After a wake the resume check owns the first 8 seconds (one reload, not a skip).
+        if (stuckFor >= failCap(item) && new Date().getTime() >= wakeGraceUntil) { failOnce('This video stalled.'); return; }
         watchTimer = setTimeout(tick, 2000);
       }
       clearWatch();
@@ -807,6 +810,7 @@
       clearReportedError();
       if (typeof shownVersion === 'number') markPainted(shownVersion);
       preloadIndex((index + 1) % playlist.items.length);
+      stallReset = function () { if (!gone() && shownVideo === v) { stuckFor = 0; lastTime = v.currentTime || 0; } };
       watchPlayback();
     }
     v.onplaying = function () {
@@ -866,6 +870,7 @@
     }
   }
   function present(index, versionOrNull) {
+    presents += 1;
     if (!playlist) return;
     var item = playlist.items[index];
     var token = slideToken;
@@ -1443,6 +1448,77 @@
   // Check right away when the network comes back.
   window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });
   window.addEventListener('resize', function () { if (zoneFit) applyZoneFit(); });
+
+  // ---- R14-02: wake-up after the page was hidden/frozen (background tab, WebView) or restored from bfcache.
+  // Only a real wake counts: visible after hidden, or pageshow with persisted=true. Nothing runs while visible,
+  // so there is no always-on watchdog; the stall path above still covers a visible page.
+  function pageHidden() { return document.hidden === true || document.webkitHidden === true || document.visibilityState === 'hidden'; }
+  function wakeVideoTarget() {
+    var item = playlist && playlist.items ? playlist.items[slideIndex] : null;
+    if (!item) return null;
+    if (zoneFit && zoneFit.el && zoneFit.el.getAttribute('data-zone') === '1') return { v: zoneFit.el, item: item, zone: true };
+    if (shownVideo && shownVideo.className.indexOf(' on') !== -1 && item.kind === 'video' &&
+        shownVideo.getAttribute('data-id') === (item.mediaId || '')) return { v: shownVideo, item: item, zone: false };
+    return null;
+  }
+  function repaintImage() {
+    var layer = layers[active], bg;
+    if (!layer || layer.className.indexOf(' on') === -1) return;
+    bg = layer.style.backgroundImage;
+    if (!bg || bg === 'none') return;
+    // Same URL (already loaded or a saved blob): no network, no reload, just a fresh paint.
+    layer.style.backgroundImage = 'none';
+    if (layer.offsetWidth < 0) layer.style.backgroundImage = 'none';
+    layer.style.backgroundImage = bg;
+  }
+  function onWake() {
+    var my, t, v, start, p, index, token, seen;
+    if (mode !== 'playing' || !getToken() || layoutFixtureOn() || pageHidden()) return;
+    my = ++wakeSeq;
+    startPlayback(); // poll state now (same as coming back online)
+    t = wakeVideoTarget();
+    if (!t) { repaintImage(); return; }
+    v = t.v;
+    if (v.ended) return; // manual mode holds the last frame on purpose
+    index = slideIndex;
+    token = slideToken;
+    seen = presents;
+    wakeGraceUntil = new Date().getTime() + WAKE_CHECK_MS;
+    if (stallReset && !t.zone) stallReset();
+    start = v.currentTime || 0;
+    try {
+      p = v.play();
+      if (p && typeof p.then === 'function') p.then(function () {}, function () {});
+    } catch (e) {}
+    setTimeout(function () {
+      var now2;
+      if (my !== wakeSeq || mode !== 'playing' || pageHidden()) return; // a newer wake or hidden again
+      if (token !== slideToken || index !== slideIndex || seen !== presents || !playlist) return; // the loop moved on or re-showed it
+      now2 = wakeVideoTarget();
+      if (!now2 || now2.v !== v || v.ended) return;
+      if ((v.currentTime || 0) > start + 0.05) return; // time advanced: really playing
+      // Not moving after the wake: reload this one item once, from the saved copy when there is one.
+      wakeSeq += 1;
+      clearSlideTimer();
+      clearWatch();
+      if (!t.zone && playlist.items.length === 1) { try { v.removeAttribute('data-src'); } catch (e2) {} }
+      present(index, null);
+    }, WAKE_CHECK_MS);
+  }
+  function onVisibility() {
+    if (pageHidden()) { wasHidden = true; wakeSeq += 1; return; }
+    if (!wasHidden) return; // visible -> visible (CEC, screensaver noise): ignore
+    wasHidden = false;
+    onWake();
+  }
+  document.addEventListener('visibilitychange', onVisibility);
+  document.addEventListener('webkitvisibilitychange', onVisibility);
+  window.addEventListener('pagehide', function () { wasHidden = true; wakeSeq += 1; });
+  window.addEventListener('pageshow', function (ev) {
+    if (!ev || !ev.persisted) return; // first load is not a wake
+    wasHidden = false;
+    onWake();
+  });
 
   function publishedBoard() {
     var raw, data, svg, box, url;

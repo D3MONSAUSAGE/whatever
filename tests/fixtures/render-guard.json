@@ -1,6 +1,6 @@
 {
  "files": {
-  "public/player.html": "35a01145306d847b7fd4a5fa3424f432ce3e2bfe8e643de627eda94a33211334",
+  "public/player.html": "378fa1f2696851af3a9ef65294d0436863b4ffa258661447c35d9ceaa266be4c",
   "lib/server/layout-render.ts": "fab9e9eb8b1753b8e3a147634160dbc85efa549ac1ee91f26a3d0f83551fc5db",
   "lib/server/menu-render.ts": "672decdb030490cdd8f1de0b6354fb7fbf1a5dcdb939f33e951d3e5b70e960a3",
   "lib/server/promo-render.ts": "b217d94de7cbcb7d765b15cae1c651cae48c7fffe74819211f4030a6daf0a24f"

@@ -8,7 +8,7 @@ import { fingerprint } from "./helpers/render-fingerprint";
  * (regenerate with UPDATE_RENDER_GUARD=1 npx vitest run tests/unit/render-guard.test.ts) and call it out
  * for explicit review. The player SHA is also pinned literally below.
  */
-const PLAYER_SHA = "35a01145306d847b7fd4a5fa3424f432ce3e2bfe8e643de627eda94a33211334";
+const PLAYER_SHA = "378fa1f2696851af3a9ef65294d0436863b4ffa258661447c35d9ceaa266be4c";
 const allow = JSON.parse(readFileSync("tests/fixtures/render-guard.json", "utf8"));
 const HOW = "Renderer/player output changed. If intended, update tests/fixtures/render-guard.json in this PR and flag it for explicit review.";
 
