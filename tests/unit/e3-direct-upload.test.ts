@@ -45,7 +45,8 @@ describe("E3: upload a logo or photo from the editor", () => {
 
   it("refreshes the classic preview right after an Up/Down move (QA retest 3 low)", () => {
     const classic = readFileSync("components/classic-editor.tsx", "utf8");
-    expect(classic.match(/refreshNow\.current = true; update\(/g)).toHaveLength(2);
+    // MB-1: the open product card follows the move (cards.moved / cards.sectionMoved) before the update.
+    expect(classic.match(/refreshNow\.current = true; (cards\.(moved|sectionMoved)\([^)]*\); )?update\(/g)).toHaveLength(2);
     expect(classic).toMatch(/const delay = refreshNow\.current \? 150 : 450;/);
     // Superseded renders are aborted, so rapid moves never overlap preview POSTs (Gother low 1).
     expect(classic).toMatch(/signal: abort\.signal/);

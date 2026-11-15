@@ -322,6 +322,20 @@ export const en = {
   "classic.savedUpdated": "Menu updated. Screens showing it refresh within a minute.",
   "classic.savedSent": "Menu board created and sent to your screens",
   "classic.savedCreated": "Menu board created. It's saved in Menu Boards and Media. Add it to a playlist or a screen when you're ready.",
+  // MB-1 product cards (both menu editors). Customer item text is shown exactly as typed.
+  "menuCard.unnamed": "New item",
+  "menuCard.noPrice": "No price",
+  "menuCard.edit": "Edit",
+  "menuCard.done": "Done",
+  "menuCard.editLabel": "Edit {name}",
+  "menuCard.doneLabel": "Done editing {name}",
+  "menuCard.nameLabel": "Item {item} in section {section}",
+  "menuCard.priceLabel": "Price {item} in section {section}",
+  "menuCard.descLabel": "Description {item} in section {section}",
+  "menuCard.removeLabel": "Remove item {item} in section {section}",
+  "menuCard.namePlaceholder": "Item name",
+  "menuCard.descPlaceholder": "Short description (optional)",
+  "studio.fontsNote": "The fonts on this page are the same files drawn into the published image.",
 } as const;
 
 export type MessageKey = keyof typeof en;

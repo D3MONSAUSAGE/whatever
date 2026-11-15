@@ -37,6 +37,8 @@ test("a menu board is made from a template, edited, and scheduled by time of day
     const editor = page.getByTestId("menu-editor");
     await editor.getByText("Fresh day").click();
     await editor.getByLabel("Menu name (only you see this)").fill("Breakfast board");
+    // MB-1: items are product cards; open the first one to edit its fields.
+    await editor.getByTestId("product-card").first().getByRole("button", { name: /^Edit / }).click();
     await editor.getByLabel("Item 1 in section 1", { exact: true }).fill("Chilaquiles");
     await editor.getByLabel("Price 1 in section 1", { exact: true }).fill("$9");
     await expect(editor.getByTestId("menu-preview")).toBeVisible({ timeout: 15_000 });
@@ -54,6 +56,7 @@ test("a menu board is made from a template, edited, and scheduled by time of day
 
     // Edit swaps the image in place.
     await card.getByRole("button", { name: "Edit" }).click();
+    await editor.getByRole("button", { name: "Edit Chilaquiles" }).click();
     await editor.getByLabel("Price 1 in section 1", { exact: true }).fill("$10");
     await editor.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByText("Menu updated.")).toBeVisible({ timeout: 15_000 });
