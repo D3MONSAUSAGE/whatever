@@ -84,6 +84,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   const reload = live.reload;
   const toast = useToast();
   const confirm = useConfirm();
+  const [checking, setChecking] = useState(false);
 
   /**
    * QA B1-10 retest / U1-04e: before uploading a video or image that is already in the library, offer to
@@ -91,7 +92,13 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
    * One question covers every duplicate in a multi-file pick; files that aren't duplicates always upload.
    */
   async function uploadChecked(picked: FileList | File[], kind: "video" | "image") {
-    const files = Array.from(picked);
+    // Gother #105 low 2: the upload buttons stay disabled during the lookup and the prompt, so a second pick can't race.
+    if (checking) return;
+    setChecking(true);
+    try { await checkThenUpload(Array.from(picked), kind); } finally { setChecking(false); }
+  }
+
+  async function checkThenUpload(files: File[], kind: "video" | "image") {
     const found = await Promise.all(files.map(async (file) => {
       // If the check fails or takes longer than a few seconds, upload as before.
       const page = await lookupWithTimeout((signal) => api<{ items: MediaItem[] }>(libraryLookupUrl(file.name, kind), { signal }));
@@ -187,9 +194,9 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
     <section>
       <PageHeader title="Media library" icon={<IconImage />} lede="Pictures, video, and documents in your library." />
       <div className="mb-6 grid grid-cols-3 gap-3" data-testid="media-uploads">
-        <FileUploadControl kind="image" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadChecked(files, "image")} />
-        <FileUploadControl kind="video" multiple disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadChecked(files, "video")} />
-        <FileUploadControl kind="document" disabled={uploads.busy} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "presentation")} />
+        <FileUploadControl kind="image" multiple disabled={uploads.busy || checking} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy || checking ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadChecked(files, "image")} />
+        <FileUploadControl kind="video" multiple disabled={uploads.busy || checking} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy || checking ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => void uploadChecked(files, "video")} />
+        <FileUploadControl kind="document" disabled={uploads.busy || checking} buttonClass={`btn btn-quiet cursor-pointer min-h-11 w-full ${uploads.busy || checking ? "pointer-events-none opacity-60" : ""}`} onFiles={(files) => uploads.enqueue(files, "presentation")} />
       </div>
       {fixture || pathOverride ? null : (
         <Suspense fallback={null}>

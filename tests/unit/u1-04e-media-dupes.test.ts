@@ -35,5 +35,8 @@ describe("U1-04e: duplicate check on the Media page covers images", () => {
     expect(src).toContain('title: "Already in your library"');
     expect(src).toContain('confirmLabel: "Upload a copy anyway"');
     expect(src).toContain('cancelLabel: "Keep the one I have"');
+    // Gother low 2: all three upload buttons are disabled while the duplicate check or its prompt is open.
+    expect(src.match(/disabled=\{uploads\.busy \|\| checking\}/g)?.length).toBe(3);
+    expect(src).toMatch(/setChecking\(true\);\s*try \{ await checkThenUpload/);
   });
 });
