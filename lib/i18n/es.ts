@@ -207,6 +207,9 @@ export const es: Record<MessageKey, string> = {
   "error.title": "Algo salió mal",
   "error.body": "Esta página tuvo un problema. Sus pantallas siguen funcionando. Intente de nuevo y, si el problema continúa, avise a soporte.",
   "error.bodyCode": "Esta página tuvo un problema. Sus pantallas siguen funcionando. Intente de nuevo y, si el problema continúa, indique a soporte el código {code}.",
+  "globalError.title": "Pekko tiene problemas",
+  "globalError.body": "Sus pantallas siguen funcionando. Intente de nuevo en un momento.",
+  "globalError.code": " Código: {code}",
 
   "auth.legalNav": "Legal",
   "auth.signInTitle": "Iniciar sesión",
