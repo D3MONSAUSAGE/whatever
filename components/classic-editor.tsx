@@ -241,7 +241,7 @@ export function ClassicEditor({
       if (warning) onError(warning);
       const savedId = res.id ?? draft.id;
       onSaved(
-        draft.id ? "Menu updated. Screens showing it refresh within a minute." : draft.displayIds.length ? "Menu board created and sent to your screens" : "Menu board created. It's in your media and playlists.",
+        draft.id ? "Menu updated. Screens showing it refresh within a minute." : draft.displayIds.length ? "Menu board created and sent to your screens" : "Menu board created. It's saved in Menu Boards and Media. Add it to a playlist or a screen when you're ready.",
         savedId ? { id: savedId, name: draft.name, playlistId: res.playlistId ?? null, tickedScreens: draft.displayIds.length } : undefined,
       );
     } catch (err) {
