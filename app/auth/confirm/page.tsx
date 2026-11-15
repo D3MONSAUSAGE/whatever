@@ -3,23 +3,42 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/index";
 import { AuthFrame, friendlyAuthError } from "@/components/auth-frame";
-import { CLEAN_CONFIRM_PATH, CONFIRM_COPY, confirmPlan } from "@/lib/auth-confirm";
+import { CLEAN_CONFIRM_PATH, confirmPlan } from "@/lib/auth-confirm";
 
 /**
  * Branded landing page for Supabase email links (B2-07 option A).
  * Nothing is verified until the owner presses the button, so link scanners
  * that open the email link cannot use it up.
  */
+function ConfirmFallback() {
+  const t = useT();
+  return <AuthFrame title={t("auth.checkingLink")} lede={t("common.oneMoment")}><div className="skeleton h-12" /></AuthFrame>;
+}
+
+/** "email" links use the same copy as "signup" (same as CONFIRM_COPY in lib/auth-confirm.ts). */
+function copyKeys(type: string) {
+  const k = type === "email" ? "signup" : type;
+  return {
+    title: `auth.confirm.${k}.title` as MessageKey,
+    lede: `auth.confirm.${k}.lede` as MessageKey,
+    button: `auth.confirm.${k}.button` as MessageKey,
+    done: `auth.confirm.${k}.done` as MessageKey,
+  };
+}
+
 export default function AuthConfirmPage() {
   return (
-    <Suspense fallback={<AuthFrame title="Checking your link…" lede="One moment."><div className="skeleton h-12" /></AuthFrame>}>
+    <Suspense fallback={<ConfirmFallback />}>
       <AuthConfirm />
     </Suspense>
   );
 }
 
 function AuthConfirm() {
+  const t = useT();
   const params = useSearchParams();
   // Read the link once and keep token_hash/type in memory only (B2-07A, Gother MEDIUM).
   const [plan] = useState(() => confirmPlan(new URLSearchParams(params.toString())));
@@ -35,35 +54,34 @@ function AuthConfirm() {
   if (!plan.ok) {
     return (
       <AuthFrame
-        title="This link can't be used"
-        lede={plan.reason === "type"
-          ? "This kind of email link isn't used by Pekko. Sign in, or ask for a new password reset link."
-          : "The link is incomplete. Open it straight from the email, or ask for a new one."}
-        footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">Back to sign in</Link>}
+        title={t("auth.linkUnusable")}
+        lede={plan.reason === "type" ? t("auth.linkType") : t("auth.linkIncomplete")}
+        footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">{t("common.backToSignIn")}</Link>}
       >
-        <Link href="/forgot-password" className="btn btn-primary w-full">Send a new reset link</Link>
+        <Link href="/forgot-password" className="btn btn-primary w-full">{t("auth.sendNewResetLink")}</Link>
       </AuthFrame>
     );
   }
 
-  const copy = CONFIRM_COPY[plan.type];
+  const keys = copyKeys(plan.type);
+  const copy = { title: t(keys.title), lede: t(keys.lede), button: t(keys.button), done: t(keys.done) };
 
   async function confirm() {
     if (!plan.ok || busy) return;
     setError(null);
-    if (!supabaseConfigured()) return setError("Sign-in isn't available on this site right now.");
+    if (!supabaseConfigured()) return setError(t("auth.signInUnavailable"));
     setBusy(true);
     try {
       const { error: err } = await getSupabase().auth.verifyOtp({ token_hash: plan.tokenHash, type: plan.type });
       if (err) {
-        setError(friendlyAuthError(err.message));
+        setError(friendlyAuthError(err.message, t));
         setBusy(false);
         return;
       }
       setDone(true);
       location.replace(plan.next);
     } catch (err) {
-      setError(friendlyAuthError((err as Error).message));
+      setError(friendlyAuthError((err as Error).message, t));
       setBusy(false);
     }
   }
@@ -72,19 +90,19 @@ function AuthConfirm() {
     <AuthFrame
       title={copy.title}
       lede={copy.lede}
-      footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">Back to sign in</Link>}
+      footer={<Link href="/login" className="font-semibold text-primary underline underline-offset-4">{t("common.backToSignIn")}</Link>}
     >
       {done ? (
         <p role="status" className="text-sm">{copy.done}</p>
       ) : (
         <>
           <button type="button" className="btn btn-primary w-full" disabled={busy} onClick={() => void confirm()}>
-            {busy ? "Checking…" : copy.button}
+            {busy ? t("auth.checking") : copy.button}
           </button>
           {error ? (
             <div className="mt-4 grid gap-3">
               <p role="alert" className="text-sm text-danger">{error}</p>
-              {plan.type === "recovery" ? <Link href="/forgot-password" className="btn btn-quiet w-full">Send a new reset link</Link> : null}
+              {plan.type === "recovery" ? <Link href="/forgot-password" className="btn btn-quiet w-full">{t("auth.sendNewResetLink")}</Link> : null}
             </div>
           ) : null}
         </>

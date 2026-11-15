@@ -5,29 +5,41 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { AuthFrame, friendlyAuthError, isRecoveryUrl, MIN_PASSWORD } from "@/components/auth-frame";
 import { safeDashboardNext } from "@/lib/safe-next";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey, Vars } from "@/lib/i18n/index";
+import { rich } from "@/components/i18n/rich";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<AuthFrame title="Sign in"><p className="text-sm text-muted">Loading…</p></AuthFrame>}>
+    <Suspense fallback={<LoginFallback />}>
       <Login />
     </Suspense>
   );
 }
 
+function LoginFallback() {
+  const t = useT();
+  return <AuthFrame title={t("auth.signInTitle")}><p className="text-sm text-muted">{t("common.loading")}</p></AuthFrame>;
+}
+
+/** A note is kept as a key (re-rendered in the current language) or as raw text from the server. */
+type Note = { key?: MessageKey; vars?: Vars; text?: string; error?: boolean };
+
 function Login() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const [mode, setMode] = useState<"in" | "up">(params.get("mode") === "up" ? "up" : "in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const [note, setNote] = useState<Note | null>(null);
   // E4: the address a confirmation email was sent to (or that needs confirming), for "Resend confirmation email".
   const [pending, setPending] = useState<string | null>(null);
   const [resendWait, setResendWait] = useState(0);
   const [resending, setResending] = useState(false);
   // Screen readers hear one polite message when the wait ends, not a per-second countdown (Gother #104 low 3).
-  const [announce, setAnnounce] = useState("");
+  const [announce, setAnnounce] = useState<MessageKey | null>(null);
   const wasWaiting = useRef(false);
 
   useEffect(() => {
@@ -37,8 +49,8 @@ function Login() {
   }, [resendWait]);
 
   useEffect(() => {
-    if (resendWait > 0) { wasWaiting.current = true; setAnnounce(""); }
-    else if (wasWaiting.current) { wasWaiting.current = false; setAnnounce("You can send a new confirmation email now."); }
+    if (resendWait > 0) { wasWaiting.current = true; setAnnounce(null); }
+    else if (wasWaiting.current) { wasWaiting.current = false; setAnnounce("auth.resendReady"); }
   }, [resendWait]);
 
   useEffect(() => {
@@ -53,7 +65,7 @@ function Login() {
     e.preventDefault();
     setNote(null);
     if (!supabaseConfigured()) {
-      setNote({ text: "Supabase is not configured on this deploy.", error: true });
+      setNote({ key: "auth.notConfigured", error: true });
       return;
     }
     setBusy(true);
@@ -63,16 +75,16 @@ function Login() {
         : await getSupabase().auth.signUp({ email, password, options: { emailRedirectTo: confirmRedirect() } });
       if (res.error) {
         // Gother #104 low 2: an unconfirmed sign-in starts the same 60 s wait as sign-up.
-        if (needsConfirmation(res.error)) { setPending(email.trim()); setResendWait(RESEND_COOLDOWN_S); return setNote({ text: "Confirm your email first. Open the link we sent you, or send a new one below.", error: true }); }
-        return setNote({ text: friendlyAuthError(res.error.message), error: true });
+        if (needsConfirmation(res.error)) { setPending(email.trim()); setResendWait(RESEND_COOLDOWN_S); return setNote({ key: "auth.confirmFirst", error: true }); }
+        return setNote({ text: friendlyAuthError(res.error.message, t), error: true });
       }
       if (res.data.session) return router.replace(nextPath());
       setPending(email.trim());
       setResendWait(RESEND_COOLDOWN_S);
-      setNote({ text: "Check your email to confirm your account, then sign in." });
+      setNote({ key: "auth.checkEmail" });
       setMode("in");
     } catch (err) {
-      setNote({ text: friendlyAuthError((err as Error).message), error: true });
+      setNote({ text: friendlyAuthError((err as Error).message, t), error: true });
     } finally {
       setBusy(false);
     }
@@ -83,11 +95,11 @@ function Login() {
     setResending(true);
     try {
       const res = await getSupabase().auth.resend({ type: "signup", email: pending, options: { emailRedirectTo: confirmRedirect() } });
-      if (res.error) return setNote({ text: friendlyAuthError(res.error.message), error: true });
+      if (res.error) return setNote({ text: friendlyAuthError(res.error.message, t), error: true });
       setResendWait(RESEND_COOLDOWN_S);
-      setNote({ text: `We sent a new confirmation email to ${pending}. It can take a minute to arrive; check spam too.` });
+      setNote({ key: "auth.resent", vars: { email: pending } });
     } catch (err) {
-      setNote({ text: friendlyAuthError((err as Error).message), error: true });
+      setNote({ text: friendlyAuthError((err as Error).message, t), error: true });
     } finally {
       setResending(false);
     }
@@ -95,41 +107,44 @@ function Login() {
 
   return (
     <AuthFrame
-      title={mode === "in" ? "Sign in" : "Create your account"}
+      title={mode === "in" ? t("auth.signInTitle") : t("auth.signUpTitle")}
       footer={
         <button type="button" className="font-semibold text-primary underline underline-offset-4"
           onClick={() => { setMode(mode === "in" ? "up" : "in"); setNote(null); }}>
-          {mode === "in" ? "New here? Create an account" : "Have an account? Sign in"}
+          {mode === "in" ? t("auth.newHere") : t("auth.haveAccount")}
         </button>
       }
     >
       {!supabaseConfigured() && (
-        <p className="mb-4 note-error">This deploy is missing its Supabase URL or publishable key.</p>
+        <p className="mb-4 note-error">{t("auth.missingConfig")}</p>
       )}
       <form onSubmit={submit} className="space-y-3">
-        <input className="field" type="email" autoComplete="email" placeholder="Email" aria-label="Email" required
+        <input className="field" type="email" autoComplete="email" placeholder={t("common.email")} aria-label={t("common.email")} required
           value={email} onChange={(e) => setEmail(e.target.value)} />
         <input className="field" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"}
-          placeholder="Password" aria-label="Password" minLength={MIN_PASSWORD} required value={password} onChange={(e) => setPassword(e.target.value)} />
+          placeholder={t("common.password")} aria-label={t("common.password")} minLength={MIN_PASSWORD} required value={password} onChange={(e) => setPassword(e.target.value)} />
         {mode === "in" ? (
           <div className="text-right">
-            <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">Forgot password?</Link>
+            <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">{t("auth.forgot")}</Link>
           </div>
         ) : null}
         {mode === "up" ? (
           <p className="text-sm text-muted" data-testid="signup-legal">
-            By creating an account you agree to the <Link className="underline" href="/terms">Terms of Service</Link> and <Link className="underline" href="/privacy">Privacy Policy</Link>.
+            {rich(t("auth.legalConsent"), {
+              terms: (c) => <Link className="underline" href="/terms">{c}</Link>,
+              privacy: (c) => <Link className="underline" href="/privacy">{c}</Link>,
+            })}
           </p>
         ) : null}
-        <button className="btn btn-primary w-full" disabled={busy}>{busy ? "One moment…" : mode === "in" ? "Sign in" : "Create account"}</button>
+        <button className="btn btn-primary w-full" disabled={busy}>{busy ? t("auth.busy") : mode === "in" ? t("auth.signInButton") : t("auth.createButton")}</button>
       </form>
-      {note && <p role={note.error ? "alert" : "status"} className={`mt-4 ${note.error ? "note-error" : "note-ok"}`}>{note.text}</p>}
+      {note && <p role={note.error ? "alert" : "status"} className={`mt-4 ${note.error ? "note-error" : "note-ok"}`}>{note.key ? t(note.key, note.vars) : note.text}</p>}
       {pending ? (
         <button type="button" className="btn btn-quiet w-full mt-3" data-testid="resend-confirmation" onClick={resend} disabled={resending || resendWait > 0}>
-          {resending ? "Sending…" : resendWait > 0 ? "Resend confirmation email (wait a minute)" : "Resend confirmation email"}
+          {resending ? t("auth.sending") : resendWait > 0 ? t("auth.resendWait") : t("auth.resend")}
         </button>
       ) : null}
-      <p className="sr-only" aria-live="polite" data-testid="resend-announce">{announce}</p>
+      <p className="sr-only" aria-live="polite" data-testid="resend-announce">{announce ? t(announce) : ""}</p>
     </AuthFrame>
   );
 }

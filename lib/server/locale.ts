@@ -27,6 +27,10 @@ export async function sessionLocale(req: Request): Promise<Locale | null> {
  * Wrap a route handler so error responses with a catalog `code` carry their message in the caller's
  * language (account locale, else Accept-Language). Success responses and English callers are untouched.
  */
-export function withLocalizedErrors<C>(handler: (req: Request, ctx: C) => Promise<Response>) {
-  return async (req: Request, ctx: C): Promise<Response> => localizeError(req, await handler(req, ctx), sessionLocale);
+// Returns the handler's own type so Next's route typing and the tests see the same signature.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withLocalizedErrors<H extends (req: Request, ...rest: any[]) => Promise<Response>>(handler: H): H {
+  const wrapped = async (req: Request, ...rest: unknown[]): Promise<Response> =>
+    localizeError(req, await handler(req, ...rest), sessionLocale);
+  return wrapped as H;
 }

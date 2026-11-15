@@ -4,9 +4,10 @@ import { en } from "./en";
 /**
  * Spanish (I18N-1). Style: formal "usted" throughout, neutral Latin American Spanish for restaurant and
  * small-business owners. "Pekko" and plan names (Starter, Business, Multi-screen) stay as they are.
- * Terms: pantalla (screen), vincular (pair), lista de reproducción (playlist), programación (schedule),
- * panel (dashboard), contenido (content), publicar (publish), subir (upload), iniciar sesión (sign in),
- * prueba gratis (free trial). Gother's glossary (/workspace/pekko-i18n/glossary.csv) takes precedence when it lands.
+ * Terms follow Gother's Android glossary (/workspace/pekko-i18n/glossary.csv): pantalla (screen), TV (device,
+ * feminine), vincular (pair), menú digital (menu board, nav "Menús"), lista de reproducción (playlist, nav "Listas"),
+ * horarios (schedules), franjas horarias (day parts), archivos (media), Kit de marca (brand kit), ubicación
+ * (location), prueba gratis (free trial). Web-only: panel (dashboard), not in the glossary.
  *
  * Keys in ENGLISH_ONLY (lib/i18n/index.ts) repeat the English text on purpose (billing wording pending
  * the reviewed courtesy translation). Typed as Record<MessageKey, string>, so a missing key fails tsc.
@@ -222,7 +223,8 @@ export const es: Record<MessageKey, string> = {
   "auth.checkEmail": "Revise su correo para confirmar su cuenta y luego inicie sesión.",
   "auth.confirmFirst": "Primero confirme su correo. Abra el enlace que le enviamos o solicite uno nuevo abajo.",
   "auth.resend": "Reenviar correo de confirmación",
-  "auth.resendWait": "Reenviar correo de confirmación ({seconds} s)",
+  "auth.resendWait": "Reenviar correo de confirmación (espere un minuto)",
+  "auth.resendReady": "Ya puede enviar un nuevo correo de confirmación.",
   "auth.sending": "Enviando…",
   "auth.resent": "Enviamos un nuevo correo de confirmación a {email}. Puede tardar un minuto en llegar; revise también la carpeta de spam.",
   "auth.forgotTitle": "Restablezca su contraseña",

@@ -84,7 +84,8 @@ function expectRetry(
   message: string,
 ) {
   expect(res.status).toBe(429);
-  expect(res.body).toEqual({ error: message });
+  expect(res.body).toMatchObject({ error: message });
+  expect(typeof (res.body as { code?: unknown }).code).toBe("string"); // I18N-1 machine code
   expect(res.headers.get("cache-control")).toBe("no-store");
   const retry = Number(res.headers.get("Retry-After"));
   expect(Number.isInteger(retry)).toBe(true);
@@ -528,7 +529,7 @@ describe("orphaned uploads", () => {
         headers: { Authorization: "Bearer something" },
       });
       expect(res.status).toBe(503);
-      expect(res.body).toEqual({ error: "Cleanup isn't configured." });
+      expect(res.body).toMatchObject({ error: "Cleanup isn't configured." });
       expect(store.objects.has(staged.orphanVideo)).toBe(true);
       expect(lines.some((line) => line.includes("orphan-uploads"))).toBe(false);
     } finally {
@@ -543,7 +544,7 @@ describe("orphaned uploads", () => {
       headers: { Authorization: "Bearer wrong-secret" },
     });
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ error: "Unauthorized." });
+    expect(res.body).toMatchObject({ error: "Unauthorized." });
     expect(store.objects.has(staged.orphanVideo)).toBe(true);
     expect(store.objects.has(staged.keptVideo)).toBe(true);
   });

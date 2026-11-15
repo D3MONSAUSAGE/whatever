@@ -5,6 +5,7 @@ import { canonicalAuthRedirect, confirmPlan, safeAuthNext } from "@/lib/auth-con
 import { middleware } from "@/middleware";
 import { captureFirstTouch, isSensitiveReferrer, sanitizeAttribution } from "@/lib/signup-attribution";
 import nextConfig from "@/next.config";
+import { en } from "@/lib/i18n/en";
 
 const q = (s: string) => new URLSearchParams(s);
 
@@ -126,6 +127,8 @@ describe("B2-07A: the email link token never leaks (Gother MEDIUM)", () => {
 
   it("wrong link types get their own message", () => {
     const page = readFileSync("app/auth/confirm/page.tsx", "utf8");
-    expect(page).toMatch(/plan\.reason === "type"[\s\S]*?This kind of email link isn't used by Pekko/);
+    expect(page).toMatch(/plan\.reason === "type" \? t\("auth\.linkType"\)/);
+    // I18N-1: the copy now lives in the dictionary.
+    expect(en["auth.linkType"]).toMatch(/This kind of email link isn't used by Pekko/);
   });
 });
