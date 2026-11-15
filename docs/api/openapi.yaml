@@ -498,6 +498,7 @@ paths:
         "200": { description: PNG image, content: { image/png: { schema: { type: string, format: binary } } } }
         "400": { description: Validation error }
         "404": { description: Photo is not in this account's media }
+        "503": { description: "The selected photo could not be read yet (for example right after upload). Retry shortly; no photo-less preview is drawn." }
   /api/brand:
     get:
       tags: [media]

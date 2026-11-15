@@ -267,6 +267,7 @@ function BrandEditor({
           </label>
           <DirectImageUpload
             what="logo"
+            library={images}
             disabled={!onLogoUploaded}
             onUploaded={async (id) => { await onLogoUploaded?.(id); }}
           />

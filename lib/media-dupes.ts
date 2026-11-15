@@ -15,6 +15,24 @@ export function libraryLookupUrl(name: string): string {
   return `/api/media?${p}`;
 }
 
+/**
+ * QA U1-04d: a logo or photo uploaded straight from Brand Kit or the classic editor that is already
+ * among the account's logo/photo choices. Images are re-encoded on upload, so the stored size never
+ * matches the picked file: the check is the file name (the only thing the Logo and Photo lists show).
+ * Newest first, so "Keep" selects the copy listed first.
+ */
+export function sameLibraryImage(items: MediaItem[] | null | undefined, file: { name: string }): MediaItem | null {
+  const name = file.name.trim();
+  if (!items || !name) return null;
+  const hits = items.filter((item) => item.kind !== "video" && item.kind !== "presentation" && item.fileName === name);
+  if (!hits.length) return null;
+  return [...hits].sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))[0];
+}
+
+export function duplicateImageMessage(name: string): string {
+  return `“${name}” is already in your library. Uploading again makes a second copy with the same name.`;
+}
+
 export function duplicateMessage(names: string[]): string {
   const list = names.length === 1 ? `“${names[0]}” is` : `${names.length} of these videos are`;
   return `${list} already in your library with the same name and size. Uploading again makes a second copy.`;
