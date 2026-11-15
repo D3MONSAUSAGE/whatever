@@ -14,7 +14,7 @@ import { en } from "@/lib/i18n/en";
 import { es } from "@/lib/i18n/es";
 import { ENGLISH_ONLY, format } from "@/lib/i18n/index";
 import { LEGAL_PRIVACY_UPDATED, LEGAL_UPDATED } from "@/lib/legal";
-import { COURTESY_NOTICE_ES, LEGAL_OPERATOR_ES, LEGAL_OWNERSHIP_ES, LEGAL_OWNERSHIP_ES_FAITHFUL, LEGAL_OWNERSHIP_ES_GENERAL, OWNERSHIP_VARIANT, legalDateEs } from "@/lib/legal-es";
+import { COURTESY_NOTICE_ES, LEGAL_OPERATOR_ES, LEGAL_OWNERSHIP_ES, legalDateEs } from "@/lib/legal-es";
 import { PLANS, TRIAL } from "@/lib/plans";
 import { FAQ_VARS } from "@/lib/marketing";
 import { PAYMENT_GRACE_DAYS, PLAYBACK_GRACE_DAYS, TRANSITION_DAYS, TRIAL_DAYS } from "@/lib/server/entitlements";
@@ -119,12 +119,7 @@ describe("Legal ES: Spanish courtesy translation", () => {
     expect(LEGAL_OPERATOR_ES).toBe("Francisco Lopez, propietario único, que opera como Pekko");
     expect(all).toContain(LEGAL_OPERATOR_ES);
     expect(all).toContain(LEGAL_OWNERSHIP_ES);
-    if (OWNERSHIP_VARIANT === "general") {
-      expect(all).not.toMatch(/Teamtegrate|Pekko LLC/i);
-    } else {
-      // Faithful variant: the companies appear only inside the ownership sentence (twice: Terms and Privacy).
-      expect(all.split(LEGAL_OWNERSHIP_ES).join("")).not.toMatch(/Teamtegrate|Pekko LLC/i);
-    }
+    expect(all).not.toMatch(/Teamtegrate|Pekko LLC/i);
     expect(all).not.toMatch(ES_RULES);
     expect(all).not.toMatch(/sole proprietor|doing business as/);
   });
@@ -162,13 +157,10 @@ describe("Legal ES: Spanish courtesy translation", () => {
   });
 });
 
-describe("Legal ES: ownership sentence versions (pending Francisco)", () => {
-  it("prepares the general (default) and faithful versions; the default is general", () => {
-    expect(OWNERSHIP_VARIANT).toBe("general"); // flip with the faithful switch commit
-    expect(LEGAL_OWNERSHIP_ES).toBe(LEGAL_OWNERSHIP_ES_GENERAL);
-    expect(LEGAL_OWNERSHIP_ES_GENERAL).not.toMatch(/Teamtegrate|Pekko LLC/);
-    expect(LEGAL_OWNERSHIP_ES_FAITHFUL).toBe("Pekko es propiedad exclusiva de Francisco Lopez. No es Pekko LLC y es totalmente independiente de Teamtegrate LLC.");
-    for (const v of [LEGAL_OWNERSHIP_ES_GENERAL, LEGAL_OWNERSHIP_ES_FAITHFUL]) expect(v).toMatch(/^Pekko es propiedad exclusiva de Francisco Lopez\. /);
+describe("Legal ES: ownership sentence", () => {
+  it("is the general wording Francisco chose and names no other company", () => {
+    expect(LEGAL_OWNERSHIP_ES).toBe("Pekko es propiedad exclusiva de Francisco Lopez. No es una sociedad de responsabilidad limitada (LLC) y es totalmente independiente de cualquier otra empresa.");
+    expect(LEGAL_OWNERSHIP_ES).not.toMatch(/Teamtegrate|Pekko LLC/);
   });
 });
 

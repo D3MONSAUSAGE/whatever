@@ -14,13 +14,16 @@ describe("Localized native validation messages (Spanish only; English keeps the 
   const tes = makeT("es");
   it("empty, bad email, too short, valid", () => {
     expect(validityMessageFor("es", { ...ok, valueMissing: true }, 8, tes)).toBe("Complete este campo.");
-    expect(validityMessageFor("es", { ...ok, typeMismatch: true }, -1, tes)).toBe(es["common.invalidEmail"]);
+    expect(validityMessageFor("es", { ...ok, typeMismatch: true }, -1, tes, "email")).toBe(es["common.invalidEmail"]);
+    // Gother LOW: schedule start/end are type=time; a non-email typeMismatch keeps the browser's message.
+    for (const type of ["time", "url", "number", undefined]) expect(validityMessageFor("es", { ...ok, typeMismatch: true }, -1, tes, type)).toBeNull();
+    expect(validityMessageFor("es", { ...ok, valueMissing: true }, -1, tes, "time")).toBe("Complete este campo.");
     expect(validityMessageFor("es", { ...ok, tooShort: true }, 8, tes)).toBe("Use al menos 8 caracteres.");
     expect(validityMessageFor("es", ok, 8, tes)).toBeNull();
   });
   it("English never overrides the browser", () => {
     const ten = makeT("en");
-    for (const v of [{ ...ok, valueMissing: true }, { ...ok, typeMismatch: true }, { ...ok, tooShort: true }]) expect(validityMessageFor("en", v, 8, ten)).toBeNull();
+    for (const v of [{ ...ok, valueMissing: true }, { ...ok, typeMismatch: true }, { ...ok, tooShort: true }]) expect(validityMessageFor("en", v, 8, ten, "email")).toBeNull();
     expect(requiredMessageFor("en", true, ten)).toBeNull();
   });
   it("Spanish copy follows usted and the glossary", () => {
