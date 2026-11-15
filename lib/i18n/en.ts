@@ -373,6 +373,13 @@ export const en = {
   "tv.onlineHint": "A screen is online when its player has sent a heartbeat in the last {seconds} seconds.",
   "tv.waitingPairing": "Waiting for the TV to finish pairing",
   "tv.noContent": "No content assigned",
+  // R13-01: player error sentences shown on the dashboard (the player itself is unchanged).
+  "perr.stalled": "This video stalled.",
+  "perr.cantPlay": "This video can't play on this TV.",
+  "perr.noStart": "This video did not start in time.",
+  "perr.autoplay": "This video was blocked from autoplaying.",
+  "perr.slideSkipped": "A slide did not load and was skipped.",
+  "perr.boardStill": "The video in this board did not start. The still image is showing.",
   "tv.noHeartbeat": "No heartbeat yet",
   "tv.lastHeartbeat": "Last heartbeat {ago}",
   "tv.previewWhat": "Preview what {name} shows",

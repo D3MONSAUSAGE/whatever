@@ -8,7 +8,7 @@ import { useT } from "@/lib/i18n/client";
 /** Small 16:9 assigned-content preview. Never presented as a live TV image. A broken or expired still falls back to the typed placeholder — the browser broken-image icon is never shown. */
 export function AssignedThumb({ display, size = "card" }: { display: DisplayItem; size?: "card" | "large" }) {
   const t = useT();
-  const preview = assignedContentPreview(display);
+  const preview = assignedContentPreview(display, t);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = preview.src && preview.src !== failedSrc ? preview.src : null;
   const wide = size === "large";

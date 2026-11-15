@@ -4,6 +4,7 @@ import { timeAgo, type DisplayItem } from "@/lib/api";
 import { ONLINE_MS } from "@/lib/server/limits";
 import { useT } from "@/lib/i18n/client";
 import { makeT, type T } from "@/lib/i18n";
+import { playerErrorLabel } from "@/lib/player-error-label";
 
 const EN: T = makeT("en");
 
@@ -95,7 +96,7 @@ export function ScreenCard({
         <p className="text-xs text-muted">
           <time dateTime={display.connected ? display.lastSeenAt ?? undefined : undefined}>{heartbeatText(display, t)}</time>
         </p>
-        {display.playerError ? <p className="text-sm text-danger" role="alert">{display.playerError}</p> : null}
+        {display.playerError ? <p className="text-sm text-danger" role="alert">{playerErrorLabel(display.playerError, t)}</p> : null}
         {actions ? <div className="mt-auto pt-2 flex flex-wrap gap-2">{actions}</div> : null}
       </div>
     </article>
