@@ -2,6 +2,8 @@
 import { useEffect } from "react";
 import { timeAgo, type DisplayItem } from "@/lib/api";
 import { ONLINE_MS } from "@/lib/server/limits";
+import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n";
 
 export const ONLINE_HINT = `A screen is online when its player has sent a heartbeat in the last ${Math.round(ONLINE_MS / 1000)} seconds.`;
 
@@ -10,6 +12,14 @@ export function contentLabel(display: DisplayItem) {
   if (display.playlist) return display.playlist.name;
   if (!display.connected) return "Waiting for the TV to finish pairing";
   return "No content assigned";
+}
+
+/**
+ * E5-F2: a screen with no TV (never paired, or just unpaired) never claims a recent heartbeat or
+ * playback. The previous TV's last heartbeat is not this screen's status.
+ */
+export function heartbeatText(display: Pick<DisplayItem, "connected" | "lastSeenAt">, t: T) {
+  return display.connected ? heartbeatLabel(display.lastSeenAt) : t("screen.noTv");
 }
 
 export function heartbeatLabel(iso: string | null) {
@@ -53,6 +63,7 @@ export function ScreenCard({
   display: DisplayItem;
   actions?: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <article id={display.id} className="card overflow-hidden scroll-mt-20 flex flex-col">
       <div className="p-3 pb-0">
@@ -66,7 +77,7 @@ export function ScreenCard({
         <p className="text-sm truncate">{contentLabel(display)}</p>
         {display.location ? <p className="text-xs text-muted truncate">{display.location.name} · {display.location.timezone}</p> : null}
         <p className="text-xs text-muted">
-          <time dateTime={display.lastSeenAt ?? undefined}>{heartbeatLabel(display.lastSeenAt)}</time>
+          <time dateTime={display.connected ? display.lastSeenAt ?? undefined : undefined}>{heartbeatText(display, t)}</time>
         </p>
         {display.playerError ? <p className="text-sm text-danger" role="alert">{display.playerError}</p> : null}
         {actions ? <div className="mt-auto pt-2 flex flex-wrap gap-2">{actions}</div> : null}

@@ -38,7 +38,7 @@ describe("E2: optional Show on which screen? after Publish", () => {
     const comp = readFileSync("components/show-on-screens.tsx", "utf8");
     // E2b: the warning now names what each ticked screen loses (see e2b-classic-screens.test.ts).
     expect(comp).toMatch(/replaceNotes\(choices, picked\)/);
-    expect(comp).toMatch(/Now showing: /);
+    expect(comp).toContain(`t("showOnScreens.replacesHere", { current: choice.nowShowing })`); // E2b-F2
   });
   it("lows: add-screen link, heading focus, Escape, wording, loading state", () => {
     const comp = readFileSync("components/show-on-screens.tsx", "utf8");

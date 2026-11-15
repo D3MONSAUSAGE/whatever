@@ -40,7 +40,7 @@ describe("E2b: Show on which screen? after saving a classic board", () => {
   it("classic assigns through the existing playlist publish route; nothing changes until a screen is ticked and confirmed", () => {
     const boards = readFileSync("components/menu-boards.tsx", "utf8");
     expect(boards).toMatch(/api\(`\/api\/playlists\/\$\{pickClassic\.playlistId\}\/publish`, \{ method: "POST", body: JSON\.stringify\(\{ displayIds \}\) \}\)/);
-    expect(boards).toMatch(/shouldOfferScreens\(\{ fromScreen, tickedScreens: saved\.tickedScreens/);
+    expect(boards).toMatch(/afterClassicSave\(\{ created, fromScreen, tickedScreens: saved\.tickedScreens/); // E2b-F1: new boards only
     const card = readFileSync("components/show-on-screens.tsx", "utf8");
     expect(card).toMatch(/if \(!targets\.length \|\| busy\) return;/);
     expect(card).toMatch(/replaceNotes\(choices, picked\)/);

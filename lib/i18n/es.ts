@@ -327,4 +327,12 @@ export const es: Record<MessageKey, string> = {
   "menuCard.namePlaceholder": "Nombre del producto",
   "menuCard.descPlaceholder": "Descripción breve (opcional)",
   "studio.fontsNote": "Las fuentes de esta página son los mismos archivos que se usan en la imagen publicada.",
+  // Small fixes R9: screens without a TV (E5-F2), classic board saves (E2b-F1/F2), media rename (U2-05-F1).
+  "screen.noTv": "No hay una TV vinculada",
+  "screen.noTvPlaying": "Aquí no se reproduce nada: no hay una TV vinculada a esta pantalla.",
+  "screen.setToShow": "Mostrará {name} cuando se vincule una TV",
+  "menuBoards.updatedOn": "Menú actualizado. Se actualiza en {screens} en un minuto.",
+  "menuBoards.updatedNoScreen": "Menú actualizado. Todavía no está en ninguna pantalla. Agréguelo desde Mis pantallas u Horarios.",
+  "showOnScreens.replacesHere": "Reemplaza {current} en esta pantalla",
+  "media.renamed": "Nombre cambiado a {name}",
 };

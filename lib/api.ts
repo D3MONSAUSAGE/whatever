@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabase } from "./supabase-browser";
 import { currentLocale } from "./i18n/client";
+import { announceScreensChanged, changesScreens, onScreensChanged, showsScreens } from "./screens-sync";
 
 export type MediaUse = { id: string; name: string };
 
@@ -155,6 +156,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   }
   if (res.status === 413) throw new Error("That image is too large to upload.");
   if (!res.ok) throw new Error(body.error || "Something went wrong. Try again.");
+  if (changesScreens(path, init.method)) announceScreensChanged();
   return body as T;
 }
 
@@ -186,6 +188,11 @@ export function useApi<T>(path: string | null, refreshMs?: number) {
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVisible); };
   }, [reload, refreshMs, path]);
+  // E5-F3: lists, counts and group views of screens refresh as soon as a screen or pairing changes.
+  useEffect(() => {
+    if (!path || !showsScreens(path)) return;
+    return onScreensChanged(() => { void reload(); });
+  }, [reload, path]);
   return { data, error, reload };
 }
 

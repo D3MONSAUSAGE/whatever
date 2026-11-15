@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useT } from "@/lib/i18n/client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatDuration, formatSize, type MediaItem, type PlaylistSummary } from "@/lib/api";
@@ -65,7 +66,11 @@ function usePagedMedia(enabled: boolean, query: string, sort: SortKey, kind: Kin
       setMore(false);
     }
   }, [page, url]);
-  return { page, error, reload, loadMore, loadingMore: more, filtering: debounced !== "" || kind !== "" || unused };
+  /** U2-05-F1: show a change (a rename) in the grid at once, before the reload returns. */
+  const patchItem = useCallback((id: string, patch: Partial<MediaItem>) => {
+    setPage((current) => current ? { ...current, items: current.items.map((item) => item.id === id ? { ...item, ...patch } : item) } : current);
+  }, []);
+  return { page, error, reload, patchItem, loadMore, loadingMore: more, filtering: debounced !== "" || kind !== "" || unused };
 }
 
 export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[]; pathOverride?: string }) {
@@ -83,6 +88,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
   const error = fixture ? null : live.error;
   const reload = live.reload;
   const toast = useToast();
+  const t = useT();
   const confirm = useConfirm();
   const [checking, setChecking] = useState(false);
 
@@ -291,7 +297,7 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
           ) : null}
         </>
       )}
-      {renaming ? <RenameDialog item={renaming} onClose={() => setRenaming(null)} onSaved={() => { setRenaming(null); toast.show("Renamed"); reload(); }} /> : null}
+      {renaming ? <RenameDialog item={renaming} onClose={() => setRenaming(null)} onSaved={(fileName) => { setRenaming(null); live.patchItem(renaming.id, { fileName }); toast.show(t("media.renamed", { name: fileName })); void reload(); }} /> : null}
       {adding ? <AddToPlaylist item={adding} onClose={() => setAdding(null)} onAdded={() => { setAdding(null); toast.show("Added to playlist"); reload(); }} /> : null}
       {toast.node}
       {confirm.node}
@@ -369,7 +375,7 @@ function ItemActions({ item, onDelete, onRename, onAdd }: { item: MediaItem; onD
   );
 }
 
-function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: () => void; onSaved: () => void }) {
+function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: () => void; onSaved: (fileName: string) => void }) {
   const presentation = item.kind === "presentation";
   const noun = presentation ? "presentation" : "file";
   const [name, setName] = useState(item.fileName);
@@ -383,8 +389,9 @@ function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: ()
     setBusy(true);
     setError(null);
     try {
-      await api(presentation ? `/api/media/presentation/${item.id}` : `/api/media/${item.id}`, { method: "PATCH", body: JSON.stringify({ name: checked?.ok ? checked.name : name }) });
-      onSaved();
+      const wanted = checked?.ok ? checked.name : name.trim();
+      const res = await api<{ fileName?: string; name?: string }>(presentation ? `/api/media/presentation/${item.id}` : `/api/media/${item.id}`, { method: "PATCH", body: JSON.stringify({ name: wanted }) });
+      onSaved(res.fileName ?? res.name ?? wanted);
     } catch (err) {
       setError((err as Error).message || "Couldn't rename that file. Try again.");
     } finally {

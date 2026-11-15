@@ -48,6 +48,32 @@ export function shouldOfferScreens(input: {
   return !(input.displays ?? []).some((display) => display.connected && display.playlist?.id === input.playlistId);
 }
 
+/**
+ * E2b-F1: after saving a classic board. The screen picker is offered only right after a NEW board
+ * is created (and only when it's on no screen). Saving an existing board never shows the picker;
+ * the toast names the screens it updates, or says it isn't on a screen yet.
+ */
+export function afterClassicSave(input: {
+  created: boolean;
+  fromScreen: boolean;
+  tickedScreens: number;
+  playlistId: string | null | undefined;
+  displays: DisplayItem[] | null | undefined;
+}): { kind: "picker" } | { kind: "updated"; screens: string[] } | { kind: "none" } {
+  if (input.created) return shouldOfferScreens(input) ? { kind: "picker" } : { kind: "none" };
+  if (input.fromScreen || !input.playlistId) return { kind: "none" };
+  const screens = (input.displays ?? [])
+    .filter((display) => display.connected && display.playlist?.id === input.playlistId)
+    .map((display) => display.name)
+    .sort((a, b) => a.localeCompare(b));
+  return { kind: "updated", screens };
+}
+
+/** "QA Bar TV", "QA Bar TV and Patio", "A, B and C" in the UI language. */
+export function screenList(names: string[], locale: string): string {
+  try { return new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(names); } catch { return names.join(", "); }
+}
+
 export const SHOW_ON_SCREENS_STYLES = `
         .show-on-screens { background: #fff; border: 1px solid #cfe0ff; border-radius: 14px; padding: 14px; margin: 10px 0; box-shadow: 0 6px 20px rgba(15, 23, 42, .06); }
         .show-on-screens h2 { margin: 0 0 4px; font-size: 16px; font-weight: 750; }

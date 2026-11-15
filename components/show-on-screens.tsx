@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type DisplayItem } from "@/lib/api";
 import { publishSavedCopyForTargets } from "@/lib/screen-actions-ui";
 import { replaceNotes, screenChoices, screensToAssign } from "@/lib/show-on-screens";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * E2: after Publish, an optional "Show on which screen?" step.
@@ -27,6 +28,7 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, loadin
   onDone: (message: string) => void;
   onSkip: () => void;
 }) {
+  const t = useT();
   const choices = useMemo(() => screenChoices(displays, playlistId), [displays, playlistId]);
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -92,7 +94,7 @@ export function ShowOnScreens({ boardId, boardName, playlistId, displays, loadin
                 onChange={(event) => setPicked(event.target.checked ? [...picked, choice.id] : picked.filter((id) => id !== choice.id))} />
               <span className="show-on-screens-name">{choice.name}</span>
               <span className="show-on-screens-status">{choice.showing ? "Set to show this board" : choice.status}</span>
-              {!choice.showing && choice.nowShowing ? <span className="show-on-screens-now">Now showing: {choice.nowShowing}</span> : null}
+              {!choice.showing && choice.nowShowing ? <span className="show-on-screens-now">{t("showOnScreens.replacesHere", { current: choice.nowShowing })}</span> : null}
             </label>
           ))}
         </fieldset>

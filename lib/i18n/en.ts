@@ -336,6 +336,14 @@ export const en = {
   "menuCard.namePlaceholder": "Item name",
   "menuCard.descPlaceholder": "Short description (optional)",
   "studio.fontsNote": "The fonts on this page are the same files drawn into the published image.",
+  // Small fixes R9: screens without a TV (E5-F2), classic board saves (E2b-F1/F2), media rename (U2-05-F1).
+  "screen.noTv": "No TV connected",
+  "screen.noTvPlaying": "Nothing is playing here: no TV is connected to this screen.",
+  "screen.setToShow": "Set to show {name} once a TV is connected",
+  "menuBoards.updatedOn": "Menu updated. It refreshes on {screens} within a minute.",
+  "menuBoards.updatedNoScreen": "Menu updated. It isn't on a screen yet. Add it from My Screens or Schedules.",
+  "showOnScreens.replacesHere": "Replaces {current} on this screen",
+  "media.renamed": "Renamed to {name}",
 } as const;
 
 export type MessageKey = keyof typeof en;
