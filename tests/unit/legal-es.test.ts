@@ -166,13 +166,10 @@ describe("Legal ES: ownership sentence", () => {
 
 describe("Legal ES: scope", () => {
   it("does not touch Stripe-hosted flows, API routes, the player or server code", () => {
-    let changed: string[] = [];
-    try {
-      // Only this PR's own commits (subject "Legal ES: …"), so later PRs are not judged by this guard.
-      changed = execSync('git log --no-merges --format= --name-only --grep="^Legal ES: " 003ba7c..HEAD', { encoding: "utf8" }).split("\n").filter(Boolean);
-    } catch {
-      return;
-    }
+    // Only this PR's own commits (subject "Legal ES: …"), so later PRs are not judged by this guard.
+    // Full history comes from tests/global-setup.ts; an unresolvable range now fails instead of skipping.
+    const changed = execSync('git log --no-merges --format= --name-only --grep="^Legal ES: " 003ba7c..HEAD', { encoding: "utf8" }).split("\n").filter(Boolean);
+    expect(changed.length, "no 'Legal ES: ' commits found").toBeGreaterThan(0);
     for (const f of changed) expect(f, f).not.toMatch(/^(public\/|app\/api\/|lib\/server\/|app\/player|app\/tv)|stripe|lib\/legal\.ts$|lib\/plans\.ts$/);
   });
 });
