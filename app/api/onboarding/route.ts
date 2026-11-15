@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/server/auth";
 import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { onboardingState } from "@/lib/server/onboarding";
+import { maybeSendWelcome } from "@/lib/server/welcome-email";
+import { after } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +15,9 @@ export async function GET(req: Request) {
   if (admin instanceof Response) return admin;
   const state = await onboardingState(admin.accountId, admin.email);
   if (state === "error") return fail("Couldn't load your setup progress.", 500);
+  // E4: one-time welcome email for new owners (off unless WELCOME_EMAIL=on). Runs after the response.
+  const welcome = () => maybeSendWelcome(admin).then(() => undefined);
+  try { after(welcome); } catch { void welcome(); }
   return json(state);
 }
 
