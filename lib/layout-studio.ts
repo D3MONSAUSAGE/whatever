@@ -640,6 +640,12 @@ function measure(value: string, size: number, family = "Inter") {
   return units * size * 1.05 * widthScaleForFamily(family);
 }
 
+/**
+ * MB1-F1: while set, item names that fitWidth shortens are recorded here so the editor can say so.
+ * Recording never changes what is drawn; the TV render calls layoutSvg and is unaffected.
+ */
+let clippedItemNames: string[] | null = null;
+
 function fitWidth(value: string, size: number, max: number, family = "Inter") {
   if (measure(value, size, family) <= max) return value;
   const chars = [...value];
@@ -766,6 +772,7 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
       const price = item.price || "";
       const priceW = price ? measure(price, nameSize, body) + (colors.priceBg ? 28 : 0) : 0;
       const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24), body);
+      if (clippedItemNames && name !== item.name) clippedItemNames.push(item.name);
       if (price && colors.priceBg) {
         parts.push(`<rect x="${(x + width - priceW).toFixed(1)}" y="${(y - nameSize).toFixed(1)}" width="${priceW.toFixed(1)}" height="${(nameSize * 1.35).toFixed(1)}" rx="8" fill="${colors.priceBg}"/>`);
       }
@@ -813,6 +820,18 @@ export function longMenuColumns(sections: LayoutSection[], width: number): Layou
 export type LayoutArt = { imageHref?: string | null };
 
 /** Complete board. Menu text stays out of the video box. The still does not say a video is playing. */
+/** The same SVG as layoutSvg, plus the item names the board shortens with "…" (as the TV does). */
+export function layoutSvgWithClips(doc: LayoutDocument, art?: LayoutArt): { svg: string; clipped: string[] } {
+  const sink: string[] = [];
+  clippedItemNames = sink;
+  try {
+    const svg = layoutSvg(doc, art);
+    return { svg, clipped: [...new Set(sink)] };
+  } finally {
+    clippedItemNames = null;
+  }
+}
+
 export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const frame = frameFor(doc.template, doc.split, doc.columnWidths);
   const colors = colorsFor(doc);

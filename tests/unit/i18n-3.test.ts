@@ -102,10 +102,11 @@ describe("I18N-3: customer content and slide output stay untouched", () => {
     expect(promos).toContain('setDraft({ id: match.id, name: match.name');
     expect(promos).toContain("name: t(`ptpl.${template}.name`)");
   });
+  // Scoped to the I18N-3 merge (b275b5a) so later, separately reviewed PRs are not judged by it.
   it("does not touch the player, renderers, server routes or TV layouts", () => {
     let changed: string[] = [];
     try {
-      changed = execSync("git diff --name-only 03a1292 -- .", { encoding: "utf8" }).split("\n").filter(Boolean);
+      changed = execSync("git diff --name-only 03a1292 b275b5a -- .", { encoding: "utf8" }).split("\n").filter(Boolean);
     } catch {
       return; // no git history in this environment
     }

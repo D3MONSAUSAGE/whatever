@@ -333,10 +333,10 @@ export function ClassicEditor({
                   order={<OrderButtons kind="item" name={item.name} scope={`classic-items-${si}`} index={ii} count={section.items.length} className="item-order product-order"
                     onMove={(dir) => { refreshNow.current = true; cards.moved(si, ii, dir); update({ ...c, sections: moveItem(c.sections, si, ii, dir) }); }} />}>
                   <input id={`${idBase}-name`} className="item-name" aria-label={t("menuCard.nameLabel", { item: ii + 1, section: si + 1 })} placeholder={t("menuCard.namePlaceholder")} value={item.name} maxLength={MENU_LIMITS.itemName} onChange={(e) => setItem({ name: e.target.value })}
-                    aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined} />
+                    aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error ${idBase}-lengths` : `${idBase}-lengths`} />
                   <input className="item-price" aria-label={t("menuCard.priceLabel", { item: ii + 1, section: si + 1 })} placeholder="$0.00" value={item.price} maxLength={MENU_LIMITS.price} onChange={(e) => setItem({ price: e.target.value })}
                     onBlur={(e) => { const next = normalizePrice(e.target.value); if (next !== item.price) setItem({ price: next }); if (needsName({ ...item, price: next })) setNameCheck(true); }}
-                    aria-describedby={`${idBase}-price-hint`} />
+                    aria-describedby={`${idBase}-price-hint ${idBase}-lengths`} />
                   <input className="item-desc" aria-label={t("menuCard.descLabel", { item: ii + 1, section: si + 1 })} placeholder={t("menuCard.descPlaceholder")} value={item.description} maxLength={MENU_LIMITS.description} onChange={(e) => setItem({ description: e.target.value })}
                     onBlur={() => { if (needsName(item)) setNameCheck(true); }} aria-describedby={`${idBase}-desc-count`} />
                   <ItemNotes item={item} idBase={idBase} showNameError={nameCheck} />

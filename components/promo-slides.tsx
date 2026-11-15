@@ -1,5 +1,5 @@
 "use client";
-import { useT } from "@/lib/i18n/client";
+import { useLocale } from "@/lib/i18n/client";
 import type { T } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -10,7 +10,7 @@ import { EmptyState, LoadState, PageHeader , LimitNote, atLimit } from "@/compon
 import { IconImage } from "@/components/icons";
 import { artImages, type MenuBoard } from "@/components/menu-boards";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
-import { PROMO_LIMITS, PROMO_TEMPLATES, placeholderFields, samplePromo, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
+import { PROMO_LIMITS, PROMO_TEMPLATES, placeholderFields, samplePromoFor, type PromoContent, type PromoTemplate } from "@/lib/promo-templates";
 
 export type Promo = {
   id: string; name: string; template: PromoTemplate; content: PromoContent | null; mediaId: string | null; imageUrl: string | null;
@@ -37,7 +37,7 @@ export type PromoFixture = {
 };
 
 export function PromoSlides({ fixture, openNew = false, openPromoId = null }: { fixture?: PromoFixture; openNew?: boolean; openPromoId?: string | null } = {}) {
-  const t = useT();
+  const { locale, t } = useLocale();
   const livePromos = useApi<{ promos: Promo[]; available: boolean }>(fixture ? null : "/api/promos");
   const liveMenus = useApi<{ menus: MenuBoard[]; available: boolean }>(fixture ? null : "/api/menus");
   const liveMedia = useApi<MediaItem[]>(fixture ? null : "/api/media");
@@ -46,7 +46,7 @@ export function PromoSlides({ fixture, openNew = false, openPromoId = null }: { 
   const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
   const [draft, setDraft] = useState<Draft | null>(() => (
     fixture?.startEditing || openNew
-      ? { id: null, name: t("ptpl.happy.name"), template: "happy", content: samplePromo("happy"), startsOn: "", endsOn: "" }
+      ? { id: null, name: t("ptpl.happy.name"), template: "happy", content: samplePromoFor("happy", locale), startsOn: "", endsOn: "" }
       : null
   ));
   const openedPromo = useRef(false);
@@ -65,7 +65,7 @@ export function PromoSlides({ fixture, openNew = false, openPromoId = null }: { 
   const menuList = menus.data?.menus ?? [];
 
   function startNew(template: PromoTemplate = "happy") {
-    setDraft({ id: null, name: t(`ptpl.${template}.name`), template, content: samplePromo(template), startsOn: "", endsOn: "" });
+    setDraft({ id: null, name: t(`ptpl.${template}.name`), template, content: samplePromoFor(template, locale), startsOn: "", endsOn: "" });
   }
 
   async function addToMenu(promo: Promo) {
@@ -212,7 +212,7 @@ function PromoEditor({ draft, setDraft, images, onSaved, onError, previewSrc, re
   onSaved: (message: string) => void; onError: (message: string) => void;
   previewSrc?: string; readOnly?: boolean;
 }) {
-  const t = useT();
+  const { locale, t } = useLocale();
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(previewSrc ?? null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -279,7 +279,7 @@ function PromoEditor({ draft, setDraft, images, onSaved, onError, previewSrc, re
           {PROMO_TEMPLATES.map((tpl) => (
             <label key={tpl.id} className={`rounded-xl border p-3 cursor-pointer ${draft.template === tpl.id ? "border-primary ring-2 ring-primary/30" : "border-line"}`}>
               <input type="radio" name="promo-template" className="sr-only" checked={draft.template === tpl.id}
-                onChange={() => setDraft({ ...draft, template: tpl.id, ...(draft.id ? {} : { content: { ...samplePromo(tpl.id), photoMediaId: c.photoMediaId, useBrand: c.useBrand }, name: t(`ptpl.${tpl.id}.name`) }) })} />
+                onChange={() => setDraft({ ...draft, template: tpl.id, ...(draft.id ? {} : { content: { ...samplePromoFor(tpl.id, locale), photoMediaId: c.photoMediaId, useBrand: c.useBrand }, name: t(`ptpl.${tpl.id}.name`) }) })} />
               <span className="flex gap-1 mb-2" aria-hidden>
                 <span className="h-6 flex-1 rounded" style={{ background: tpl.swatch[0], border: "1px solid #d5e2f2" }} />
                 <span className="h-6 w-8 rounded" style={{ background: tpl.swatch[1] }} />

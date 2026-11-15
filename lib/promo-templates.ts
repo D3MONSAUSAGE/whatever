@@ -48,6 +48,22 @@ export function samplePromo(template: PromoTemplate = "happy"): PromoContent {
   return { ...PROMO_TEMPLATES.find((t) => t.id === template)!.sample };
 }
 
+/**
+ * Spanish bracketed samples, used only when a promo is created while the editor is in Spanish.
+ * PROMO_TEMPLATES (ids, EN samples) stay unchanged; saved promos are never rewritten.
+ */
+const SAMPLES_ES: Record<PromoTemplate, Omit<PromoContent, "useBrand">> = {
+  happy: { tag: "Hora feliz", headline: "[Su promoción de bebidas]", subheadline: "[Qué incluye]", price: "[$0]", details: "[Qué días, dónde]", footer: "[Horario]" },
+  deal: { tag: "Oferta", headline: "[Su combo]", subheadline: "[Qué incluye]", price: "[$0]", details: "", footer: "[Condiciones]" },
+  special: { tag: "Especial del día", headline: "[Nombre del platillo]", subheadline: "[Descripción breve]", price: "[$0]", details: "", footer: "[Pregunte a su mesero]" },
+};
+
+/** Sample content for a NEW promo in the editor language. English is exactly samplePromo(). */
+export function samplePromoFor(template: PromoTemplate = "happy", locale: string = "en"): PromoContent {
+  if (locale !== "es") return samplePromo(template);
+  return { ...SAMPLES_ES[template], useBrand: true };
+}
+
 function text(value: unknown, max: number): string | null {
   if (value == null) return "";
   if (typeof value !== "string") return null;

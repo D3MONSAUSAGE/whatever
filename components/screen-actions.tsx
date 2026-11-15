@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import Link from "next/link";
 import { orderedZones } from "@/lib/time-zones";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -48,6 +49,7 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
   library?: ScreenLibrary;
   initialPanel?: Panel;
 }) {
+  const t = useT();
   const [panel, setPanel] = useState<Panel>(initialPanel);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,15 +85,15 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
 
   async function assignImage(mediaId: string) {
     const ok = await confirm.ask({
-      title: "Publish this to the TV?",
-      body: `This replaces the single picture on this screen. Other screens stay as they are. ${publishTimingCopy(display)}`,
-      confirmLabel: "Publish to TV",
+      title: t("sa2.publishThis"),
+      body: `${t("sa2.replacesPicture")} ${publishTimingCopy(display, t)}`,
+      confirmLabel: t("sa2.publishToTv"),
     });
     if (ok !== true) return;
     setBusy(true);
     try {
       await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ mediaId }) });
-      setNote(publishSavedCopy(display));
+      setNote(publishSavedCopy(display, t));
       onChanged();
     } catch (err) {
       setNote((err as Error).message);
@@ -107,7 +109,7 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
         method: "POST",
         body: JSON.stringify({ playlistId, displayIds: [display.id], commit: true, replace: false }),
       });
-      setNote(publishSavedCopy(display));
+      setNote(publishSavedCopy(display, t));
       onChanged();
     } catch (err) {
       setNote((err as Error).message);
@@ -126,14 +128,14 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
       body: JSON.stringify({ playlistId, displayIds: [display.id], commit: false }),
     });
     const ok = await confirm.ask({
-      title: "Publish to this TV?",
+      title: t("sa2.publishToThis"),
       body: [
-        preview.affected.length ? `This screen will play it.` : "This screen already plays it. The saved draft will be published.",
-        preview.willBeCleared.length ? `These other screens keep it: ${preview.willBeCleared.map((item) => item.name).join(", ")}.` : "No other screen loses this playlist.",
-        preview.overriddenBySchedule.length ? "A schedule on this screen still wins until it ends." : "",
-        publishTimingCopy(display),
+        preview.affected.length ? t("sa2.willPlay") : t("sa2.alreadyPlays"),
+        preview.willBeCleared.length ? t("sa2.othersKeep", { names: preview.willBeCleared.map((item) => item.name).join(", ") }) : t("sa2.noneLose"),
+        preview.overriddenBySchedule.length ? t("sa2.scheduleWins") : "",
+        publishTimingCopy(display, t),
       ].filter(Boolean).join(" "),
-      confirmLabel: "Publish to TV",
+      confirmLabel: t("sa2.publishToTv"),
     });
     if (ok !== true) return;
     await commitPlaylist(playlistId);
@@ -141,9 +143,9 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
 
   async function publishFile(item: { id: string; fileName: string }) {
     const ok = await confirm.ask({
-      title: "Publish this to the TV?",
-      body: `Video and documents play from a playlist. This creates one for this screen and leaves other screens as they are. ${publishTimingCopy(display)}`,
-      confirmLabel: "Publish to TV",
+      title: t("sa2.publishThis"),
+      body: `${t("sa2.filePlaylist")} ${publishTimingCopy(display, t)}`,
+      confirmLabel: t("sa2.publishToTv"),
     });
     if (ok !== true) return;
     setBusy(true);
@@ -181,15 +183,15 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
 
   async function assignBoard(menuId: string) {
     const ok = await confirm.ask({
-      title: "Publish this layout to the TV?",
-      body: `Only this screen changes. ${publishTimingCopy(display)}`,
-      confirmLabel: "Publish to TV",
+      title: t("sa2.publishLayout"),
+      body: `${t("sa2.onlyThis")} ${publishTimingCopy(display, t)}`,
+      confirmLabel: t("sa2.publishToTv"),
     });
     if (ok !== true) return;
     setBusy(true);
     try {
       await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId, displayId: display.id }) });
-      setNote(publishSavedCopy(display));
+      setNote(publishSavedCopy(display, t));
       onChanged();
     } catch (err) {
       setNote((err as Error).message);
@@ -205,15 +207,15 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
           const ids = SCREEN_ACTION_ORDER.filter((id) => screenActionGroup(id) === group);
           return (
             <div key={group} className="min-w-0">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{screenActionGroupLabel(group)}</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{screenActionGroupLabel(group, t)}</h3>
               <div className="flex flex-wrap gap-2 mt-2">
                 {ids.map((id) => (
                   <button key={id} type="button" className={screenActionClass(id, panel === id)} aria-pressed={panel === id} onClick={() => open(panel === id ? null : id)}>
-                    {screenActionLabel(id)}
+                    {screenActionLabel(id, t)}
                   </button>
                 ))}
               </div>
-              <p className="text-sm text-muted mt-1">{ids.map((id) => panel === id ? screenActionHelper(id) : null).find(Boolean) ?? (group === "primary" ? screenActionHelper("change") : null)}</p>
+              <p className="text-sm text-muted mt-1">{ids.map((id) => panel === id ? screenActionHelper(id, t) : null).find(Boolean) ?? (group === "primary" ? screenActionHelper("change", t) : null)}</p>
             </div>
           );
         })}
@@ -221,11 +223,11 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
       {note ? <p role="status" className="text-sm mt-3">{note}</p> : null}
       {panel === "upload" ? (
         <div className="card p-4 mt-3 grid gap-4">
-          <p className="text-sm text-muted">{screenActionHelper("upload")}</p>
+          <p className="text-sm text-muted">{screenActionHelper("upload", t)}</p>
           <FileUploadControl kind="image" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "image")} />
           <FileUploadControl kind="video" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "video")} />
           <FileUploadControl kind="document" disabled={uploads.busy} onFiles={(files) => uploads.enqueue(files, "presentation")} />
-          {uploads.busy ? <p className="text-sm">Uploading…</p> : null}
+          {uploads.busy ? <p className="text-sm">{t("sa2.uploading")}</p> : null}
         </div>
       ) : null}
       {panel === "change" ? (
@@ -242,10 +244,10 @@ export function ScreenActions({ display, onChanged, preview = false, library, in
       {confirm.node}
       {panel === "create" ? (
         <div className="card p-4 mt-3 flex flex-wrap gap-2">
-          <p className="text-sm text-muted w-full">{screenActionHelper("create")}</p>
-          <Link className="btn btn-quiet min-h-11" href={`/dashboard/media/menus?screen=${display.id}&new=1`}>New menu board</Link>
-          <Link className="btn btn-quiet min-h-11" href="/dashboard/media/promos?new=1" data-testid="create-promotion">New promotion</Link>
-          <button type="button" className="btn btn-quiet min-h-11" onClick={() => open("playlist")}>New playlist</button>
+          <p className="text-sm text-muted w-full">{screenActionHelper("create", t)}</p>
+          <Link className="btn btn-quiet min-h-11" href={`/dashboard/media/menus?screen=${display.id}&new=1`}>{t("sa2.newBoard")}</Link>
+          <Link className="btn btn-quiet min-h-11" href="/dashboard/media/promos?new=1" data-testid="create-promotion">{t("sa2.newPromo")}</Link>
+          <button type="button" className="btn btn-quiet min-h-11" onClick={() => open("playlist")}>{t("sa2.newPlaylist")}</button>
         </div>
       ) : null}
       {panel === "playlist" ? (
@@ -273,6 +275,7 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
   onPublish: (playlistId: string) => Promise<void>;
   onNote: (message: string) => void;
 }) {
+  const t = useT();
   const [editingId, setEditingId] = useState(display.playlist?.id ?? "");
   const playlistId = editingId;
   const detail = useApi<PlaylistDetail>(playlistId ? `/api/playlists/${playlistId}` : null);
@@ -283,9 +286,9 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
   useEffect(() => { setRows(null); }, [playlistId]);
 
   async function createPlaylist() {
-    const created = await api<{ id: string }>("/api/playlists", { method: "POST", body: JSON.stringify({ name: `${display.name} playlist` }) });
+    const created = await api<{ id: string }>("/api/playlists", { method: "POST", body: JSON.stringify({ name: t("sa2.screenPlaylist", { name: display.name }) }) });
     setEditingId(created.id);
-    onNote("Playlist created. Add items, then publish.");
+    onNote(t("sa2.created"));
   }
 
   async function save() {
@@ -300,25 +303,25 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
         items: items.map((item) => ({ mediaId: item.mediaId, durationMs: item.durationMs })),
       }),
     });
-    onNote("Playlist draft saved. Publish to send it to this TV.");
+    onNote(t("sa2.draftSaved"));
   }
 
   if (!playlistId) {
     return (
       <div className="card p-4 mt-3">
-        <p className="text-sm">This screen is not on a playlist. A single picture does not have slides.</p>
-        <button type="button" className="btn btn-quiet min-h-11 mt-3" onClick={() => createPlaylist().catch((err: Error) => onNote(err.message))}>Create a playlist for this screen</button>
-        {playlists.length ? <p className="text-sm text-muted mt-3">Or choose one under Change content.</p> : null}
+        <p className="text-sm">{t("sa2.noPlaylist")}</p>
+        <button type="button" className="btn btn-quiet min-h-11 mt-3" onClick={() => createPlaylist().catch((err: Error) => onNote(err.message))}>{t("sa2.createPlaylist")}</button>
+        {playlists.length ? <p className="text-sm text-muted mt-3">{t("sa2.orChoose")}</p> : null}
       </div>
     );
   }
   return (
     <div className="card p-4 mt-3 grid gap-3 min-w-0">
-      {!items ? <p className="text-sm">{detail.error || "Loading playlist…"}</p> : items.map((item, index) => (
+      {!items ? <p className="text-sm">{detail.error || t("sa2.loadingPlaylist")}</p> : items.map((item, index) => (
         <div key={`${item.mediaId}-${index}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_auto]">
           <span className="text-sm truncate self-center">{item.fileName}</span>
-          <label className="text-xs">Seconds
-            <input className="field w-full" aria-label={`Seconds for ${item.fileName}`} inputMode="numeric" value={item.durationMs == null ? "" : String(Math.round(item.durationMs / 1000))}
+          <label className="text-xs">{t("sa2.seconds")}
+            <input className="field w-full" aria-label={t("sa2.secondsFor", { name: item.fileName })} inputMode="numeric" value={item.durationMs == null ? "" : String(Math.round(item.durationMs / 1000))}
               onChange={(event) => {
                 const next = event.target.value.trim();
                 const seconds = Number(next);
@@ -327,31 +330,31 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
               }} />
           </label>
           <span className="flex gap-2">
-            <button type="button" className="btn btn-quiet min-h-11" aria-label={`Move ${item.fileName} up`} disabled={index === 0} onClick={() => {
+            <button type="button" className="btn btn-quiet min-h-11" aria-label={t("sa2.moveUp", { name: item.fileName })} disabled={index === 0} onClick={() => {
               const next = items.slice();
               const [row] = next.splice(index, 1);
               next.splice(index - 1, 0, row);
               setRows(next);
-            }}>Up</button>
-            <button type="button" className="btn btn-quiet text-danger min-h-11" aria-label={`Remove ${item.fileName}`} onClick={() => setRows(items.filter((_, i) => i !== index))}>Remove</button>
+            }}>{t("sa2.up")}</button>
+            <button type="button" className="btn btn-quiet text-danger min-h-11" aria-label={t("sa2.removeName", { name: item.fileName })} onClick={() => setRows(items.filter((_, i) => i !== index))}>{t("sa2.remove")}</button>
           </span>
         </div>
       ))}
-      <label className="text-sm">Add from library
-        <select className="field mt-1 w-full" aria-label="Add library file" value={addId} onChange={(event) => {
+      <label className="text-sm">{t("sa2.addFromLibrary")}
+        <select className="field mt-1 w-full" aria-label={t("sa2.addLibraryAria")} value={addId} onChange={(event) => {
           const mediaId = event.target.value;
           setAddId("");
           const file = library.find((item) => item.id === mediaId);
           if (!file || !items) return;
           setRows([...items, { mediaId, durationMs: null, fileName: file.fileName }]);
         }}>
-          <option value="">Choose a file</option>
+          <option value="">{t("sa2.chooseFile")}</option>
           {library.filter((item) => !item.sourceMediaId).map((item) => <option key={item.id} value={item.id}>{item.fileName}</option>)}
         </select>
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn btn-quiet min-h-11" disabled={busy || !items} onClick={() => save().catch((err: Error) => onNote(err.message))}>Save draft</button>
-        <button type="button" className="btn btn-primary min-h-11" disabled={busy} onClick={() => onPublish(playlistId)}>Publish to TV</button>
+        <button type="button" className="btn btn-quiet min-h-11" disabled={busy || !items} onClick={() => save().catch((err: Error) => onNote(err.message))}>{t("sa2.saveDraft")}</button>
+        <button type="button" className="btn btn-primary min-h-11" disabled={busy} onClick={() => onPublish(playlistId)}>{t("sa2.publishToTv")}</button>
       </div>
     </div>
   );
@@ -360,11 +363,12 @@ function PlaylistEditor({ display, library, playlists, busy, onPublish, onNote }
 // Common US zones first, then the rest A–Z (QA U1-08).
 const ZONES = orderedZones(["Europe/London"]);
 const DAYS = [
-  { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" },
-  { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" }, { value: 7, label: "Sun" },
-];
+  { value: 1, labelKey: "day.mon" }, { value: 2, labelKey: "day.tue" }, { value: 3, labelKey: "day.wed" },
+  { value: 4, labelKey: "day.thu" }, { value: 5, labelKey: "day.fri" }, { value: 6, labelKey: "day.sat" }, { value: 7, labelKey: "day.sun" },
+] as const;
 
 function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; playlists: PlaylistSummary[]; onDone: (message: string) => void }) {
+  const t = useT();
   const saved = useApi<ScheduleItem[]>("/api/schedules");
   const mine = (saved.data ?? []).filter((item) => item.displayId === display.id);
   const storedZone = display.location?.timezone || "UTC";
@@ -373,20 +377,20 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
   const [playlistId, setPlaylistId] = useState(display.playlist?.id ?? "");
   const [start, setStart] = useState("11:00");
   const [end, setEnd] = useState("14:00");
-  const [name, setName] = useState("Screen promotion");
+  const [name, setName] = useState(() => t("sa2.defaultName"));
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
   const [overnightOk, setOvernightOk] = useState(false);
   const opened = useRef(false);
   // QA B2-02 / B2-03: overnight windows need an explicit tick; overlaps say which rule plays.
   const overnight = isOvernight(start, end);
   const overlaps = zone === storedZone
-    ? findOverlaps({ id: scheduleId || undefined, name: name || "This rule", displayId: display.id, groupId: null, weekdays, startTime: start, endTime: end, startsOn: null, endsOn: null, priority: 0 }, saved.data ?? [], [])
+    ? findOverlaps({ id: scheduleId || undefined, name: name || t("sa2.thisRule"), displayId: display.id, groupId: null, weekdays, startTime: start, endTime: end, startsOn: null, endsOn: null, priority: 0 }, saved.data ?? [], [], undefined, t)
     : [];
 
   function load(item: ScheduleItem | null, nextZone = zone) {
     if (!item) {
       setScheduleId("");
-      setName("Screen promotion");
+      setName(t("sa2.defaultName"));
       setPlaylistId(display.playlist?.id ?? "");
       setStart("11:00");
       setEnd("14:00");
@@ -417,10 +421,10 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
   }, [saved.data, display.id]);
 
   async function save() {
-    if (!playlistId) throw new Error("Choose a playlist to schedule.");
-    if (overnight && !overnightOk) throw new Error("This window ends the next day. Tick “Yes, run overnight” to save it, or change the end time.");
-    if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) throw new Error("Use times like 21:24 and 22:00.");
-    try { Intl.DateTimeFormat("en-US", { timeZone: zone }); } catch { throw new Error("Use a timezone like America/Los_Angeles."); }
+    if (!playlistId) throw new Error(t("sa2.needPlaylist"));
+    if (overnight && !overnightOk) throw new Error(t("sa2.overnightTick"));
+    if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) throw new Error(t("sa2.timesLike"));
+    try { Intl.DateTimeFormat("en-US", { timeZone: zone }); } catch { throw new Error(t("sa2.zoneLike")); }
     const clockChanged = Boolean(display.location && zone !== display.location.timezone);
     if (clockChanged && display.location) {
       await api(`/api/locations/${display.location.id}`, { method: "PATCH", body: JSON.stringify({ timezone: zone }) });
@@ -438,33 +442,33 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
       }
       throw err;
     }
-    onDone(`Saved ${formatClock12(start)} to ${formatClock12(end)} in ${zoneLabel(zone)}. A screen schedule wins over a group schedule while it is on. The TV plays the playlist's published slides, not an unpublished draft.`);
+    onDone(t("sa2.saved", { start: formatClock12(start), end: formatClock12(end), zone: zoneLabel(zone) }));
   }
 
   return (
     <form className="card p-4 mt-3 grid gap-3" onSubmit={(event) => { event.preventDefault(); save().catch((err: Error) => onDone(err.message)); }}>
-      <p className="text-sm">Times are {zoneLabel(zone)}. {storedZone !== zone ? `This screen's location clock is ${storedZone}. Saving updates it, including other screens at that location.` : "This is the clock the TV uses."}</p>
-      <label className="text-sm">Timezone
-        <input className="field mt-1 w-full" aria-label="Timezone" list="screen-timezones" value={zone} onChange={(event) => { const next = event.target.value; setZone(next); const current = mine.find((item) => item.id === scheduleId); if (current) load(current, next); }} />
+      <p className="text-sm">{t("sa2.timesAre", { zone: zoneLabel(zone) })} {storedZone !== zone ? t("sa2.clockIs", { zone: storedZone }) : t("sa2.tvClock")}</p>
+      <label className="text-sm">{t("sa2.timezone")}
+        <input className="field mt-1 w-full" aria-label={t("sa2.timezone")} list="screen-timezones" value={zone} onChange={(event) => { const next = event.target.value; setZone(next); const current = mine.find((item) => item.id === scheduleId); if (current) load(current, next); }} />
         <datalist id="screen-timezones">{ZONES.map((item) => <option key={item} value={item} />)}</datalist>
       </label>
       {mine.length ? (
-        <label className="text-sm">Saved window
-          <select className="field mt-1 w-full" aria-label="Saved schedule" value={scheduleId} onChange={(event) => load(mine.find((item) => item.id === event.target.value) ?? null)}>
-            <option value="">New window</option>
+        <label className="text-sm">{t("sa2.savedWindow")}
+          <select className="field mt-1 w-full" aria-label={t("sa2.savedScheduleAria")} value={scheduleId} onChange={(event) => load(mine.find((item) => item.id === event.target.value) ?? null)}>
+            <option value="">{t("sa2.newWindow")}</option>
             {mine.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
       ) : null}
-      <label className="text-sm">Playlist
-        <select className="field mt-1 w-full" aria-label="Playlist to schedule" value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
-          <option value="">Choose a playlist</option>
-          {playlists.map((item) => <option key={item.id} value={item.id}>{item.name}{item.publishedAt ? "" : " (not published)"}</option>)}
+      <label className="text-sm">{t("sa2.playlist")}
+        <select className="field mt-1 w-full" aria-label={t("sa2.playlistAria")} value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
+          <option value="">{t("sa2.choosePlaylist")}</option>
+          {playlists.map((item) => <option key={item.id} value={item.id}>{item.name}{item.publishedAt ? "" : ` ${t("sa2.notPublished").trim()}`}</option>)}
         </select>
       </label>
-      <p className="text-sm text-muted">The TV plays the published slides. Unpublished changes stay in the draft until that playlist is published.</p>
-      <label className="text-sm">Name
-        <input className="field mt-1 w-full" aria-label="Schedule name" value={name} onChange={(event) => setName(event.target.value)} />
+      <p className="text-sm text-muted">{t("sa2.publishedNote")}</p>
+      <label className="text-sm">{t("sa2.name")}
+        <input className="field mt-1 w-full" aria-label={t("sa2.nameAria")} value={name} onChange={(event) => setName(event.target.value)} />
       </label>
       <div className="flex flex-wrap gap-2">
         {DAYS.map((day) => {
@@ -472,29 +476,29 @@ function ScheduleForm({ display, playlists, onDone }: { display: DisplayItem; pl
           return (
             <button key={day.value} type="button" className={`btn min-h-11 ${on ? "btn-primary" : ""}`} aria-pressed={on}
               onClick={() => setWeekdays(on ? weekdays.filter((value) => value !== day.value) : [...weekdays, day.value].sort((a, b) => a - b))}>
-              {day.label}
+              {t(day.labelKey)}
             </button>
           );
         })}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <label className="text-sm">From
-          <input className="field mt-1 w-full" aria-label="Start time" type="time" value={start === "24:00" ? "00:00" : start} onChange={(event) => { setStart(event.target.value); setOvernightOk(false); }} />
+        <label className="text-sm">{t("sa2.from")}
+          <input className="field mt-1 w-full" aria-label={t("sa2.startAria")} type="time" value={start === "24:00" ? "00:00" : start} onChange={(event) => { setStart(event.target.value); setOvernightOk(false); }} />
         </label>
-        <label className="text-sm">Until
-          <input className="field mt-1 w-full" aria-label="End time" type="time" value={end === "24:00" ? "00:00" : end} onChange={(event) => { setEnd(event.target.value); setOvernightOk(false); }} />
+        <label className="text-sm">{t("sa2.until")}
+          <input className="field mt-1 w-full" aria-label={t("sa2.endAria")} type="time" value={end === "24:00" ? "00:00" : end} onChange={(event) => { setEnd(event.target.value); setOvernightOk(false); }} />
         </label>
       </div>
       {overnight ? (
         <div className="note-warn grid gap-2" role="status">
-          <p>{overnightMessage(start, end)}</p>
-          <label className="flex items-center gap-2 min-h-11"><input type="checkbox" checked={overnightOk} onChange={(event) => setOvernightOk(event.target.checked)} /> Yes, run overnight</label>
+          <p>{overnightMessage(start, end, t)}</p>
+          <label className="flex items-center gap-2 min-h-11"><input type="checkbox" checked={overnightOk} onChange={(event) => setOvernightOk(event.target.checked)} /> {t("dp.yesOvernight")}</label>
         </div>
       ) : null}
       {overlaps.length ? (
         <div className="note-warn text-sm grid gap-1" role="status">{overlaps.map((item) => <p key={item.other.id ?? item.other.name}>{item.message}</p>)}</div>
       ) : null}
-      <button type="submit" className="btn btn-primary min-h-11">{scheduleId ? "Update schedule" : "Save schedule"}</button>
+      <button type="submit" className="btn btn-primary min-h-11">{scheduleId ? t("sa2.updateSchedule") : t("sa2.saveSchedule")}</button>
     </form>
   );
 }

@@ -145,7 +145,8 @@ export const MENU_FIELD_STYLES = `
         .product-thumb { grid-area: thumb; width: 56px; height: 56px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #eef4ff, #e3ecfb); color: #2a4f8f; font-size: 19px; font-weight: 750; letter-spacing: .01em; border: 1px solid #dfe7f5; flex: 0 0 auto; overflow: hidden; user-select: none; }
         .product-thumb.has-image { background: #f3f5f9; padding: 0; }
         .product-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .product-thumb.is-empty { color: #8a96ab; background: #f3f5f9; border-style: dashed; }
+        .product-thumb.is-empty { color: #5b6577; background: #f3f5f9; border-style: dashed; }
+        .product-card input::placeholder, .product-card textarea::placeholder { color: #5b6577; opacity: 1; }
         .product-main { grid-area: main; min-width: 0; display: grid; gap: 2px; cursor: pointer; }
         .product-name { font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .product-name.is-placeholder { color: #5b6577; font-weight: 600; font-style: italic; }
