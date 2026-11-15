@@ -1,3 +1,5 @@
+import { withEn } from "./helpers/with-en";
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,7 +23,7 @@ describe("premium editor chrome", () => {
     } catch {
       return;
     }
-    const source = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("components/classic-editor.tsx", "utf8") + readFileSync("components/studio-leave.tsx", "utf8") + readFileSync("components/shell.tsx", "utf8");
+    const source = withEn(readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("components/classic-editor.tsx", "utf8") + readFileSync("components/studio-leave.tsx", "utf8") + readFileSync("components/shell.tsx", "utf8"));
     const style = source.match(/<style>\{`([\s\S]*?)`\}<\/style>/)?.[1] ?? "";
     expect(style).toContain("position: sticky");
     expect(source).toContain('id="studio-tv-preview"');
@@ -31,8 +33,10 @@ describe("premium editor chrome", () => {
     expect(style).not.toContain("grid-template-columns: 320px minmax(0, 1fr) 280px");
     expect(source).toContain("TemplatePicker");
     expect(source).toContain("template-thumb-check");
-    expect(source).toContain("Content &amp; text");
-    expect(source).toContain("Colors &amp; style");
+    expect(source).toContain('t("ce.content")'); // I18N-3: copy lives in the dictionary
+    expect(source).toContain('t("ls.colors")');
+    expect(en["ce.content"]).toBe("Content & text");
+    expect(en["ls.colors"]).toBe("Colors & style");
     expect(source).toContain("studio-canvas-stage");
     expect(source).toContain("board-switch");
     expect(source).toContain("item-card");

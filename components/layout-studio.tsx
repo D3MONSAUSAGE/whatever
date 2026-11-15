@@ -613,7 +613,7 @@ export function LayoutStudio({
           setNote(publishSavedCopy({
             online: screenOnline ?? false,
             connected: screenConnected ?? true,
-          }));
+          }, t));
         }
       } else if (board?.playlistId) {
         setNote(t("ls.published"));

@@ -244,7 +244,7 @@ describe("embedded editor leave paths", () => {
     expect(studio).toContain("if (alreadyConfirmed) { startFreshBoard(); return; }");
     expect(studio).toContain("confirmDiscard(studioIsDirty(), startFreshBoard)");
     // The Menu boards in-editor link also goes through requestLeave, not a raw navigation.
-    const leaveLink = studio.slice(studio.indexOf(">Menu boards</a>") - 400, studio.indexOf(">Menu boards</a>"));
+    const leaveLink = studio.slice(studio.indexOf('>{t("ls.menuBoards")}</a>') - 400, studio.indexOf('>{t("ls.menuBoards")}</a>'));
     expect(leaveLink).toContain("requestLeave");
     expect(leaveLink).toContain("preventDefault");
   });

@@ -1374,7 +1374,7 @@ export const es: Record<MessageKey, string> = {
   "font.lobster.hint": "Cursiva amigable",
 
   // I18N-3: Layout Studio (more)
-  "ls.browserCopy": "Esta copia del navegador no escribe en ninguna cuenta.",
+  "ls.browserCopy": "Esta copia del navegador no guarda cambios en ninguna cuenta.",
   "ls.thisBoard": "Este menú",
 
   // I18N-3: Media library (file and playlist names never translated)
@@ -1662,7 +1662,7 @@ export const es: Record<MessageKey, string> = {
   "ss.enabled": "Activado",
   "ss.paused": "En pausa",
   "ss.timezone": "Zona horaria",
-  "ss.delLocBody": "¿Eliminar “{name}”? Las pantallas desconectadas aquí se separan de ella.",
+  "ss.delLocBody": "¿Eliminar “{name}”? Las pantallas de esta ubicación quedarán sin ubicación asignada.",
   "ss.delGroupBody": "¿Eliminar “{name}”? Se quitan los horarios dirigidos a él.",
   "ss.delSchedBody": "¿Eliminar “{name}”? Las pantallas vuelven a su asignación guardada fuera de cualquier otra regla.",
   "ss.nameFor": "Nombre de {name}",

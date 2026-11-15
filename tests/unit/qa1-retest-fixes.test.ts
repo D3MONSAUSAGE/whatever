@@ -1,3 +1,4 @@
+import { en } from "@/lib/i18n/en";
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { filledSections, menuCounts, sectionLimitMessage, shownSections } from "@/lib/menu-fields";
@@ -67,8 +68,10 @@ describe("B1-10 retest: library upload offers the copy already there", () => {
   it("asks before making a second copy; upload pipeline untouched", () => {
     expect(duplicateMessage(["a.mp4"])).toMatch(/already in your library/);
     const lib = readFileSync("components/media-library.tsx", "utf8");
-    expect(lib).toMatch(/Keep the one I have/);
-    expect(lib).toMatch(/Upload a copy anyway/);
+    expect(lib).toContain('cancelLabel: t("diu.dupKeep")'); // I18N-3
+    expect(lib).toContain('confirmLabel: t("diu.dupCopy")');
+    expect(en["diu.dupKeep"]).toBe("Keep the one I have");
+    expect(en["diu.dupCopy"]).toBe("Upload a copy anyway");
     expect(readFileSync("components/uploads.tsx", "utf8")).toMatch(/\/api\/media\/upload/);
   });
 });

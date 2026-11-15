@@ -1,3 +1,4 @@
+import { en } from "@/lib/i18n/en";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { MEDIA_NAME_MAX, mediaRename } from "@/lib/media-rename";
@@ -32,9 +33,11 @@ describe("U2-05: rename in Media (display name only)", () => {
 
   it("UI: Rename for images and videos, presentations keep their own endpoint", () => {
     const ui = readFileSync("components/media-library.tsx", "utf8");
-    expect(ui).toMatch(/aria-label=\{`Rename \$\{item\.fileName\}`\}>Rename<\/button>/);
+    expect(ui).toContain('aria-label={t("ml.renameAria", { name: item.fileName })}>{t("ml.rename")}</button>'); // I18N-3
+    expect(en["ml.renameAria"]).toBe("Rename {name}");
     expect(ui).toMatch(/presentation \? `\/api\/media\/presentation\/\$\{item\.id\}` : `\/api\/media\/\$\{item\.id\}`/);
-    expect(ui).toMatch(/Only the name shown in Pekko changes\. Screens and playlists keep using this file\./);
+    expect(ui).toContain('t("ml.renameNote")');
+    expect(en["ml.renameNote"]).toBe("Only the name shown in Pekko changes. Screens and playlists keep using this file.");
   });
 });
 

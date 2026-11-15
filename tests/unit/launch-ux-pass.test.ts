@@ -179,9 +179,11 @@ describe("upload picker UI", () => {
     expect(media).toContain("FileUploadControl");
     expect(studio).toContain("FileUploadControl");
     expect(screen).not.toMatch(/className="block mt-1 w-full[^"]*" aria-label="Upload image" type="file"/);
-    expect(media).toContain(">Promotions<");
+    expect(media).toContain('{t("ml.promotions")}<'); // I18N-3
+    expect(en["ml.promotions"]).toBe("Promotions");
     expect(media).not.toContain(">Promos<");
-    expect(media).toContain("Pictures, video, and documents in your library.");
+    expect(media).toContain('lede={t("ml.lede")}');
+    expect(en["ml.lede"]).toBe("Pictures, video, and documents in your library.");
     expect(media).not.toContain("Images up to 15 MB");
     expect(media).toContain('data-testid="media-uploads"');
     expect(media).toContain("grid grid-cols-3");
@@ -191,7 +193,7 @@ describe("upload picker UI", () => {
     expect(media).toContain('kind="document"');
     expect((media.match(/btn-quiet/g) ?? []).length).toBeGreaterThanOrEqual(3);
     const studioHelp = readFileSync("components/layout-studio.tsx", "utf8");
-    expect(studioHelp).toContain("PROMO_AREA_HINT");
+    expect(studioHelp).toContain('t("ls.promoHint")'); // I18N-3: was PROMO_AREA_HINT
     expect(studioHelp).toContain('promoArea={template === "menu-promo-67" || template === "two-menu-promo"}');
   });
 });
@@ -271,8 +273,10 @@ describe("publish copy for offline targets across every leftover toast", () => {
     expect(group).toContain("publishSavedCopyForTargets(targets, t)");
     expect(group).not.toContain("TVs update within about 30 seconds.");
     expect(studio).toContain("publishSavedCopy({");
+    expect(studio).toMatch(/connected: screenConnected \?\? true,\s*\}, t\)\)/);
     expect(studio).not.toContain("TV updates within ~30 s");
-    expect(studio).toContain("Screens already playing this board will update when they are online.");
+    expect(studio).toContain('setNote(t("ls.published"))');
+    expect(en["ls.published"]).toContain("Screens already playing this board will update when they are online.");
   });
 });
 
@@ -282,7 +286,8 @@ describe("isolated studio photo limit copy", () => {
     expect(studio).toContain("export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000");
     expect(studio).toContain('export const ISOLATED_STUDIO_PHOTO_LIMIT_LABEL = "1.5 MB or smaller"');
     expect(studio).toContain("file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES");
-    expect(studio).toContain("Use a photo under 1.5 MB.");
+    expect(studio).toContain('setNote(t("ls.photoTooBig"))');
+    expect(en["ls.photoTooBig"]).toBe("Use a photo under 1.5 MB.");
     expect(studio).toContain("isolatedPhotoLimit={!accountMode && !sessionToken}");
     expect(studio).toContain("limitLabel={imageLimitLabel}");
     expect(studio).toContain("ISOLATED_STUDIO_PHOTO_LIMIT_LABEL");
@@ -292,7 +297,8 @@ describe("isolated studio photo limit copy", () => {
 describe("playlist publish copy", () => {
   it("uses neutral no-timing wording because the editor has no online status for its targets", () => {
     const source = readFileSync("components/playlist-editor.tsx", "utf8");
-    expect(source).toContain("Published. Screens playing this playlist update when they're online.");
+    expect(source).toContain('toast.show(t("pe.published"))');
+    expect(en["pe.published"]).toBe("Published. Screens playing this playlist update when they're online.");
     expect(source).not.toContain("Published. TVs update within about 10 seconds.");
     expect(source).not.toMatch(/toast\.show\([^)]*within about 10 seconds/);
     expect(source).not.toContain("They switch within about 10 seconds.");

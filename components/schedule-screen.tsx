@@ -23,13 +23,13 @@ import { ScheduleViews } from "@/components/schedule-views";
 import { orderedZones } from "@/lib/time-zones";
 
 const DAYS = [
-  { value: 1, label: "day.mon" },
-  { value: 2, label: "day.tue" },
-  { value: 3, label: "day.wed" },
-  { value: 4, label: "day.thu" },
-  { value: 5, label: "day.fri" },
-  { value: 6, label: "day.sat" },
-  { value: 7, label: "day.sun" },
+  { value: 1, labelKey: "day.mon" },
+  { value: 2, labelKey: "day.tue" },
+  { value: 3, labelKey: "day.wed" },
+  { value: 4, labelKey: "day.thu" },
+  { value: 5, labelKey: "day.fri" },
+  { value: 6, labelKey: "day.sat" },
+  { value: 7, labelKey: "day.sun" },
 ] as const;
 
 const ZONE_EXTRAS = [
@@ -515,7 +515,7 @@ function Rules({
                   className={`btn ${on ? "btn-pressed" : "btn-quiet"}`}
                   onClick={() => setWeekdays(on ? weekdays.filter((value) => value !== day.value) : [...weekdays, day.value].sort((a, b) => a - b))}
                 >
-                  {t(day.label)}
+                  {t(day.labelKey)}
                 </button>
               );
             })}
@@ -670,5 +670,5 @@ function labelForDefault(preview: SchedulePreview, t: T) {
 }
 
 function dayList(days: number[], t: T) {
-  return DAYS.filter((day) => days.includes(day.value)).map((day) => t(day.label)).join(" ");
+  return DAYS.filter((day) => days.includes(day.value)).map((day) => t(day.labelKey)).join(" ");
 }

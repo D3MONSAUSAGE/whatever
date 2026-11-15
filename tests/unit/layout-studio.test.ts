@@ -1,3 +1,5 @@
+import { withEn } from "./helpers/with-en";
+import { en } from "@/lib/i18n/en";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
@@ -282,7 +284,8 @@ describe("layout studio frames", () => {
     expect(png.readUInt32BE(16)).toBe(1920);
     expect(png.readUInt32BE(20)).toBe(1080);
     const editor = readFileSync("components/layout-studio.tsx", "utf8");
-    expect(editor).toContain("Publishing…");
+    expect(editor).toContain('t("ls.publishing")'); // I18N-3
+    expect(en["ls.publishing"]).toBe("Publishing…");
     expect(editor).toContain("disabled={saving !== null}");
     expect(readFileSync("components/displays-screen.tsx", "utf8")).toContain("screenNameWarning");
   });
@@ -433,9 +436,10 @@ describe("player composition contract", () => {
       }
     }
     expect(player).toContain("v.videoWidth > 0 && v.currentTime > 0");
-    const editor = readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("lib/layout-studio-editor.ts", "utf8");
-    expect(editor).toContain("Each column is 20% to 60%");
-    expect(editor).toContain("Editing canvas");
+    const editor = withEn(readFileSync("components/layout-studio.tsx", "utf8") + readFileSync("components/studio-chrome.tsx", "utf8") + readFileSync("lib/layout-studio-editor.ts", "utf8"));
+    expect(editor).toContain('t("ls.columnsNote")'); // I18N-3
+    expect(en["ls.columnsNote"]).toContain("Each column is 20% to 60%");
+    expect(en["ls.canvas"]).toBe("Editing canvas");
     expect(editor).toContain("studio-tv-preview");
     expect(editor).toContain("Upload image");
     expect(editor).toContain("FileUploadControl");

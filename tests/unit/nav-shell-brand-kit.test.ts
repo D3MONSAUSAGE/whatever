@@ -212,7 +212,8 @@ describe("web Brand Kit and Account hub (no bulk apply)", () => {
     expect(en["bk.previewAria"]).toBe("Brand preview");
     expect(layout).not.toContain("/api/brand/apply");
     expect(classic).not.toContain("/api/brand/apply");
-    expect(layout).toContain(">Apply brand<");
+    expect(layout).toContain('>{t("ls.applyBrand")}<');
+    expect(en["ls.applyBrand"]).toBe("Apply brand");
     expect(layout).toContain("{!menuId ? (");
     expect(en["acct.support.action"]).toBe("Contact support"); // I18N-2: card copy lives in the dictionary
     expect(account).not.toContain("Open support");
