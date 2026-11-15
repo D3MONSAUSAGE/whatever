@@ -149,8 +149,8 @@ describe("screen action hierarchy and offline publish copy", () => {
     expect(publishSavedCopy({ online: false, connected: true })).toContain("offline");
     expect(publishSavedCopy({ online: false, connected: true })).not.toMatch(/within about 30 seconds/i);
     const source = readFileSync("components/screen-actions.tsx", "utf8");
-    expect(source).toContain("publishTimingCopy(display)");
-    expect(source).toContain("publishSavedCopy(display)");
+    expect(source).toContain("publishTimingCopy(display, t)");
+    expect(source).toContain("publishSavedCopy(display, t)");
     expect(source).not.toContain("TV updates within ~30 s");
     expect(source).toContain("/dashboard/media/promos?new=1");
     expect(source).not.toMatch(/promos"\s*>New promotion/);
