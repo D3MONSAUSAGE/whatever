@@ -1,4 +1,5 @@
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 import { requireAdmin } from "@/lib/server/auth";
 import { hashCode, isUuid } from "@/lib/server/crypto";
 import { PAIR_CLAIM_MAX_PER_IP, PAIR_CLAIM_MAX_PER_USER, PAIR_CLAIM_WINDOW_SECONDS } from "@/lib/server/limits";
@@ -14,7 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * content, schedules and groups. The old TV for this screen is disconnected. Same code checks
  * and rate limits as adding a screen (POST /api/displays/pair); no screen is added.
  */
-export async function POST(req: Request, { params }: Ctx) {
+export const POST = withLocalizedErrors(async (req: Request, { params }: Ctx) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -37,4 +38,4 @@ export async function POST(req: Request, { params }: Ctx) {
   if (error) return fail("Couldn't connect the TV. Try again.", 500);
   if (!displayId) return fail("That code doesn't match a TV. Check the screen — codes expire after 10 minutes.", 404);
   return json({ id: displayId });
-}
+});

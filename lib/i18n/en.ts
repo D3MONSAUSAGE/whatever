@@ -299,6 +299,9 @@ export const en = {
   "apiError.business_name_required": "Enter your business name.",
   "apiError.business_name_too_long": "Keep the business name under 80 characters.",
   "apiError.business_name_save_failed": "Couldn't save the business name. Try again.",
+  "apiError.subscription_inactive": "Your plan isn't active, so new screens can't be added. Choose a plan to continue.",
+  "apiError.screen_limit": "Your plan's screen limit is reached. Choose a plan with more screens, or pause another screen first.",
+  "apiError.preview_rate_limited": "Too many previews. Wait a minute.",
   "apiError.locale_invalid": "Choose English or Español.",
   "apiError.locale_save_failed": "Couldn't save your language. Try again.",
   // Generic fallbacks by HTTP status when a message has no specific entry yet.

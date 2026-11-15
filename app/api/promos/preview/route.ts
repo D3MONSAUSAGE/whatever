@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { withLocalizedErrors } from "@/lib/server/locale";
 import { enforceLimit, fail, readJson } from "@/lib/server/http";
 import { isPromoTemplate, parsePromoContent } from "@/lib/promo-templates";
 import { renderPromoPng } from "@/lib/server/promo-render";
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Render a promo preview PNG without saving anything. */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async (req: Request) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -22,4 +23,4 @@ export async function POST(req: Request) {
   if (photo) return fail(photo.error, photo.status);
   const png = renderPromoPng(body.template, content.value, await artFor(admin.accountId, content.value));
   return new Response(Buffer.from(png), { status: 200, headers: { "content-type": "image/png", "cache-control": "no-store" } });
-}
+});

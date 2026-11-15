@@ -1,4 +1,5 @@
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 import { requireAdmin } from "@/lib/server/auth";
 import { hashCode } from "@/lib/server/crypto";
 import {
@@ -15,7 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Admin enters the code shown on the TV.
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async (req: Request) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -78,4 +79,4 @@ export async function POST(req: Request) {
     .map((row) => String(row.name ?? ""));
   const warning = existing.error ? null : screenNameWarning(name, names);
   return json({ id: displayId, ...(warning ?? {}) });
-}
+});
