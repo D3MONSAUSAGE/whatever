@@ -163,9 +163,9 @@ describe("Legal ES: Spanish courtesy translation", () => {
 });
 
 describe("Legal ES: ownership sentence versions (pending Francisco)", () => {
-  it("prepares the general (default) and faithful versions; the default is general", () => {
-    expect(OWNERSHIP_VARIANT).toBe("general"); // flip with the faithful switch commit
-    expect(LEGAL_OWNERSHIP_ES).toBe(LEGAL_OWNERSHIP_ES_GENERAL);
+  it("prepares the general and faithful versions; the faithful one is in use", () => {
+    expect(OWNERSHIP_VARIANT).toBe("faithful"); // Francisco chose the faithful version
+    expect(LEGAL_OWNERSHIP_ES).toBe(LEGAL_OWNERSHIP_ES_FAITHFUL);
     expect(LEGAL_OWNERSHIP_ES_GENERAL).not.toMatch(/Teamtegrate|Pekko LLC/);
     expect(LEGAL_OWNERSHIP_ES_FAITHFUL).toBe("Pekko es propiedad exclusiva de Francisco Lopez. No es Pekko LLC y es totalmente independiente de Teamtegrate LLC.");
     for (const v of [LEGAL_OWNERSHIP_ES_GENERAL, LEGAL_OWNERSHIP_ES_FAITHFUL]) expect(v).toMatch(/^Pekko es propiedad exclusiva de Francisco Lopez\. /);
