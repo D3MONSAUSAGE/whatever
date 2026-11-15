@@ -25,7 +25,7 @@ import {
   parseUnifiedSearch,
   type LayoutOption,
 } from "@/lib/menu-board-unify";
-import type { T } from "@/lib/i18n";
+import { makeT, type T } from "@/lib/i18n";
 
 export type { Brand };
 export { artImages };
@@ -64,9 +64,11 @@ export type MenuFixture = {
   studio?: AccountStudio;
 };
 
-function newClassicDraft(displayIds: string[] = [], brand?: Brand | null): ClassicDraft {
+const EN: T = makeT("en");
+
+function newClassicDraft(displayIds: string[] = [], brand?: Brand | null, t: T = EN): ClassicDraft {
   const content = brand ? seedClassicMenu(sampleMenu(), brand) : sampleMenu();
-  return { id: null, name: "Lunch menu", template: "classic", content, displayIds };
+  return { id: null, name: t("mb.defaultName"), template: "classic", content, displayIds };
 }
 
 function boardKindLabel(menu: MenuBoard, t: T): string {
@@ -89,7 +91,7 @@ function openClassified(menu: MenuBoard, screenId: string | null): View | null {
   return null;
 }
 
-function initialView(fixture?: MenuFixture, search?: Record<string, string | string[] | undefined | null>): { view: View; pendingBoardId: string | null } {
+function initialView(fixture?: MenuFixture, search?: Record<string, string | string[] | undefined | null>, t: T = EN): { view: View; pendingBoardId: string | null } {
   if (fixture?.startMenuId) {
     const menu = fixture.menus.find((item) => item.id === fixture.startMenuId);
     if (menu) {
@@ -97,7 +99,7 @@ function initialView(fixture?: MenuFixture, search?: Record<string, string | str
       if (next) return { view: next, pendingBoardId: null };
     }
   }
-  if (fixture?.startEditing) return { view: { mode: "classic", draft: newClassicDraft(), screenId: null }, pendingBoardId: null };
+  if (fixture?.startEditing) return { view: { mode: "classic", draft: newClassicDraft([], null, t), screenId: null }, pendingBoardId: null };
   if (fixture?.startLayout) {
     return {
       view: { mode: "layout", boardId: fixture.startBoardId ?? null, template: fixture.startLayout, screenId: null, zone: fixture.startZone },
@@ -112,7 +114,7 @@ function initialView(fixture?: MenuFixture, search?: Record<string, string | str
   }
   if (parsed.layout) {
     const option = layoutOptionById(parsed.layout);
-    if (option?.kind === "classic") return { view: { mode: "classic", draft: newClassicDraft(screenId ? [screenId] : []), screenId }, pendingBoardId: null };
+    if (option?.kind === "classic") return { view: { mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], null, t), screenId }, pendingBoardId: null };
     if (option?.layoutTemplate) return { view: { mode: "layout", boardId: null, template: option.layoutTemplate, screenId }, pendingBoardId: null };
   }
   if (parsed.isNew) return { view: { mode: "pick-layout", screenId }, pendingBoardId: null };
@@ -136,12 +138,12 @@ export function MenuBoards({
   const menus = fixture ? { data: { menus: fixture.menus, available: fixture.available !== false }, error: null, reload: async () => {} } : liveMenus;
   const displays = fixture ? { data: fixture.displays ?? [] } : liveDisplays;
   const media = fixture ? { data: fixture.images ?? [] } : liveMedia;
-  const started = initialView(fixture, initialSearch);
+  const { locale, t } = useLocale();
+  const started = initialView(fixture, initialSearch, t);
   const [view, setView] = useState<View>(started.view);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(started.pendingBoardId);
   const [selectedLayout, setSelectedLayout] = useState<LayoutOption | null>(null);
   const toast = useToast();
-  const { locale, t } = useLocale();
   // E2b: "Show on which screen?" after saving a classic board that isn't on any screen yet.
   const [pickClassic, setPickClassic] = useState<{ id: string; name: string; playlistId: string } | null>(null);
   const confirm = useConfirm();
@@ -158,12 +160,12 @@ export function MenuBoards({
 
   function startNew() {
     if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
-    else setView({ mode: "classic", draft: newClassicDraft([], kit), screenId: null });
+    else setView({ mode: "classic", draft: newClassicDraft([], kit, t), screenId: null });
   }
 
   function pickOption(option: LayoutOption, screenId: string | null) {
     if (option.kind === "classic") {
-      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], kit), screenId });
+      setView({ mode: "classic", draft: newClassicDraft(screenId ? [screenId] : [], kit, t), screenId });
       return;
     }
     if (option.layoutTemplate) {

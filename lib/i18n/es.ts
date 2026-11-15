@@ -997,7 +997,7 @@ export const es: Record<MessageKey, string> = {
   "mb.delTitle": "¿Eliminar este menú digital?",
   "mb.deleted": "Menú digital eliminado",
   "mb.delBody": "¿Eliminar “{name}”? Las pantallas siguen mostrando su última imagen hasta que las cambie. La imagen y la lista de reproducción se quedan en su biblioteca.",
-  "mb.defaultName": "Menú de comida",
+  "mb.defaultName": "Menú del almuerzo",
   "mb.kindMenu": "Menú",
   "mb.kindBoard": "Menú digital",
   "mb.updated": "actualizado {ago}",
