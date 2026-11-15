@@ -1,6 +1,7 @@
 "use client";
 import { FileUploadControl } from "@/components/file-upload";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
+import { hasKey, type T } from "@/lib/i18n";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
@@ -23,14 +24,14 @@ import { findSameVideo } from "@/lib/layout-account";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { ColorField } from "@/components/color-field";
-import { hasUnsavedEdits, PROMO_AREA_HINT } from "@/lib/menu-board-unify";
+import { hasUnsavedEdits } from "@/lib/menu-board-unify";
 import { publishSavedCopy } from "@/lib/screen-actions-ui";
 import { ShowOnScreens } from "@/components/show-on-screens";
 import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
 import { StudioGuardedLink, useConfirmDiscard, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
-import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, ITEM_NAME_REQUIRED, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
+import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
 import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
 
@@ -85,6 +86,7 @@ export function LayoutStudio({
   onClose?: () => void;
 } = {}) {
   const t = useT();
+  const { locale } = useLocale();
   const accountMode = mode === "account";
   const startingTemplate = initialTemplate ?? "menu-promo-67";
   const [template, setTemplate] = useState<LayoutTemplate>(startingTemplate);
@@ -99,7 +101,7 @@ export function LayoutStudio({
   const studioBp = useStudioBreakpoint();
   const phonePreview = studioBp === "phone";
   const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [note, setNote] = useState(accountMode || fixture ? "" : "This browser copy does not write an account.");
+  const [note, setNote] = useState(accountMode || fixture ? "" : t("ls.browserCopy"));
   const spec = templateSpec(template);
   const frame = frameFor(draft.template, draft.split, draft.columnWidths);
   const [step, setStep] = useState<StudioStep>("template");
@@ -196,7 +198,7 @@ export function LayoutStudio({
       if (origin && scope && !sameStudioScope(origin, scope)) {
         const created = freshBoard(account?.boards.length ?? 0);
         applyFresh(created, scope);
-        setNote("Switched accounts. A new board is open.");
+        setNote(t("ls.switched"));
       }
       return;
     }
@@ -228,7 +230,7 @@ export function LayoutStudio({
         setImageHref(loaded.draft.imageHref);
         setVideoOn(loaded.draft.videoOn === true && frameFor(loaded.draft.doc.template, loaded.draft.doc.split).video !== null);
         setOrigin(scope);
-        setNote("Restored the draft stored in this browser.");
+        setNote(t("ls.restored"));
       }
       if (loaded.published) setPublished(loaded.published);
     } catch { /* a bad draft is ignored */ }
@@ -285,7 +287,7 @@ export function LayoutStudio({
       api<unknown>("/api/layout-studio").then((body) => {
         if (cancel) return;
         const loaded = readAccountStudio(body);
-        if (!loaded) { setNote("Couldn't read this account."); return; }
+        if (!loaded) { setNote(t("ls.cantRead")); return; }
         setAccount(loaded);
         const result = signedInPreviewLoad(loaded, null);
         // Read scope from a ref so a slow resolveStudioScope cannot leave origin null.
@@ -454,14 +456,14 @@ export function LayoutStudio({
   function update(next: LayoutDocument) {
     setDraft(next);
     if (saveLock.current) return;
-    setNote("Editing the draft. It is not on a screen.");
+    setNote(t("ls.editingDraft"));
   }
 
   function namelessBlocked(): boolean {
     const nameless = firstNamelessItem(draft.sections);
     if (!nameless) return false;
     setNameCheck(true);
-    setNote(ITEM_NAME_REQUIRED);
+    setNote(t("mf.nameRequired"));
     const columns = template === "triple-column" || template === "two-menu-promo" || template === "two-column";
     setSectionIndex(nameless.section);
     setZone(columns ? `column-${nameless.section}` : "menu");
@@ -480,14 +482,14 @@ export function LayoutStudio({
     const doc = checkedDraft();
     if (!doc) return;
     if (!scope) {
-      setNote("Sign in to keep a draft in this browser. An unscoped copy was not stored.");
+      setNote(t("ls.signInDraft"));
       return;
     }
     const snapshot: Snapshot = { doc, imageHref, videoOn: videoOn && !!videoBox };
     writeStudioDraft(window.localStorage, scope, { ...snapshot, boardId: menuId });
     setDraft(doc);
     setOrigin(scope);
-    setNote("Draft kept in this browser. No account was written.");
+    setNote(t("ls.draftKept"));
     markClean({ ...currentEdit(), draft: doc });
   }
 
@@ -495,7 +497,7 @@ export function LayoutStudio({
     const doc = checkedDraft();
     if (!doc) return;
     if (!scope) {
-      setNote("Sign in to publish a preview in this browser. An unscoped copy was not stored.");
+      setNote(t("ls.signInPublish"));
       return;
     }
     const box = mediaVideoBox(doc);
@@ -508,13 +510,13 @@ export function LayoutStudio({
     setDraft(doc);
     setPublished(snapshot);
     setOrigin(scope);
-    setNote("Published preview is frozen in this browser. It was not sent to an account or a screen.");
+    setNote(t("ls.frozen"));
     markClean({ ...currentEdit(), draft: doc, videoOn: videoOn && !!box });
   }
 
   async function reloadAccount(preferId: string | null, keepUnsaved = false) {
     const loaded = readAccountStudio(await api<unknown>("/api/layout-studio"));
-    if (!loaded) throw new Error("Couldn't reload the account.");
+    if (!loaded) throw new Error(t("ls.cantReload"));
     setAccount(loaded);
     const board = boardAfterReload(loaded, preferId, { keepUnsaved });
     if (!board) return loaded;
@@ -549,10 +551,10 @@ export function LayoutStudio({
   async function saveAccount(saveMode: "draft" | "publish") {
     if (namelessBlocked()) return;
     if (fixture) {
-      setNote(saveMode === "publish" ? "Preview only — nothing was published." : "Preview only — nothing was saved.");
+      setNote(saveMode === "publish" ? t("ls.previewNotPublished") : t("ls.previewNotSaved"));
       if (saveMode === "publish" && displays !== undefined && menuId && !screenId) {
         const board = fixture.boards.find((item) => item.id === menuId);
-        setPickFor({ id: menuId, name: boardName || board?.name || "This board", playlistId: board?.playlistId ?? null, preview: true });
+        setPickFor({ id: menuId, name: boardName || board?.name || t("ls.thisBoard"), playlistId: board?.playlistId ?? null, preview: true });
       }
       return;
     }
@@ -575,7 +577,7 @@ export function LayoutStudio({
       setOrigin(currentOrigin);
     }
     if (saveShouldWaitForScope(fromCurrentAccount.current, currentOrigin, currentScope)) {
-      setNote("Confirming this account… try saving again in a moment.");
+      setNote(t("ls.confirming"));
       return;
     }
     const guard = saveAccountGuard(currentOrigin, currentScope);
@@ -591,7 +593,7 @@ export function LayoutStudio({
     if (!doc) return;
     saveLock.current = saveMode;
     setSaving(saveMode);
-    setNote(saveMode === "publish" ? "Publishing…" : "Saving draft…");
+    setNote(saveMode === "publish" ? t("ls.publishing") : t("ls.savingDraft"));
     try {
       const body = await api<{ menuId?: string; swapped?: boolean }>("/api/layout-studio", {
         method: "POST",
@@ -602,10 +604,10 @@ export function LayoutStudio({
       const boardId = typeof body.menuId === "string" ? body.menuId : nextId;
       const board = loaded.boards.find((item) => item.id === boardId);
       if (saveMode !== "publish") {
-        setNote("Draft saved on this account. Screens were not moved.");
+        setNote(t("ls.draftSaved"));
       } else if (screenId) {
         if (!board?.playlistId) {
-          setNote("The board was saved, but it has no playlist, so this screen was not changed.");
+          setNote(t("ls.noPlaylist"));
         } else {
           await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: board.id, displayId: screenId }) });
           setNote(publishSavedCopy({
@@ -614,14 +616,14 @@ export function LayoutStudio({
           }));
         }
       } else if (board?.playlistId) {
-        setNote("Published to this account. Screens already playing this board will update when they are online.");
+        setNote(t("ls.published"));
         // E2: offer screens, but never assign without the user's choice.
-        if (displays !== undefined) setPickFor({ id: board.id, name: board.name || boardName || "This board", playlistId: board.playlistId, preview: false });
+        if (displays !== undefined) setPickFor({ id: board.id, name: board.name || boardName || t("ls.thisBoard"), playlistId: board.playlistId, preview: false });
       } else {
-        setNote("The board was saved, but publishing did not create a playlist.");
+        setNote(t("ls.noPlaylistCreated"));
       }
     } catch (err) {
-      setNote((err as Error).message || (saveMode === "publish" ? "Couldn't publish that board." : "Couldn't save that draft."));
+      setNote((err as Error).message || (saveMode === "publish" ? t("ls.cantPublish") : t("ls.cantSave")));
     } finally {
       setSaving(null);
       setTimeout(() => { saveLock.current = null; }, 0);
@@ -652,7 +654,7 @@ export function LayoutStudio({
   function onPhoto(file: File | undefined) {
     if (!file) { removePhoto(); return; }
     const imageOk = !file.type || file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp" || /\.(jpe?g|png|webp)$/i.test(file.name);
-    if (!imageOk) { setNote("Use a JPEG, PNG, or WebP from your camera roll. This photo's format is not supported."); return; }
+    if (!imageOk) { setNote(t("ls.badFormat")); return; }
     const exclusive = zone === "feature" && template !== "signature";
     const replacedVideo = exclusive && Boolean(draft.videoMediaId || clipUrl || videoOn);
     const local = URL.createObjectURL(file);
@@ -664,20 +666,20 @@ export function LayoutStudio({
       setDraft((current) => placeZoneMedia(current, "photo", current.imageMediaId, true));
     }
     if (!accountMode && !sessionToken) {
-      if (file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES) { setNote("Use a photo under 1.5 MB."); setImageHref(null); return; }
+      if (file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES) { setNote(t("ls.photoTooBig")); setImageHref(null); return; }
       const reader = new FileReader();
       reader.onload = () => setImageHref(typeof reader.result === "string" ? reader.result : local);
       reader.readAsDataURL(file);
-      setNote(replacedVideo ? "Image replaces the video in this zone." : "Photo is in the preview only. It was not uploaded to the library.");
+      setNote(replacedVideo ? t("ls.imageReplacesVideo") : t("ls.photoPreviewOnly"));
       return;
     }
-    setProgress("Uploading…");
+    setProgress(t("ed.uploading"));
     const form = new FormData();
     form.set("file", file);
     form.set("name", file.name);
     const send = sessionToken
-      ? uploadForm("/api/media", form, sessionToken, (percent) => setProgress(percent >= 99 ? "Processing…" : "Uploading…"))
-      : authToken().then((token) => uploadForm("/api/media", form, token, (percent) => setProgress(percent >= 99 ? "Processing…" : "Uploading…")));
+      ? uploadForm("/api/media", form, sessionToken, (percent) => setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading")))
+      : authToken().then((token) => uploadForm("/api/media", form, token, (percent) => setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading"))));
     send.then(async (body) => {
       const loaded = await reloadAccount(menuId, true);
       const entry = loaded.library.find((item) => item.id === body.id) ?? null;
@@ -689,7 +691,7 @@ export function LayoutStudio({
       if (exclusive) { setClipUrl(null); setVideoOn(false); }
       setImageHref(entry?.url || local);
       setProgress(null);
-      setNote(replacedVideo ? "Image replaces the video in this zone." : "Upload complete.");
+      setNote(replacedVideo ? t("ls.imageReplacesVideo") : t("ls.uploadComplete"));
     }).catch((err: Error) => {
       setProgress(null);
       setNote(err.message || "Couldn't upload that photo.");
@@ -699,13 +701,13 @@ export function LayoutStudio({
   function removePhoto() {
     setImageHref(null);
     update({ ...draft, imageMediaId: null });
-    setNote("Photo removed from this board.");
+    setNote(t("ls.photoRemoved"));
   }
 
   async function onVideo(file: File | undefined) {
     if (!file) return;
     if (!videoBox || zone === "photo" || zone === "background" || zone === "menu" || zone.startsWith("column-")) {
-      setNote("This zone does not play video. A board has one video, and only the promotion, banner, or side strip can hold it.");
+      setNote(t("ls.noVideoZone"));
       return;
     }
     const exclusive = zone === "feature" && template !== "signature";
@@ -718,7 +720,7 @@ export function LayoutStudio({
       setDraft((current) => placeZoneMedia(current, "video", current.videoMediaId, true));
     }
     if (!accountMode && !sessionToken) {
-      setNote(replacedImage ? "Video replaces the image in this zone. Sign in to save it to the library." : "Video is in the preview. Sign in to add it to your library.");
+      setNote(replacedImage ? t("ls.videoReplacesSignIn") : t("ls.videoPreviewSignIn"));
       return;
     }
     const existing = accountMode ? findSameVideo(account?.library, file) : null;
@@ -730,10 +732,10 @@ export function LayoutStudio({
       });
       if (exclusive) setImageHref(null);
       if (existing.url) setClipUrl(null);
-      setNote("This video is already in your library, so the board uses that copy.");
+      setNote(t("ls.videoInLibrary"));
       return;
     }
-    setProgress("Uploading…");
+    setProgress(t("ed.uploading"));
     try {
       const prepared = await prepareVideo(file);
       const signed = await api<{ mediaId: string; signedUrl: string; token: string }>("/api/media/upload", {
@@ -741,9 +743,9 @@ export function LayoutStudio({
         body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }),
       });
       await uploadToSignedUrl(signed.signedUrl, file, (percent) => {
-        setProgress(percent >= 99 ? "Processing…" : "Uploading…");
+        setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading"));
       }, file.name, signed.token);
-      setProgress("Processing…");
+      setProgress(t("ls.processing"));
       await api("/api/media/upload/complete", {
         method: "POST",
         body: JSON.stringify({
@@ -764,7 +766,7 @@ export function LayoutStudio({
       if (exclusive) setImageHref(null);
       if (entry?.url) setClipUrl(null);
       setProgress(null);
-      setNote(replacedImage ? "Video replaces the image in this zone." : "Upload complete.");
+      setNote(replacedImage ? t("ls.videoReplaces") : t("ls.uploadComplete"));
     } catch (err) {
       setProgress(null);
       setNote((err as Error).message || "Couldn't upload that video.");
@@ -776,11 +778,11 @@ export function LayoutStudio({
     setClipUrl(null);
     setVideoOn(false);
     update({ ...draft, videoMediaId: null });
-    setNote("Video removed. A board plays one video.");
+    setNote(t("ls.videoRemoved"));
   }
 
   const activeSection = Math.min(sectionIndex, Math.max(0, draft.sections.length - 1));
-  const photoLabel = zone === "photo" || zone === "background" || template === "signature" ? "Background image" : "Feature photo";
+  const photoLabel = zone === "photo" || zone === "background" || template === "signature" ? t("ls.bgImage") : t("ls.featurePhoto");
 
   function renderStage(interactive: boolean) {
     return (
@@ -828,13 +830,13 @@ export function LayoutStudio({
   );
   function renderSaveDraft() {
     return accountMode || account
-      ? <button type="button" className="btn btn-quiet min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? "Saving…" : "Save draft"}</button>
-      : <button type="button" className="btn btn-quiet min-h-11" onClick={saveDraft}>Save draft</button>;
+      ? <button type="button" className="btn btn-quiet min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("draft"); }}>{saving === "draft" ? t("ed.saving") : t("ls.saveDraft")}</button>
+      : <button type="button" className="btn btn-quiet min-h-11" onClick={saveDraft}>{t("ls.saveDraft")}</button>;
   }
   function renderPublish() {
     return accountMode || account
-      ? <button type="button" className="btn btn-primary min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? "Publishing…" : "Publish"}</button>
-      : <button type="button" className="btn btn-primary min-h-11" onClick={publish}>Publish preview</button>;
+      ? <button type="button" className="btn btn-primary min-h-11" disabled={saving !== null} onClick={() => { void saveAccount("publish"); }}>{saving === "publish" ? t("ls.publishing") : t("ls.publish")}</button>
+      : <button type="button" className="btn btn-primary min-h-11" onClick={publish}>{t("ls.publishPreview")}</button>;
   }
   function renderPreviewButton() {
     return accountMode
@@ -842,36 +844,36 @@ export function LayoutStudio({
         <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
           setStep("preview");
           document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }}>Preview</button>
+        }}>{t("ls.preview")}</button>
       )
-      : <a href="/layout-studio/player" className="btn btn-quiet min-h-11" style={{ textDecoration: "none" }}>Preview</a>;
+      : <a href="/layout-studio/player" className="btn btn-quiet min-h-11" style={{ textDecoration: "none" }}>{t("ls.preview")}</a>;
   }
 
   return (
     <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#f4f7fb", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
-          {onClose ? <button type="button" className="studio-back" disabled={saving !== null} onClick={() => requestLeave(onClose)}>Back to menu boards</button> : null}
+          {onClose ? <button type="button" className="studio-back" disabled={saving !== null} onClick={() => requestLeave(onClose)}>{t("ls.back")}</button> : null}
           <div className="studio-page-title">
             {renaming && account ? (
-              <input aria-label="Board name" className="studio-title-input" value={boardName} maxLength={80} autoFocus
+              <input aria-label={t("ls.boardName")} className="studio-title-input" value={boardName} maxLength={80} autoFocus
                 onChange={(event) => setBoardName(event.target.value)}
                 onBlur={() => setRenaming(false)}
                 onKeyDown={(event) => { if (event.key === "Enter") setRenaming(false); }} />
             ) : (
               <h1 className="studio-title">
-                <span className="studio-title-text">{account ? (boardName || (menuId ? "Untitled board" : "New menu board")) : (embedded ? (menuId ? "Edit menu board" : "New menu board") : "Layout Studio")}</span>
-                {account ? <button type="button" className="studio-rename" aria-label="Rename board" onClick={() => setRenaming(true)} title="Rename board"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg></button> : null}
+                <span className="studio-title-text">{account ? (boardName || (menuId ? t("ls.untitled") : t("ls.newMenuBoard"))) : (embedded ? (menuId ? t("ls.editMenuBoard") : t("ls.newMenuBoard")) : "Layout Studio")}</span>
+                {account ? <button type="button" className="studio-rename" aria-label={t("ls.rename")} onClick={() => setRenaming(true)} title={t("ls.rename")}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg></button> : null}
               </h1>
             )}
           </div>
           {account ? (
             <div className="board-bar">
-              <select aria-label="Switch board" className="board-switch" value={menuId ?? ""} onChange={(event) => selectBoard(event.target.value)}>
-                {menuId ? null : <option value="">{boardName || "Untitled board"}</option>}
-                {account.boards.map((board) => <option key={board.id} value={board.id}>{board.id === menuId ? boardChoice({ ...board, name: boardName || board.name }) : boardChoice(board)}</option>)}
+              <select aria-label={t("ls.switch")} className="board-switch" value={menuId ?? ""} onChange={(event) => selectBoard(event.target.value)}>
+                {menuId ? null : <option value="">{boardName || t("ls.untitled")}</option>}
+                {account.boards.map((board) => <option key={board.id} value={board.id}>{board.id === menuId ? boardChoice({ ...board, name: boardName || board.name }, locale) : boardChoice(board, locale)}</option>)}
               </select>
-              <button type="button" className="btn btn-quiet board-new" onClick={() => newBoard()}>New board</button>
+              <button type="button" className="btn btn-quiet board-new" onClick={() => newBoard()}>{t("ls.newBoard")}</button>
             </div>
           ) : null}
         </div>
@@ -889,15 +891,15 @@ export function LayoutStudio({
       <div className="studio-grid">
         <div className="studio-left">
         <section className="studio-controls" data-testid="studio-tools">
-          {screenId ? <p style={{ fontSize: 14 }}>This edit is for one screen. Publish assigns the board to that screen and leaves the others as they are.</p> : null}
+          {screenId ? <p style={{ fontSize: 14 }}>{t("ls.oneScreen")}</p> : null}
 
           <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
             <details className="studio-panel" open>
-              <summary className="studio-panel-summary">Layout</summary>
+              <summary className="studio-panel-summary">{t("ls.layout")}</summary>
               <TemplatePicker template={template} onChoose={choose} />
             </details>
             <details className="studio-panel" open>
-              <summary className="studio-panel-summary">Sections</summary>
+              <summary className="studio-panel-summary">{t("ls.sections")}</summary>
               <ZonePicker template={template} frame={frame} zone={zone} onSelect={openZone} />
             </details>
             <details className="studio-panel" open>
@@ -906,16 +908,16 @@ export function LayoutStudio({
             </details>
             <details className="studio-panel">
               <summary className="studio-panel-summary">Images &amp; video</summary>
-              <p className="zone-help">Select a photo or video area on the board to choose, replace, or remove media. Its controls open directly under the board.</p>
+              <p className="zone-help">{t("ls.selectMediaBoard")}</p>
             </details>
           </div>
 
           <div className={step === "section" ? "studio-pane on" : "studio-pane"} data-step="section">
-            <p className="studio-zone-hint studio-mobile-hint">Select a menu area in the preview. Its editor opens under the board.</p>
+            <p className="studio-zone-hint studio-mobile-hint">{t("ls.selectMenuArea")}</p>
           </div>
 
           <div className={step === "content" ? "studio-pane on" : "studio-pane"} data-step="content">
-            <p className="studio-zone-hint studio-mobile-hint">Select a photo or video area in the preview. Choose, replace, or remove media under the board.</p>
+            <p className="studio-zone-hint studio-mobile-hint">{t("ls.selectMediaArea")}</p>
           </div>
 
         </section>
@@ -923,45 +925,45 @@ export function LayoutStudio({
         <section className="studio-controls studio-controls-end" data-testid="studio-tools-style">
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
             <details className="studio-panel">
-              <summary className="studio-panel-summary">Colors &amp; style</summary>
-              <div className="segment" role="group" aria-label="Palette">
+              <summary className="studio-panel-summary">{t("ls.colors")}</summary>
+              <div className="segment" role="group" aria-label={t("ls.palette")}>
                 {(["classic", "fresh", "bold"] as const).map((palette) => (
                   <button key={palette} type="button" aria-pressed={draft.palette === palette} onClick={() => update({ ...draft, palette })}>{palette}</button>
                 ))}
               </div>
-              <ColorField label="Text color" ariaLabel="Text color" value={draft.textColor} fallback="#0b1220" onChange={(next) => update({ ...draft, textColor: next })} />
-              <ColorField label="Menu background" ariaLabel="Menu background" value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
-              <ColorField label="Feature color" ariaLabel="Primary color" value={draft.primaryColor} fallback="#0066ff" onChange={(next) => update({ ...draft, primaryColor: next })} />
-              <ColorField label="Accent color" ariaLabel="Accent color" value={draft.accentColor} fallback="#ffd34d" onChange={(next) => update({ ...draft, accentColor: next })} />
+              <ColorField label={t("ls.textColor")} ariaLabel={t("ls.textColor")} value={draft.textColor} fallback="#0b1220" onChange={(next) => update({ ...draft, textColor: next })} />
+              <ColorField label={t("ls.menuBg")} ariaLabel={t("ls.menuBg")} value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
+              <ColorField label={t("ls.featureColor")} ariaLabel={t("ls.primaryColor")} value={draft.primaryColor} fallback="#0066ff" onChange={(next) => update({ ...draft, primaryColor: next })} />
+              <ColorField label={t("ls.accentColor")} ariaLabel={t("ls.accentColor")} value={draft.accentColor} fallback="#ffd34d" onChange={(next) => update({ ...draft, accentColor: next })} />
               <div style={{ margin: "12px 0" }}>
-                <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>Colours come from your Brand Kit. There is no separate brand form on this page.</p>
+                <p style={{ fontSize: 13, color: "#5c534c", margin: "0 0 8px" }}>{t("ls.coloursNote")}</p>
                 <BrandSummary fixture={brand ?? undefined} />
-                <p style={{ fontSize: 13, margin: "8px 0" }}><StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>Open Brand Kit</StudioGuardedLink></p>
+                <p style={{ fontSize: 13, margin: "8px 0" }}><StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold" style={{ color: "#1a4d8c" }}>{t("ls.openBrandKit")}</StudioGuardedLink></p>
                 {!menuId ? (
                   <button type="button" className="btn btn-quiet min-h-11" onClick={() => {
                     const colors = brand?.brand ?? liveBrand.data;
                     if (!colors?.primaryColor && !colors?.accentColor) return;
                     update({ ...draft, primaryColor: colors.primaryColor || draft.primaryColor, accentColor: colors.accentColor || draft.accentColor });
-                  }}>Apply brand</button>
+                  }}>{t("ls.applyBrand")}</button>
                 ) : null}
               </div>
-              <button type="button" className="btn btn-quiet min-h-11" onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>Use built-in colors</button>
-              <label style={fieldLabel}>Type size
-                <div className="segment" role="group" aria-label="Type size">
-                  <button type="button" aria-pressed={draft.typeScale === "room"} onClick={() => update({ ...draft, typeScale: "room" })}>Room</button>
-                  <button type="button" aria-pressed={draft.typeScale === "counter"} onClick={() => update({ ...draft, typeScale: "counter" })}>Counter</button>
+              <button type="button" className="btn btn-quiet min-h-11" onClick={() => update({ ...draft, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null })}>{t("ls.builtIn")}</button>
+              <label style={fieldLabel}>{t("ls.typeSize")}
+                <div className="segment" role="group" aria-label={t("ls.typeSize")}>
+                  <button type="button" aria-pressed={draft.typeScale === "room"} onClick={() => update({ ...draft, typeScale: "room" })}>{t("ls.room")}</button>
+                  <button type="button" aria-pressed={draft.typeScale === "counter"} onClick={() => update({ ...draft, typeScale: "counter" })}>{t("ls.counter")}</button>
                 </div>
               </label>
-              <p className="zone-help">Room is for a television. Counter is slightly denser.</p>
-              <label style={fieldLabel}>Font
-                <select className="field" aria-label="Font" value={draft.font} onChange={(event) => {
+              <p className="zone-help">{t("ls.roomNote")}</p>
+              <label style={fieldLabel}>{t("ls.font")}
+                <select className="field" aria-label={t("ls.font")} value={draft.font} onChange={(event) => {
                   const next = event.target.value;
                   if (!isBoardFont(next)) return;
                   // E6-F2: a body font equal to the heading font is the same as none.
                   const { bodyFont, ...rest } = draft;
                   update(bodyFont && bodyFont !== next ? { ...rest, font: next, bodyFont } : { ...rest, font: next });
                 }}>
-                  {BOARD_FONTS.map((font) => <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>{font.label} · {font.hint}</option>)}
+                  {BOARD_FONTS.map((font) => <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>{font.label} · {t(`font.${font.id}.hint`)}</option>)}
                 </select>
               </label>
               <label style={fieldLabel}>{t("studio.bodyFont")}
@@ -972,34 +974,34 @@ export function LayoutStudio({
                   update(isBoardFont(next) && next !== draft.font ? { ...rest, bodyFont: next } : rest);
                 }}>
                   <option value="">{t("studio.bodyFontSame")}</option>
-                  {BOARD_FONTS.filter((font) => font.id !== draft.font).map((font) => <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>{font.label} · {font.hint}</option>)}
+                  {BOARD_FONTS.filter((font) => font.id !== draft.font).map((font) => <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>{font.label} · {t(`font.${font.id}.hint`)}</option>)}
                 </select>
               </label>
               <p className="zone-help">{t("studio.bodyFontHelp")}</p>
               <p style={{ fontSize: 13, color: "#5c534c" }}>{t("studio.fontsNote")}</p>
-              <p className="zone-help">Photo and video fit and position are under the board when you select a photo or video area.</p>
-              <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
+              <p className="zone-help">{t("ls.fitNote")}</p>
+              <label style={fieldLabel}>{proportionLabel(template, t)} {Math.round(draft.split * 100)}%
                 <input type="range" min={spec.min} max={spec.max} step={0.01} value={draft.split} aria-describedby="proportion-note"
                   onChange={(event) => update({ ...draft, split: Number(event.target.value) })} />
               </label>
-              <p id="proportion-note" style={{ fontSize: 13, color: "#5c534c", marginTop: 0 }}>{proportionNote(template)}</p>
+              <p id="proportion-note" style={{ fontSize: 13, color: "#5c534c", marginTop: 0 }}>{proportionNote(template, t)}</p>
               {template === "triple-column" || template === "two-menu-promo" ? <ColumnWidths draft={draft} update={update} /> : null}
             </details>
           </div>
 
           <div className={step === "publish" ? "studio-pane on" : "studio-pane"} data-step="publish">
-            {account?.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>Classic menus stay in the menu editor: {account.legacy.map((item) => item.name).join(", ")}.</p> : null}
+            {account?.legacy.length ? <p style={{ fontSize: 13, color: "#5c534c" }}>{t("ls.classicStay", { names: account.legacy.map((item) => item.name).join(", ") })}</p> : null}
             {accountMode ? null : (
               <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0", minHeight: 44 }}>
                 <input type="checkbox" checked={videoOn && !!videoBox && !draft.videoMediaId} disabled={!videoBox || Boolean(draft.videoMediaId)} onChange={(event) => setVideoOn(event.target.checked)} />
-                Play the bundled demo in the safe area
+                {t("ls.demo")}
               </label>
             )}
             <div className="studio-save-inline" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {accountMode ? <a href="/dashboard/media/menus" className="btn btn-quiet min-h-11" style={{ textDecoration: "none" }} onClick={(event) => {
                 event.preventDefault();
                 requestLeave(() => { if (onClose) onClose(); else window.location.assign("/dashboard/media/menus"); });
-              }}>Menu boards</a> : null}
+              }}>{t("ls.menuBoards")}</a> : null}
             </div>
             {note ? <p className="studio-inline-note" role="alert" style={{ fontSize: 14, color: "#5c534c" }}>{note}</p> : null}
           </div>
@@ -1010,29 +1012,29 @@ export function LayoutStudio({
           className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
           id="studio-tv-preview"
           data-testid="studio-tv-preview"
-          aria-label="Editing canvas"
+          aria-label={t("ls.canvas")}
         >
-          <p className="studio-kicker">Board · preview of what your TV will show</p>
+          <p className="studio-kicker">{t("ls.kicker")}</p>
           <div className="studio-canvas-stage">
             {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
           </div>
           {studioBp !== "phone" ? (
-            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label="Selected area controls" tabIndex={0}>
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label={t("ls.areaControls")} tabIndex={0}>
               {editorPlacement === "canvas"
                 ? zoneEditor
-                : <p className="studio-zone-hint">Select a photo or video area on the board to replace it, choose from your library, remove it, or change how it fits. Its controls open here.</p>}
+                : <p className="studio-zone-hint">{t("ls.selectMediaHere")}</p>}
             </div>
           ) : null}
         </section>
       </div>
       <div className="studio-savebar">
         {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
-        <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
+        <nav className="studio-tabs" role="tablist" aria-label={t("ls.steps")}>
           {(["preview", "template", "section", "content", "style", "publish"] as const).map((id) => (
             <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12, minHeight: 44 }} onClick={() => {
               setStep(id);
               if (id === "preview") document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            }}>{stepLabel(id)}</button>
+            }}>{stepLabel(id, t)}</button>
           ))}
         </nav>
         <div className="studio-save-actions">
@@ -1086,13 +1088,14 @@ function ZonePicker({ template, frame, zone, onSelect }: {
   zone: string;
   onSelect: (id: string) => void;
 }) {
+  const t = useT();
   const hits = previewHits(template, frame);
   return (
     <div className="zone-picker">
-      <div className="segment" role="group" aria-label="Sections">
+      <div className="segment" role="group" aria-label={t("ls.sections")}>
         {hits.map((hit) => (
           <button key={hit.id} type="button" aria-pressed={hit.id === zone} onClick={() => onSelect(hit.id)}>
-            {hit.label.replace(/^Edit /, "")}
+            {zoneText(hit.label, t)}
           </button>
         ))}
       </div>
@@ -1137,7 +1140,7 @@ function SelectedZoneEditor({
   const t = useT();
   const panel = editorPanelForZone(zone);
   if (panel === "none") {
-    return <p className="studio-zone-hint">Select an area in the preview to edit it here.</p>;
+    return <p className="studio-zone-hint">{t("ls.selectArea")}</p>;
   }
   const columns = columnTemplate(template);
   const exclusive = zone === "feature" && template !== "signature";
@@ -1147,13 +1150,13 @@ function SelectedZoneEditor({
       {panel === "menu" ? (
         <div className="zone-groups">
           <section className="zone-group">
-            <h3>{columns ? "Menu column" : "Menu sections"}</h3>
+            <h3>{columns ? t("ls.menuColumn") : t("ls.menuSections")}</h3>
             {(() => { const counts = menuCounts(draft.sections); return <MenuLimits sections={counts.sections} items={counts.items} maxSections={counts.maxSections} maxItems={counts.maxItems} columns={Boolean(columns)} />; })()}
             {columns ? null : (
-              <div className="segment section-tabs" role="group" aria-label="Menu sections">
+              <div className="segment section-tabs" role="group" aria-label={t("ls.menuSections")}>
                 {draft.sections.map((section, index) => (
                   <button key={index} type="button" aria-pressed={index === sectionIndex} onClick={() => setSectionIndex(index)}>
-                    {section.name || `Section ${index + 1}`}
+                    {section.name || t("ls.sectionN", { n: index + 1 })}
                   </button>
                 ))}
               </div>
@@ -1162,25 +1165,25 @@ function SelectedZoneEditor({
               if (columns && si !== sectionIndex) return null;
               return (
                 <fieldset key={si} className={si === sectionIndex ? "section-card section-block on" : "section-card section-block"}>
-                  <legend className="section-card-legend">{columns ? `Menu column ${si + 1}` : `Section ${si + 1}`}</legend>
+                  <legend className="section-card-legend">{columns ? t("ls.menuColumnN", { n: si + 1 }) : t("ls.sectionN", { n: si + 1 })}</legend>
                   {columns ? null : (
                     <div className="section-card-head">
-                      <span className="item-limit">{section.items.filter((item) => item.name.trim()).length} of {MENU_LIMITS.itemsPerSection} items</span>
+                      <span className="item-limit">{t("ls.itemsOf", { n: section.items.filter((item) => item.name.trim()).length, max: MENU_LIMITS.itemsPerSection })}</span>
                       <OrderButtons className="section-order" kind="section" name={section.name} scope="studio-sections" index={si} count={draft.sections.length}
                         onMove={(dir) => {
                           cards.sectionMoved(si, dir);
                           update({ ...draft, sections: moveSection(draft.sections, si, dir) });
                           setSectionIndex(Math.max(0, Math.min(draft.sections.length - 1, si + dir)));
                         }} />
-                      <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`} disabled={draft.sections.length <= 1}
+                      <button type="button" className="section-remove" aria-label={t("ls.removeSectionN", { n: si + 1 })} disabled={draft.sections.length <= 1}
                         onClick={() => {
                           cards.clear();
                           update({ ...draft, sections: draft.sections.filter((_, i) => i !== si) });
                           setSectionIndex(Math.max(0, Math.min(si, draft.sections.length - 2)));
-                        }}>Remove section</button>
+                        }}>{t("ls.removeSection")}</button>
                     </div>
                   )}
-                  <input aria-label={`Section ${si + 1} name`} className="item-field" style={field} value={section.name} maxLength={MENU_LIMITS.sectionName}
+                  <input aria-label={t("ls.sectionNameN", { n: si + 1 })} className="item-field" style={field} value={section.name} maxLength={MENU_LIMITS.sectionName}
                     onChange={(event) => update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, name: event.target.value } : s) })} />
                   {section.items.map((item, ii) => {
                     const idBase = `studio-item-${si}-${ii}`;
@@ -1206,18 +1209,18 @@ function SelectedZoneEditor({
                     );
                   })}
                   <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(draft.sections, si)} onClick={() => { cards.open(si, section.items.length); update({ ...draft, sections: draft.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) }); }}>
-                    {canAddItem(draft.sections, si) ? "Add item" : section.items.length >= MENU_LIMITS.itemsPerSection ? `Section full (${MENU_LIMITS.itemsPerSection} items)` : `Menu full (${MENU_LIMITS.items} items)`}
+                    {canAddItem(draft.sections, si) ? t("ls.addItem") : section.items.length >= MENU_LIMITS.itemsPerSection ? t("ls.sectionFull", { max: MENU_LIMITS.itemsPerSection }) : t("ls.menuFull", { max: MENU_LIMITS.items })}
                   </button>
                   {template === "triple-column" && si === draft.sections.length - 1 ? (
-                    <p className="zone-help">A photo sits behind all three columns. A video is not added, because it would cover a column.</p>
+                    <p className="zone-help">{t("ls.tripleNote")}</p>
                   ) : null}
                 </fieldset>
               );
             })}
             {columns ? null : (
               <button type="button" className="btn btn-quiet item-add" disabled={!canAddSection(draft.sections)}
-                onClick={() => { update({ ...draft, sections: [...draft.sections, { name: "Section", items: [blankItem()] }] }); setSectionIndex(draft.sections.length); }}>
-                {canAddSection(draft.sections) ? `Add section (${draft.sections.length} of ${MENU_LIMITS.sections})` : sectionLimitMessage(draft.sections)}
+                onClick={() => { update({ ...draft, sections: [...draft.sections, { name: t("ls.section"), items: [blankItem()] }] }); setSectionIndex(draft.sections.length); }}>
+                {canAddSection(draft.sections) ? t("ls.addSection", { n: draft.sections.length, max: MENU_LIMITS.sections }) : sectionLimitMessage(draft.sections, t)}
               </button>
             )}
           </section>
@@ -1230,7 +1233,7 @@ function SelectedZoneEditor({
             allowImage={panel === "background" ? true : zoneAllows(template, zone, "image")}
             allowVideo={panel === "background" ? false : zoneAllows(template, zone, "video")}
             promoArea={template === "menu-promo-67" || template === "two-menu-promo"}
-            imageLimitLabel={isolatedPhotoLimit ? ISOLATED_STUDIO_PHOTO_LIMIT_LABEL : undefined}
+            imageLimitLabel={isolatedPhotoLimit ? t("fu.limit", { mb: 1.5 }) : undefined}
             draft={draft}
             account={account}
             progress={progress}
@@ -1253,7 +1256,7 @@ function SelectedZoneEditor({
               update(next);
               setImageHref(entry?.url ?? null);
               if (exclusive && entry) { setClipUrl(null); setVideoOn(false); }
-              setNote(exclusive && entry && (draft.videoMediaId || clipUrl) ? "Image replaces the video in this zone." : "");
+              setNote(exclusive && entry && (draft.videoMediaId || clipUrl) ? t("ls.imageReplacesVideo") : "");
             }}
             onLibraryVideo={(entry) => {
               if (panel === "background") return;
@@ -1263,27 +1266,27 @@ function SelectedZoneEditor({
               setClipUrl(null);
               setVideoOn(Boolean(next.videoMediaId));
               if (exclusive && entry) setImageHref(null);
-              setNote(exclusive && entry && (draft.imageMediaId || imageHref) ? "Video replaces the image in this zone." : "");
+              setNote(exclusive && entry && (draft.imageMediaId || imageHref) ? t("ls.videoReplaces") : "");
             }}
           />
           {panel === "media" && zoneAllows(template, zone, "text") ? (
             <section className="zone-group">
-              <h3>Text settings</h3>
-              <label style={fieldLabel}>{template === "split-50" ? "Right side title" : template === "signature" ? "Side title" : "Feature title"}
-                <input aria-label={template === "split-50" ? "Right side title" : "Feature title"} style={field} value={draft.featureTitle} maxLength={40}
+              <h3>{t("ls.textSettings")}</h3>
+              <label style={fieldLabel}>{template === "split-50" ? t("ls.rightTitle") : template === "signature" ? t("ls.sideTitle") : t("ls.featureTitle")}
+                <input aria-label={template === "split-50" ? t("ls.rightTitle") : t("ls.featureTitle")} style={field} value={draft.featureTitle} maxLength={40}
                   onChange={(event) => update({ ...draft, featureTitle: event.target.value })} />
               </label>
-              <label style={fieldLabel}>{template === "split-50" ? "Right side detail" : template === "signature" ? "Side detail" : "Feature detail"}
-                <input aria-label={template === "split-50" ? "Right side detail" : "Feature detail"} style={field} value={draft.featureDetail} maxLength={80}
+              <label style={fieldLabel}>{template === "split-50" ? t("ls.rightDetail") : template === "signature" ? t("ls.sideDetail") : t("ls.featureDetail")}
+                <input aria-label={template === "split-50" ? t("ls.rightDetail") : t("ls.featureDetail")} style={field} value={draft.featureDetail} maxLength={80}
                   onChange={(event) => update({ ...draft, featureDetail: event.target.value })} />
               </label>
             </section>
           ) : null}
           {panel === "background" ? (
-            <ColorField label="Menu background" ariaLabel="Menu background" value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
+            <ColorField label={t("ls.menuBg")} ariaLabel={t("ls.menuBg")} value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
           ) : null}
           {template === "triple-column" && zone === "photo" ? (
-            <FileUploadControl kind="image" accept="image/jpeg,image/png,image/webp" limitLabel={isolatedPhotoLimit ? ISOLATED_STUDIO_PHOTO_LIMIT_LABEL : undefined} onFiles={(files) => onPhoto(files[0])} />
+            <FileUploadControl kind="image" accept="image/jpeg,image/png,image/webp" limitLabel={isolatedPhotoLimit ? t("fu.limit", { mb: 1.5 }) : undefined} onFiles={(files) => onPhoto(files[0])} />
           ) : null}
         </div>
       ) : null}
@@ -1306,6 +1309,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
   active: string;
   onHit: (id: string) => void;
 }) {
+  const t = useT();
   const frameRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState({ scale: 1, left: 0, top: 0 });
   useEffect(() => {
@@ -1343,7 +1347,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
             key={hit.id}
             type="button"
             className="zone-hit"
-            aria-label={hit.label}
+            aria-label={t("ls.editZone", { zone: zoneText(hit.label, t) })}
             aria-pressed={active === hit.id}
             onClick={() => onHit(hit.id)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onHit(hit.id); } }}
@@ -1360,7 +1364,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
               cursor: "pointer", padding: 0, color: "#fff",
             }}
           >
-            <span style={{ position: "absolute", left: 4, top: hit.id === "menu" || hit.id.startsWith("column-") ? undefined : 4, bottom: hit.id === "menu" || hit.id.startsWith("column-") ? 4 : undefined, maxWidth: "calc(100% - 8px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: active === hit.id ? "#0066ff" : "rgba(0,0,0,0.45)", borderRadius: 6, padding: "2px 6px", fontSize: 11, fontWeight: 700, lineHeight: "14px" }}>{hit.label.replace(/^Edit /, "")}</span>
+            <span style={{ position: "absolute", left: 4, top: hit.id === "menu" || hit.id.startsWith("column-") ? undefined : 4, bottom: hit.id === "menu" || hit.id.startsWith("column-") ? 4 : undefined, maxWidth: "calc(100% - 8px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: active === hit.id ? "#0066ff" : "rgba(0,0,0,0.45)", borderRadius: 6, padding: "2px 6px", fontSize: 11, fontWeight: 700, lineHeight: "14px" }}>{zoneText(hit.label, t)}</span>
           </button>
         ))}
       </div>
@@ -1370,35 +1374,37 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
 
 
 function BoardText({ draft, update }: { draft: LayoutDocument; update: (next: LayoutDocument) => void }) {
+  const t = useT();
   return (
     <section className="zone-group board-text">
-      <h3>Text settings</h3>
-      <label style={fieldLabel}>Title
-        <input style={field} aria-label="Title" value={draft.title} maxLength={MENU_LIMITS.title} onChange={(event) => update({ ...draft, title: event.target.value })} />
+      <h3>{t("ls.textSettings")}</h3>
+      <label style={fieldLabel}>{t("ls.title")}
+        <input style={field} aria-label={t("ls.title")} value={draft.title} maxLength={MENU_LIMITS.title} onChange={(event) => update({ ...draft, title: event.target.value })} />
       </label>
-      <label style={fieldLabel}>Subtitle
-        <input style={field} aria-label="Subtitle" value={draft.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(event) => update({ ...draft, subtitle: event.target.value })} />
+      <label style={fieldLabel}>{t("ls.subtitle")}
+        <input style={field} aria-label={t("ls.subtitle")} value={draft.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(event) => update({ ...draft, subtitle: event.target.value })} />
       </label>
-      <label style={fieldLabel}>Footer
-        <input style={field} aria-label="Footer" value={draft.footer} maxLength={MENU_LIMITS.footer} onChange={(event) => update({ ...draft, footer: event.target.value })} />
+      <label style={fieldLabel}>{t("ls.footer")}
+        <input style={field} aria-label={t("ls.footer")} value={draft.footer} maxLength={MENU_LIMITS.footer} onChange={(event) => update({ ...draft, footer: event.target.value })} />
       </label>
     </section>
   );
 }
 
 function ZoneHead({ zone, template, onClose }: { zone: string; template: LayoutTemplate; onClose: () => void }) {
+  const t = useT();
   const caps = zoneCapabilities(template).find((item) => item.id === zone);
   return (
     <header className="zone-head">
       <div>
-        <h2>{zoneLabel(zone, template)}</h2>
+        <h2>{zoneText(zoneLabel(zone, template, t), t)}</h2>
         <div className="zone-chips">
-          {caps?.text ? <span className="badge">Text</span> : null}
-          {caps?.image ? <span className="badge">Image</span> : null}
-          {caps?.video ? <span className="badge">Video</span> : null}
+          {caps?.text ? <span className="badge">{t("ls.text")}</span> : null}
+          {caps?.image ? <span className="badge">{t("ls.image")}</span> : null}
+          {caps?.video ? <span className="badge">{t("ls.video")}</span> : null}
         </div>
       </div>
-      <button type="button" className="btn btn-quiet" onClick={onClose} aria-label="Close section">Close</button>
+      <button type="button" className="btn btn-quiet" onClick={onClose} aria-label={t("ls.closeAria")}>{t("ls.close")}</button>
     </header>
   );
 }
@@ -1407,14 +1413,22 @@ function enlargePreviewText(svg: string) {
   return svg.replace(/font-size="([\d.]+)"/g, (_match, size) => `font-size="${Math.round(Number(size) * 1.12)}"`);
 }
 
-function boardChoice(board: AccountBoard) {
+function boardChoice(board: AccountBoard, locale: string = "en") {
   const layout = templateSpec(board.document.template).name;
-  const when = board.updatedAt ? new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(board.updatedAt)) : "";
+  const when = board.updatedAt ? new Intl.DateTimeFormat(locale === "es" ? "es" : "en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(board.updatedAt)) : "";
   return [board.name, layout, when].filter(Boolean).join(" · ");
 }
 
-function zoneLabel(zone: string, template: LayoutTemplate) {
-  return zoneCapabilities(template).find((item) => item.id === zone)?.label ?? "Section";
+/** Zone names come from lib/layout-studio.ts in English; the editor shows them through t() (I18N-3). */
+function zoneText(label: string, t: T): string {
+  const bare = label.replace(/^Edit /, "");
+  const name = bare.charAt(0).toUpperCase() + bare.slice(1);
+  const key = `zone.${name.toLowerCase().replace(/\s+/g, "-")}`;
+  return hasKey(key) ? t(key) : name;
+}
+
+function zoneLabel(zone: string, template: LayoutTemplate, t: T) {
+  return zoneCapabilities(template).find((item) => item.id === zone)?.label ?? t("ls.section");
 }
 
 function zoneAllows(template: LayoutTemplate, zone: string, kind: "image" | "video" | "text") {
@@ -1443,11 +1457,12 @@ function ZoneMedia({
   onLibraryPhoto: (entry: AccountLibraryFile | null) => void;
   onLibraryVideo: (entry: AccountLibraryFile | null) => void;
 }) {
+  const t = useT();
   const [libraryOpen, setLibraryOpen] = useState(false);
   const hasImage = allowImage && Boolean(draft.imageMediaId || previewImage);
   const hasVideo = allowVideo && Boolean(draft.videoMediaId || previewVideo || videoAttached);
-  const imageLabel = hasImage && !hasVideo ? "Replace image" : "Upload image";
-  const videoLabel = hasVideo ? "Replace video" : "Upload video";
+  const imageLabel = hasImage && !hasVideo ? t("ls.replaceImage") : t("ls.uploadImage");
+  const videoLabel = hasVideo ? t("ls.replaceVideo") : t("ls.uploadVideo");
   const imagePrimary = allowImage && !hasVideo;
   const videoPrimary = allowVideo && (hasVideo || !allowImage);
   const imageFile = account?.library.find((item) => item.id === draft.imageMediaId);
@@ -1457,27 +1472,27 @@ function ZoneMedia({
   return (
     <div className="zone-groups">
       <section className="zone-group">
-        <h3>Media</h3>
-        <p className="zone-help">{photoLabel}. {allowImage && allowVideo ? (promoArea ? PROMO_AREA_HINT : "Image or one video.") : allowVideo ? "One video." : "Image only."}</p>
+        <h3>{t("ls.media")}</h3>
+        <p className="zone-help">{photoLabel}. {allowImage && allowVideo ? (promoArea ? t("ls.promoHint") : t("ls.imageOrVideo")) : allowVideo ? t("ls.oneVideo") : t("ls.imageOnly")}</p>
         {hasVideo && allowVideo ? (
           <div className="media-card">
             {thumbVideo ? <video className="media-thumb" muted playsInline preload="auto" src={thumbVideo.includes("#") || thumbVideo.startsWith("blob:") ? thumbVideo : `${thumbVideo}#t=0.1`} onLoadedData={(event) => { const node = event.currentTarget; if (node.currentTime < 0.05) node.currentTime = 0.1; }} /> : <div className="media-thumb" />}
             <div className="media-meta">
-              <p className="media-name">{videoFile?.name || "Video"}</p>
-              <p className="zone-help">Video</p>
+              <p className="media-name">{videoFile?.name || t("ls.video")}</p>
+              <p className="zone-help">{t("ls.video")}</p>
             </div>
-            <button type="button" className="remove-btn" onClick={removeVideo}>Remove video</button>
+            <button type="button" className="remove-btn" onClick={removeVideo}>{t("ls.removeVideo")}</button>
           </div>
         ) : hasImage ? (
           <div className="media-card">
             {thumbImage ? <img className="media-thumb" alt="" src={thumbImage} /> : <div className="media-thumb" />}
             <div className="media-meta">
-              <p className="media-name">{imageFile?.name || "Image"}</p>
-              <p className="zone-help">Image</p>
+              <p className="media-name">{imageFile?.name || t("ls.image")}</p>
+              <p className="zone-help">{t("ls.image")}</p>
             </div>
-            <button type="button" className="remove-btn" onClick={removePhoto}>Remove image</button>
+            <button type="button" className="remove-btn" onClick={removePhoto}>{t("ls.removeImage")}</button>
           </div>
-        ) : <p className="zone-help">Nothing in this zone yet.</p>}
+        ) : <p className="zone-help">{t("ls.nothingHere")}</p>}
         <div className={allowImage && allowVideo ? "media-row" : "media-row single"}>
           {allowImage ? (
             <FileUploadControl
@@ -1498,43 +1513,43 @@ function ZoneMedia({
             />
           ) : null}
         </div>
-        {hasVideo && allowImage ? <p className="zone-help">Replaces the current video.</p> : null}
-        {hasImage && !hasVideo && allowVideo ? <p className="zone-help">Replaces the current image.</p> : null}
-        {account ? <button type="button" className="btn btn-quiet library-btn" aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>Choose from library</button> : null}
+        {hasVideo && allowImage ? <p className="zone-help">{t("ls.replacesVideo")}</p> : null}
+        {hasImage && !hasVideo && allowVideo ? <p className="zone-help">{t("ls.replacesImage")}</p> : null}
+        {account ? <button type="button" className="btn btn-quiet library-btn" aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>{t("ls.chooseLibrary")}</button> : null}
         {libraryOpen && account ? (
           <div className="media-actions">
-            {allowImage ? <label className="zone-help">Image
-              <select className="field" aria-label="Choose image from library" value={hasVideo && allowVideo ? "" : (draft.imageMediaId ?? "")} onChange={(event) => onLibraryPhoto(account.library.find((item) => item.id === event.target.value) ?? null)}>
-                <option value="">No photo</option>
+            {allowImage ? <label className="zone-help">{t("ls.image")}
+              <select className="field" aria-label={t("ls.chooseImage")} value={hasVideo && allowVideo ? "" : (draft.imageMediaId ?? "")} onChange={(event) => onLibraryPhoto(account.library.find((item) => item.id === event.target.value) ?? null)}>
+                <option value="">{t("ls.noPhoto")}</option>
                 {account.library.filter((item) => item.kind === "image").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
             </label> : null}
             {allowVideo ? (
-              <label className="zone-help">Video
-                <select className="field" aria-label="Choose video from library" value={draft.videoMediaId ?? ""} onChange={(event) => onLibraryVideo(account.library.find((item) => item.id === event.target.value) ?? null)}>
-                  <option value="">No video</option>
+              <label className="zone-help">{t("ls.video")}
+                <select className="field" aria-label={t("ls.chooseVideo")} value={draft.videoMediaId ?? ""} onChange={(event) => onLibraryVideo(account.library.find((item) => item.id === event.target.value) ?? null)}>
+                  <option value="">{t("ls.noVideo")}</option>
                   {account.library.filter((item) => item.kind === "video").map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
             ) : null}
           </div>
         ) : null}
-        {allowVideo ? <p className="zone-help">{hasVideo ? "This board already has its one video. Another video replaces it." : "A board plays one video, muted and looping, in this zone."}</p> : null}
+        {allowVideo ? <p className="zone-help">{hasVideo ? t("ls.hasVideo") : t("ls.playsVideo")}</p> : null}
       </section>
       <section className="zone-group">
-        <h3>Display settings</h3>
-        <div className="segment" role="group" aria-label="How the media fits">
-          <button type="button" aria-pressed={draft.imageFit !== "contain"} onClick={() => update({ ...draft, imageFit: "cover" })}>Fill</button>
-          <button type="button" aria-pressed={draft.imageFit === "contain"} onClick={() => update({ ...draft, imageFit: "contain" })}>Fit</button>
+        <h3>{t("ls.displaySettings")}</h3>
+        <div className="segment" role="group" aria-label={t("ls.howFits")}>
+          <button type="button" aria-pressed={draft.imageFit !== "contain"} onClick={() => update({ ...draft, imageFit: "cover" })}>{t("ls.fill")}</button>
+          <button type="button" aria-pressed={draft.imageFit === "contain"} onClick={() => update({ ...draft, imageFit: "contain" })}>{t("ls.fit")}</button>
         </div>
-        <p className="zone-help">Fill: covers the section and may crop the edges. Fit: shows the whole image or video and may leave bars.</p>
-        <label className="zone-help">Position
-          <select className="field" aria-label="Photo position" value={draft.imageAnchor} onChange={(event) => update({ ...draft, imageAnchor: anchorValue(event.target.value) })}>
-            <option value="center">Center</option>
-            <option value="top">Top</option>
-            <option value="bottom">Bottom</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
+        <p className="zone-help">{t("ls.fillFitNote")}</p>
+        <label className="zone-help">{t("ls.position")}
+          <select className="field" aria-label={t("ls.photoPosition")} value={draft.imageAnchor} onChange={(event) => update({ ...draft, imageAnchor: anchorValue(event.target.value) })}>
+            <option value="center">{t("ls.center")}</option>
+            <option value="top">{t("ls.top")}</option>
+            <option value="bottom">{t("ls.bottom")}</option>
+            <option value="left">{t("ls.left")}</option>
+            <option value="right">{t("ls.right")}</option>
           </select>
         </label>
       </section>
@@ -1552,13 +1567,13 @@ function setItem(draft: LayoutDocument, si: number, ii: number, patch: Partial<L
   });
 }
 
-function stepLabel(step: StudioStep) {
-  if (step === "template") return "Template";
-  if (step === "section") return "Section";
-  if (step === "content") return "Content";
-  if (step === "style") return "Style";
-  if (step === "preview") return "Preview";
-  return "Publish";
+function stepLabel(step: StudioStep, t: T) {
+  if (step === "template") return t("ls.template");
+  if (step === "section") return t("ls.section");
+  if (step === "content") return t("ls.content");
+  if (step === "style") return t("ls.style");
+  if (step === "preview") return t("ls.preview");
+  return t("ls.publish");
 }
 
 function anchorValue(value: string): LayoutDocument["imageAnchor"] {
@@ -1567,6 +1582,7 @@ function anchorValue(value: string): LayoutDocument["imageAnchor"] {
 }
 
 function ColumnWidths({ draft, update }: { draft: LayoutDocument; update: (next: LayoutDocument) => void }) {
+  const t = useT();
   const widths = draft.columnWidths ?? [draft.split, (1 - draft.split) / 2, (1 - draft.split) / 2];
   function setWidth(index: number, next: number) {
     const current: [number, number, number] = [widths[0], widths[1], widths[2]];
@@ -1580,35 +1596,35 @@ function ColumnWidths({ draft, update }: { draft: LayoutDocument; update: (next:
   }
   return (
     <fieldset style={{ border: "1px solid #ddd4c6", borderRadius: 12, padding: 12 }}>
-      <legend>Column widths</legend>
+      <legend>{t("ls.columnWidths")}</legend>
       {widths.map((width, index) => (
-        <label key={index} style={fieldLabel}>Column {index + 1} {Math.round(width * 100)}%
-          <input aria-label={`Column ${index + 1} width`} type="range" min={0.2} max={0.6} step={0.01} value={width} onChange={(event) => setWidth(index, Number(event.target.value))} />
+        <label key={index} style={fieldLabel}>{t("ls.columnN", { n: index + 1 })} {Math.round(width * 100)}%
+          <input aria-label={t("ls.columnWidthN", { n: index + 1 })} type="range" min={0.2} max={0.6} step={0.01} value={width} onChange={(event) => setWidth(index, Number(event.target.value))} />
         </label>
       ))}
-      <p style={{ fontSize: 13, color: "#5c534c" }}>Each column is 20% to 60%. They always add up to the full board.</p>
+      <p style={{ fontSize: 13, color: "#5c534c" }}>{t("ls.columnsNote")}</p>
     </fieldset>
   );
 }
 
-function proportionLabel(template: LayoutTemplate) {
-  if (template === "menu-banner") return "Banner height";
-  if (template === "triple-column") return "First column width";
-  if (template === "two-menu-promo") return "First menu column";
-  if (template === "two-column") return "First column width";
-  if (template === "signature") return "Menu card width";
-  if (template === "split-50") return "Left side";
-  return "Menu width";
+function proportionLabel(template: LayoutTemplate, t: T) {
+  if (template === "menu-banner") return t("ls.bannerHeight");
+  if (template === "triple-column") return t("ls.firstColumn");
+  if (template === "two-menu-promo") return t("ls.firstMenuColumn");
+  if (template === "two-column") return t("ls.firstColumn");
+  if (template === "signature") return t("ls.cardWidth");
+  if (template === "split-50") return t("ls.leftSide");
+  return t("ls.menuWidth");
 }
 
-function proportionNote(template: LayoutTemplate) {
-  if (template === "triple-column") return "Each column is 20% to 60% and the three widths add up to the full board. This layout has no video area.";
-  if (template === "two-menu-promo") return "The two menu columns and the promotion add up to the full 16:9 board, about 35% / 35% / 30%. Both menus are edited separately. The promo area uses a photo or video from Media.";
-  if (template === "two-column") return "The two menu columns add up to the full 16:9 board, about 50% / 50%. Each column is edited separately. A photo can sit behind both. A video is not added, because it would cover a column.";
-  if (template === "menu-banner") return "Banner height is 12% to 28% of the board. The menu uses the space above it.";
-  if (template === "menu-promo-67") return "Menu width is 55% to 75%. The promo area uses a photo or video from Media for the rest.";
-  if (template === "split-50") return "The left side is 40% to 60%. The right side uses the rest.";
-  return "The menu card is 40% to 70% of the width. The video stays in the strip beside it.";
+function proportionNote(template: LayoutTemplate, t: T) {
+  if (template === "triple-column") return t("ls.pTriple");
+  if (template === "two-menu-promo") return t("ls.pTwoPromo");
+  if (template === "two-column") return t("ls.pTwoCol");
+  if (template === "menu-banner") return t("ls.pBanner");
+  if (template === "menu-promo-67") return t("ls.pPromo67");
+  if (template === "split-50") return t("ls.pSplit");
+  return t("ls.pSignature");
 }
 
 function chip(active: boolean): CSSProperties {
