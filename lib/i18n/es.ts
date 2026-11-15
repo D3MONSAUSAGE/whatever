@@ -29,7 +29,7 @@ export const es: Record<MessageKey, string> = {
   "common.password": "Contraseña",
   "common.support": "Soporte",
   "common.somethingWrong": "Algo salió mal. Intente de nuevo.",
-  "common.englishOnlyNote": "Los detalles de facturación se muestran en inglés.",
+  "common.englishOnlyNote": "El estado del plan y algunos botones de facturación se muestran en inglés.",
 
   "brand.tagline": "Señalización digital sencilla",
   "brand.homeLabel": "Inicio de Pekko",

@@ -11,9 +11,19 @@ export const COURTESY_NOTICE_ES =
 export const ENGLISH_ORIGINAL_ES = "Ver la versión original en inglés";
 
 export const LEGAL_OPERATOR_ES = "Francisco Lopez, propietario único, que opera como Pekko";
-/** Faithful to LEGAL_OWNERSHIP without naming other entities (Francisco: never name them in Spanish). */
-export const LEGAL_OWNERSHIP_ES =
+/**
+ * Ownership sentence: two prepared versions, pending Francisco's wording decision.
+ * - "general" (current default): names no other company, per the brief; broader than the English.
+ * - "faithful": mirrors LEGAL_OWNERSHIP and names both companies, like the English.
+ * Switching is a one-line change of OWNERSHIP_VARIANT; tests cover both.
+ */
+export const LEGAL_OWNERSHIP_ES_GENERAL =
   "Pekko es propiedad exclusiva de Francisco Lopez. No es una sociedad de responsabilidad limitada (LLC) y es totalmente independiente de cualquier otra empresa.";
+export const LEGAL_OWNERSHIP_ES_FAITHFUL =
+  "Pekko es propiedad exclusiva de Francisco Lopez. No es Pekko LLC y es totalmente independiente de Teamtegrate LLC.";
+export type OwnershipVariant = "general" | "faithful";
+export const OWNERSHIP_VARIANT = "general" as OwnershipVariant;
+export const LEGAL_OWNERSHIP_ES = OWNERSHIP_VARIANT === "faithful" ? LEGAL_OWNERSHIP_ES_FAITHFUL : LEGAL_OWNERSHIP_ES_GENERAL;
 export const REFUND_POLICY_ES =
   "Los pagos de suscripciones mensuales no se reembolsan por tiempo no utilizado ni por una cancelación a mitad de un período de facturación, salvo cuando la ley aplicable exija un reembolso. Los cargos duplicados o incorrectos confirmados se corregirán. Cancelar detiene la siguiente renovación; el acceso continúa hasta el final del período ya pagado.";
 
