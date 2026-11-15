@@ -7,11 +7,12 @@ import { api, useApi, type PlaylistDetail, type PlaylistSummary } from "@/lib/ap
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconList } from "@/components/icons";
-import { EmptyState, LoadState, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader, useRequiredMessage } from "@/components/ui";
 import { makeT, type T } from "@/lib/i18n";
 
 export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary[]; pathOverride?: string }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const live = useApi<PlaylistSummary[]>(fixture ? null : "/api/playlists");
   const data = fixture ?? live.data;
   const error = fixture ? null : live.error;
@@ -95,7 +96,7 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
         <h2 className="font-semibold">{t("pl.new")}</h2>
         <p className="text-sm text-muted mb-4">{t("pl.newLede")}</p>
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-          <input className="field" required maxLength={80} placeholder={t("pl.namePh")} aria-label={t("pl.nameAria")}
+          <input className="field" required {...requiredMsg} maxLength={80} placeholder={t("pl.namePh")} aria-label={t("pl.nameAria")}
             value={name} onChange={(event) => setName(event.target.value)} />
           <button className="btn btn-primary" disabled={creating}>{creating ? t("pl.creating") : t("pl.create")}</button>
         </div>

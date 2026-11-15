@@ -1879,4 +1879,6 @@ export const es: Record<MessageKey, string> = {
   "toast.dismiss": "Cerrar",
   "toast.open": "Abrir",
   "common.required": "Complete este campo.",
+  "common.invalidEmail": "Use un correo electrónico válido, por ejemplo nombre@ejemplo.com.",
+  "common.tooShort": "Use al menos {n} caracteres.",
 };

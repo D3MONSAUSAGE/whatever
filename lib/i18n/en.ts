@@ -1891,6 +1891,8 @@ export const en = {
   "toast.dismiss": "Dismiss",
   "toast.open": "Open",
   "common.required": "Please fill out this field.",
+  "common.invalidEmail": "Please enter an email address.",
+  "common.tooShort": "Please use at least {n} characters.",
 } as const;
 
 export type MessageKey = keyof typeof en;

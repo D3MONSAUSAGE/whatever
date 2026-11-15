@@ -6,7 +6,7 @@ import { useLocale, useT } from "@/lib/i18n/client";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
-import { EmptyState, LoadState, PageHeader } from "@/components/ui";
+import { EmptyState, LoadState, PageHeader, useRequiredMessage } from "@/components/ui";
 import { byName, SEARCH_FROM } from "@/components/playlist-list";
 import { screenNameWarning } from "@/lib/screen-names";
 import { syncLine } from "@/lib/sync-line";
@@ -219,6 +219,7 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -248,9 +249,9 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
       </ol>
       <div className="grid gap-3 lg:grid-cols-[10rem_1fr_auto]">
         <input className="field text-xl tracking-[0.2em] font-semibold" inputMode="numeric" autoComplete="one-time-code"
-          placeholder="123 456" maxLength={7} required value={code}
+          placeholder="123 456" maxLength={7} required {...requiredMsg} value={code}
           onChange={(event) => setCode(event.target.value.replace(/[^\d ]/g, ""))} aria-label={t("disp.codeLabel")} />
-        <input className="field" placeholder={t("disp.namePlaceholder")} maxLength={60} required
+        <input className="field" placeholder={t("disp.namePlaceholder")} maxLength={60} required {...requiredMsg}
           value={name} onChange={(event) => setName(event.target.value)} aria-label={t("disp.tvName")} />
         <button className="btn btn-primary" disabled={busy}>{busy ? t("disp.connectingShort") : t("disp.connectTv")}</button>
       </div>

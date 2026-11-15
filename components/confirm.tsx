@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT } from "@/lib/i18n/client";
+import { useRequiredMessage } from "@/components/ui";
 
 export type ConfirmRequest = {
   title: string;
@@ -37,6 +38,7 @@ export function useConfirm() {
 
 function ConfirmDialog({ pending, onClose }: { pending: Pending; onClose: (value: string | boolean | null) => void }) {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const titleId = useId();
   const bodyId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +99,7 @@ function ConfirmDialog({ pending, onClose }: { pending: Pending; onClose: (value
                 maxLength={pending.input.maxLength}
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
-                required
+                required {...requiredMsg}
               />
             </label>
           )}

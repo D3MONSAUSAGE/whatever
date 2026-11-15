@@ -5,9 +5,11 @@ import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { useT } from "@/lib/i18n/client";
 import { rich } from "@/components/i18n/rich";
 import { AuthFrame, friendlyAuthError } from "@/components/auth-frame";
+import { useRequiredMessage } from "@/components/ui";
 
 export default function ForgotPassword() {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -47,7 +49,7 @@ export default function ForgotPassword() {
       ) : (
         <form onSubmit={submit} className="space-y-3">
           <label className="form-label" htmlFor="email">{t("common.email")}</label>
-          <input id="email" className="field" type="email" autoComplete="email" required placeholder={t("auth.emailPlaceholder")}
+          <input id="email" className="field" type="email" autoComplete="email" required {...requiredMsg} placeholder={t("auth.emailPlaceholder")}
             value={email} onChange={(e) => setEmail(e.target.value)} />
           <button className="btn btn-primary w-full" disabled={busy}>{busy ? t("auth.sending") : t("auth.sendResetLink")}</button>
           {error ? <p role="alert" className="note-error">{error}</p> : null}

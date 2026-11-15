@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { useT } from "@/lib/i18n/client";
 import { AuthFrame, friendlyAuthError, MIN_PASSWORD } from "@/components/auth-frame";
+import { useRequiredMessage } from "@/components/ui";
 
 type Phase = "checking" | "ready" | "invalid" | "done";
 
 export default function ResetPassword() {
   const t = useT();
+  const requiredMsg = useRequiredMessage();
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("checking");
   // Raw Supabase message; translated at render so a language switch re-words it.
@@ -85,10 +87,10 @@ export default function ResetPassword() {
     <AuthFrame title={t("auth.newPasswordTitle")} lede={t("auth.newPasswordLede", { min: MIN_PASSWORD })}>
       <form onSubmit={submit} className="space-y-3">
         <label className="form-label" htmlFor="new-password">{t("auth.newPassword")}</label>
-        <input id="new-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required
+        <input id="new-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required {...requiredMsg}
           value={password} onChange={(e) => setPassword(e.target.value)} />
         <label className="form-label" htmlFor="confirm-password">{t("auth.confirmPassword")}</label>
-        <input id="confirm-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required
+        <input id="confirm-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required {...requiredMsg}
           value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         <button className="btn btn-primary w-full" disabled={busy}>{busy ? t("auth.saving") : t("auth.saveNewPassword")}</button>
         {error ? <p role="alert" className="note-error">{error}</p> : null}

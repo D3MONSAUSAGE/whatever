@@ -6,7 +6,7 @@ import { ManageBilling } from "@/components/manage-billing";
 import { api, useApi } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase-browser";
 import { IconGear } from "@/components/icons";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, useRequiredMessage } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { friendlyAuthError, MIN_PASSWORD } from "@/components/auth-frame";
@@ -19,6 +19,7 @@ export default function Settings() {
   const toast = useToast();
   const confirm = useConfirm();
   const { locale, t } = useLocale();
+  const requiredMsg = useRequiredMessage();
   const [origin, setOrigin] = useState("");
   const [email, setEmail] = useState<string | null>(null);
   const [savedName, setSavedName] = useState("");
@@ -146,17 +147,17 @@ export default function Settings() {
           <div className="grid gap-3">
             <div>
               <label className="form-label" htmlFor="current-password">{t("settings.currentPassword")}</label>
-              <input id="current-password" className="field" type="password" autoComplete="current-password" required
+              <input id="current-password" className="field" type="password" autoComplete="current-password" required {...requiredMsg}
                 value={current} onChange={(e) => setCurrent(e.target.value)} />
             </div>
             <div>
               <label className="form-label" htmlFor="new-password">{t("settings.newPassword")}</label>
-              <input id="new-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required
+              <input id="new-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required {...requiredMsg}
                 value={next} onChange={(e) => setNext(e.target.value)} />
             </div>
             <div>
               <label className="form-label" htmlFor="again-password">{t("settings.confirmPassword")}</label>
-              <input id="again-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required
+              <input id="again-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required {...requiredMsg}
                 value={again} onChange={(e) => setAgain(e.target.value)} />
             </div>
           </div>
