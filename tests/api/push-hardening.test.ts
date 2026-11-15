@@ -186,9 +186,20 @@ describe("POST /api/push/test", () => {
     expect((await pushTest(req("token-b", {}))).status).toBe(200);
   });
 
-  it("503 when push isn't configured (Preview has no FCM)", async () => {
+  it("503 when push isn't configured (Preview has no FCM), without using up a test slot", async () => {
     fakeSender.current = null;
-    expect((await pushTest(req("token-a", {}))).status).toBe(503);
+    for (let i = 0; i < 7; i++) expect((await pushTest(req("token-a", {}))).status).toBe(503);
+    expect(store.rate_limits.filter((r) => String(r.key).startsWith("push-test:"))).toEqual([]);
+    const sent = recordingSender();
+    for (let i = 0; i < 5; i++) expect((await pushTest(req("token-a", {}))).status).toBe(200);
+    expect((await pushTest(req("token-a", {}))).status).toBe(429);
+    expect(sent.length).toBe(10);
+  });
+  it("503 text is Spanish with Accept-Language: es", async () => {
+    fakeSender.current = null;
+    const res = await pushTest(new Request("http://localhost/x", { method: "POST", headers: { Authorization: "Bearer token-a", "Accept-Language": "es" }, body: "{}" }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("Las notificaciones push todavía no están configuradas en este servidor.");
   });
 
   it("0 devices is still a 200", async () => {

@@ -225,6 +225,7 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Couldn't load your setup progress.": "No se pudo cargar el progreso de la configuración.",
   "Couldn't remove this device.": "No se pudo quitar este dispositivo.",
   "Couldn't save this device.": "No se pudo guardar este dispositivo.",
+  "Push notifications aren't set up on this server yet.": "Las notificaciones push todavía no están configuradas en este servidor.",
   "Couldn't send a test notification.": "No se pudo enviar una notificación de prueba.",
   "Send an empty JSON body {}.": "Envíe un cuerpo JSON vacío {}.",
   "scope must be 'global' or 'local'.": "scope debe ser 'global' o 'local'.",

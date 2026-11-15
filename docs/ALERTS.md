@@ -12,7 +12,7 @@
 
 ## Push (FCM)
 - Phones register with `POST /api/devices` and remove themselves on sign-out with `DELETE /api/devices/:token` (or `DELETE /api/devices {token}`). These contracts are unchanged.
-- `POST /api/session/sign-out {scope:"global"}` (web "Sign out of all devices") deletes all of the caller's `push_devices` rows before the Supabase global sign-out. `{scope:"local", token}` deletes that one token; `{scope:"local"}` without a token removes nothing.
+- `POST /api/session/sign-out {scope:"global"}` (web "Sign out of all devices") deletes all of the caller's `push_devices` rows before the Supabase global sign-out. It only clears push devices and does not end the session: the client must still call Supabase sign-out. `{scope:"local", token}` deletes that one token; `{scope:"local"}` without a token removes nothing.
 - `POST /api/push/test` with body `{}`: signed-in only, sends `data: {type:"test"}` (Android channel `screen_alerts`) to the caller's own devices, 5 per hour per user, never writes `alerts`. Replies `{devices, sent, failed}`; tokens FCM reports as gone are pruned like normal delivery. 503 when push isn't configured (Preview has no FCM).
 - Stored in `public.alerts` (RLS on, no policies; server-only). Deleted after 90 days by the daily cron (`alerts_purge`).
 

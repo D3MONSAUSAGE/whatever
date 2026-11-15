@@ -70,3 +70,12 @@ describe("docs/ALERTS.md", () => {
     expect(doc).toContain("POST /api/push/test");
   });
 });
+
+describe("docs/PUSH.md (Gother #127 LOWs)", () => {
+  it("names the release app id and says sign-out cleanup doesn't end the session", () => {
+    const doc = readFileSync("docs/PUSH.md", "utf8");
+    expect(doc).toContain("com.pekkotv.app");
+    expect(doc).not.toMatch(/app ids com\.pekko\.app/);
+    expect(doc).toContain("It only clears push devices. It does NOT end the session");
+  });
+});
