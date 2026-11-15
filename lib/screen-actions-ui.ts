@@ -1,15 +1,19 @@
+import { makeT, type T } from "@/lib/i18n/index";
+
+const EN: T = makeT("en");
+
 export type ScreenActionId = "upload" | "change" | "create" | "playlist" | "schedule";
 export type ScreenActionGroup = "primary" | "secondary" | "supporting";
 
 /** Visual order: primary, then secondary, then supporting. */
 export const SCREEN_ACTION_ORDER: ScreenActionId[] = ["change", "schedule", "playlist", "upload", "create"];
 
-export function screenActionLabel(id: ScreenActionId) {
-  if (id === "change") return "Change content";
-  if (id === "schedule") return "Schedule";
-  if (id === "playlist") return "Edit playlist";
-  if (id === "upload") return "Upload media";
-  return "Create content";
+export function screenActionLabel(id: ScreenActionId, t: T = EN) {
+  if (id === "change") return t("sa.change");
+  if (id === "schedule") return t("sa.schedule");
+  if (id === "playlist") return t("sa.playlist");
+  if (id === "upload") return t("sa.upload");
+  return t("sa.create");
 }
 
 export function screenActionGroup(id: ScreenActionId): ScreenActionGroup {
@@ -18,18 +22,18 @@ export function screenActionGroup(id: ScreenActionId): ScreenActionGroup {
   return "supporting";
 }
 
-export function screenActionHelper(id: ScreenActionId) {
-  if (id === "change") return "Choose what this TV plays, then publish it.";
-  if (id === "schedule") return "Play different content at set times.";
-  if (id === "playlist") return "Edit the playlist assigned to this screen.";
-  if (id === "upload") return "Files go into this account's library. Publish them from Change content.";
-  return "Make a new menu board, promotion, or playlist.";
+export function screenActionHelper(id: ScreenActionId, t: T = EN) {
+  if (id === "change") return t("sa.changeHelp");
+  if (id === "schedule") return t("sa.scheduleHelp");
+  if (id === "playlist") return t("sa.playlistHelp");
+  if (id === "upload") return t("sa.uploadHelp");
+  return t("sa.createHelp");
 }
 
-export function screenActionGroupLabel(group: ScreenActionGroup) {
-  if (group === "primary") return "Publish to TV";
-  if (group === "secondary") return "Schedule and playlists";
-  return "Library";
+export function screenActionGroupLabel(group: ScreenActionGroup, t: T = EN) {
+  if (group === "primary") return t("sa.groupPrimary");
+  if (group === "secondary") return t("sa.groupSecondary");
+  return t("sa.groupSupporting");
 }
 
 /** Change content is the primary action. The others stay secondary. An open panel stays pressed. */
@@ -42,20 +46,16 @@ export function screenActionClass(id: ScreenActionId, open: boolean) {
  * Timing language for a publish confirm or success note.
  * Never promise an immediate update, and never treat an offline or unpaired TV as online.
  */
-export function publishTimingCopy(display: { online: boolean; connected: boolean }): string {
-  if (!display.connected) {
-    return "This screen is not connected yet. The assignment is saved and will play once the TV finishes pairing.";
-  }
-  if (!display.online) {
-    return "This screen is offline. The assignment is saved, and the TV will update when it comes back online.";
-  }
-  return "The TV updates within about 30 seconds.";
+export function publishTimingCopy(display: { online: boolean; connected: boolean }, t: T = EN): string {
+  if (!display.connected) return t("sa.timingUnpaired");
+  if (!display.online) return t("sa.timingOffline");
+  return t("sa.timingOnline");
 }
 
-export function publishSavedCopy(display: { online: boolean; connected: boolean }): string {
-  if (!display.connected) return "Assigned. It will play once the TV finishes pairing.";
-  if (!display.online) return "Assigned. This screen is offline, so the TV will update when it comes back online.";
-  return "Assigned. The TV updates within about 30 seconds, then this screen shows as playing.";
+export function publishSavedCopy(display: { online: boolean; connected: boolean }, t: T = EN): string {
+  if (!display.connected) return t("sa.savedUnpaired");
+  if (!display.online) return t("sa.savedOffline");
+  return t("sa.savedOnline");
 }
 
 /**
@@ -63,32 +63,18 @@ export function publishSavedCopy(display: { online: boolean; connected: boolean 
  * If any target is offline or unpaired, it uses the saved-until-back-online wording
  * and never promises a 30-second update for those screens.
  */
-export function publishSavedCopyForTargets(targets: { online: boolean; connected?: boolean }[]): string {
+export function publishSavedCopyForTargets(targets: { online: boolean; connected?: boolean }[], t: T = EN): string {
   if (targets.length === 1) {
     const target = targets[0];
-    return publishSavedCopy({ online: target.online, connected: target.connected ?? true });
+    return publishSavedCopy({ online: target.online, connected: target.connected ?? true }, t);
   }
   const unpaired = targets.filter((item) => item.connected === false);
   const offline = targets.filter((item) => (item.connected ?? true) && !item.online);
   const live = targets.filter((item) => (item.connected ?? true) && item.online);
-  const parts = ["Assigned."];
-  if (live.length) {
-    parts.push(live.length === 1
-      ? "The online TV updates within about 30 seconds."
-      : "Online TVs update within about 30 seconds.");
-  }
-  if (offline.length) {
-    parts.push(offline.length === 1
-      ? "The offline screen is saved, and that TV will update when it comes back online."
-      : "Offline screens are saved, and those TVs will update when they come back online.");
-  }
-  if (unpaired.length) {
-    parts.push(unpaired.length === 1
-      ? "The unpaired screen will play once the TV finishes pairing."
-      : "Unpaired screens will play once those TVs finish pairing.");
-  }
-  if (parts.length === 1) {
-    return "Assigned. The TVs update within about 30 seconds, then they show as playing.";
-  }
+  const parts = [t("sa.assigned")];
+  if (live.length) parts.push(t(live.length === 1 ? "sa.liveOne" : "sa.liveMany"));
+  if (offline.length) parts.push(t(offline.length === 1 ? "sa.offlineOne" : "sa.offlineMany"));
+  if (unpaired.length) parts.push(t(unpaired.length === 1 ? "sa.unpairedOne" : "sa.unpairedMany"));
+  if (parts.length === 1) return t("sa.allAssigned");
   return parts.join(" ");
 }

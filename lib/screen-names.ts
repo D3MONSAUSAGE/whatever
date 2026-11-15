@@ -1,3 +1,7 @@
+import { makeT, type T } from "@/lib/i18n/index";
+
+const EN: T = makeT("en");
+
 /** Compare screen names ignoring case and extra spaces. "Front  counter" matches "front counter". */
 export function screenNameKey(name: string) {
   return name.trim().replace(/\s+/g, " ").toLowerCase();
@@ -18,14 +22,14 @@ export function suggestScreenName(name: string, existing: string[]) {
   return `${base} 2`;
 }
 
-export function screenNameWarning(name: string, existing: string[]) {
+export function screenNameWarning(name: string, existing: string[], t: T = EN) {
   const key = screenNameKey(name);
   if (!key) return null;
   const match = existing.find((item) => screenNameKey(item) === key);
   if (!match) return null;
   const suggestedName = suggestScreenName(name, existing);
   return {
-    nameWarning: `Another screen is already named “${match}”. You can still use this name. A free name would be “${suggestedName}”.`,
+    nameWarning: t("names.duplicate", { match, suggested: suggestedName }),
     suggestedName,
   };
 }
