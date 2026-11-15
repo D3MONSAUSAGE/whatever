@@ -91,10 +91,13 @@ describe("status-only copy map", () => {
     expect(statusOnlyText("Couldn't check your plan. Try again.")).toBe("Couldn't check your plan. Try again.");
     expect(statusOnlyText("That's more screens than your plan includes.")).toBe("That's more screens than your plan includes.");
   });
-  it("falls back by dropping steering sentences from unknown copy", () => {
+  it("uses a neutral fallback for unmatched steering copy, never a paused claim", () => {
     const out = statusOnlyText("Screens are paused. Choose a plan on the dashboard.");
-    expect(out).toBe("Screens are paused.");
+    expect(out).toBe("That isn't available in this app.");
     expect(out).not.toMatch(PURCHASE_STEERING);
+    expect(statusOnlyText("Elija un plan para continuar.")).toBe("Eso no está disponible en esta app.");
+    expect(statusOnlyText("Please subscribe or upgrade.")).toBe("That isn't available in this app.");
+    expect(statusOnlyText("Please suscríbase hoy.")).toBe("Eso no está disponible en esta app.");
   });
 });
 
@@ -165,6 +168,58 @@ describe("rewriteAndroidStatusCopy", () => {
       error: "Your plan's screen limit is reached. Pause another screen to pair this one.",
       code: "screen_limit",
     });
+  });
+});
+
+describe("customer content is not rewritten for a Dart UA", () => {
+  async function dartIdentical(payload: unknown) {
+    const res = json(payload);
+    const out = await rewriteAndroidStatusCopy(dart(), res);
+    expect(out).toBe(res);
+    expect(await out.clone().text()).toBe(JSON.stringify(payload));
+  }
+
+  it("leaves menu, promo, alert and layout bodies with $, Dashboard, Pricing or billing byte-identical", async () => {
+    await dartIdentical({
+      id: "menu-1",
+      name: "Lunch",
+      content: { title: "Taco Tuesday $2", sections: [{ name: "Specials", items: [{ name: "Taco", price: "$2" }] }] },
+    });
+    await dartIdentical({
+      id: "promo-1",
+      title: "Pricing board",
+      message: "Ask about billing at the counter.",
+      items: ["$5 deal", "Pricing board"],
+    });
+    await dartIdentical({
+      alerts: [
+        { id: "a1", title: "Dashboard", message: "Dashboard TV went offline at 9:00." },
+        { id: "a2", message: "Billing TV came back online." },
+      ],
+    });
+    await dartIdentical({
+      board: { name: "Pricing", title: "Spring pricing", zones: [{ label: "$5 deal", text: "See the dashboard for billing." }] },
+    });
+  });
+
+  it("leaves day-part style errors that embed a customer name with $ or Pricing untouched", async () => {
+    await dartIdentical({
+      error: "“Taco Tuesday $2” hasn't been published yet. Publish this board first, then schedule it.",
+      code: "conflict",
+    });
+    await dartIdentical({
+      error: "Pricing board: Check each part of the day.",
+      code: "validation_failed",
+    });
+    await dartIdentical({
+      error: "Dashboard special: a time is missing.",
+      code: "validation_failed",
+    });
+  });
+
+  it("does not rewrite a top-level error that has no code, or nested message/title fields", async () => {
+    await dartIdentical({ error: "Choose a plan to continue." });
+    await dartIdentical({ item: { message: "Choose a plan on the dashboard.", title: "Billing $5" } });
   });
 });
 

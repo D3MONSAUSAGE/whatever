@@ -141,7 +141,7 @@ export function warningFor(e: EntitlementRow): Warning {
   return null;
 }
 
-/** Plans that are sold today. Anything else (grandfathered, comp, unknown) grants nothing once enforced. */
+/** Plans that are sold today. Complimentary (`comp`) is granted separately in commercialEntitlement(); grandfathered and unknown plans grant nothing once enforced. */
 export const COMMERCIAL_PLANS: readonly PlanId[] = ["trial", "starter", "business", "multi"];
 
 const RESTRICTED = (e: EntitlementRow, state: "expired" | "canceled", playbackEndsAt: string | null = null): EntitlementRow => ({
