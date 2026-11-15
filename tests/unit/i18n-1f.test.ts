@@ -52,7 +52,7 @@ describe("I18N-1F-01/02: FAQ questions in Spanish, billing answers stay English"
   });
   it("marks lang=\"en\" on the answer, not the whole question card", () => {
     const src = readFileSync("components/site/sections.tsx", "utf8");
-    expect(src).toContain('<p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a)}>');
+    expect(src).toContain('<p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a) ?? (locale === "en" && BILLING_ANSWERS.includes(k.a) ? "en" : undefined)}>');
     expect(src).not.toContain('className="card p-5 group" lang=');
   });
 });

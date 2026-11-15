@@ -1,0 +1,80 @@
+import { LegalPage } from "@/components/legal-page";
+import { CourtesyNotice } from "@/components/legal/courtesy-notice";
+import { LEGAL_ADDRESS, LEGAL_PRIVACY_UPDATED, SUPPORT_EMAIL } from "@/lib/legal";
+import { LEGAL_OPERATOR_ES, LEGAL_OWNERSHIP_ES, LEGAL_PRIVACY_UPDATED_ES } from "@/lib/legal-es";
+
+/** Spanish courtesy translation of app/privacy/page.tsx. Keep paragraph-for-paragraph with the English page. */
+export function PrivacyEs() {
+  return (
+    <LegalPage title="Política de privacidad" updated={LEGAL_PRIVACY_UPDATED} dateLine={`Vigente desde el ${LEGAL_PRIVACY_UPDATED_ES}. Última actualización: ${LEGAL_PRIVACY_UPDATED_ES}.`} notice={<CourtesyNotice englishHref="/privacy?lang=en" />}>
+      <p>Esta política explica qué información procesa {LEGAL_OPERATOR_ES} cuando usted usa Pekko, para qué y las opciones que el producto realmente ofrece. {LEGAL_OWNERSHIP_ES}</p>
+
+      <h2 className="font-semibold text-lg" id="changes">Cambios en esta política</h2>
+      <p>
+        Antes de que un cambio importante entre en vigor, la política actualizada se publica en esta página con su nueva fecha de vigencia. La página sigue enlazada desde el pie del sitio.
+        Cuando se requiera un aviso, o cuando un aviso sea apropiado para una cuenta cuya dirección de correo electrónico tenga Pekko, ese aviso se envía al correo de la cuenta.
+        Pekko no envía automáticamente un correo por cada modificación de esta página. La publicación de esta sección no envía ningún correo.
+      </p>
+
+      <h2 className="font-semibold text-lg">Información que se usa para operar Pekko</h2>
+      <ul className="list-disc pl-5 grid gap-1">
+        <li><strong>Cuenta.</strong> Dirección de correo electrónico, nombre del negocio y un nombre visible opcional. Las contraseñas de inicio de sesión las almacena Supabase Auth, no como texto plano en los registros de cuentas de Pekko.</li>
+        <li><strong>Contenido y configuración.</strong> Imágenes, videos, menús digitales y configuración de marca que usted sube, además de listas de reproducción, horarios, promociones, ubicaciones, grupos de pantallas y nombres de pantallas.</li>
+        <li><strong>Pantallas.</strong> Para cada pantalla vinculada: cuándo se reportó por última vez, lo que informó que estaba reproduciendo, errores de reproducción, períodos sin conexión y un token del dispositivo que se almacena solo como hash. No se recopila nada sobre las personas que pasan frente a una pantalla.</li>
+        <li><strong>Actividad propia (de primera parte).</strong> Registros de publicaciones, cambios del contenido de las pantallas, vinculación y eliminación de pantallas, cambios de horarios, y cargas o eliminaciones. También el tiempo de actividad por hora de las pantallas y la reproducción confirmada. Los hitos del producto de la cuenta registran el inicio de la prueba, la primera pantalla vinculada, la primera publicación, el cambio de plan, la cancelación, cuántas pantallas se vincularon durante la prueba y el vencimiento de la prueba. Esas filas de hitos no se muestran en su lista de actividad.</li>
+        <li><strong>Plan y facturación.</strong> Plan, fechas de la prueba, estado de la suscripción, el período pagado actual y los identificadores de cliente y de suscripción de Stripe cuando existe una suscripción de pago. Pekko no almacena números de tarjeta.</li>
+        <li><strong>Notificaciones push móviles.</strong> Si usa la app de Pekko y el dispositivo permite notificaciones, un token push de ese dispositivo.</li>
+        <li><strong>Límites contra el abuso y registros.</strong> Los intentos de vinculación se limitan usando la dirección IP de la solicitud como clave del límite de frecuencia. Esa clave puede permanecer en la tabla de límites de frecuencia; esta aplicación no fija una fecha de destrucción aparte para ella. Los registros de errores de Vercel generados por esta aplicación incluyen el método, la ruta y un mensaje breve. No incluyen encabezados, cookies ni cuerpos de las solicitudes.</li>
+      </ul>
+
+      <h2 className="font-semibold text-lg">Para qué se usa</h2>
+      <p>Para iniciar su sesión, almacenar y entregar su contenido a sus pantallas, mostrar el estado de las pantallas, enviar alertas de la cuenta y de las pantallas, gestionar la facturación cuando se inicia un plan de pago, medir qué anuncios y canales traen nuevos registros, limitar el abuso y solucionar problemas del Servicio. Usted conserva la propiedad de su contenido. No vendemos información personal. No hay ninguna venta de la cual excluirse, y esta política no es una declaración de cumplimiento de ninguna ley de privacidad en particular.</p>
+
+      <h2 className="font-semibold text-lg">Qué se mide y qué no</h2>
+      <p>Los registros anteriores son registros propios de las pantallas y los cambios de la propia cuenta. Esta aplicación no incluye una red publicitaria ni un script de analítica web de terceros. El cliente de inicio de sesión del panel almacena la sesión en el navegador y llama a la API de Pekko con un token de portador (bearer token).</p>
+      <p>El correo transaccional se envía a través de Resend como texto plano. La solicitud de envío no activa el seguimiento de aperturas ni de clics, y el dominio de envío verificado pekkotv.com reporta el seguimiento de aperturas y de clics desactivado. Esto describe esta aplicación y esa configuración del dominio. No es una promesa de que un proveedor nunca registre ni mida sus propios sistemas.</p>
+
+      <h2 className="font-semibold text-lg">Atribución de anuncios y campañas</h2>
+      <p>
+        Cuando usted llega por primera vez a pekkotv.com, podemos guardar las etiquetas de campaña del enlace (fuente, medio, campaña, contenido y término) y la dirección del sitio que lo envió (el referente) en una cookie propia y en el almacenamiento local de su navegador por hasta 90 días.
+        Si crea una cuenta en ese tiempo, copiamos esta información de la primera visita a su cuenta una sola vez, al registrarse, y no la sobrescribimos después.
+        La usamos solo para medir qué anuncios y canales traen nuevos registros. No la vendemos ni la compartimos con anunciantes ni redes publicitarias, y no usamos píxeles publicitarios ni scripts de analítica de terceros.
+        La copia en su cuenta se elimina cuando se elimina su cuenta.
+      </p>
+
+      <h2 className="font-semibold text-lg">Proveedores de servicios</h2>
+      <ul className="list-disc pl-5 grid gap-1">
+        <li><strong>Supabase</strong> proporciona la base de datos, la autenticación y el almacenamiento de archivos. El proyecto de Pekko reporta la región us-west-1. Esa es la región del proyecto, no una promesa de que toda copia de seguridad, registro o acceso de soporte permanezca allí.</li>
+        <li><strong>Vercel</strong> aloja el sitio web y la API.</li>
+        <li><strong>Stripe</strong> procesa las suscripciones de pago cuando se inicia un plan de pago, conforme a Stripe Billing estándar. Pekko es el vendedor. La publicación de esta política no activa cargos.</li>
+        <li><strong>Resend</strong> envía correos transaccionales del servicio y de facturación. El dominio de envío verificado pekkotv.com reporta la región us-east-1. Esa es la región de envío, no una promesa de que todos los sistemas de Resend permanezcan allí. La dirección de soporte que aparece abajo recibe correo en ese dominio. Use esa dirección, no el remitente de facturación, para asuntos de privacidad y soporte.</li>
+        <li><strong>Google Firebase Cloud Messaging</strong> entrega las notificaciones push móviles cuando se registra un token de dispositivo y el dispositivo permite notificaciones.</li>
+      </ul>
+      <p>No se ofrece ninguna garantía de residencia exclusiva de los datos ni de transferencia internacional. Una región reportada de proyecto o de envío no garantiza que todo el procesamiento permanezca en esa región.</p>
+
+      <h2 className="font-semibold text-lg">Cuánto tiempo se conserva</h2>
+      <p>La información de la cuenta y el contenido se conservan mientras la cuenta está abierta, y por más tiempo cuando una copia de seguridad de un proveedor o una necesidad legal los retiene. Esta aplicación no fija el ciclo de copias de seguridad de Supabase ni el período de conservación de los registros de facturación de Stripe, por lo que no indica un número de días para ninguno de los dos. El tiempo de actividad de las pantallas, los eventos de reproducción, los períodos sin conexión, los registros de actividad y las alertas de pantallas se eliminan después de 90 días. El vencimiento de la prueba, un pago fallido o una cancelación no eliminan contenido por sí solos.</p>
+      <p>El propietario de la cuenta puede actualizar el nombre visible, el nombre del negocio y la contraseña en Configuración, y puede solicitar la eliminación de la cuenta en Configuración o en <a className="underline" href="/account-deletion">/account-deletion</a>. La eliminación se realiza 7 días después de la solicitud y se puede cancelar hasta entonces. Elimina la cuenta, el inicio de sesión, el contenido y los registros que se indican en esa página. Se conserva un registro de eliminación con el id de la cuenta, el id del usuario y las fechas de la solicitud, sin la dirección de correo electrónico ni el contenido. No interprete la regla de conservación de las pantallas como una promesa de que las copias de seguridad de los proveedores o los registros de facturación exigidos por ley desaparecen de inmediato.</p>
+
+      <h2 className="font-semibold text-lg">Opciones</h2>
+      <ul className="list-disc pl-5 grid gap-1">
+        <li>Actualice el nombre visible, el nombre del negocio y la contraseña en Configuración. El correo de la cuenta se muestra allí.</li>
+        <li>Permita o rechace las notificaciones móviles en el dispositivo. Un token push se almacena solo cuando se usan notificaciones.</li>
+        <li>Cancele una suscripción desde el portal de facturación que proporciona Stripe una vez que exista un plan de pago. La cancelación detiene la siguiente renovación.</li>
+        <li>Decida qué pantallas siguen activas cuando un plan incluye menos pantallas. Las demás se pausan. El contenido se conserva.</li>
+        <li>Solicite la eliminación, o cancele una eliminación pendiente, como se describe arriba.</li>
+        <li>Envíe un correo al contacto que aparece abajo para hacer una solicitud de privacidad sobre su cuenta. Es posible que necesitemos confirmar que usted controla la cuenta antes de atenderla.</li>
+      </ul>
+
+      <h2 className="font-semibold text-lg">Menores</h2>
+      <p>Pekko es para negocios y no está dirigido a menores de 13 años.</p>
+
+      <h2 className="font-semibold text-lg">Contacto</h2>
+      <p>
+        <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a><br />
+        {LEGAL_OPERATOR_ES}<br />
+        {LEGAL_ADDRESS}
+      </p>
+    </LegalPage>
+  );
+}

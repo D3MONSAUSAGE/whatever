@@ -1,5 +1,5 @@
 "use client";
-import { BillingDisclosure } from "@/components/billing-disclosure";
+import { LocalizedBillingDisclosure } from "@/components/localized-billing-disclosure";
 import { ManageBilling } from "@/components/manage-billing";
 import { PLANS } from "@/lib/plans";
 import { availabilityOf, checkoutNote, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
@@ -140,7 +140,7 @@ export default function Billing() {
           ))}
         </ul>
         <p className="text-muted mt-3 text-sm min-h-5" data-testid="checkout-note">{checkoutNote(availability, mode)}</p>
-        <BillingDisclosure className="mt-4" />
+        <LocalizedBillingDisclosure className="mt-4" />
       </section>
 
       {list.length > 0 && (

@@ -1,5 +1,4 @@
 import type { MessageKey } from "./en";
-import { en } from "./en";
 
 /**
  * Spanish (I18N-1). Style: formal "usted" throughout, neutral Latin American Spanish for restaurant and
@@ -9,8 +8,8 @@ import { en } from "./en";
  * horarios (schedules), franjas horarias (day parts), archivos (media), Kit de marca (brand kit), ubicación
  * (location), prueba gratis (free trial). Web-only: panel (dashboard), not in the glossary.
  *
- * Keys in ENGLISH_ONLY (lib/i18n/index.ts) repeat the English text on purpose (billing wording pending
- * the reviewed courtesy translation). Typed as Record<MessageKey, string>, so a missing key fails tsc.
+ * Keys in ENGLISH_ONLY (lib/i18n/index.ts) repeat the English text on purpose (none since the approved
+ * billing courtesy translation). Typed as Record<MessageKey, string>, so a missing key fails tsc.
  */
 export const es: Record<MessageKey, string> = {
   "lang.label": "Idioma",
@@ -30,7 +29,7 @@ export const es: Record<MessageKey, string> = {
   "common.password": "Contraseña",
   "common.support": "Soporte",
   "common.somethingWrong": "Algo salió mal. Intente de nuevo.",
-  "common.englishOnlyNote": "Los detalles de facturación se muestran en inglés.",
+  "common.englishOnlyNote": "El estado del plan y algunos botones de facturación se muestran en inglés.",
 
   "brand.tagline": "Señalización digital sencilla",
   "brand.homeLabel": "Inicio de Pekko",
@@ -51,9 +50,9 @@ export const es: Record<MessageKey, string> = {
   "footer.legal": "Legal",
   "footer.startTrial": "Comenzar prueba gratis",
   "footer.contact": "Contacto",
-  "footer.terms": "Términos (en inglés)",
-  "footer.privacy": "Privacidad (en inglés)",
-  "footer.billingTerms": "Términos de facturación (en inglés)",
+  "footer.terms": "Términos",
+  "footer.privacy": "Privacidad",
+  "footer.billingTerms": "Términos de facturación",
   "footer.deleteAccount": "Eliminar su cuenta",
   "footer.rights": "© {year} {owner}. Todos los derechos reservados.",
 
@@ -159,13 +158,13 @@ export const es: Record<MessageKey, string> = {
   "faq.title": "Preguntas frecuentes",
   "faq.lede": "¿Necesita ayuda con una pantalla? Consulte <link>Soporte</link>.",
   "faq.trial.q": "¿Cómo funciona la prueba gratis?",
-  "faq.trial.a": en["faq.trial.a"],
+  "faq.trial.a": "Su prueba de {days} días comienza cuando crea su cuenta. Incluye todas las funciones en hasta {screens} pantallas, la experiencia completa de Multi-screen. No le pedimos tarjeta.",
   "faq.trialEnd.q": "¿Qué pasa cuando termina la prueba?",
-  "faq.trialEnd.a": en["faq.trialEnd.a"],
+  "faq.trialEnd.a": "Sus pantallas siguen reproduciendo durante 3 días más. Si no selecciona un plan, se pausan. Su contenido y configuración nunca se eliminan cuando termina una prueba, y al seleccionar un plan sus pantallas se vuelven a activar.",
   "faq.screen.q": "¿Qué cuenta como una pantalla?",
   "faq.screen.a": "Cada pantalla vinculada a su cuenta con el reproductor de Pekko cuenta como una pantalla, ya sea una TV, una tableta o una computadora.",
   "faq.plans.q": "¿Qué planes hay?",
-  "faq.plans.a": en["faq.plans.a"],
+  "faq.plans.a": "Starter cuesta $19 al mes por 1 pantalla, Business cuesta $39 al mes por hasta 3 pantallas y Multi-screen cuesta $59 al mes por hasta 5 pantallas. Los precios están en dólares estadounidenses y se facturan mensualmente; pueden aplicarse impuestos.",
   "faq.devices.q": "¿En qué dispositivos funciona Pekko?",
   "faq.devices.a": "Funciona en el navegador web de su TV inteligente, probado en las principales marcas, como LG, Samsung, Vizio e Insignia. Usted administra todo desde un navegador en su teléfono o computadora.",
   "faq.hardware.q": "¿Necesito equipo especial?",
@@ -173,7 +172,7 @@ export const es: Record<MessageKey, string> = {
   "faq.internet.q": "¿Qué pasa si se cae el internet?",
   "faq.internet.a": "Su panel mostrará la pantalla sin conexión. Revise el Wi-Fi y la alimentación de la TV, y que el reproductor de Pekko siga abierto.",
   "faq.cancel.q": "¿Puedo cancelar o eliminar mi cuenta?",
-  "faq.cancel.a": en["faq.cancel.a"],
+  "faq.cancel.a": "Durante la prueba no hay ninguna tarjeta registrada, así que no hay nada que cancelar. Puede eliminar su cuenta en cualquier momento desde Configuración; la eliminación se realiza 7 días después y puede cancelarla hasta entonces.",
   "faq.pptx.q": "¿Puedo subir presentaciones de PowerPoint o PDF?",
   "faq.pptx.a": "Sí. Suba un archivo .pptx o PDF de hasta 50 MB y 40 diapositivas o páginas. Pekko convierte las diapositivas y páginas en imágenes fijas para sus listas de reproducción. Las animaciones, transiciones y videos incrustados no se reproducen. No se admiten archivos .ppt antiguos ni archivos .pptm con macros.",
 
@@ -718,9 +717,9 @@ export const es: Record<MessageKey, string> = {
   "settings.signOut": "Cerrar sesión",
   "settings.signingOut": "Cerrando sesión…",
   "settings.signOutAll": "Cerrar sesión en todos los dispositivos",
-  "settings.terms": "Términos del servicio (en inglés)",
-  "settings.billingTerms": "Términos de facturación (en inglés)",
-  "settings.privacy": "Política de privacidad (en inglés)",
+  "settings.terms": "Términos del servicio",
+  "settings.billingTerms": "Términos de facturación",
+  "settings.privacy": "Política de privacidad",
   "settings.businessRequired": "Escriba el nombre de su negocio.",
   "settings.businessSaved": "Nombre del negocio guardado",
   "settings.businessName": "Nombre del negocio",

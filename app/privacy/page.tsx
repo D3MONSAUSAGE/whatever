@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
+import { PrivacyEs } from "@/components/legal/privacy-es";
+import { showSpanishLegal, type LegalParams } from "@/lib/legal-locale";
 import { LEGAL_ADDRESS, LEGAL_OPERATOR, LEGAL_OWNERSHIP, LEGAL_PRIVACY_UPDATED, SUPPORT_EMAIL } from "@/lib/legal";
 
-export const metadata: Metadata = { title: "Privacy Policy · Pekko" };
+export async function generateMetadata({ searchParams }: { searchParams: LegalParams }): Promise<Metadata> {
+  return { title: (await showSpanishLegal(searchParams)) ? "Política de privacidad · Pekko" : "Privacy Policy · Pekko" };
+}
 
-export default function Privacy() {
+export default async function Privacy({ searchParams }: { searchParams: LegalParams }) {
+  if (await showSpanishLegal(searchParams)) return <PrivacyEs />;
   return (
     <LegalPage title="Privacy Policy" updated={LEGAL_PRIVACY_UPDATED} dateLine={`Effective ${LEGAL_PRIVACY_UPDATED}. Last updated ${LEGAL_PRIVACY_UPDATED}.`}>
       <p>This policy explains what {LEGAL_OPERATOR} processes when you use Pekko, why, and the choices the product actually offers. {LEGAL_OWNERSHIP}</p>
