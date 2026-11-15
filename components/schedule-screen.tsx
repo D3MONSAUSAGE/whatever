@@ -257,7 +257,7 @@ function Locations({
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
         </label>
         <TimezoneField value={timezone} onChange={setTimezone} />
-        <LimitNote count={locations?.length} max={50} noun="locations" />
+        <LimitNote count={locations?.length} max={50} noun="locations" nounKey="ss.noun.locations" />
         <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(locations?.length, 50)}>{t("ss.addLocation")}</button>
       </form>
       {!locations ? <LoadState error={error} label={t("ss.loadingLocations")} /> : locations.length === 0 ? (
@@ -330,7 +330,7 @@ function Groups({
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} />
         </label>
         <DisplayChecks displays={displays} picked={picked} onChange={setPicked} legend={t("ss.newGroupScreens")} />
-        <LimitNote count={groups?.length} max={100} noun="screen groups" />
+        <LimitNote count={groups?.length} max={100} noun="screen groups" nounKey="groups.limitNoun" />
         <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(groups?.length, 100)}>{t("ss.createGroup")}</button>
       </form>
       {!groups ? <LoadState error={error} label={t("ss.loadingGroups")} /> : groups.length === 0 ? (
@@ -552,7 +552,7 @@ function Rules({
             {overlaps.map((item) => <p key={item.other.id ?? item.other.name}>{item.message}</p>)}
           </div>
         ) : null}
-        <LimitNote count={schedules?.length} max={200} noun="schedules" />
+        <LimitNote count={schedules?.length} max={200} noun="schedules" nounKey="ss.noun.schedules" />
         <button type="submit" className="btn btn-primary w-fit" disabled={atLimit(schedules?.length, 200)}>{t("ss.addSchedule")}</button>
       </form>
       {!schedules ? <LoadState error={error} label={t("ss.loadingSchedules")} /> : schedules.length === 0 ? (

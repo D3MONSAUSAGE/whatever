@@ -9,7 +9,7 @@ import {
   type AccountBoard, type AccountLibraryFile, type AccountStudio,
 } from "@/lib/layout-account";
 import {
-  containedBoard, frameFor, layoutSvg, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, seedBrand, templateSpec, zoneCapabilities,
+  containedBoard, frameFor, layoutSvg, layoutSvgWithClips, mediaVideoBox, MENU_LIMITS, parseLayout, sampleLayout, seedBrand, templateSpec, zoneCapabilities,
   type LayoutDocument, type LayoutItem, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import {
@@ -149,7 +149,7 @@ export function LayoutStudio({
   // The board preview follows typing at low priority so long menus stay responsive (QA B1-05),
   // and rows without a name are left out, as they are when the board is saved (QA B1-02).
   const previewDraft = useDeferredValue(draft);
-  const svg = useMemo(() => layoutSvg(withoutNamelessItems(previewDraft), { imageHref }), [previewDraft, imageHref]);
+  const { svg, clipped } = useMemo(() => layoutSvgWithClips(withoutNamelessItems(previewDraft), { imageHref }), [previewDraft, imageHref]);
   const previewMarkup = phonePreview ? enlargePreviewText(svg) : svg;
   const videoBox = mediaVideoBox(draft);
   const librarySrc = libraryVideoUrl(account, draft.videoMediaId, !accountMode && videoOn && !draft.videoMediaId && !clipUrl);
@@ -786,6 +786,7 @@ export function LayoutStudio({
 
   function renderStage(interactive: boolean) {
     return (
+      <>
       <Stage
         svg={previewMarkup}
         video={showZone ? videoBox : null}
@@ -795,6 +796,12 @@ export function LayoutStudio({
         active={zone}
         onHit={interactive ? openZone : () => undefined}
       />
+      {clipped.length ? (
+        <p className="note-warn text-sm" role="status" data-testid="clipped-names" style={{ marginTop: 8 }}>
+          {t("ls.clippedNames", { names: clipped.map((name) => `“${name}”`).join(", ") })}
+        </p>
+      ) : null}
+      </>
     );
   }
   const editorPlacement = zoneEditorPlacement(zone, studioBp);
@@ -1195,10 +1202,10 @@ function SelectedZoneEditor({
                       order={<OrderButtons kind="item" name={item.name} scope={`studio-items-${si}`} index={ii} count={section.items.length} className="item-order product-order"
                         onMove={(dir) => { cards.moved(si, ii, dir); update({ ...draft, sections: moveItem(draft.sections, si, ii, dir) }); }} />}>
                       <input id={`${idBase}-name`} aria-label={t("menuCard.nameLabel", { item: ii + 1, section: si + 1 })} className="item-name" style={field} placeholder={t("menuCard.namePlaceholder")} value={item.name} maxLength={MENU_LIMITS.itemName}
-                        aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error` : undefined}
+                        aria-invalid={nameInvalid || undefined} aria-describedby={nameInvalid ? `${idBase}-name-error ${idBase}-lengths` : `${idBase}-lengths`}
                         onChange={(event) => setItem(draft, si, ii, { name: event.target.value }, update)} />
                       <input aria-label={t("menuCard.priceLabel", { item: ii + 1, section: si + 1 })} className="item-price" style={field} placeholder="$0" value={item.price} maxLength={MENU_LIMITS.price}
-                        aria-describedby={`${idBase}-price-hint`}
+                        aria-describedby={`${idBase}-price-hint ${idBase}-lengths`}
                         onBlur={(event) => { const next = normalizePrice(event.target.value); if (next !== item.price) setItem(draft, si, ii, { price: next }, update); if (needsName({ ...item, price: next })) setNameCheck(true); }}
                         onChange={(event) => setItem(draft, si, ii, { price: event.target.value }, update)} />
                       <input aria-label={t("menuCard.descLabel", { item: ii + 1, section: si + 1 })} className="item-desc" style={field} placeholder={t("menuCard.descPlaceholder")} value={item.description} maxLength={MENU_LIMITS.description}

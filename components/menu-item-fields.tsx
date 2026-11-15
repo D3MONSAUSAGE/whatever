@@ -19,8 +19,18 @@ export function ItemNotes({ item, idBase, showNameError }: { item: Item; idBase:
   const nameError = showNameError && needsName(item);
   const hint = priceHint(item.price, t);
   const descLength = item.description.length;
+  const nameLength = item.name.length;
+  const priceLength = item.price.length;
+  const nameFull = nameLength >= MENU_LIMITS.itemName;
+  const priceFull = priceLength >= MENU_LIMITS.price;
+  const near = nameLength >= MENU_LIMITS.itemName - 5 || priceLength >= MENU_LIMITS.price - 2;
   return (
     <>
+      {/* MB1-F2: name and price lengths are always visible while the card is open. */}
+      <p className={`item-note item-count${near ? " item-count-near" : ""}`} id={`${idBase}-lengths`} data-testid="item-lengths">
+        {t("mif.lengths", { name: charCount(item.name, MENU_LIMITS.itemName), price: charCount(item.price, MENU_LIMITS.price) })}
+        {nameFull || priceFull ? ` · ${t("mf.limitReached")}` : ""}
+      </p>
       {nameError ? <p className="item-note item-note-error" id={`${idBase}-name-error`} role="alert">{t("mf.nameRequired")}</p> : null}
       {hint ? <p className="item-note item-note-hint" id={`${idBase}-price-hint`}>{hint}</p> : null}
       {descLength > 0 ? (

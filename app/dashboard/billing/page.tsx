@@ -8,6 +8,7 @@ import { api, useApi, type DisplayItem } from "@/lib/api";
 import { BillingEmailSelfTest } from "@/components/billing-email-selftest";
 import { PageHeader } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { useLocale } from "@/lib/i18n/client";
 
 type Entitlements = {
   state: string; plan: string; plan_name: string; screen_limit: number; active_screens: number; total_screens: number;
@@ -30,6 +31,7 @@ export default function Billing() {
   const ent = useApi<Entitlements>("/api/entitlements");
   const screens = useApi<DisplayItem[]>("/api/displays");
   const toast = useToast();
+  const { locale, t } = useLocale();
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [busy, setBusy] = useState(false);
   const checkout = useApi<{ available: boolean }>("/api/billing/checkout");
@@ -85,7 +87,8 @@ export default function Billing() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <PageHeader title="Plan & billing" eyebrow="Account" lede="Your plan, trial and which screens are on." />
+      <PageHeader title={t("billing.title")} eyebrow={t("billing.eyebrow")} lede="Your plan, trial and which screens are on." />
+      {locale !== "en" ? <p className="text-sm text-muted" lang={locale} data-testid="english-only-note">{t("common.englishOnlyNote")}</p> : null}
 
       {ent.error && <div className="card p-5 text-danger">{ent.error}</div>}
       {e && (

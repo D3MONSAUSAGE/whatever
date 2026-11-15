@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { friendlyAuthError, MIN_PASSWORD } from "@/components/auth-frame";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 
 const NAME_MAX = 60;
 
@@ -18,7 +18,7 @@ export default function Settings() {
   const me = useApi<{ email: string; accountName: string }>("/api/me");
   const toast = useToast();
   const confirm = useConfirm();
-  const t = useT();
+  const { locale, t } = useLocale();
   const [origin, setOrigin] = useState("");
   const [email, setEmail] = useState<string | null>(null);
   const [savedName, setSavedName] = useState("");
@@ -126,6 +126,7 @@ export default function Settings() {
         <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard/billing" className="font-semibold" data-testid="billing-link">{t("settings.planBilling")}</Link>
           <ManageBilling className="btn-quiet" />
+          {locale !== "en" ? <p className="text-sm text-muted w-full" lang={locale} data-testid="english-only-note">{t("common.englishOnlyNote")}</p> : null}
         </div>
         <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">{t("settings.help")}</Link>
         <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">{t("settings.deleteLink")}</Link>
