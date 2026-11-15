@@ -4,13 +4,14 @@ import { isUuid } from "@/lib/server/crypto";
 import { fail, json } from "@/lib/server/http";
 import { loadLocations } from "@/lib/server/locations";
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
 /** The same nextChange object that GET /api/displays puts on the row. */
-export async function GET(req: Request, { params }: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -36,4 +37,4 @@ export async function GET(req: Request, { params }: Ctx) {
     timezone: zone,
     nextChange: info.get(id)?.nextChange ?? null,
   });
-}
+});

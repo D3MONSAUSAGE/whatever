@@ -5,13 +5,14 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { loadRulesForDisplay } from "@/lib/server/playback";
 import { buildTimeline, PREVIEW_MAX_DAYS, scheduleNow } from "@/lib/server/schedule";
 import { fail, json } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RESOLUTION = "A rule on this screen beats a rule on a group. Higher priority wins next. The most recently updated rule wins next. The lowest id breaks a remaining tie. Anything left plays the screen's saved assignment.";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const url = new URL(req.url);
@@ -90,4 +91,4 @@ export async function GET(req: Request) {
       };
     }),
   });
-}
+});

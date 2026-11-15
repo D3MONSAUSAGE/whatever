@@ -5,12 +5,13 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { parseScheduleBody, type ScheduleDraft } from "@/lib/server/schedule";
 import { fail, json, readJson } from "@/lib/server/http";
 import { assertTarget } from "@/lib/server/schedule-target";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -46,9 +47,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const saved = await writeSchedule(admin.accountId, id, merged.value);
   if (saved) return saved;
   return json({ ok: true });
-}
+});
 
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -60,7 +61,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   }
   if (!(deleted.data ?? []).length) return fail("Schedule not found.", 404);
   return json({ ok: true });
-}
+});
 
 async function writeSchedule(accountId: string, id: string, value: ScheduleDraft) {
   const target = await assertTarget(accountId, value.playlistId, value.displayId, value.groupId);

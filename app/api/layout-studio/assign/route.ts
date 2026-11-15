@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
  * Point one screen at a published board's playlist.
  * Other screens keep their assignments. Republishing the board still uses menu_swap_media.
  */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (!layoutStudioEnabled()) return fail("Not found", 404);
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -51,4 +52,4 @@ export async function POST(req: Request) {
   if (updated.error) return fail("Couldn't assign that board.", 500);
   if (!updated.data) return fail("That board or screen isn't in this account.", 404);
   return json({ ok: true, playlistId: String(menu.data.playlist_id), displayId: body.displayId });
-}
+});

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
-import { ONLINE_HINT, OfflineAlert, ScreenCard } from "@/components/tv";
+import { OfflineAlert, ScreenCard, onlineHint } from "@/components/tv";
+import { useLocale, useT } from "@/lib/i18n/client";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
@@ -43,6 +44,8 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const [assigning, setAssigning] = useState<string[] | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
+  const t = useT();
+  const { locale } = useLocale();
   // After pairing, check every few seconds (even if this tab is behind the TV window) until the
   // new screen reports in, so the card flips from "Waiting" to "Online" by itself (QA B1-08).
   const [watchUntil, setWatchUntil] = useState(0);
@@ -62,18 +65,18 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   async function rename(display: DisplayItem) {
     const name = await confirm.ask({
-      title: "Rename this screen",
-      body: "This only changes the name in your dashboard.",
-      confirmLabel: "Save name",
-      input: { label: "Name", ariaLabel: "New TV name", defaultValue: display.name, maxLength: 60 },
+      title: t("disp.renameTitle"),
+      body: t("disp.renameBody"),
+      confirmLabel: t("disp.saveName"),
+      input: { label: t("disp.name"), ariaLabel: t("disp.newName"), defaultValue: display.name, maxLength: 60 },
     });
     if (typeof name !== "string" || name === display.name) return;
     const others = (displays.data ?? []).filter((item) => item.id !== display.id).map((item) => item.name);
-    const dup = screenNameWarning(name, others);
-    if (dup) toast.show(`${dup.nameWarning} Suggested: ${dup.suggestedName}`);
+    const dup = screenNameWarning(name, others, t);
+    if (dup) toast.show(t("disp.suggested", { warning: dup.nameWarning, name: dup.suggestedName }));
     try {
       await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
-      toast.show("Renamed");
+      toast.show(t("disp.renamed"));
       displays.reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -82,15 +85,15 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   async function disconnect(display: DisplayItem) {
     const ok = await confirm.ask({
-      title: "Disconnect this screen?",
-      body: `Disconnect “${display.name}”? The TV will go back to showing a pairing code.`,
-      confirmLabel: "Disconnect this TV",
+      title: t("disp.disconnectTitle"),
+      body: t("disp.disconnectBody", { name: display.name }),
+      confirmLabel: t("disp.disconnectConfirm"),
       danger: true,
     });
     if (ok !== true) return;
     try {
       await api(`/api/displays/${display.id}`, { method: "DELETE" });
-      toast.show("Disconnected");
+      toast.show(t("disp.disconnected"));
       displays.reload();
     } catch (err) {
       toast.show((err as Error).message, true);
@@ -99,24 +102,24 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 
   return (
     <section>
-      <PageHeader title="Add and manage screens" icon={<IconTv />} lede={ONLINE_HINT}
+      <PageHeader title={t("disp.title")} icon={<IconTv />} lede={onlineHint(t)}
         action={
           <a href="#add-screen" className="btn btn-primary" data-testid="add-screen"
             onClick={(event) => { event.preventDefault(); const form = document.getElementById("add-screen"); form?.scrollIntoView({ behavior: "smooth", block: "start" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus({ preventScroll: true }); }}>
-            Add screen
+            {t("screens.add")}
           </a>
         }
       />
       <div className="mb-4">
-        <button type="button" className="btn btn-quiet" onClick={() => setAssigning([])}>Assign playlist</button>
+        <button type="button" className="btn btn-quiet" onClick={() => setAssigning([])}>{t("disp.assignPlaylist")}</button>
       </div>
       {displays.data ? <OfflineAlert displays={displays.data} /> : null}
       {watchUntil ? (
-        <p role="status" className="card p-3 mb-3 text-sm" data-testid="pair-watch">Connecting your TV… This page updates by itself as soon as the TV checks in (usually within a minute).</p>
+        <p role="status" className="card p-3 mb-3 text-sm" data-testid="pair-watch">{t("disp.connecting")}</p>
       ) : null}
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
         onPaired={(warning, id) => {
-          toast.show(warning || "Connected. The TV will switch over in a few seconds.");
+          toast.show(warning || t("disp.connected"));
           setWatch({ id: id ?? null, before: beforePair.current });
           displays.reload();
           setWatchUntil(Date.now() + PAIR_WATCH_FOR_MS);
@@ -125,15 +128,15 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
         onError={(message) => toast.show(message, true)} />
 
       {!displays.data ? (
-        <div className="mt-8"><LoadState error={displays.error} label="Loading…" /></div>
+        <div className="mt-8"><LoadState error={displays.error} label={t("screens.loading")} /></div>
       ) : displays.data.length === 0 ? (
-        <div className="mt-8"><EmptyState title="No screens yet">Open the TV address on a smart TV or browser, then type the code it shows into the box above.</EmptyState></div>
+        <div className="mt-8"><EmptyState title={t("screens.emptyTitle")}>{t("disp.emptyBody")}</EmptyState></div>
       ) : (
         <>
         {displays.data.length >= SEARCH_FROM ? (
-          <input className="field mt-8" type="search" aria-label="Search screens" placeholder="Search screens" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="field mt-8" type="search" aria-label={t("disp.search")} placeholder={t("disp.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
         ) : null}
-        {byName(displays.data, search).length === 0 ? <div className="mt-8"><EmptyState title="No screens match that search">Try another name, or clear the search.</EmptyState></div> : null}
+        {byName(displays.data, search).length === 0 ? <div className="mt-8"><EmptyState title={t("disp.noMatchTitle")}>{t("disp.noMatchBody")}</EmptyState></div> : null}
         <ul className="mt-8 grid gap-4 lg:grid-cols-2">
           {byName(displays.data, search).map((display) => (
             <li key={display.id}>
@@ -141,48 +144,48 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
                 <>
                   {display.connected && display.reportedState && display.reportedState !== "unknown" ? (
                     <p className="w-full text-xs text-muted" data-testid="sync-state">
-                      {syncLine(display)}
+                      {syncLine(display, t)}
                     </p>
                   ) : null}
                   {display.nextChange ? (
-                    <p className="w-full text-xs text-muted">Next change: {display.nextChange.label}</p>
+                    <p className="w-full text-xs text-muted">{t("screens.nextChange", { label: display.nextChange.label })}</p>
                   ) : null}
                   {display.currentSchedule ? (
                     <p className="w-full text-xs text-muted" data-testid="current-schedule">
-                      <span className="badge badge-live mr-1">Scheduled</span>
-                      {display.currentSchedule.name} plays {display.currentSchedule.playlistName || "a playlist"}
-                      {display.currentSchedule.until ? ` until ${new Date(display.currentSchedule.until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true })}` : ""}
+                      <span className="badge badge-live mr-1">{t("disp.scheduled")}</span>
+                      {t("disp.schedulePlays", { name: display.currentSchedule.name, playlist: display.currentSchedule.playlistName || t("disp.aPlaylist") })}
+                      {display.currentSchedule.until ? t("disp.until", { when: new Date(display.currentSchedule.until).toLocaleString(locale === "es" ? "es" : [], { weekday: "short", hour: "numeric", minute: "2-digit", hour12: locale !== "es" }) }) : ""}
                     </p>
                   ) : null}
                   {locations.data && locations.data.length > 0 ? (
                     <label className="w-full text-xs font-semibold text-muted">
-                      Location
+                      {t("disp.location")}
                       <select
-                        aria-label={`Location for ${display.name}`}
+                        aria-label={t("disp.locationFor", { name: display.name })}
                         className="field mt-1"
                         value={display.location?.id ?? ""}
                         onChange={async (event) => {
                           const locationId = event.target.value || null;
                           try {
                             await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ locationId }) });
-                            toast.show("Location saved");
+                            toast.show(t("disp.locationSaved"));
                             displays.reload();
                           } catch (err) {
                             toast.show((err as Error).message, true);
                           }
                         }}
                       >
-                        <option value="">No location (UTC)</option>
+                        <option value="">{t("disp.noLocation")}</option>
                         {locations.data.map((location) => (
                           <option key={location.id} value={location.id}>{location.name}</option>
                         ))}
                       </select>
                     </label>
                   ) : null}
-                  <button type="button" className="btn btn-primary" onClick={() => setPicking(display)}>Change image</button>
-                  <button type="button" className="btn btn-quiet" onClick={() => setAssigning([display.id])}>Assign to this screen</button>
-                  <button type="button" className="btn btn-quiet" onClick={() => rename(display)}>Rename</button>
-                  <button type="button" className="btn btn-quiet text-danger" onClick={() => disconnect(display)}>Disconnect</button>
+                  <button type="button" className="btn btn-primary" onClick={() => setPicking(display)}>{t("disp.changeImage")}</button>
+                  <button type="button" className="btn btn-quiet" onClick={() => setAssigning([display.id])}>{t("disp.assignHere")}</button>
+                  <button type="button" className="btn btn-quiet" onClick={() => rename(display)}>{t("disp.rename")}</button>
+                  <button type="button" className="btn btn-quiet text-danger" onClick={() => disconnect(display)}>{t("disp.disconnect")}</button>
                 </>
               } />
             </li>
@@ -215,15 +218,18 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const t = useT();
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     onSubmitting?.();
     try {
       const paired = await api<{ id?: string; nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
+      // The server warning is English; show the same check in the UI language (I18N-2).
+      const local = screenNameWarning(name, names, t);
       setCode("");
       setName("");
-      onPaired(paired.nameWarning ? `${paired.nameWarning} Suggested: ${paired.suggestedName}` : undefined, typeof paired.id === "string" ? paired.id : undefined);
+      onPaired(paired.nameWarning ? t("disp.suggested", { warning: local?.nameWarning ?? paired.nameWarning, name: paired.suggestedName ?? local?.suggestedName ?? "" }) : undefined, typeof paired.id === "string" ? paired.id : undefined);
     } catch (err) {
       onError((err as Error).message);
     } finally {
@@ -232,26 +238,26 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
   }
   return (
     <form id="add-screen" onSubmit={submit} className="card p-4 md:p-5 scroll-mt-20 md:scroll-mt-4" aria-labelledby="add-screen-title">
-      <h2 id="add-screen-title" className="font-semibold">Add a screen</h2>
+      <h2 id="add-screen-title" className="font-semibold">{t("disp.addTitle")}</h2>
       <ol className="mt-2 mb-4 grid gap-2 text-sm text-muted list-decimal pl-5">
-        <li>On the TV (or any browser on it), open this address:
+        <li>{t("disp.step1")}
           <PlayerUrl />
         </li>
-        <li>The TV shows a 6-digit code.</li>
-        <li>Type the code and a name below, then press <strong className="text-ink">Connect TV</strong>. The TV switches over in a few seconds.</li>
+        <li>{t("disp.step2")}</li>
+        <li>{t("disp.step3a")} <strong className="text-ink">{t("disp.connectTv")}</strong>. {t("disp.step3b")}</li>
       </ol>
       <div className="grid gap-3 lg:grid-cols-[10rem_1fr_auto]">
         <input className="field text-xl tracking-[0.2em] font-semibold" inputMode="numeric" autoComplete="one-time-code"
           placeholder="123 456" maxLength={7} required value={code}
-          onChange={(event) => setCode(event.target.value.replace(/[^\d ]/g, ""))} aria-label="Code on the TV" />
-        <input className="field" placeholder="Name, like Front counter" maxLength={60} required
-          value={name} onChange={(event) => setName(event.target.value)} aria-label="TV name" />
-        <button className="btn btn-primary" disabled={busy}>{busy ? "Connecting…" : "Connect TV"}</button>
+          onChange={(event) => setCode(event.target.value.replace(/[^\d ]/g, ""))} aria-label={t("disp.codeLabel")} />
+        <input className="field" placeholder={t("disp.namePlaceholder")} maxLength={60} required
+          value={name} onChange={(event) => setName(event.target.value)} aria-label={t("disp.tvName")} />
+        <button className="btn btn-primary" disabled={busy}>{busy ? t("disp.connectingShort") : t("disp.connectTv")}</button>
       </div>
-      {screenNameWarning(name, names) ? (
-        <p role="status" className="text-sm mt-3">{screenNameWarning(name, names)?.nameWarning}</p>
+      {screenNameWarning(name, names, t) ? (
+        <p role="status" className="text-sm mt-3">{screenNameWarning(name, names, t)?.nameWarning}</p>
       ) : null}
-      <p className="text-xs text-muted mt-3">The TV address is also in <a className="underline" href="/dashboard/settings" aria-label="Open the page with the TV address">Settings</a>.</p>
+      <p className="text-xs text-muted mt-3">{t("disp.addressAlsoIn")} <a className="underline" href="/dashboard/settings" aria-label={t("disp.openSettingsAria")}>{t("disp.settings")}</a>.</p>
     </form>
   );
 }
@@ -259,6 +265,7 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
 function PlayerUrl() {
   const [url, setUrl] = useState("/pair");
   const [copied, setCopied] = useState(false);
+  const t = useT();
   useEffect(() => { setUrl(`${window.location.origin}/pair`); }, []);
   async function copy() {
     try {
@@ -277,9 +284,9 @@ function PlayerUrl() {
   return (
     <span className="mt-2 flex flex-wrap items-center gap-2">
       <code data-testid="player-url" className="rounded-lg border border-line bg-white px-3 py-2 text-base font-semibold text-ink break-all">{url}</code>
-      <span className="text-sm text-muted">({url.replace(/^https?:\/\//, "").replace(/\/pair$/, "/tv")} opens the same player.)</span>
-      <button type="button" className="btn" onClick={copy} aria-label="Copy TV address">{copied ? "Copied" : "Copy"}</button>
-      <span role="status" className="sr-only">{copied ? "TV address copied" : ""}</span>
+      <span className="text-sm text-muted">{t("disp.samePlayer", { host: url.replace(/^https?:\/\//, "").replace(/\/pair$/, "/tv") })}</span>
+      <button type="button" className="btn" onClick={copy} aria-label={t("disp.copyAddress")}>{copied ? t("disp.copied") : t("disp.copy")}</button>
+      <span role="status" className="sr-only">{copied ? t("disp.addressCopied") : ""}</span>
     </span>
   );
 }
@@ -289,11 +296,12 @@ function Picker({ display, onClose, onPublished, onError }: {
 }) {
   const media = useApi<MediaItem[]>("/api/media");
   const [busy, setBusy] = useState(false);
+  const t = useT();
   async function publish(mediaId: string | null) {
     setBusy(true);
     try {
       await api(`/api/displays/${display.id}`, { method: "PATCH", body: JSON.stringify({ mediaId }) });
-      onPublished(mediaId ? publishSavedCopy(display) : `Cleared ${display.name}`);
+      onPublished(mediaId ? publishSavedCopy(display, t) : t("disp.cleared", { name: display.name }));
     } catch (err) {
       onError((err as Error).message);
       setBusy(false);
@@ -302,19 +310,19 @@ function Picker({ display, onClose, onPublished, onError }: {
   const images = (media.data ?? []).filter((item) => item.kind !== "video");
   return (
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label={`Choose an image for ${display.name}`}
+      <div role="dialog" aria-label={t("disp.chooseImageFor", { name: display.name })}
         className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-lg font-semibold">Publish to {display.name}</h2>
-          <button type="button" className="btn btn-quiet px-3" onClick={onClose} aria-label="Close">Close</button>
+          <h2 className="text-lg font-semibold">{t("disp.publishTo", { name: display.name })}</h2>
+          <button type="button" className="btn btn-quiet px-3" onClick={onClose} aria-label={t("disp.close")}>{t("disp.close")}</button>
         </div>
         <p className="text-sm text-muted mb-4">
-          Tap an image. {publishTimingCopy(display)}
-          {display.playlist ? " This replaces the playlist on this TV." : ""}
+          {t("disp.tapImage")} {publishTimingCopy(display, t)}
+          {display.playlist ? t("disp.replacesPlaylist") : ""}
         </p>
         {!media.data ? <LoadState error={media.error} /> : images.length === 0 ? (
-          <p className="text-muted">Upload an image in Media first. Videos play from a playlist.</p>
+          <p className="text-muted">{t("disp.uploadFirst")}</p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {images.map((item) => {
@@ -326,7 +334,7 @@ function Picker({ display, onClose, onPublished, onError }: {
                     <span className="block aspect-video bg-black rounded-md overflow-hidden">
                       {item.url ? <img src={item.url} alt="" className="size-full object-contain" /> : null}
                     </span>
-                    <span className="block mt-1 text-sm truncate">{current ? "On screen now" : item.fileName}</span>
+                    <span className="block mt-1 text-sm truncate">{current ? t("disp.onScreenNow") : item.fileName}</span>
                   </button>
                 </li>
               );
@@ -334,7 +342,7 @@ function Picker({ display, onClose, onPublished, onError }: {
           </ul>
         )}
         {display.media ? (
-          <button type="button" className="btn btn-quiet w-full mt-5" disabled={busy} onClick={() => publish(null)}>Clear screen</button>
+          <button type="button" className="btn btn-quiet w-full mt-5" disabled={busy} onClick={() => publish(null)}>{t("disp.clearScreen")}</button>
         ) : null}
       </div>
     </div>
@@ -350,6 +358,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
 }) {
   const playlists = useApi<PlaylistSummary[]>("/api/playlists");
   const confirm = useConfirm();
+  const t = useT();
   const [playlistId, setPlaylistId] = useState("");
   const [replace, setReplace] = useState(false);
   const [busy, setBusy] = useState<null | "checking" | "publishing">(null);
@@ -368,8 +377,8 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
 
   async function publish() {
     const displayIds = Object.entries(chosen).filter(([, on]) => on).map(([id]) => id);
-    if (!playlistId) return onError("Choose a playlist.");
-    if (!displayIds.length) return onError("Choose at least one screen.");
+    if (!playlistId) return onError(t("disp.choosePlaylist"));
+    if (!displayIds.length) return onError(t("disp.chooseScreen"));
     setBusy(assignBusyFor("preview"));
     let committing = false;
     try {
@@ -389,16 +398,16 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
       const assign = preview.affected.map((item) => item.name);
       const cleared = preview.willBeCleared.map((item) => item.name);
       const ok = await confirm.ask({
-        title: replace ? "Replace on the screens you didn't check?" : "Publish to these screens?",
+        title: replace ? t("disp.replaceTitle") : t("disp.publishTitle"),
         body: [
-          assign.length ? `Will play it: ${assign.join(", ")}.` : "The checked screens already play it.",
-          cleared.length && replace ? `Will take it off: ${cleared.join(", ")}. Their current playlist is removed.` : "",
-          cleared.length && !replace ? `Will keep it: ${cleared.join(", ")}. They were not checked, and their content stays.` : "",
-          preview.kept.length ? `${preview.kept.length} other screens keep their own content.` : "",
-          preview.overriddenBySchedule.length ? `A schedule still wins on: ${preview.overriddenBySchedule.map((item) => item.name).join(", ")}.` : "",
-          preview.offline.length ? `Offline until they reconnect: ${preview.offline.map((item) => item.name).join(", ")}.` : "",
+          assign.length ? t("disp.willPlay", { names: assign.join(", ") }) : t("disp.alreadyPlay"),
+          cleared.length && replace ? t("disp.willTakeOff", { names: cleared.join(", ") }) : "",
+          cleared.length && !replace ? t("disp.willKeep", { names: cleared.join(", ") }) : "",
+          preview.kept.length ? t("disp.keptOthers", { n: preview.kept.length }) : "",
+          preview.overriddenBySchedule.length ? t("disp.scheduleWins", { names: preview.overriddenBySchedule.map((item) => item.name).join(", ") }) : "",
+          preview.offline.length ? t("disp.offlineUntil", { names: preview.offline.map((item) => item.name).join(", ") }) : "",
         ].filter(Boolean).join(" "),
-        confirmLabel: replace ? "Replace and publish" : "Publish",
+        confirmLabel: replace ? t("disp.replaceAndPublish") : t("disp.publish"),
       });
       if (ok !== true) return;
       committing = true;
@@ -413,11 +422,11 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
         online: item.online && !offlineNames.has(item.name),
         connected: item.connected,
       }));
-      onDone(publishSavedCopyForTargets(targets));
+      onDone(publishSavedCopyForTargets(targets, t));
     } catch (err) {
       const timedOut = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
-      if (timedOut && committing) onDone("Still publishing; check the screens in a moment.");
-      else onError(timedOut ? "The preview took too long. Try again." : (err as Error).message);
+      if (timedOut && committing) onDone(t("disp.stillPublishing"));
+      else onError(timedOut ? t("disp.previewSlow") : (err as Error).message);
     } finally {
       setBusy(null);
     }
@@ -427,34 +436,34 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
   return (
     <>
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label="Assign playlist" className="bg-paper w-full md:max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+      <div role="dialog" aria-label={t("disp.assignPlaylist")} className="bg-paper w-full md:max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-lg font-semibold">Assign playlist</h2>
-          <button type="button" className="btn btn-quiet px-3" onClick={onClose}>Close</button>
+          <h2 className="text-lg font-semibold">{t("disp.assignPlaylist")}</h2>
+          <button type="button" className="btn btn-quiet px-3" onClick={onClose}>{t("disp.close")}</button>
         </div>
         <p className="text-sm text-muted mb-4">
-          Checked screens get this playlist. Screens you leave unchecked keep what they have, including this playlist. Replace is the only way to take it off them.
+          {t("disp.assignHelp")}
         </p>
         {!playlists.data ? <LoadState error={playlists.error} /> : playlists.data.length === 0 ? (
-          <p className="text-muted">Create a playlist first.</p>
+          <p className="text-muted">{t("disp.createPlaylistFirst")}</p>
         ) : (
           <>
             <label className="grid gap-1 mb-4">
-              <span className="text-sm font-medium">Playlist</span>
-              <select className="field" aria-label="Playlist to assign" value={playlistId} onChange={(event) => pickPlaylist(event.target.value)}>
-                <option value="">Choose a playlist</option>
+              <span className="text-sm font-medium">{t("disp.playlist")}</span>
+              <select className="field" aria-label={t("disp.playlistToAssign")} value={playlistId} onChange={(event) => pickPlaylist(event.target.value)}>
+                <option value="">{t("disp.choosePlaylistOption")}</option>
                 {playlists.data.map((playlist) => (
                   <option key={playlist.id} value={playlist.id}>{playlist.name}</option>
                 ))}
               </select>
             </label>
-            {selected ? <p className="text-xs text-muted mb-3">{selected.slideCount} {selected.slideCount === 1 ? "slide" : "slides"} in the draft.</p> : null}
+            {selected ? <p className="text-xs text-muted mb-3">{t(selected.slideCount === 1 ? "disp.oneSlide" : "disp.manySlides", { n: selected.slideCount })}</p> : null}
             <ul className="grid gap-2 mb-4">
               {displays.map((display) => (
                 <li key={display.id}>
                   <label className="flex items-center gap-3 min-h-11">
-                    <input type="checkbox" className="size-5" checked={!!chosen[display.id]} aria-label={`Assign ${display.name}`}
+                    <input type="checkbox" className="size-5" checked={!!chosen[display.id]} aria-label={t("disp.assignName", { name: display.name })}
                       onChange={(event) => setChosen({ ...chosen, [display.id]: event.target.checked })} />
                     <span>{display.name}</span>
                   </label>
@@ -462,11 +471,11 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
               ))}
             </ul>
             <label className="flex items-center gap-3 min-h-11 mb-4 text-sm">
-              <input type="checkbox" className="size-5" checked={replace} onChange={(event) => setReplace(event.target.checked)} aria-label="Replace on unchecked screens" />
-              <span>Replace: take this playlist off screens you didn&apos;t check</span>
+              <input type="checkbox" className="size-5" checked={replace} onChange={(event) => setReplace(event.target.checked)} aria-label={t("disp.replaceAria")} />
+              <span>{t("disp.replaceLabel")}</span>
             </label>
             <button type="button" className="btn btn-primary w-full" disabled={busy !== null} onClick={publish}>
-              {busy === "checking" ? "Checking…" : busy === "publishing" ? "Publishing…" : "Publish to selected screens"}
+              {busy === "checking" ? t("disp.checking") : busy === "publishing" ? t("disp.publishing") : t("disp.publishSelected")}
             </button>
           </>
         )}

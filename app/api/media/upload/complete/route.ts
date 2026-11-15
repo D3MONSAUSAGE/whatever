@@ -15,6 +15,7 @@ import {
 } from "@/lib/mp4";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export const maxDuration = 300;
 
 // Confirms a direct-to-Storage upload: codec, duration, dimensions, then the library row.
 // A retry after the row or the thumbnail was stored returns that same id and does not delete the objects.
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   if (!(await videoSchemaReady())) return fail(VIDEO_UNAVAILABLE, 503);
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
     );
   }
   return json({ id: mediaId }, 201);
-}
+});
 
 /** True when this account already has the row. A lookup failure is a 500 response. */
 async function ownMedia(accountId: string, mediaId: string): Promise<true | Response | null> {

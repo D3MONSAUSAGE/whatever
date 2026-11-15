@@ -4,22 +4,23 @@ import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { GROUPS_UNAVAILABLE, parseGroupDurationMs, presentationGroupsReady } from "@/lib/server/presentation-groups";
 import { normalizeFileName } from "@/lib/server/validate";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(req: Request, ctx: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, ctx: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   if (!(await presentationGroupsReady())) return fail(GROUPS_UNAVAILABLE, 503);
   const { id } = await ctx.params;
   if (!isUuid(id)) return fail("Presentation not found.", 404);
   return loadDetail(admin.accountId, id);
-}
+});
 
-export async function PATCH(req: Request, ctx: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, ctx: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   if (!(await presentationGroupsReady())) return fail(GROUPS_UNAVAILABLE, 503);
@@ -82,7 +83,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   return loadDetail(admin.accountId, id);
-}
+});
 
 async function loadDetail(accountId: string, id: string) {
   const dbStarted = performance.now();

@@ -2,6 +2,7 @@ import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { ONLINE_MS } from "@/lib/server/limits";
 import { fail, json } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 const PAGE = 1000;
 
 // Lightweight dashboard counts for this account. Online matches GET /api/displays.
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
     playlists,
     activeSchedules,
   });
-}
+});
 
 async function activeDisplays(accountId: string) {
   const rows: { last_seen_at?: unknown }[] = [];

@@ -5,12 +5,13 @@ import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { isValidTimeZone } from "@/lib/server/schedule";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -42,9 +43,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   if (!updated.data) return fail("Location not found.", 404);
   return json({ ok: true });
-}
+});
 
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -74,4 +75,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (deleted.error) return fail("Couldn't delete the location.", 500);
   if (!(deleted.data ?? []).length) return fail("Location not found.", 404);
   return json({ ok: true });
-}
+});

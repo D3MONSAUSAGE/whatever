@@ -5,11 +5,12 @@ import {
   DAY, buildUptime, countSince, coverageStart, expectedFor, isErr, isOnline, loadDisplays, locationZones, playbackStatus, uptimeDaily,
 } from "@/lib/server/analytics";
 import { analyticsFail } from "@/lib/server/analytics-routes";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const accountId = admin.accountId;
@@ -80,4 +81,4 @@ export async function GET(req: Request) {
     // Not measured per account. Shown as unavailable rather than estimated.
     bandwidth: null,
   });
-}
+});

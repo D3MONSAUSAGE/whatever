@@ -22,7 +22,7 @@ describe("U2-05: rename in Media (display name only)", () => {
 
   it("server: admin-only, account-scoped, updates file_name only (no storage, no deletes)", () => {
     const route = readFileSync("app/api/media/[id]/route.ts", "utf8");
-    const patch = route.slice(route.indexOf("export async function PATCH"), route.indexOf("export async function DELETE"));
+    const patch = route.slice(route.indexOf("async function PATCH("), route.indexOf("async function DELETE(")) // I18N-2: handlers are wrapped in withLocalizedErrors;
     expect(patch).toMatch(/const admin = await requireAdmin\(req\);/);
     expect(patch.match(/\.eq\("account_id", admin\.accountId\)/g)).toHaveLength(2);
     expect(patch).toMatch(/\.update\(\{ file_name: next\.name \}\)/);

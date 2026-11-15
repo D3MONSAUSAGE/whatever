@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { en } from "@/lib/i18n/en";
 import { describe, expect, it } from "vitest";
 import {
   LAYOUT_OPTIONS, canSaveThrough, classicEditorForRegion, classicPreviewHits,
@@ -222,7 +223,8 @@ describe("remaining in-app Layout Studio links and copy", () => {
   it("points My Screens and the content picker at Menu boards, not Layout Studio", () => {
     const screens = readFileSync("components/my-screens.tsx", "utf8");
     expect(screens).toContain("unifiedEditorPath({ screen: display.id, isNew: true })");
-    expect(screens).toContain("open Menu boards");
+    expect(screens).toContain('t("screens.openMenus")'); // I18N-2
+    expect(en["screens.openMenus"]).toBe("open Menu boards");
     expect(screens).not.toContain("/dashboard/media/layout-studio?screen=");
     expect(screens).not.toContain("open Layout Studio");
     const picker = readFileSync("components/content-picker.tsx", "utf8");

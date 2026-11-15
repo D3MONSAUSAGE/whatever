@@ -1,13 +1,20 @@
+import { makeT, type T } from "@/lib/i18n/index";
+
+const EN: T = makeT("en");
+
 /** What the screen is showing right now, including a schedule that overrides the saved assignment. */
 export function nowPlaying(
   base: string,
   schedule: { name: string; playlistName: string; untilLabel: string | null } | null | undefined,
+  t: T = EN,
+  baseIsStatus?: boolean,
 ) {
   if (!schedule) return base;
-  const until = schedule.untilLabel ? ` until ${schedule.untilLabel}` : "";
-  const next = !base || base === "No content assigned" || base.startsWith("Waiting") ? "the saved assignment" : base;
-  const title = schedule.playlistName || "a playlist";
-  return `Now: ${title} (schedule ${schedule.name}${until}) · then ${next}`;
+  const until = schedule.untilLabel ? t("np.until", { time: schedule.untilLabel }) : "";
+  const status = baseIsStatus ?? (!base || base === "No content assigned" || base.startsWith("Waiting"));
+  const next = status ? t("np.savedAssignment") : base;
+  const title = schedule.playlistName || t("np.aPlaylist");
+  return t("np.now", { title, name: schedule.name, until, next });
 }
 
 export function clockLabel(iso: string | null) {
@@ -26,7 +33,7 @@ export function groupPreviewCopy(impact: {
   willBeCleared: Named[];
   overriddenBySchedule: { id: string; name: string; scheduleName: string }[];
   offline: Named[];
-}, memberIds: string[], replace: boolean) {
+}, memberIds: string[], replace: boolean, t: T = EN) {
   const members = new Set(memberIds);
   const inside = <T extends { id: string }>(items: T[]) => items.filter((item) => members.has(item.id));
   const outside = new Set([
@@ -37,7 +44,7 @@ export function groupPreviewCopy(impact: {
   const offlineIds = new Set(offline.map((item) => item.id));
   const affected = [
     ...inside(impact.affected).filter((item) => !offlineIds.has(item.id)),
-    ...offline.map((item) => ({ ...item, name: `${item.name} (will update when back online)` })),
+    ...offline.map((item) => ({ ...item, name: t("np.willUpdate", { name: item.name }) })),
   ];
   return {
     affected,

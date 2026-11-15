@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { en } from "@/lib/i18n/en";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -67,12 +68,14 @@ describe("assigned content preview", () => {
   it("shows thumbnails on My Screens cards, with Change content as the primary action", () => {
     const source = readFileSync("components/my-screens.tsx", "utf8");
     expect(source).toContain("AssignedThumb");
-    expect(source).toContain("Change content");
+    expect(source).toContain('t("sa.change")'); // I18N-2: copy lives in the dictionary
+    expect(en["sa.change"]).toBe("Change content");
     expect(source).toContain("panel=change");
     expect(source).toContain("panel=schedule");
     expect(source).toContain("panel=playlist");
     expect(source).toContain("btn-primary");
-    expect(source).toContain("Total screens");
+    expect(source).toContain('t("screens.total")');
+    expect(en["screens.total"]).toBe("Total screens");
     expect(source).toContain('compact');
   });
 

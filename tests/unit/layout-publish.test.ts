@@ -61,7 +61,7 @@ describe("layout save", () => {
     expect(off).toEqual({ ok: false, error: "Layout Studio is not on." });
     expect(libraryError(account, null, "photo")).toMatch(/media library/);
     const route = readFileSync("app/api/layout-studio/route.ts", "utf8");
-    const handler = route.slice(route.indexOf("export async function POST"));
+    const handler = route.slice(route.indexOf("async function POST(")) // I18N-2: wrapped in withLocalizedErrors;
     expect(handler.indexOf("layoutStudioEnabled")).toBeLessThan(handler.indexOf("requireAdmin"));
   });
 

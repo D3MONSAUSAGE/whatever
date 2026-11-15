@@ -2,11 +2,12 @@ import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
 import { DAY, buildUptime, coverageStart, isErr, loadDisplays, locationZones, uptimeDaily } from "@/lib/server/analytics";
 import { analyticsFail } from "@/lib/server/analytics-routes";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const days = Number(new URL(req.url).searchParams.get("days") || "7");
@@ -20,4 +21,4 @@ export async function GET(req: Request) {
   if (isErr(rows)) return analyticsFail(rows);
   const result = buildUptime(displays, rows, days, coverage, zones, now);
   return json({ days, coverageFrom: coverage, screens: result.screens, overall: { uptimePct: result.overall } });
-}
+});

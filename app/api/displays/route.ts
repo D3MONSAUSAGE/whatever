@@ -9,11 +9,12 @@ import { billingEnforced, entitledDisplayIds, loadEffectiveEntitlement } from "@
 import { loadDisplaySchedules } from "@/lib/server/display-schedules";
 import { parseLayout } from "@/lib/layout-studio";
 import { playbackReport } from "@/lib/server/playback-report";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -113,7 +114,7 @@ export async function GET(req: Request) {
     });
   if (!page) return json(out);
   return json({ items: out, total: page.total, offset: page.offset, limit: page.limit, nextOffset: page.nextOffset });
-}
+});
 
 async function loadDisplayRows(accountId: string) {
   const media = "media:assigned_media_id (id, file_name, storage_path)";

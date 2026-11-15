@@ -4,13 +4,14 @@ import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { displayAccess, loadRemoteScreen } from "@/lib/server/remote";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
 /** Issue next/prev for a screen the caller owns. Returns the updated screen state. */
-export async function POST(req: Request, { params }: Ctx) {
+export const POST = withLocalizedErrors(async function POST(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -49,4 +50,4 @@ export async function POST(req: Request, { params }: Ctx) {
     command,
     screen: loaded.screen,
   });
-}
+});

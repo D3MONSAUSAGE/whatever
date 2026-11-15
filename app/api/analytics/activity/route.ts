@@ -3,11 +3,12 @@ import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
 import { analyticsFail } from "@/lib/server/analytics-routes";
 import { isMissingSchema } from "@/lib/server/schema";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const params = new URL(req.url).searchParams;
@@ -25,4 +26,4 @@ export async function GET(req: Request) {
     events: page.map((x) => ({ at: x.at, kind: x.kind, subjectId: x.subject_id, subjectName: x.subject_name, detail: x.detail ?? {} })),
     nextBefore: rows.length > limit ? page[page.length - 1].at : null,
   });
-}
+});

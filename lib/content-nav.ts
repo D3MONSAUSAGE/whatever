@@ -1,3 +1,4 @@
+import type { MessageKey } from "@/lib/i18n/index";
 export type ContentTabId = "media" | "promotions" | "playlists" | "presentations";
 
 export const CONTENT_TABS: { id: ContentTabId; href: string; label: string }[] = [
@@ -66,14 +67,15 @@ export function kindFromPath(path: string, kind: string | null | undefined): str
 }
 
 /** Main dashboard navigation, in order. Icons are attached in the shell. */
-export const MAIN_NAV: { href: string; label: string; short?: string }[] = [
+export const MAIN_NAV: { href: string; label: string; short?: string; labelKey: MessageKey; shortKey?: MessageKey }[] = [
   // `short` is the label under the icon in the six-column phone bar (about 60px per item at 360-390px).
-  { href: "/dashboard/screens", label: "My Screens", short: "Screens" },
-  { href: MENU_BOARDS_HREF, label: "Menu Boards", short: "Menus" },
-  { href: "/dashboard/content", label: "Content" },
-  { href: "/dashboard/playlists", label: "Playlists" },
-  { href: "/dashboard/schedule", label: "Schedules" },
-  { href: "/dashboard/account", label: "Account" },
+  // label/short are the English text; the shell renders labelKey/shortKey through t() (I18N-2).
+  { href: "/dashboard/screens", label: "My Screens", short: "Screens", labelKey: "dash.nav.screens", shortKey: "dash.nav.screensShort" },
+  { href: MENU_BOARDS_HREF, label: "Menu Boards", short: "Menus", labelKey: "dash.nav.menus", shortKey: "dash.nav.menusShort" },
+  { href: "/dashboard/content", label: "Content", labelKey: "dash.nav.content" },
+  { href: "/dashboard/playlists", label: "Playlists", labelKey: "dash.nav.playlists", shortKey: "dash.nav.playlistsShort" },
+  { href: "/dashboard/schedule", label: "Schedules", labelKey: "dash.nav.schedule" },
+  { href: "/dashboard/account", label: "Account", labelKey: "dash.nav.account" },
 ];
 
 /** Whether a main-nav item is the current section for this path. */

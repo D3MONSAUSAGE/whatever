@@ -6,47 +6,28 @@ import { PageHeader } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
 import { LanguageSelect } from "@/components/i18n/language-select";
 
+// I18N-2: copy lives in the dictionary (acct.<id>.title/body/action).
 const CARDS = [
-  {
-    title: "Settings",
-    body: "Name, password, alerts, and signing out.",
-    href: "/dashboard/settings",
-    action: "Open settings",
-  },
-  {
-    title: "Brand Kit",
-    body: "Logo, main colour, and highlight colour for new menus and promotions.",
-    href: "/dashboard/account/brand-kit",
-    action: "Open Brand Kit",
-  },
-  {
-    title: "Billing",
-    body: "Your plan, invoices, and payment method.",
-    href: "/dashboard/billing",
-    action: "Open billing",
-  },
-  {
-    title: "Support",
-    body: "Get help from the support page.",
-    href: "/support",
-    action: "Contact support",
-  },
+  { id: "settings", href: "/dashboard/settings" },
+  { id: "brand", href: "/dashboard/account/brand-kit" },
+  { id: "billing", href: "/dashboard/billing" },
+  { id: "support", href: "/support" },
 ] as const;
 
 export default function AccountHub() {
   const t = useT();
   return (
     <section className="min-w-0 pb-28 lg:pb-0">
-      <PageHeader title="Account" eyebrow="Pekko" lede="Settings, your brand, the plan you already have, and how to reach support." icon={<IconGear />} />
+      <PageHeader title={t("acct.title")} eyebrow="Pekko" lede={t("acct.lede")} icon={<IconGear />} />
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
         {CARDS.map((card) => (
-          <li key={card.title} className="card flex flex-col p-5 min-h-[13.5rem]">
-            <h2 className="font-semibold">{card.title}</h2>
-            <p className="text-sm text-muted mt-1 flex-1">{card.body}</p>
-            <Link href={card.href} className="btn btn-primary min-h-11 mt-auto w-full">{card.action}</Link>
+          <li key={card.id} className="card flex flex-col p-5 min-h-[13.5rem]">
+            <h2 className="font-semibold">{t(`acct.${card.id}.title`)}</h2>
+            <p className="text-sm text-muted mt-1 flex-1">{t(`acct.${card.id}.body`)}</p>
+            <Link href={card.href} className="btn btn-primary min-h-11 mt-auto w-full">{t(`acct.${card.id}.action`)}</Link>
           </li>
         ))}
-        {/* I18N-1: the rest of Account is translated in I18N-2. Saved to the account by AccountLocaleSync. */}
+        {/* Saved to the account by AccountLocaleSync. */}
         <li className="card flex flex-col p-5 min-h-[13.5rem]" data-testid="language-card">
           <h2 className="font-semibold">{t("lang.accountTitle")}</h2>
           <p className="text-sm text-muted mt-1 flex-1">{t("lang.accountBody")}</p>

@@ -6,6 +6,7 @@ import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaybackMode, normalizePlaylistName, normalizeTransition, parseDraftItems } from "@/lib/server/validate";
 import { GROUP_MAX_DURATION_MS, GROUP_MIN_DURATION_MS } from "@/lib/server/presentation-groups";
 import { fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ type MediaRef = {
   slide_count?: number | null;
 };
 
-export async function GET(req: Request, { params }: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -180,9 +181,9 @@ export async function GET(req: Request, { params }: Ctx) {
       assigned: display.assigned_playlist_id === id,
     })),
   });
-}
+});
 
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -222,9 +223,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   if (!ok) return fail("Couldn't save the playlist. Check that the images are still in your library.", 400);
   return json({ ok: true });
-}
+});
 
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -240,7 +241,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   }
   if (!ok) return fail("Playlist not found.", 404);
   return json({ ok: true });
-}
+});
 
 async function durationsFitMedia(accountId: string, items: { mediaId: string; durationMs: number | null }[]) {
   const ids = [...new Set(items.map((item) => item.mediaId))];

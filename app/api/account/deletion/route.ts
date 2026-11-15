@@ -2,6 +2,7 @@ import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { currentRequest, deletionEnabled, DELETION_DELAY_DAYS, passwordMatches } from "@/lib/server/account-deletion";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,16 +19,16 @@ async function owner(req: Request) {
   return admin;
 }
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await owner(req);
   if (admin instanceof Response) return admin;
   const r = await currentRequest(admin.accountId);
   if (r === "error") return fail("Couldn't load deletion status.", 500);
   return json({ enabled: deletionEnabled(), delayDays: DELETION_DELAY_DAYS, request: r });
-}
+});
 
 // { confirm: "DELETE", password } schedules deletion in 7 days. The owner can cancel until then.
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (!deletionEnabled()) return OFF();
   const admin = await owner(req);
   if (admin instanceof Response) return admin;
@@ -43,14 +44,14 @@ export async function POST(req: Request) {
     ? json({ error: "Only the account owner can delete this account.", code: "not_owner" }, 403)
     : fail("Couldn't schedule deletion. Try again.", 500);
   return json({ enabled: true, delayDays: DELETION_DELAY_DAYS, request: await currentRequest(admin.accountId) }, 202);
-}
+});
 
 // Cancel a pending request.
-export async function DELETE(req: Request) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request) {
   const admin = await owner(req);
   if (admin instanceof Response) return admin;
   const r = await db().from("account_deletion_requests").update({ status: "canceled" })
     .eq("account_id", admin.accountId).eq("user_id", admin.userId).eq("status", "pending");
   if (r.error) return fail("Couldn't cancel. Try again.", 500);
   return json({ enabled: deletionEnabled(), delayDays: DELETION_DELAY_DAYS, request: null });
-}
+});

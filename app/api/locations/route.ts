@@ -6,13 +6,14 @@ import { normalizePlaylistName } from "@/lib/server/validate";
 import { CREATE_LOCATION_MAX_PER_USER, CREATE_LOCATION_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { loadLocations } from "@/lib/server/locations";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_LOCATIONS = 50;
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -31,9 +32,9 @@ export async function GET(req: Request) {
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
   return json(loaded.map((location) => ({ ...location, displayCount: counts.get(location.id) ?? 0 })));
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -58,4 +59,4 @@ export async function POST(req: Request) {
     return fail("Couldn't add the location.", 500);
   }
   return json({ id: inserted.data.id }, 201);
-}
+});

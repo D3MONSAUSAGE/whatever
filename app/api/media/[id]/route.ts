@@ -5,6 +5,7 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { playlistDeleteMessage, playlistsUsingMedia } from "@/lib/server/media-usage";
 import { fail, json, readJson } from "@/lib/server/http";
 import { mediaRename } from "@/lib/media-rename";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
  * playlists and screens are unchanged. Scoped to the signed-in admin's account.
  * Presentations keep their own rename at /api/media/presentation/[id].
  */
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -42,10 +43,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (saved.error) return fail("Couldn't rename that file. Try again.", 500);
   if (!saved.data) return fail("File not found.", 404);
   return json({ id, fileName: String(saved.data.file_name) });
-}
+});
 
 // Clears the image from any TV showing it. Refuses while a playlist still uses it.
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -108,4 +109,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (thumbnail && thumbnail.startsWith(`${admin.accountId}/`) && thumbnail !== path) paths.push(thumbnail);
   await db().storage.from(BUCKET).remove(paths);
   return json({ ok: true });
-}
+});

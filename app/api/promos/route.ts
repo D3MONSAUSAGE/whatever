@@ -4,11 +4,12 @@ import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { dropMenuImage } from "@/lib/server/menus";
 import { MAX_PROMOS, PROMOS_UNAVAILABLE, PROMO_COLUMNS, checkPromoPhoto, isMissingSchema, parsePromoBody, promoView, storePromoImage, type PromoInput, type PromoRow } from "@/lib/server/promos";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const rows = await db().from("promos").select(PROMO_COLUMNS).eq("account_id", admin.accountId).order("updated_at", { ascending: false });
@@ -17,10 +18,10 @@ export async function GET(req: Request) {
     return fail("Couldn't load promos.", 500);
   }
   return json({ promos: await promoView((rows.data ?? []) as PromoRow[], admin.accountId), available: true });
-}
+});
 
 /** Render a promo slide into media plus its own one-slide playlist. Not shown anywhere until added to a menu. */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const parsed = parsePromoBody(await readJson(req));
@@ -48,4 +49,4 @@ export async function POST(req: Request) {
   }).select("id").single();
   if (row.error) return fail("Couldn't create the promo.", 500);
   return json({ id: row.data.id, mediaId, playlistId: String(playlist.data) }, 201);
-}
+});

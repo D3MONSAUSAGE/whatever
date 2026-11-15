@@ -5,13 +5,14 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { fail, json, readJson } from "@/lib/server/http";
 import { GET as listDisplays } from "../route";
 import { screenNameWarning } from "@/lib/screen-names";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string }> };
 
 // One screen, same object as a row of GET /api/displays. The phone parses this strictly.
-export async function GET(req: Request, { params }: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, { params }: Ctx) {
   const { id } = await params;
   if (!isUuid(id)) return fail("Display not found.", 404);
   const listed = await listDisplays(new Request(new URL("/api/displays", req.url), { headers: req.headers }));
@@ -20,11 +21,11 @@ export async function GET(req: Request, { params }: Ctx) {
   const row = Array.isArray(body) ? body.find((item) => item && item.id === id) : null;
   if (!row) return fail("Display not found.", 404);
   return json(row);
-}
+});
 
 // Rename ({ name }), move or clear a location ({ locationId }, null clears),
 // or publish ({ mediaId }, null clears the screen). A body with mediaId ignores the rest.
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -94,7 +95,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
 
   return json({ ok: true });
-}
+});
 
 async function updateLocation(accountId: string, displayId: string, locationId: string | null) {
   const moved = await db()
@@ -111,7 +112,7 @@ async function updateLocation(accountId: string, displayId: string, locationId: 
 }
 
 // Disconnect: revokes the TV's token immediately; the TV returns to its pairing screen.
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -136,4 +137,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
     .eq("display_id", id);
   if (members.error && !isMissingSchema(members.error)) return fail("Couldn't disconnect. Try again.", 500);
   return json({ ok: true });
-}
+});

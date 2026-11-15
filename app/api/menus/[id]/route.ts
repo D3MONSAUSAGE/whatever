@@ -6,6 +6,7 @@ import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { keepStoredFonts } from "@/lib/menu-templates";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ async function load(accountId: string, id: string) {
   return { row: row.data as MenuRow };
 }
 
-export async function GET(req: Request, { params }: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -29,10 +30,10 @@ export async function GET(req: Request, { params }: Ctx) {
   if (found.error) return found.error;
   const [menu] = await menuView(admin.accountId, [found.row]);
   return json(menu);
-}
+});
 
 /** Save edits: renders a new image and swaps it in everywhere the old one plays. */
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -62,10 +63,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
     published = !pub.error && Boolean(pub.data);
   }
   return json({ id, mediaId, playlistId, published });
-}
+});
 
 /** Removes the editable menu only. Its last image and playlist stay, so no screen goes blank. */
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -77,4 +78,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (del.error) return isMissingSchema(del.error) ? fail(MENUS_UNAVAILABLE, 503) : fail("Couldn't delete the menu.", 500);
   if (!(del.data ?? []).length) return fail("Menu not found.", 404);
   return json({ ok: true });
-}
+});

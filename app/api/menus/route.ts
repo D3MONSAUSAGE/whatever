@@ -3,13 +3,14 @@ import { db } from "@/lib/server/supabase";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MAX_MENUS, MENUS_UNAVAILABLE, checkMenuPhoto, dropMenuImage, isMissingSchema, menuView, parseMenuBody, storeMenuImage, type MenuInput, type MenuRow } from "@/lib/server/menus";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const COLUMNS = "id, name, template, content, media_id, playlist_id, created_at, updated_at";
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const rows = await db().from("menus").select(COLUMNS).eq("account_id", admin.accountId).order("updated_at", { ascending: false });
@@ -18,9 +19,9 @@ export async function GET(req: Request) {
     return fail("Couldn't load menus.", 500);
   }
   return json({ menus: await menuView(admin.accountId, (rows.data ?? []) as MenuRow[]), available: true });
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const parsed = parseMenuBody(await readJson(req));
@@ -63,4 +64,4 @@ export async function POST(req: Request) {
     if (!published) return json({ id: row.data.id, mediaId, playlistId, published, warning: "Menu saved, but it couldn't be shown on those screens. Check that they're paired." }, 201);
   }
   return json({ id: row.data.id, mediaId, playlistId, published }, 201);
-}
+});

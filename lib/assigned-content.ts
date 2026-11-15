@@ -1,6 +1,10 @@
 /** Assigned-content preview for a screen card. Uses only fields already on DisplayItem. No new API. */
 
 import type { DisplayItem } from "@/lib/api";
+import { makeT, type T } from "@/lib/i18n/index";
+
+const EN: T = makeT("en");
+
 
 export type AssignedKind = "image" | "video" | "menu-board" | "playlist" | "presentation" | "empty";
 
@@ -91,13 +95,18 @@ export function assignedContentPreview(display: DisplayItem): AssignedPreview {
   return { src: null, kind: "empty", label: "No content", name };
 }
 
-export function assignedKindLabel(kind: AssignedKind): string {
+export function assignedKindLabel(kind: AssignedKind, t: T = EN): string {
   switch (kind) {
-    case "image": return "Image";
-    case "video": return "Video";
-    case "menu-board": return "Menu board";
-    case "playlist": return "Playlist";
-    case "presentation": return "Presentation";
-    default: return "No content";
+    case "image": return t("kind.image");
+    case "video": return t("kind.video");
+    case "menu-board": return t("kind.menuBoard");
+    case "playlist": return t("kind.playlist");
+    case "presentation": return t("kind.presentation");
+    default: return t("kind.none");
   }
+}
+
+/** The caption under the thumbnail ("Assigned" / "No content") in the UI language. */
+export function assignedCaption(label: "Assigned" | "No content", t: T = EN): string {
+  return label === "Assigned" ? t("kind.assigned") : t("kind.none");
 }

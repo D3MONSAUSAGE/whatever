@@ -5,13 +5,14 @@ import { videoSchemaReady } from "@/lib/server/video";
 import { MAX_VIDEO_BYTES, mp4ErrorMessage } from "@/lib/mp4";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Hands the browser a signed upload URL. The video bytes go straight to
 // Storage and never through this function (Vercel caps request bodies at 4.5 MB).
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   if (!(await videoSchemaReady())) return fail(VIDEO_UNAVAILABLE, 503);
@@ -35,4 +36,4 @@ export async function POST(req: Request) {
     token: signed.data.token,
     signedUrl: signed.data.signedUrl,
   }, 201);
-}
+});

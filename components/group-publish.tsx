@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api, useApi, type DisplayItem, type PlaylistSummary } from "@/lib/api";
 import { groupPreviewCopy, groupPublishIds } from "@/lib/now-playing";
 import { publishSavedCopyForTargets } from "@/lib/screen-actions-ui";
+import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n";
 
 type Impact = {
   affected: { id: string; name: string }[];
@@ -19,20 +21,21 @@ function timedOut(err: unknown) {
   return err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
 }
 
-function names(items: { name: string }[]) {
-  return items.length ? items.map((item) => item.name).join(", ") : "None";
+function names(items: { name: string }[], t: T) {
+  return items.length ? items.map((item) => item.name).join(", ") : t("gp.none");
 }
 
 function GroupPreview({ impact, memberIds }: { impact: Impact; memberIds: string[] }) {
-  const copy = groupPreviewCopy(impact, memberIds, false);
+  const t = useT();
+  const copy = groupPreviewCopy(impact, memberIds, false, t);
   return (
     <div className="grid gap-2 text-sm">
-      <p><span className="font-semibold">Affected.</span> {names(copy.affected)}</p>
-      {copy.unchanged.length ? <p><span className="font-semibold">Also showing this (unchanged).</span> {names(copy.unchanged)}</p> : null}
-      {copy.kept.length ? <p><span className="font-semibold">Kept.</span> {names(copy.kept)}</p> : null}
-      <p><span className="font-semibold">Overridden by schedule.</span> {copy.overriddenBySchedule.length ? copy.overriddenBySchedule.map((item) => `${item.name} (${item.scheduleName})`).join(", ") : "None"}</p>
-      <p className="text-muted">Replace is not offered here. Screens outside this group keep what they have.</p>
-      {copy.othersLeftAlone ? <p>{copy.othersLeftAlone === 1 ? "1 other screen is left alone." : `${copy.othersLeftAlone} other screens are left alone.`}</p> : null}
+      <p><span className="font-semibold">{t("gp.affected")}</span> {names(copy.affected, t)}</p>
+      {copy.unchanged.length ? <p><span className="font-semibold">{t("gp.unchanged")}</span> {names(copy.unchanged, t)}</p> : null}
+      {copy.kept.length ? <p><span className="font-semibold">{t("gp.kept")}</span> {names(copy.kept, t)}</p> : null}
+      <p><span className="font-semibold">{t("gp.overridden")}</span> {copy.overriddenBySchedule.length ? copy.overriddenBySchedule.map((item) => `${item.name} (${item.scheduleName})`).join(", ") : t("gp.none")}</p>
+      <p className="text-muted">{t("gp.noReplace")}</p>
+      {copy.othersLeftAlone ? <p>{copy.othersLeftAlone === 1 ? t("gp.oneLeftAlone") : t("gp.manyLeftAlone", { n: copy.othersLeftAlone })}</p> : null}
     </div>
   );
 }
@@ -47,6 +50,7 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
   const [phase, setPhase] = useState<"idle" | "preview" | "commit">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const t = useT();
 
   if (seen !== memberKey) {
     setSeen(memberKey);
@@ -57,8 +61,8 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
   const selected = groupPublishIds(members.map((item) => item.id), chosen);
 
   async function run(commit: boolean) {
-    if (!playlistId) { setFailed(true); setMessage("Choose a playlist."); return; }
-    if (!selected.length) { setFailed(true); setMessage("Choose at least one screen in this group."); return; }
+    if (!playlistId) { setFailed(true); setMessage(t("disp.choosePlaylist")); return; }
+    if (!selected.length) { setFailed(true); setMessage(t("gp.chooseScreen")); return; }
     setPhase(commit ? "commit" : "preview");
     setFailed(false);
     setMessage(null);
@@ -74,7 +78,7 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
           online: item.online && !offlineIds.has(item.id),
           connected: item.connected,
         }));
-        setMessage(publishSavedCopyForTargets(targets));
+        setMessage(publishSavedCopyForTargets(targets, t));
         onChanged();
       } else {
         setPreview(body);
@@ -82,11 +86,11 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
     } catch (err) {
       if (timedOut(err) && commit) {
         setFailed(false);
-        setMessage("Still publishing; check the screens in a moment.");
+        setMessage(t("disp.stillPublishing"));
         onChanged();
       } else {
         setFailed(true);
-        setMessage(timedOut(err) ? "The preview took too long. Try again." : (err as Error).message);
+        setMessage(timedOut(err) ? t("disp.previewSlow") : (err as Error).message);
       }
     } finally {
       setPhase("idle");
@@ -95,11 +99,11 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
 
   return (
     <form className="card p-4 mb-4 grid gap-3 min-w-0" onSubmit={(event) => { event.preventDefault(); void run(preview ? true : false); }}>
-      <h2 className="font-semibold">Publish to this group</h2>
-      <p className="text-sm text-muted">Only these screens are included. A screen that is not in the group cannot be selected, and this publish does not take content off anyone else.</p>
-      <label className="text-sm">Playlist
-        <select className="field mt-1 w-full" aria-label="Playlist for this group" value={playlistId} onChange={(event) => { setPlaylistId(event.target.value); setPreview(null); setMessage(null); }}>
-          <option value="">Choose a playlist</option>
+      <h2 className="font-semibold">{t("gp.title")}</h2>
+      <p className="text-sm text-muted">{t("gp.help")}</p>
+      <label className="text-sm">{t("disp.playlist")}
+        <select className="field mt-1 w-full" aria-label={t("gp.playlistFor")} value={playlistId} onChange={(event) => { setPlaylistId(event.target.value); setPreview(null); setMessage(null); }}>
+          <option value="">{t("disp.choosePlaylistOption")}</option>
           {(playlists.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>
@@ -107,9 +111,9 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
         {members.map((display) => (
           <li key={display.id}>
             <label className="flex items-center gap-3 min-h-11">
-              <input type="checkbox" className="size-5" checked={chosen[display.id] !== false} aria-label={`Publish to ${display.name}`}
+              <input type="checkbox" className="size-5" checked={chosen[display.id] !== false} aria-label={t("gp.publishTo", { name: display.name })}
                 onChange={(event) => { setChosen({ ...chosen, [display.id]: event.target.checked }); setPreview(null); }} />
-              <span className="min-w-0 truncate">{display.name}{display.online ? "" : " · offline"}</span>
+              <span className="min-w-0 truncate">{display.name}{display.online ? "" : t("gp.offlineSuffix")}</span>
             </label>
           </li>
         ))}
@@ -117,8 +121,8 @@ export function GroupPublish({ groupId, members, onChanged }: { groupId: string;
       {preview ? <GroupPreview impact={preview} memberIds={members.map((item) => item.id)} /> : null}
       {message ? <p role="status" className={`text-sm ${failed ? "text-danger" : ""}`}>{message}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn min-h-11" disabled={phase !== "idle"} onClick={() => void run(false)}>{phase === "preview" ? "Checking…" : "Preview"}</button>
-        <button type="submit" className="btn btn-primary min-h-11" disabled={phase !== "idle" || !preview}>{phase === "commit" ? "Publishing…" : "Publish to these screens"}</button>
+        <button type="button" className="btn min-h-11" disabled={phase !== "idle"} onClick={() => void run(false)}>{phase === "preview" ? t("disp.checking") : t("gp.preview")}</button>
+        <button type="submit" className="btn btn-primary min-h-11" disabled={phase !== "idle" || !preview}>{phase === "commit" ? t("disp.publishing") : t("gp.publish")}</button>
       </div>
     </form>
   );

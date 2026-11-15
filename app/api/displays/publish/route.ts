@@ -6,6 +6,7 @@ import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
 import { publishImpact } from "@/lib/server/screen-publish";
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
  * playlist stay on it. replace:true passes only the selection to publish_playlist,
  * which is what clears the others. POST /api/playlists/:id/publish is unchanged.
  */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const started = Date.now();
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -113,4 +114,4 @@ export async function POST(req: Request) {
   console.info(JSON.stringify({ event: "display-publish", commit: true, ms, screens: publishIds.length }));
   if (ms > 8000) console.error(JSON.stringify({ event: "display-publish-slow", ms, screens: publishIds.length }));
   return json({ commit: true, replace, playlistId, ...impact });
-}
+});

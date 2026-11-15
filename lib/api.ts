@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabase } from "./supabase-browser";
 import { currentLocale } from "./i18n/client";
+import { makeT, type T } from "./i18n/index";
 import { announceScreensChanged, changesScreens, onScreensChanged, showsScreens } from "./screens-sync";
 
 export type MediaUse = { id: string; name: string };
@@ -196,13 +197,13 @@ export function useApi<T>(path: string | null, refreshMs?: number) {
   return { data, error, reload };
 }
 
-export function timeAgo(iso: string | null) {
-  if (!iso) return "never";
+export function timeAgo(iso: string | null, t: T = makeT("en")) {
+  if (!iso) return t("time.never");
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 90) return "just now";
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86400)} days ago`;
+  if (s < 90) return t("time.justNow");
+  if (s < 3600) return t("time.minAgo", { n: Math.round(s / 60) });
+  if (s < 86400) return t("time.hAgo", { n: Math.round(s / 3600) });
+  return t("time.daysAgo", { n: Math.round(s / 86400) });
 }
 
 export const formatSize = (b: number) =>

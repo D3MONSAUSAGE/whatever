@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { friendlyAuthError, MIN_PASSWORD } from "@/components/auth-frame";
+import { useT } from "@/lib/i18n/client";
 
 const NAME_MAX = 60;
 
@@ -17,6 +18,7 @@ export default function Settings() {
   const me = useApi<{ email: string; accountName: string }>("/api/me");
   const toast = useToast();
   const confirm = useConfirm();
+  const t = useT();
   const [origin, setOrigin] = useState("");
   const [email, setEmail] = useState<string | null>(null);
   const [savedName, setSavedName] = useState("");
@@ -47,35 +49,35 @@ export default function Settings() {
     e.preventDefault();
     setNameError(null);
     const value = name.trim().replace(/\s+/g, " ");
-    if (value.length > NAME_MAX) return setNameError(`Keep it to ${NAME_MAX} characters.`);
+    if (value.length > NAME_MAX) return setNameError(t("settings.nameTooLong", { max: NAME_MAX }));
     setNameBusy(true);
     const { error } = await getSupabase().auth.updateUser({ data: { display_name: value } });
     setNameBusy(false);
-    if (error) return setNameError(friendlyAuthError(error.message));
+    if (error) return setNameError(friendlyAuthError(error.message, t));
     setSavedName(value);
     setName(value);
-    toast.show(value ? "Name saved" : "Name cleared");
+    toast.show(value ? t("settings.nameSaved") : t("settings.nameCleared"));
   }
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwError(null);
-    if (next.length < MIN_PASSWORD) return setPwError(`Use at least ${MIN_PASSWORD} characters.`);
-    if (next !== again) return setPwError("The new passwords don't match.");
-    if (next === current) return setPwError("Choose a password different from your current one.");
-    if (!email) return setPwError("Couldn't read your account email. Reload and try again.");
+    if (next.length < MIN_PASSWORD) return setPwError(t("settings.pwShort", { min: MIN_PASSWORD }));
+    if (next !== again) return setPwError(t("settings.pwMismatch"));
+    if (next === current) return setPwError(t("settings.pwSame"));
+    if (!email) return setPwError(t("settings.pwNoEmail"));
     setPwBusy(true);
     try {
       // Re-check the current password so an unattended, signed-in device can't change it.
       const check = await getSupabase().auth.signInWithPassword({ email, password: current });
       if (check.error) {
-        setPwError(check.error.message.toLowerCase().includes("invalid login") ? "Your current password isn't right." : friendlyAuthError(check.error.message));
+        setPwError(check.error.message.toLowerCase().includes("invalid login") ? t("settings.pwWrongCurrent") : friendlyAuthError(check.error.message, t));
         return;
       }
       const { error } = await getSupabase().auth.updateUser({ password: next });
-      if (error) return setPwError(friendlyAuthError(error.message));
+      if (error) return setPwError(friendlyAuthError(error.message, t));
       setCurrent(""); setNext(""); setAgain("");
-      toast.show("Password changed. Other devices are signed out.");
+      toast.show(t("settings.pwChanged"));
     } finally {
       setPwBusy(false);
     }
@@ -83,36 +85,36 @@ export default function Settings() {
 
   async function signOutEverywhere() {
     const ok = await confirm.ask({
-      title: "Sign out of all devices?",
-      body: "This signs you out here and on every phone, tablet, and computer. Your TVs keep playing; they don't use your sign-in.",
-      confirmLabel: "Sign out everywhere",
+      title: t("settings.signOutAllTitle"),
+      body: t("settings.signOutAllBody"),
+      confirmLabel: t("settings.signOutAllConfirm"),
       danger: true,
     });
     if (!ok) return;
     setSignOutBusy(true);
     const { error } = await getSupabase().auth.signOut({ scope: "global" });
     setSignOutBusy(false);
-    if (error) toast.show(friendlyAuthError(error.message), true);
+    if (error) toast.show(friendlyAuthError(error.message, t), true);
   }
 
   return (
     <section className="max-w-2xl">
-      <PageHeader title="Settings" eyebrow="Account" icon={<IconGear />} lede="Your sign-in, your name, and the address your TVs open." />
+      <PageHeader title={t("settings.title")} eyebrow={t("settings.eyebrow")} icon={<IconGear />} lede={t("settings.lede")} />
 
       <div className="grid gap-5">
         <div className="card">
-          <h2 className="px-5 pt-5 font-semibold">Account</h2>
+          <h2 className="px-5 pt-5 font-semibold">{t("settings.account")}</h2>
           {me.error && !me.data ? (
             <div className="m-5 note-error" role="alert">
-              Couldn&apos;t load your account. {me.error}{" "}
-              <button type="button" className="underline font-semibold" onClick={() => me.reload()}>Try again</button>
+              {t("settings.loadFailed")} {me.error}{" "}
+              <button type="button" className="underline font-semibold" onClick={() => me.reload()}>{t("settings.tryAgain")}</button>
             </div>
           ) : (
             <dl className="divide-y divide-line">
-              <Row label="Email">{email ?? me.data?.email ?? <span className="skeleton inline-block h-5 w-48 align-middle" />}</Row>
-              <Row label="Business">{me.data ? (me.data.accountName || <span className="text-muted">Not set</span>) : <span className="skeleton inline-block h-5 w-32 align-middle" />}</Row>
-              <Row label="Pair a TV"><span className="break-all">{origin}/pair</span></Row>
-              <Row label="Same player, other address"><span className="break-all">{origin}/tv</span></Row>
+              <Row label={t("settings.email")}>{email ?? me.data?.email ?? <span className="skeleton inline-block h-5 w-48 align-middle" />}</Row>
+              <Row label={t("settings.business")}>{me.data ? (me.data.accountName || <span className="text-muted">{t("settings.notSet")}</span>) : <span className="skeleton inline-block h-5 w-32 align-middle" />}</Row>
+              <Row label={t("settings.pairTv")}><span className="break-all">{origin}/pair</span></Row>
+              <Row label={t("settings.samePlayer")}><span className="break-all">{origin}/tv</span></Row>
             </dl>
           )}
         </div>
@@ -122,67 +124,67 @@ export default function Settings() {
         <AlertSettings />
 
         <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard/billing" className="font-semibold" data-testid="billing-link">Plan &amp; billing →</Link>
+          <Link href="/dashboard/billing" className="font-semibold" data-testid="billing-link">{t("settings.planBilling")}</Link>
           <ManageBilling className="btn-quiet" />
         </div>
-        <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">Help &amp; support →</Link>
-        <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">Delete account →</Link>
+        <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">{t("settings.help")}</Link>
+        <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">{t("settings.deleteLink")}</Link>
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
-          <h2 id="name-heading" className="font-semibold">Display name</h2>
-          <p className="text-sm text-muted mt-1 mb-3">Shown to you in the dashboard and the Pekko app. Leave blank to use your email.</p>
-          <label className="form-label" htmlFor="display-name">Name</label>
+          <h2 id="name-heading" className="font-semibold">{t("settings.displayName")}</h2>
+          <p className="text-sm text-muted mt-1 mb-3">{t("settings.displayNameHelp")}</p>
+          <label className="form-label" htmlFor="display-name">{t("settings.name")}</label>
           <input id="display-name" className="field" maxLength={NAME_MAX} autoComplete="name" placeholder={email ?? ""}
             value={name} onChange={(e) => setName(e.target.value)} />
           {nameError ? <p role="alert" className="note-error mt-3">{nameError}</p> : null}
-          <button className="btn btn-primary mt-3" disabled={nameBusy || name.trim() === savedName}>{nameBusy ? "Saving…" : "Save name"}</button>
+          <button className="btn btn-primary mt-3" disabled={nameBusy || name.trim() === savedName}>{nameBusy ? t("settings.saving") : t("settings.saveName")}</button>
         </form>
 
         <form className="card p-5" onSubmit={changePassword} aria-labelledby="pw-heading">
-          <h2 id="pw-heading" className="font-semibold">Change password</h2>
-          <p className="text-sm text-muted mt-1 mb-3">At least {MIN_PASSWORD} characters. Changing it signs you out on your other phones and computers; this one stays signed in.</p>
+          <h2 id="pw-heading" className="font-semibold">{t("settings.changePassword")}</h2>
+          <p className="text-sm text-muted mt-1 mb-3">{t("settings.changePasswordHelp", { min: MIN_PASSWORD })}</p>
           <div className="grid gap-3">
             <div>
-              <label className="form-label" htmlFor="current-password">Current password</label>
+              <label className="form-label" htmlFor="current-password">{t("settings.currentPassword")}</label>
               <input id="current-password" className="field" type="password" autoComplete="current-password" required
                 value={current} onChange={(e) => setCurrent(e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="new-password">New password</label>
+              <label className="form-label" htmlFor="new-password">{t("settings.newPassword")}</label>
               <input id="new-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required
                 value={next} onChange={(e) => setNext(e.target.value)} />
             </div>
             <div>
-              <label className="form-label" htmlFor="again-password">Confirm new password</label>
+              <label className="form-label" htmlFor="again-password">{t("settings.confirmPassword")}</label>
               <input id="again-password" className="field" type="password" autoComplete="new-password" minLength={MIN_PASSWORD} required
                 value={again} onChange={(e) => setAgain(e.target.value)} />
             </div>
           </div>
           {pwError ? <p role="alert" className="note-error mt-3">{pwError}</p> : null}
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button className="btn btn-primary" disabled={pwBusy}>{pwBusy ? "Saving…" : "Change password"}</button>
-            <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">Forgot your current password?</Link>
+            <button className="btn btn-primary" disabled={pwBusy}>{pwBusy ? t("settings.saving") : t("settings.changePassword")}</button>
+            <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">{t("settings.forgotCurrent")}</Link>
           </div>
         </form>
 
         <div className="card p-5">
-          <h2 className="font-semibold">Your brand</h2>
-          <p className="text-sm text-muted mt-1 mb-3">Add your logo and colours to your menu boards and promotions.</p>
-          <Link href="/dashboard/account/brand-kit" className="btn btn-quiet">Set up your brand</Link>
+          <h2 className="font-semibold">{t("settings.brandTitle")}</h2>
+          <p className="text-sm text-muted mt-1 mb-3">{t("settings.brandBody")}</p>
+          <Link href="/dashboard/account/brand-kit" className="btn btn-quiet">{t("settings.brandAction")}</Link>
         </div>
 
         <div className="card p-5">
-          <h2 className="font-semibold">Sign out</h2>
-          <p className="text-sm text-muted mt-1 mb-3">Lost a phone or shared a computer? Sign out everywhere. Screens keep playing.</p>
+          <h2 className="font-semibold">{t("settings.signOutTitle")}</h2>
+          <p className="text-sm text-muted mt-1 mb-3">{t("settings.signOutBody")}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-quiet" onClick={() => getSupabase().auth.signOut()}>Sign out</button>
+            <button type="button" className="btn btn-quiet" onClick={() => getSupabase().auth.signOut()}>{t("settings.signOut")}</button>
             <button type="button" className="btn btn-quiet text-danger" disabled={signOutBusy} onClick={signOutEverywhere}>
-              {signOutBusy ? "Signing out…" : "Sign out of all devices"}
+              {signOutBusy ? t("settings.signingOut") : t("settings.signOutAll")}
             </button>
           </div>
         </div>
       </div>
       <p className="mt-6 text-xs text-muted">
-        <a href="/terms" className="hover:underline">Terms of Service</a> · <a href="/terms#billing" className="hover:underline">Billing terms</a> · <a href="/privacy" className="hover:underline">Privacy Policy</a>
+        <a href="/terms" className="hover:underline">{t("settings.terms")}</a> · <a href="/terms#billing" className="hover:underline">{t("settings.billingTerms")}</a> · <a href="/privacy" className="hover:underline">{t("settings.privacy")}</a>
       </p>
       {confirm.node}
     </section>
@@ -200,6 +202,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function BusinessForm({ current, onSaved }: { current: string | null; onSaved: () => void }) {
   const toast = useToast();
+  const t = useT();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,11 +211,11 @@ function BusinessForm({ current, onSaved }: { current: string | null; onSaved: (
     e.preventDefault();
     setError(null);
     const name = value.trim().replace(/\s+/g, " ");
-    if (!name) return setError("Enter your business name.");
+    if (!name) return setError(t("settings.businessRequired"));
     setBusy(true);
     try {
       await api("/api/me", { method: "PATCH", body: JSON.stringify({ accountName: name }) });
-      toast.show("Business name saved");
+      toast.show(t("settings.businessSaved"));
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -222,13 +225,13 @@ function BusinessForm({ current, onSaved }: { current: string | null; onSaved: (
   }
   return (
     <form className="card p-5" onSubmit={save} aria-labelledby="business-heading">
-      <h2 id="business-heading" className="font-semibold">Business name</h2>
-      <p className="text-sm text-muted mt-1 mb-3">Your business as customers know it. Shown in the dashboard and the Pekko app.</p>
-      <label className="form-label" htmlFor="business-name">Business name</label>
+      <h2 id="business-heading" className="font-semibold">{t("settings.businessName")}</h2>
+      <p className="text-sm text-muted mt-1 mb-3">{t("settings.businessHelp")}</p>
+      <label className="form-label" htmlFor="business-name">{t("settings.businessName")}</label>
       <input id="business-name" className="field" maxLength={80} autoComplete="organization"
         value={value} onChange={(e) => setValue(e.target.value)} />
       {error ? <p role="alert" className="note-error mt-3">{error}</p> : null}
-      <button className="btn btn-primary mt-3" disabled={busy || current === null || value.trim() === current}>{busy ? "Saving…" : "Save business name"}</button>
+      <button className="btn btn-primary mt-3" disabled={busy || current === null || value.trim() === current}>{busy ? t("settings.saving") : t("settings.saveBusiness")}</button>
     </form>
   );
 }

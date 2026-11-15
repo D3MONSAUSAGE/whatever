@@ -4,6 +4,7 @@ import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { PROMOS_UNAVAILABLE, PROMO_COLUMNS, checkPromoPhoto, detachPromo, isMissingSchema, parsePromoBody, promoView, rerenderPromo, syncPromoDates, type PromoRow } from "@/lib/server/promos";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ async function load(accountId: string, id: string) {
   return { row: row.data as PromoRow };
 }
 
-export async function GET(req: Request, { params }: Ctx) {
+export const GET = withLocalizedErrors(async function GET(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -26,10 +27,10 @@ export async function GET(req: Request, { params }: Ctx) {
   if (found.error) return found.error;
   const [promo] = await promoView([found.row], admin.accountId);
   return json(promo);
-}
+});
 
 /** Save edits. A new image replaces the old one everywhere it plays; date changes move the dated rules too. */
-export async function PATCH(req: Request, { params }: Ctx) {
+export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -68,10 +69,10 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (!(await syncPromoDates(admin.accountId, row, startsOn, endsOn))) return fail("Couldn't move the promo's dates.", 500);
   }
   return json({ id, mediaId, startsOn, endsOn });
-}
+});
 
 /** Takes the promo off its menu, then removes the editable promo. Its last image stays in the media library. */
-export async function DELETE(req: Request, { params }: Ctx) {
+export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const { id } = await params;
@@ -82,4 +83,4 @@ export async function DELETE(req: Request, { params }: Ctx) {
   const del = await db().from("promos").delete().eq("id", id).eq("account_id", admin.accountId);
   if (del.error) return fail("Couldn't delete the promo.", 500);
   return json({ ok: true });
-}
+});

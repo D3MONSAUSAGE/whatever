@@ -4,12 +4,13 @@ import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { isUuid } from "@/lib/server/crypto";
 import { ALERTS_UNAVAILABLE } from "@/lib/server/alerts";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // { ids: [uuid, ...] } (max 100) or { all: true }. Marks this account's alerts read.
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -27,4 +28,4 @@ export async function POST(req: Request) {
     return fail(missing ? ALERTS_UNAVAILABLE : "Couldn't update alerts.", missing ? 503 : 500);
   }
   return json({ ok: true, marked: (r.data ?? []).length });
-}
+});

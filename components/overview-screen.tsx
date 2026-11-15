@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { useApi, type OnboardingState, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { LogoMark, WaveBackdrop } from "@/components/brand";
 import { IconCalendar, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
-import { ONLINE_HINT, OfflineAlert, offlineScreens } from "@/components/tv";
+import { OfflineAlert, offlineScreens, onlineHint } from "@/components/tv";
+import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n";
 import { LoadState, Stat } from "@/components/ui";
 import { SetupTracker } from "@/components/setup-tracker";
 
@@ -35,6 +37,7 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
   useEffect(() => { if (!fixture?.origin) setOrigin(location.origin); }, [fixture?.origin]);
 
   const ready = Boolean(displayData) && mediaCount != null;
+  const t = useT();
 
   return (
     <section>
@@ -42,16 +45,16 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
         <WaveBackdrop tone="dark" className="h-[85%]" />
         <div className="relative flex items-center justify-between gap-6">
           <div className="min-w-0">
-            <h1 className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">Overview</h1>
-            <h2 className="mt-2 text-2xl md:text-[1.85rem] font-semibold tracking-tight">Welcome back!</h2>
-            <p className="mt-1.5 text-sm md:text-[15px] text-white/80 max-w-xl">Here&apos;s what&apos;s happening with your screens today.</p>
+            <h1 className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">{t("ov.eyebrow")}</h1>
+            <h2 className="mt-2 text-2xl md:text-[1.85rem] font-semibold tracking-tight">{t("ov.welcome")}</h2>
+            <p className="mt-1.5 text-sm md:text-[15px] text-white/80 max-w-xl">{t("ov.lede")}</p>
           </div>
           <LogoMark className="hidden sm:block size-16 md:size-20 shrink-0" />
         </div>
       </div>
 
       {!ready || !displayData || mediaCount == null ? (
-        <LoadState error={displaysLive.error || mediaLive.error} label="Loading…" />
+        <LoadState error={displaysLive.error || mediaLive.error} />
       ) : (
         <OverviewBody
           displayData={displayData}
@@ -87,6 +90,8 @@ function OverviewBody({
   origin: string;
   fixture: boolean;
 }) {
+  const t = useT();
+  const hint = onlineHint(t);
   const online = displayData.filter(onlineNow).length;
   const offline = offlineScreens(displayData).length;
   const published = displayData.some((item) => item.media || item.playlist);
@@ -101,25 +106,25 @@ function OverviewBody({
     <>
       <OfflineAlert displays={displayData} linkToDisplays />
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-        <Stat icon={<IconTv />} label="Screens" value={displayData.length} />
-        <Stat tone="live" label="Online" value={online} hint={ONLINE_HINT} />
-        <Stat tone="danger" label="Offline" value={offline} hint={ONLINE_HINT} />
-        <Stat icon={<IconImage />} label="Media files" value={mediaCount} />
-        <Stat icon={<IconList />} label="Playlists" value={playlistCount === null ? "—" : playlistCount} hint={playlistError ?? undefined} />
-        <Stat icon={<IconCalendar />} label="Scheduled" value={scheduleCount === null ? "—" : scheduleCount} hint={scheduleError ?? undefined} />
+        <Stat icon={<IconTv />} label={t("ov.screens")} value={displayData.length} />
+        <Stat tone="live" label={t("ov.online")} value={online} hint={hint} />
+        <Stat tone="danger" label={t("ov.offline")} value={offline} hint={hint} />
+        <Stat icon={<IconImage />} label={t("ov.media")} value={mediaCount} />
+        <Stat icon={<IconList />} label={t("ov.playlists")} value={playlistCount === null ? "—" : playlistCount} hint={playlistError ?? undefined} />
+        <Stat icon={<IconCalendar />} label={t("ov.scheduled")} value={scheduleCount === null ? "—" : scheduleCount} hint={scheduleError ?? undefined} />
       </div>
-      <p className="text-xs text-muted -mt-4 mb-8">{ONLINE_HINT} Screens still waiting to pair are not counted as offline.</p>
+      <p className="text-xs text-muted -mt-4 mb-8">{hint} {t("ov.waitingNotOffline")}</p>
 
       <SetupTracker fixture={setupFixture} origin={origin} />
 
       {recent.length > 0 && (
         <div>
-          <h2 className="font-semibold mb-1">Recent Screens</h2>
-          <p className="text-sm text-muted mb-4">Sorted by the latest heartbeat. The picture is the image on the screen, or the first published slide of its playlist.</p>
+          <h2 className="font-semibold mb-1">{t("ov.recent")}</h2>
+          <p className="text-sm text-muted mb-4">{t("ov.recentHelp")}</p>
           <ul className="card divide-y divide-line overflow-hidden">
             {recent.map((display) => {
               const url = display.media?.url || display.playlist?.url || null;
-              const presence = screenPresence(display);
+              const presence = screenPresence(display, t);
               return (
                 <li key={display.id}>
                   <Link href={`/dashboard/displays#${display.id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-paper">
@@ -147,10 +152,10 @@ function OverviewBody({
   );
 }
 
-function screenPresence(display: DisplayItem) {
-  if (!display.connected) return { label: "Waiting", dot: "bg-muted", text: "text-muted" };
-  if (display.online) return { label: "Online", dot: "bg-live", text: "text-live-ink" };
-  return { label: "Offline", dot: "bg-danger", text: "text-danger" };
+function screenPresence(display: DisplayItem, t: T) {
+  if (!display.connected) return { label: t("tv.waiting"), dot: "bg-muted", text: "text-muted" };
+  if (display.online) return { label: t("tv.online"), dot: "bg-live", text: "text-live-ink" };
+  return { label: t("tv.offline"), dot: "bg-danger", text: "text-danger" };
 }
 
 export default function Overview() {

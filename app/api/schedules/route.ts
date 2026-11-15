@@ -6,13 +6,14 @@ import { assertTarget } from "@/lib/server/schedule-target";
 import { CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
 import { ownerFields, promoByPlaylist } from "@/lib/server/schedule-owner";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_SCHEDULES = 200;
 
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const schedules = await db()
@@ -51,9 +52,9 @@ export async function GET(req: Request) {
     updatedAt: row.updated_at,
     ...ownerFields(owners, String(row.playlist_id)),
   })));
-}
+});
 
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const parsed = parseScheduleBody(await readJson(req));
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
     return fail("Couldn't add the schedule.", 500);
   }
   return json({ id: inserted.data.id }, 201);
-}
+});
 
 async function namesFor(accountId: string, playlistIds: string[], displayIds: string[], groupIds: string[]) {
   const playlists = new Map<string, string>();

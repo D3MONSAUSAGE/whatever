@@ -1,12 +1,13 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
 import { loadRemoteScreens } from "@/lib/server/remote";
+import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Screens the signed-in owner can remote-control, with live playback state. */
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -16,4 +17,4 @@ export async function GET(req: Request) {
     return fail("Couldn't load screens.", 500);
   }
   return json(loaded.screens);
-}
+});
