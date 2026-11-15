@@ -13,3 +13,19 @@ export async function deletionSnapshot(page: ReactElement) {
   const contactEl = contact ? await (ContactBlock as (p: unknown) => Promise<ReactElement>)(contact.props) : null;
   return { html: renderToStaticMarkup(createElement(Fragment, null, ...body)), contact: contactEl ? renderToStaticMarkup(contactEl) : null };
 }
+
+/** Render a tree whose only async component is ContactBlock (wherever it is nested). */
+export async function renderWithContact(node: ReactNode): Promise<string> {
+  const resolve = async (n: ReactNode): Promise<ReactNode> => {
+    if (Array.isArray(n)) return Promise.all(n.map(resolve));
+    if (!isValidElement(n)) return n;
+    if (n.type === ContactBlock) return (ContactBlock as (p: unknown) => Promise<ReactElement>)(n.props);
+    if (typeof n.type === "function" && (n.type as { name: string }).name === "AccountDeletionEs") return resolve((n.type as () => ReactElement)());
+    if (typeof n.type === "function" && (n.type as { name: string }).name === "PublicPage") return resolve((n.props as { children: ReactNode }).children);
+    const props = n.props as { children?: ReactNode };
+    if (props.children === undefined || typeof n.type !== "string") return n;
+    const kids = await resolve(props.children);
+    return createElement(n.type, { ...(n.props as object), key: n.key ?? undefined, children: undefined }, ...(Array.isArray(kids) ? kids : [kids]));
+  };
+  return renderToStaticMarkup(createElement(Fragment, null, await resolve(node)));
+}
