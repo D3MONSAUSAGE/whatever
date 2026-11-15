@@ -54,6 +54,18 @@ describe("billing reminders at commercial launch", () => {
     delete process.env.BILLING_ENFORCE;
     expect(planOrgReminders({ ...acct, state: "grandfathered" }, "2026-11-12T15:00:00.000Z").map((p) => p.kind)).toContain("transition_14");
   });
+  it("skips billing reminders and notice copy for designated comp accounts", () => {
+    const expiredSql = { ...base, state: "expired" as const, plan: "comp" as const, playback_allowed: false, can_add_screen: false, screen_limit: 0 };
+    const e = commercialEntitlement(expiredSql, true);
+    expect(e.state).toBe("active");
+    expect(billingNotices(e)).toEqual([]);
+    const acct: ReminderAccount = {
+      id: "c", email: "reviewer@example.com", plan: "comp", state: "expired",
+      trial_started_at: null, trial_ends_at: "2026-10-01T00:00:00.000Z", playback_ends_at: null,
+      grace_ends_at: null, subscription_status: null, current_period_end: null, transition_started_at: null,
+    };
+    expect(planOrgReminders(acct, "2026-11-12T15:00:00.000Z")).toEqual([]);
+  });
 });
 
 import { formatWhen, remainingPhrase, reminderZone } from "@/lib/server/billing-notices";

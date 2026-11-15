@@ -1,12 +1,13 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 import { loadEffectiveEntitlement, readTransitionStart, toResponse, transitionEndsAt } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Canonical plan/trial/screen entitlement for the signed-in account (web + mobile). */
-export async function GET(req: Request) {
+export const GET = withLocalizedErrors(async function GET(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const e = await loadEffectiveEntitlement(admin.accountId);
@@ -16,4 +17,4 @@ export async function GET(req: Request) {
   return json(toResponse(admin.accountId, e, process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin, {
     transitionEndsAt: transitionEndsAt(started),
   }));
-}
+});
