@@ -1,0 +1,1697 @@
+{
+ "formatWhen|null|2026-11-15T08:00:00.000Z": "Nov 15, 2026 at 12:00 AM PST",
+ "remaining|2026-11-15T08:00:00.000Z": "in 3 days",
+ "template|trial_ending_3|null|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|null|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|null|2026-11-15T08:00:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 15, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|null|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|null|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|null|2026-11-15T08:00:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 15, 2026 at 12:00 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|null|2026-11-13T09:30:00.000Z": "Nov 13, 2026 at 1:30 AM PST",
+ "remaining|2026-11-13T09:30:00.000Z": "in 1 day",
+ "template|trial_ending_3|null|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|null|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|null|2026-11-13T09:30:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 1:30 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|null|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|null|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|null|2026-11-13T09:30:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 13, 2026 at 1:30 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|null|2026-11-12T10:15:00.000Z": "Nov 12, 2026 at 2:15 AM PST",
+ "remaining|2026-11-12T10:15:00.000Z": "in 2 hours",
+ "template|trial_ending_3|null|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|null|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|null|2026-11-12T10:15:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 2:15 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|null|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|null|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|null|2026-11-12T10:15:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 2:15 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|null|2026-11-12T08:40:00.000Z": "Nov 12, 2026 at 12:40 AM PST",
+ "remaining|2026-11-12T08:40:00.000Z": "in less than an hour",
+ "template|trial_ending_3|null|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|null|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|null|2026-11-12T08:40:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 12:40 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|null|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|null|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|null|2026-11-12T08:40:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 12:40 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|null|2026-11-26T20:07:00.000Z": "Nov 26, 2026 at 12:07 PM PST",
+ "remaining|2026-11-26T20:07:00.000Z": "in 14 days",
+ "template|trial_ending_3|null|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|null|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|null|2026-11-26T20:07:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 26, 2026 at 12:07 PM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|null|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|null|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|null|2026-11-26T20:07:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 12:07 PM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|UTC|2026-11-15T08:00:00.000Z": "Nov 15, 2026 at 12:00 AM PST",
+ "template|trial_ending_3|UTC|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|UTC|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|UTC|2026-11-15T08:00:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 15, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|UTC|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|UTC|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|UTC|2026-11-15T08:00:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 15, 2026 at 12:00 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|UTC|2026-11-13T09:30:00.000Z": "Nov 13, 2026 at 1:30 AM PST",
+ "template|trial_ending_3|UTC|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|UTC|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|UTC|2026-11-13T09:30:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 1:30 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|UTC|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|UTC|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|UTC|2026-11-13T09:30:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 13, 2026 at 1:30 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|UTC|2026-11-12T10:15:00.000Z": "Nov 12, 2026 at 2:15 AM PST",
+ "template|trial_ending_3|UTC|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|UTC|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|UTC|2026-11-12T10:15:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 2:15 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|UTC|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|UTC|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|UTC|2026-11-12T10:15:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 2:15 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|UTC|2026-11-12T08:40:00.000Z": "Nov 12, 2026 at 12:40 AM PST",
+ "template|trial_ending_3|UTC|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|UTC|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|UTC|2026-11-12T08:40:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 12:40 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|UTC|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|UTC|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|UTC|2026-11-12T08:40:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 12:40 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|UTC|2026-11-26T20:07:00.000Z": "Nov 26, 2026 at 12:07 PM PST",
+ "template|trial_ending_3|UTC|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|UTC|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|UTC|2026-11-26T20:07:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 26, 2026 at 12:07 PM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|UTC|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|UTC|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|UTC|2026-11-26T20:07:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 12:07 PM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Los_Angeles|2026-11-15T08:00:00.000Z": "Nov 15, 2026 at 12:00 AM PST",
+ "template|trial_ending_3|America/Los_Angeles|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Los_Angeles|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Los_Angeles|2026-11-15T08:00:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 15, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Los_Angeles|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Los_Angeles|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Los_Angeles|2026-11-15T08:00:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 15, 2026 at 12:00 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Los_Angeles|2026-11-13T09:30:00.000Z": "Nov 13, 2026 at 1:30 AM PST",
+ "template|trial_ending_3|America/Los_Angeles|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Los_Angeles|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Los_Angeles|2026-11-13T09:30:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 1:30 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Los_Angeles|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Los_Angeles|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Los_Angeles|2026-11-13T09:30:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 13, 2026 at 1:30 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Los_Angeles|2026-11-12T10:15:00.000Z": "Nov 12, 2026 at 2:15 AM PST",
+ "template|trial_ending_3|America/Los_Angeles|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Los_Angeles|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Los_Angeles|2026-11-12T10:15:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 2:15 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Los_Angeles|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Los_Angeles|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Los_Angeles|2026-11-12T10:15:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 2:15 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Los_Angeles|2026-11-12T08:40:00.000Z": "Nov 12, 2026 at 12:40 AM PST",
+ "template|trial_ending_3|America/Los_Angeles|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Los_Angeles|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Los_Angeles|2026-11-12T08:40:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 12:40 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Los_Angeles|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Los_Angeles|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Los_Angeles|2026-11-12T08:40:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 12:40 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Los_Angeles|2026-11-26T20:07:00.000Z": "Nov 26, 2026 at 12:07 PM PST",
+ "template|trial_ending_3|America/Los_Angeles|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Los_Angeles|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Los_Angeles|2026-11-26T20:07:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 26, 2026 at 12:07 PM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Los_Angeles|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Los_Angeles|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Los_Angeles|2026-11-26T20:07:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 12:07 PM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Mexico_City|2026-11-15T08:00:00.000Z": "Nov 15, 2026 at 2:00 AM CST",
+ "template|trial_ending_3|America/Mexico_City|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 2:00 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Mexico_City|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 2:00 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Mexico_City|2026-11-15T08:00:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 15, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Mexico_City|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 2:00 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Mexico_City|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 2:00 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Mexico_City|2026-11-15T08:00:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 15, 2026 at 2:00 AM CST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Mexico_City|2026-11-13T09:30:00.000Z": "Nov 13, 2026 at 3:30 AM CST",
+ "template|trial_ending_3|America/Mexico_City|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 3:30 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Mexico_City|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 3:30 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Mexico_City|2026-11-13T09:30:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 3:30 AM CST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Mexico_City|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 3:30 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Mexico_City|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 3:30 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Mexico_City|2026-11-13T09:30:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 13, 2026 at 3:30 AM CST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Mexico_City|2026-11-12T10:15:00.000Z": "Nov 12, 2026 at 4:15 AM CST",
+ "template|trial_ending_3|America/Mexico_City|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 4:15 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Mexico_City|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 4:15 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Mexico_City|2026-11-12T10:15:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 4:15 AM CST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Mexico_City|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 4:15 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Mexico_City|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 4:15 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Mexico_City|2026-11-12T10:15:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 4:15 AM CST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Mexico_City|2026-11-12T08:40:00.000Z": "Nov 12, 2026 at 2:40 AM CST",
+ "template|trial_ending_3|America/Mexico_City|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:40 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Mexico_City|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:40 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Mexico_City|2026-11-12T08:40:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 2:40 AM CST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Mexico_City|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:40 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Mexico_City|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:40 AM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Mexico_City|2026-11-12T08:40:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 2:40 AM CST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/Mexico_City|2026-11-26T20:07:00.000Z": "Nov 26, 2026 at 2:07 PM CST",
+ "template|trial_ending_3|America/Mexico_City|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 2:07 PM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/Mexico_City|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 2:07 PM CST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/Mexico_City|2026-11-26T20:07:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 26, 2026 at 2:07 PM CST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/Mexico_City|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 2:07 PM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/Mexico_City|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 2:07 PM CST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/Mexico_City|2026-11-26T20:07:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 2:07 PM CST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/New_York|2026-11-15T08:00:00.000Z": "Nov 15, 2026 at 3:00 AM EST",
+ "template|trial_ending_3|America/New_York|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 3:00 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/New_York|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 3:00 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/New_York|2026-11-15T08:00:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 15, 2026 at 3:00 AM EST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/New_York|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 3:00 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/New_York|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 3:00 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/New_York|2026-11-15T08:00:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 15, 2026 at 3:00 AM EST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/New_York|2026-11-13T09:30:00.000Z": "Nov 13, 2026 at 4:30 AM EST",
+ "template|trial_ending_3|America/New_York|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 4:30 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/New_York|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 4:30 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/New_York|2026-11-13T09:30:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 4:30 AM EST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/New_York|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 4:30 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/New_York|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 4:30 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/New_York|2026-11-13T09:30:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 13, 2026 at 4:30 AM EST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/New_York|2026-11-12T10:15:00.000Z": "Nov 12, 2026 at 5:15 AM EST",
+ "template|trial_ending_3|America/New_York|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 5:15 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/New_York|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 5:15 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/New_York|2026-11-12T10:15:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 5:15 AM EST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/New_York|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 5:15 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/New_York|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 5:15 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/New_York|2026-11-12T10:15:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 5:15 AM EST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/New_York|2026-11-12T08:40:00.000Z": "Nov 12, 2026 at 3:40 AM EST",
+ "template|trial_ending_3|America/New_York|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 3:40 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/New_York|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 3:40 AM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/New_York|2026-11-12T08:40:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 3:40 AM EST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/New_York|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 3:40 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/New_York|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 3:40 AM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/New_York|2026-11-12T08:40:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 3:40 AM EST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|America/New_York|2026-11-26T20:07:00.000Z": "Nov 26, 2026 at 3:07 PM EST",
+ "template|trial_ending_3|America/New_York|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 3:07 PM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|America/New_York|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 3:07 PM EST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|America/New_York|2026-11-26T20:07:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 26, 2026 at 3:07 PM EST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|America/New_York|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 3:07 PM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|America/New_York|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 3:07 PM EST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|America/New_York|2026-11-26T20:07:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 3:07 PM EST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|Not/AZone|2026-11-15T08:00:00.000Z": "Nov 15, 2026 at 12:00 AM PST",
+ "template|trial_ending_3|Not/AZone|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|Not/AZone|2026-11-15T08:00:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko trial ends in 3 days",
+  "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|Not/AZone|2026-11-15T08:00:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 15, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|Not/AZone|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|Not/AZone|2026-11-15T08:00:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko payment grace ends in 3 days",
+  "text": "Your payment grace ends on Nov 15, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|Not/AZone|2026-11-15T08:00:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-15T08:00:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 15, 2026 at 12:00 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|Not/AZone|2026-11-13T09:30:00.000Z": "Nov 13, 2026 at 1:30 AM PST",
+ "template|trial_ending_3|Not/AZone|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|Not/AZone|2026-11-13T09:30:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko trial ends in 1 day",
+  "text": "Your free trial ends on Nov 13, 2026 at 1:30 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|Not/AZone|2026-11-13T09:30:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 1:30 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|Not/AZone|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|Not/AZone|2026-11-13T09:30:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko payment grace ends in 1 day",
+  "text": "Your payment grace ends on Nov 13, 2026 at 1:30 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|Not/AZone|2026-11-13T09:30:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-13T09:30:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 13, 2026 at 1:30 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|Not/AZone|2026-11-12T10:15:00.000Z": "Nov 12, 2026 at 2:15 AM PST",
+ "template|trial_ending_3|Not/AZone|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|Not/AZone|2026-11-12T10:15:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko trial ends in 2 hours",
+  "text": "Your free trial ends on Nov 12, 2026 at 2:15 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|Not/AZone|2026-11-12T10:15:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 2:15 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|Not/AZone|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|Not/AZone|2026-11-12T10:15:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko payment grace ends in 2 hours",
+  "text": "Your payment grace ends on Nov 12, 2026 at 2:15 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|Not/AZone|2026-11-12T10:15:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T10:15:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 2:15 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|Not/AZone|2026-11-12T08:40:00.000Z": "Nov 12, 2026 at 12:40 AM PST",
+ "template|trial_ending_3|Not/AZone|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|Not/AZone|2026-11-12T08:40:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko trial ends in less than an hour",
+  "text": "Your free trial ends on Nov 12, 2026 at 12:40 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|Not/AZone|2026-11-12T08:40:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 12, 2026 at 12:40 AM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|Not/AZone|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|Not/AZone|2026-11-12T08:40:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko payment grace ends in less than an hour",
+  "text": "Your payment grace ends on Nov 12, 2026 at 12:40 AM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|Not/AZone|2026-11-12T08:40:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-12T08:40:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 12, 2026 at 12:40 AM PST. Your content stays; nothing is deleted."
+ },
+ "formatWhen|Not/AZone|2026-11-26T20:07:00.000Z": "Nov 26, 2026 at 12:07 PM PST",
+ "template|trial_ending_3|Not/AZone|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_3",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|trial_ending_1|Not/AZone|2026-11-26T20:07:00.000Z": {
+  "kind": "trial_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko trial ends in 14 days",
+  "text": "Your free trial ends on Nov 26, 2026 at 12:07 PM PST. Choose a plan to keep your screens on. Your content stays either way."
+ },
+ "template|payment_failed|Not/AZone|2026-11-26T20:07:00.000Z": {
+  "kind": "payment_failed",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Pekko couldn't take your payment",
+  "text": "We couldn't take your last payment. Update your payment method before Nov 26, 2026 at 12:07 PM PST to keep your screens playing. Your content is not deleted."
+ },
+ "template|grace_ending_2|Not/AZone|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_2",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|grace_ending_1|Not/AZone|2026-11-26T20:07:00.000Z": {
+  "kind": "grace_ending_1",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko payment grace ends in 14 days",
+  "text": "Your payment grace ends on Nov 26, 2026 at 12:07 PM PST. Update your payment method before then. Your content is not deleted."
+ },
+ "template|transition_14|Not/AZone|2026-11-26T20:07:00.000Z": {
+  "kind": "transition_14",
+  "deadline": "2026-11-26T20:07:00.000Z",
+  "subject": "Your Pekko access continues for 14 days",
+  "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 12:07 PM PST. Your content stays; nothing is deleted."
+ },
+ "notices|trial3|null": [
+  {
+   "kind": "trial_ending_3",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices-enforced|trial3|null": [
+  {
+   "kind": "trial_ending_3",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices|trial3|America/Mexico_City": [
+  {
+   "kind": "trial_ending_3",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 2:00 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices-enforced|trial3|America/Mexico_City": [
+  {
+   "kind": "trial_ending_3",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 2:00 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices|trial1|null": [
+  {
+   "kind": "trial_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 1 day",
+   "text": "Your free trial ends on Nov 13, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices-enforced|trial1|null": [
+  {
+   "kind": "trial_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 1 day",
+   "text": "Your free trial ends on Nov 13, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices|trial1|America/Mexico_City": [
+  {
+   "kind": "trial_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 1 day",
+   "text": "Your free trial ends on Nov 13, 2026 at 2:00 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices-enforced|trial1|America/Mexico_City": [
+  {
+   "kind": "trial_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 1 day",
+   "text": "Your free trial ends on Nov 13, 2026 at 2:00 AM CST. Choose a plan to keep your screens on. Your content stays either way."
+  }
+ ],
+ "notices|trialGrace|null": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 12:00 AM PST. Your content is still saved."
+  }
+ ],
+ "notices-enforced|trialGrace|null": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 12:00 AM PST. Your content is still saved."
+  }
+ ],
+ "notices|trialGrace|America/Mexico_City": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 2:00 AM CST. Your content is still saved."
+  }
+ ],
+ "notices-enforced|trialGrace|America/Mexico_City": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 2:00 AM CST. Your content is still saved."
+  }
+ ],
+ "notices|trialGraceNoEnd|null": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices-enforced|trialGraceNoEnd|null": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices|trialGraceNoEnd|America/Mexico_City": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices-enforced|trialGraceNoEnd|America/Mexico_City": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices|expired|null": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-04T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices-enforced|expired|null": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-04T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices|expired|America/Mexico_City": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-04T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices-enforced|expired|America/Mexico_City": [
+  {
+   "kind": "trial_ended",
+   "deadline": "2026-11-04T08:00:00.000Z",
+   "subject": "Your Pekko trial has ended",
+   "text": "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on."
+  }
+ ],
+ "notices|pastDue2|null": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 14, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_2",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 2 days",
+   "text": "Your payment grace ends on Nov 14, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices-enforced|pastDue2|null": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 14, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_2",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 2 days",
+   "text": "Your payment grace ends on Nov 14, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices|pastDue2|America/Mexico_City": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 14, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_2",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 2 days",
+   "text": "Your payment grace ends on Nov 14, 2026 at 2:00 AM CST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices-enforced|pastDue2|America/Mexico_City": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 14, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_2",
+   "deadline": "2026-11-14T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 2 days",
+   "text": "Your payment grace ends on Nov 14, 2026 at 2:00 AM CST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices|pastDue1|null": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 1 day",
+   "text": "Your payment grace ends on Nov 13, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices-enforced|pastDue1|null": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 1 day",
+   "text": "Your payment grace ends on Nov 13, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices|pastDue1|America/Mexico_City": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 1 day",
+   "text": "Your payment grace ends on Nov 13, 2026 at 2:00 AM CST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices-enforced|pastDue1|America/Mexico_City": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 1 day",
+   "text": "Your payment grace ends on Nov 13, 2026 at 2:00 AM CST. Update your payment method before then. Your content is not deleted."
+  }
+ ],
+ "notices|pastDue5|null": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-17T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 17, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  }
+ ],
+ "notices-enforced|pastDue5|null": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-17T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 17, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  }
+ ],
+ "notices|pastDue5|America/Mexico_City": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-17T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 17, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+  }
+ ],
+ "notices-enforced|pastDue5|America/Mexico_City": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-17T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 17, 2026 at 2:00 AM CST to keep your screens playing. Your content is not deleted."
+  }
+ ],
+ "notices|canceled|null": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices-enforced|canceled|null": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices|canceled|America/Mexico_City": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices-enforced|canceled|America/Mexico_City": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "2026-11-10T08:00:00.000Z",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices|canceledNoDates|null": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "none",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices-enforced|canceledNoDates|null": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "none",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices|canceledNoDates|America/Mexico_City": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "none",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices-enforced|canceledNoDates|America/Mexico_City": [
+  {
+   "kind": "subscription_canceled",
+   "deadline": "none",
+   "subject": "Your Pekko screens are paused",
+   "text": "Your subscription is not active, so your screens are paused. Your content and settings are saved. Choose a plan or update your payment method in Billing to turn them back on."
+  }
+ ],
+ "notices|active|null": [],
+ "notices-enforced|active|null": [],
+ "notices|active|America/Mexico_City": [],
+ "notices-enforced|active|America/Mexico_City": [],
+ "notices|grandfathered|null": [],
+ "notices-enforced|grandfathered|null": [
+  {
+   "kind": "transition_14",
+   "deadline": "2026-11-20T08:00:00.000Z",
+   "subject": "Your Pekko access continues for 14 days",
+   "text": "You're an early Pekko customer. You keep full access through Nov 20, 2026 at 12:00 AM PST. Your content stays; nothing is deleted."
+  }
+ ],
+ "notices|grandfathered|America/Mexico_City": [],
+ "notices-enforced|grandfathered|America/Mexico_City": [
+  {
+   "kind": "transition_14",
+   "deadline": "2026-11-20T08:00:00.000Z",
+   "subject": "Your Pekko access continues for 14 days",
+   "text": "You're an early Pekko customer. You keep full access through Nov 20, 2026 at 2:00 AM CST. Your content stays; nothing is deleted."
+  }
+ ],
+ "selftest": [
+  {
+   "kind": "trial_ending_3",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "[TEST] Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+  },
+  {
+   "kind": "trial_ending_1",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "[TEST] Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way."
+  },
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-19T08:00:00.000Z",
+   "subject": "[TEST] Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 19, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_2",
+   "deadline": "2026-11-19T08:00:00.000Z",
+   "subject": "[TEST] Your Pekko payment grace ends in 7 days",
+   "text": "Your payment grace ends on Nov 19, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+  },
+  {
+   "kind": "grace_ending_1",
+   "deadline": "2026-11-19T08:00:00.000Z",
+   "subject": "[TEST] Your Pekko payment grace ends in 7 days",
+   "text": "Your payment grace ends on Nov 19, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted."
+  },
+  {
+   "kind": "transition_14",
+   "deadline": "2026-11-26T08:00:00.000Z",
+   "subject": "[TEST] Your Pekko access continues for 14 days",
+   "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 12:00 AM PST. Your content stays; nothing is deleted."
+  }
+ ],
+ "plan|acct-gf": [
+  {
+   "kind": "transition_14",
+   "deadline": "2026-11-26T08:00:00.000Z",
+   "subject": "Your Pekko access continues for 14 days",
+   "text": "You're an early Pekko customer. You keep full access through Nov 26, 2026 at 2:00 AM CST. Your content stays; nothing is deleted.",
+   "claimKey": "acct-gf|transition_14|notice",
+   "transitionStart": "2026-11-12T08:00:00.000Z"
+  }
+ ],
+ "plan|acct-trial": [
+  {
+   "kind": "trial_ending_3",
+   "deadline": "2026-11-15T08:00:00.000Z",
+   "subject": "Your Pekko trial ends in 3 days",
+   "text": "Your free trial ends on Nov 15, 2026 at 12:00 AM PST. Choose a plan to keep your screens on. Your content stays either way.",
+   "claimKey": "acct-trial|trial_ending_3|2026-11-15T08:00:00.000Z",
+   "transitionStart": null
+  }
+ ],
+ "plan|acct-due": [
+  {
+   "kind": "payment_failed",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Pekko couldn't take your payment",
+   "text": "We couldn't take your last payment. Update your payment method before Nov 13, 2026 at 12:00 AM PST to keep your screens playing. Your content is not deleted.",
+   "claimKey": "acct-due|payment_failed|2026-11-13T08:00:00.000Z",
+   "transitionStart": null
+  },
+  {
+   "kind": "grace_ending_1",
+   "deadline": "2026-11-13T08:00:00.000Z",
+   "subject": "Your Pekko payment grace ends in 1 day",
+   "text": "Your payment grace ends on Nov 13, 2026 at 12:00 AM PST. Update your payment method before then. Your content is not deleted.",
+   "claimKey": "acct-due|grace_ending_1|2026-11-13T08:00:00.000Z",
+   "transitionStart": null
+  }
+ ],
+ "alertEmail|al1|UTC": {
+  "subject": "Pekko: \"Office Tv\" is offline",
+  "text": "Your screen \"Office Tv\" stopped checking in around Nov 12, 2:05 AM UTC.\n\nCheck that the TV is on and connected to the internet. Your content is saved on the TV, so it may still be showing it.\n\nSee your screens: https://pekkotv.com/dashboard/displays\nChange alert settings: https://pekkotv.com/dashboard/settings"
+ },
+ "formatAt|UTC": "Nov 12, 2:05 AM UTC",
+ "alertEmail|al1|America/Los_Angeles": {
+  "subject": "Pekko: \"Office Tv\" is offline",
+  "text": "Your screen \"Office Tv\" stopped checking in around Nov 11, 6:05 PM PST.\n\nCheck that the TV is on and connected to the internet. Your content is saved on the TV, so it may still be showing it.\n\nSee your screens: https://pekkotv.com/dashboard/displays\nChange alert settings: https://pekkotv.com/dashboard/settings"
+ },
+ "formatAt|America/Los_Angeles": "Nov 11, 6:05 PM PST",
+ "alertEmail|al1|America/Mexico_City": {
+  "subject": "Pekko: \"Office Tv\" is offline",
+  "text": "Your screen \"Office Tv\" stopped checking in around Nov 11, 8:05 PM CST.\n\nCheck that the TV is on and connected to the internet. Your content is saved on the TV, so it may still be showing it.\n\nSee your screens: https://pekkotv.com/dashboard/displays\nChange alert settings: https://pekkotv.com/dashboard/settings"
+ },
+ "formatAt|America/Mexico_City": "Nov 11, 8:05 PM CST",
+ "alertEmail|al1|Not/AZone": {
+  "subject": "Pekko: \"Office Tv\" is offline",
+  "text": "Your screen \"Office Tv\" stopped checking in around Nov 12, 2:05 AM UTC.\n\nCheck that the TV is on and connected to the internet. Your content is saved on the TV, so it may still be showing it.\n\nSee your screens: https://pekkotv.com/dashboard/displays\nChange alert settings: https://pekkotv.com/dashboard/settings"
+ },
+ "formatAt|Not/AZone": "Nov 12, 2:05 AM UTC",
+ "alertEmail|al2|UTC": {
+  "subject": "Pekko: \"Office Tv\" is back online",
+  "text": "Your screen \"Office Tv\" is back online after about 25 min (offline since Nov 12, 2:05 AM UTC).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al2|America/Los_Angeles": {
+  "subject": "Pekko: \"Office Tv\" is back online",
+  "text": "Your screen \"Office Tv\" is back online after about 25 min (offline since Nov 11, 6:05 PM PST).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al2|America/Mexico_City": {
+  "subject": "Pekko: \"Office Tv\" is back online",
+  "text": "Your screen \"Office Tv\" is back online after about 25 min (offline since Nov 11, 8:05 PM CST).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al2|Not/AZone": {
+  "subject": "Pekko: \"Office Tv\" is back online",
+  "text": "Your screen \"Office Tv\" is back online after about 25 min (offline since Nov 12, 2:05 AM UTC).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al3|UTC": {
+  "subject": "Pekko: \"Barra \"Norte\" — Taquería\" is back online",
+  "text": "Your screen \"Barra \"Norte\" — Taquería\" is back online after about 2.5 h (offline since Nov 12, 2:05 AM UTC).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al3|America/Los_Angeles": {
+  "subject": "Pekko: \"Barra \"Norte\" — Taquería\" is back online",
+  "text": "Your screen \"Barra \"Norte\" — Taquería\" is back online after about 2.5 h (offline since Nov 11, 6:05 PM PST).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al3|America/Mexico_City": {
+  "subject": "Pekko: \"Barra \"Norte\" — Taquería\" is back online",
+  "text": "Your screen \"Barra \"Norte\" — Taquería\" is back online after about 2.5 h (offline since Nov 11, 8:05 PM CST).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al3|Not/AZone": {
+  "subject": "Pekko: \"Barra \"Norte\" — Taquería\" is back online",
+  "text": "Your screen \"Barra \"Norte\" — Taquería\" is back online after about 2.5 h (offline since Nov 12, 2:05 AM UTC).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al4|UTC": {
+  "subject": "Pekko: \"Patio\" is back online",
+  "text": "Your screen \"Patio\" is back online after about 1 min (offline since Nov 12, 2:05 AM UTC).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al4|America/Los_Angeles": {
+  "subject": "Pekko: \"Patio\" is back online",
+  "text": "Your screen \"Patio\" is back online after about 1 min (offline since Nov 11, 6:05 PM PST).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al4|America/Mexico_City": {
+  "subject": "Pekko: \"Patio\" is back online",
+  "text": "Your screen \"Patio\" is back online after about 1 min (offline since Nov 11, 8:05 PM CST).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "alertEmail|al4|Not/AZone": {
+  "subject": "Pekko: \"Patio\" is back online",
+  "text": "Your screen \"Patio\" is back online after about 1 min (offline since Nov 12, 2:05 AM UTC).\n\nSee your screens: https://pekkotv.com/dashboard/displays"
+ },
+ "push|al1": {
+  "title": "\"Office Tv\" is offline",
+  "body": "It stopped checking in. Check that the TV is on and connected.",
+  "data": {
+   "type": "screen_offline",
+   "alertId": "al1",
+   "screenId": "d1"
+  }
+ },
+ "push|al2": {
+  "title": "\"Office Tv\" is back online",
+  "body": "Your screen is checking in again.",
+  "data": {
+   "type": "screen_online",
+   "alertId": "al2",
+   "screenId": "d1"
+  }
+ },
+ "push|al3": {
+  "title": "\"Barra \"Norte\" — Taquería\" is back online",
+  "body": "Your screen is checking in again.",
+  "data": {
+   "type": "screen_online",
+   "alertId": "al3",
+   "screenId": ""
+  }
+ },
+ "push|al4": {
+  "title": "\"Patio\" is back online",
+  "body": "Your screen is checking in again.",
+  "data": {
+   "type": "screen_online",
+   "alertId": "al4",
+   "screenId": "d4"
+  }
+ },
+ "welcome|default": {
+  "to": "owner@x.test",
+  "subject": "Welcome to Pekko",
+  "text": "Hi,\n\nThanks for creating your Pekko account. To get your first screen playing:\n\n1. On the TV, open pekkotv.com/tv. It shows a 6-digit code.\n2. In Pekko, open My Screens, choose Add screen and enter that code.\n3. Upload a photo, video or menu and publish it to the screen.\n\nOpen your dashboard: https://pekkotv.com/dashboard\n\nYou're getting this one-time email because you just created a Pekko account with this address.\n\nPekko"
+ },
+ "welcome|origin": {
+  "to": "owner@x.test",
+  "subject": "Welcome to Pekko",
+  "text": "Hi,\n\nThanks for creating your Pekko account. To get your first screen playing:\n\n1. On the TV, open pantalla-chi.vercel.app/tv. It shows a 6-digit code.\n2. In Pekko, open My Screens, choose Add screen and enter that code.\n3. Upload a photo, video or menu and publish it to the screen.\n\nOpen your dashboard: https://pantalla-chi.vercel.app/dashboard\n\nYou're getting this one-time email because you just created a Pekko account with this address.\n\nPekko"
+ }
+}

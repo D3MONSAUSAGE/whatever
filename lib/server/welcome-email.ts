@@ -1,6 +1,8 @@
 import { db } from "./supabase";
 import { sendTransactionalEmail, supabaseNoticeLedger, type NoticeLedger, type SendResult } from "./transactional-email";
 import type { EmailMessage } from "./email";
+import { notificationLocale } from "./notification-locale";
+import type { Locale } from "@/lib/i18n/locales";
 
 /**
  * E4: one welcome email per account, sent the first time a new owner's dashboard loads setup progress
@@ -32,7 +34,8 @@ export function welcomeSince(env: Record<string, string | undefined> = process.e
   return raw && Number.isFinite(at) ? at : null;
 }
 
-export function welcomeMessage(to: string, origin = "https://pekkotv.com"): EmailMessage {
+export function welcomeMessage(to: string, origin = "https://pekkotv.com", locale: Locale = "en"): EmailMessage {
+  if (locale === "es") return welcomeMessageEs(to, origin);
   return {
     to,
     subject: "Welcome to Pekko",
@@ -54,6 +57,29 @@ export function welcomeMessage(to: string, origin = "https://pekkotv.com"): Emai
   };
 }
 
+/** I18N-4: Spanish welcome. Same steps, links and one-time notice as English. */
+function welcomeMessageEs(to: string, origin: string): EmailMessage {
+  return {
+    to,
+    subject: "Le damos la bienvenida a Pekko",
+    text: [
+      "Hola:",
+      "",
+      "Gracias por crear su cuenta de Pekko. Para que su primera pantalla empiece a reproducir:",
+      "",
+      `1. En la TV, abra ${origin.replace(/^https:\/\//, "")}/tv. Mostrará un código de 6 dígitos.`,
+      "2. En Pekko, abra Mis pantallas, elija Agregar pantalla y escriba ese código.",
+      "3. Suba una foto, un video o un menú y publíquelo en la pantalla.",
+      "",
+      `Abra su panel: ${origin}/dashboard`,
+      "",
+      "Recibe este correo único porque acaba de crear una cuenta de Pekko con esta dirección.",
+      "",
+      "Pekko",
+    ].join("\n"),
+  };
+}
+
 export type WelcomeDeps = {
   env?: Record<string, string | undefined>;
   ledger?: NoticeLedger;
@@ -62,6 +88,8 @@ export type WelcomeDeps = {
   lookup?: (input: { userId: string; accountId: string }) => Promise<{ emailConfirmedAt: string | null; accountCreatedAt: string | null } | null>;
   send?: typeof sendTransactionalEmail;
   log?: (line: string) => void;
+  /** I18N-4: accounts.locale, read only after every gate passed. Copy language only. */
+  locale?: (accountId: string) => Promise<Locale>;
 };
 
 export type WelcomeOutcome = "disabled" | "no-email" | "already" | "unconfirmed" | "too-old" | "lookup-failed" | SendResult["reason"];
@@ -99,11 +127,12 @@ export async function maybeSendWelcome(
     const created = Date.parse(facts.accountCreatedAt ?? "");
     const now = (deps.now ?? Date.now)();
     if (!Number.isFinite(created) || created < since || now - created > WELCOME_WINDOW_MS) return "too-old";
+    const locale = await (deps.locale ?? notificationLocale)(admin.accountId);
     const result = await (deps.send ?? sendTransactionalEmail)({
       idempotencyKey: key,
       accountId: admin.accountId,
       kind: WELCOME_KIND,
-      message: welcomeMessage(admin.email),
+      message: welcomeMessage(admin.email, undefined, locale),
       env,
       ledger,
       log,
