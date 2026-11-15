@@ -125,6 +125,11 @@ describe("I18N-2: Spanish for API errors Android can show (codes unchanged)", ()
     "emailEnabled must be true or false.", "enabled must be true or false.", "platform must be 'android' or 'ios'.",
     "pushEnabled must be true or false.", "token must be an FCM registration token.", "unauthorized", "unavailable", "…",
   ]);
+  // Field-name validation for developers and devices, never shown to a customer as a sentence.
+  const DEV_OR_BILLING_ONLY_TEMPLATES = new Set([
+    "${k} must be true or false.",
+    "thresholdMinutes must be a whole number from ${THRESHOLD_MIN} to ${THRESHOLD_MAX}.",
+  ]);
   function walk(dir: string): string[] {
     return readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".ts") ? [p] : []; });
   }
@@ -136,8 +141,23 @@ describe("I18N-2: Spanish for API errors Android can show (codes unchanged)", ()
         const text = m[1];
         if (!catalog.has(text) && apiMessageEs(text) === null && !DEV_OR_BILLING_ONLY.has(text)) missing.add(`${f}: ${text}`);
       }
+      // Gother #111 LOW: template fail(`…`) calls too. Each ${…} is filled with a sample value before the lookup;
+      // `${name}: ${error}` wrappers only pass through inner messages, which this walk already checks on their own.
+      for (const m of readFileSync(f, "utf8").matchAll(/fail\(\s*`([^`]+)`/g)) {
+        const raw = m[1];
+        if (/^\$\{[^}]+\}: \$\{[^}]+\}$/.test(raw) || DEV_OR_BILLING_ONLY_TEMPLATES.has(raw)) continue;
+        const sample = raw.replace(/\$\{[^}]+\}/g, "7");
+        if (!catalog.has(sample) && apiMessageEs(sample) === null) missing.add(`${f}: ${raw}`);
+      }
     }
     expect([...missing]).toEqual([]);
+  });
+  it("the template walk sees fail(`…`) calls and catches an untranslated one", () => {
+    const src = 'return fail(`This account already has ${MAX_MENUS} menus.`, 400); return fail(`Only ${n} left on this plan.`, 400);';
+    const found = [...src.matchAll(/fail\(\s*`([^`]+)`/g)].map((m) => m[1].replace(/\$\{[^}]+\}/g, "7"));
+    expect(found).toEqual(["This account already has 7 menus.", "Only 7 left on this plan."]);
+    expect(apiMessageEs(found[0])).toBe("Esta cuenta ya tiene 7 menús.");
+    expect(apiMessageEs(found[1])).toBeNull();
   });
   it("customer routes are wrapped so errors come back in the caller's language; player, cron, billing and webhooks are not", () => {
     const skip = /app\/api\/(admin|billing|cron|config|health|player|webhooks|entitlements)\//;
