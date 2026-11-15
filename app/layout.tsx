@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SignupAttribution } from "@/components/signup-attribution";
+import { LocaleProvider } from "@/lib/i18n/client";
+import { getLocale } from "@/lib/i18n/server";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,10 +30,17 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0066FF" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * I18N-1: the pekko_locale cookie picks the language (English when unset), so pages render per request.
+ * Switching language only changes React context + the cookie; nothing remounts, so drafts survive.
+ */
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="en" className={inter.variable}>
-      <body className={`${inter.className} antialiased`}><SignupAttribution />{children}</body>
+    <html lang={locale} className={inter.variable}>
+      <body className={`${inter.className} antialiased`}>
+        <LocaleProvider initial={locale}><SignupAttribution />{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

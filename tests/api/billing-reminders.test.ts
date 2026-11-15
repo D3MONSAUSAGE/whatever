@@ -83,13 +83,13 @@ describe("GET /api/cron/billing-reminders", () => {
     process.env.CRON_SECRET = SECRET;
     const wrong = await call("http://localhost/api/cron/billing-reminders?dryRun=1", "Bearer not-the-secret");
     expect(wrong.status).toBe(401);
-    expect(wrong.body).toEqual({ error: "Unauthorized." });
+    expect(wrong.body).toMatchObject({ error: "Unauthorized." });
     expect(JSON.stringify(wrong.body)).not.toContain(SECRET);
 
     delete process.env.CRON_SECRET;
     const missing = await call("http://localhost/api/cron/billing-reminders?dryRun=1", `Bearer ${SECRET}`);
     expect(missing.status).toBe(503);
-    expect(missing.body).toEqual({ error: "Cron isn't configured." });
+    expect(missing.body).toMatchObject({ error: "Cron isn't configured." });
     expect(JSON.stringify(missing.body)).not.toContain("cronAuth");
   });
 

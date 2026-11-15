@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LogoMark, WaveBackdrop } from "@/components/brand";
 
-export function ErrorView({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
+export function ErrorView({ title, body, action, dashboardLabel = "Go to dashboard" }: { title: string; body: string; action?: React.ReactNode; dashboardLabel?: string }) {
   return (
     <main className="wave-surface relative min-h-dvh overflow-hidden grid place-items-center px-5 py-12">
       <WaveBackdrop />
@@ -12,7 +12,7 @@ export function ErrorView({ title, body, action }: { title: string; body: string
           <p className="mt-2 text-sm text-muted leading-relaxed">{body}</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             {action}
-            <Link href="/dashboard" className="btn btn-quiet">Go to dashboard</Link>
+            <Link href="/dashboard" className="btn btn-quiet">{dashboardLabel}</Link>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { db } from "@/lib/server/supabase";
+import { withLocalizedErrors } from "@/lib/server/locale";
 import { requireAdmin } from "@/lib/server/auth";
 import { hashCode } from "@/lib/server/crypto";
 import {
@@ -15,7 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Admin enters the code shown on the TV.
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async (req: Request) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
 
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   // Count only real code attempts, so a blank form doesn't burn the budget.
   const okUser = await allow(`pair-claim:user:${admin.userId}`, PAIR_CLAIM_WINDOW_SECONDS, PAIR_CLAIM_MAX_PER_USER);
   const okIp = await allow(`pair-claim:ip:${clientIp(req)}`, PAIR_CLAIM_WINDOW_SECONDS, PAIR_CLAIM_MAX_PER_IP);
-  if (!okUser || !okIp) return fail("Too many attempts. Wait 15 minutes, then try again.", 429);
+  if (!okUser || !okIp) return fail("Too many attempts. Wait 15 minutes, then try again.", 429, "rate_limited_15m");
 
   const enforce = billingEnforced();
   if (enforce) {
@@ -78,4 +79,4 @@ export async function POST(req: Request) {
     .map((row) => String(row.name ?? ""));
   const warning = existing.error ? null : screenNameWarning(name, names);
   return json({ id: displayId, ...(warning ?? {}) });
-}
+});

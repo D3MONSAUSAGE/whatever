@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabase } from "./supabase-browser";
+import { currentLocale } from "./i18n/client";
 
 export type MediaUse = { id: string; name: string };
 
@@ -109,6 +110,7 @@ export function uploadForm(path: string, form: FormData, token: string, onProgre
     const xhr = new XMLHttpRequest();
     xhr.open("POST", path);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("Accept-Language", currentLocale());
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
     };
@@ -140,6 +142,8 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   const token = await authToken();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
+  // I18N-1: error text in the chosen UI language (the account's saved locale wins on the server).
+  if (!headers.has("Accept-Language")) headers.set("Accept-Language", currentLocale());
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   const res = await fetch(path, { ...init, headers });

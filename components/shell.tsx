@@ -3,6 +3,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
 import { ToastProvider } from "@/components/toast";
+import { AccountLocaleSync } from "@/components/i18n/account-locale-sync";
 import { UploadProgress, UploadsProvider } from "@/components/uploads";
 import { BrandLockup, PRODUCT_NAME } from "@/components/brand";
 import { AlertsBanner } from "@/components/alerts";
@@ -91,6 +92,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   return (
     <StudioLeaveProvider>
     <ToastProvider>
+    {preview ? null : <AccountLocaleSync />}
     <UploadsProvider>
     <div className="min-h-dvh md:flex">
       <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">

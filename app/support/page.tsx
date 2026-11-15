@@ -2,30 +2,34 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
 import { ContactBlock } from "@/components/contact-block";
+import { getT } from "@/lib/i18n/server";
+import type { MessageKey } from "@/lib/i18n/index";
+import { rich } from "@/components/i18n/rich";
 
-export const metadata: Metadata = { title: "Support · Pekko" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("support.metaTitle") };
+}
 
-const FAQ: { q: string; a: React.ReactNode }[] = [
-  { q: "The TV shows a 6-digit code and nothing else", a: <>It isn&apos;t paired yet. In Pekko, open <strong>My Screens → Add screen</strong> and type the code. A new code appears every 10 minutes. You can also reload the TV page for a new one.</> },
-  { q: "What address do I open on the TV?", a: <>Open the TV&apos;s web browser and go to <strong>pekkotv.com/pair</strong>. (pekkotv.com/tv opens the same player.) The address is also on the Add screen page with a copy button.</> },
-  { q: "I published but the TV still shows the old content", a: <>Check the TV is online (My Screens shows <em>Online</em>). The TV checks in about every 30 seconds. Saving a draft doesn&apos;t change the TV; press <strong>Publish</strong>.</> },
-  { q: "The screen says “This screen is paused”", a: <>Your trial or plan has ended, or this screen is beyond your plan&apos;s screen limit. Open <strong>Settings → Plan &amp; billing</strong>. Your content is kept and the TV resumes on its own.</> },
-  { q: "The screen says it's offline", a: <>Check the TV&apos;s Wi-Fi and power, and that the Pekko player is still open.</> },
-  { q: "My video won't upload or play", a: <>Use MP4 (H.264). Very large files take longer; keep the page open until it finishes.</> },
-  { q: "I forgot my password", a: <>Use <Link className="underline" href="/forgot-password">Forgot password</Link>. The link works once and expires in an hour; check spam.</> },
-  { q: "How do I delete my account?", a: <>See <Link className="underline" href="/account-deletion">Delete your account</Link>.</> },
+const ITEMS: { id: string; href?: string }[] = [
+  { id: "code" }, { id: "address" }, { id: "old" }, { id: "paused" }, { id: "offline" }, { id: "video" },
+  { id: "password", href: "/forgot-password" },
+  { id: "delete", href: "/account-deletion" },
 ];
 
-export default function Support() {
+export default async function Support() {
+  const t = await getT();
   return (
     <PublicPage>
-      <h1 className="text-2xl font-semibold tracking-tight">Support</h1>
-      <p className="text-muted mt-1">Quick fixes for common problems.</p>
+      <h1 className="text-2xl font-semibold tracking-tight">{t("support.title")}</h1>
+      <p className="text-muted mt-1">{t("support.lede")}</p>
       <div className="mt-6 grid gap-3">
-        {FAQ.map((f) => (
-          <details key={f.q} className="card p-4">
-            <summary className="font-semibold cursor-pointer">{f.q}</summary>
-            <p className="mt-2 text-sm leading-relaxed">{f.a}</p>
+        {ITEMS.map((f) => (
+          <details key={f.id} className="card p-4">
+            <summary className="font-semibold cursor-pointer">{t(`support.${f.id}.q` as MessageKey)}</summary>
+            <p className="mt-2 text-sm leading-relaxed">
+              {rich(t(`support.${f.id}.a` as MessageKey), { link: (c) => <Link className="underline" href={f.href ?? "/support"}>{c}</Link> })}
+            </p>
           </details>
         ))}
       </div>

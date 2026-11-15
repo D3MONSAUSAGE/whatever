@@ -1,10 +1,16 @@
 import { db } from "./supabase";
+import { codeForMessage } from "./error-codes";
 
 export function json(data: unknown, status = 200, headers?: Record<string, string>) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });
 }
 
-export const fail = (message: string, status: number) => json({ error: message }, status);
+/**
+ * Error response `{error, code}` (I18N-1). `error` is unchanged English text (+13 reads it word for word);
+ * `code` is a stable machine code: explicit, else from the exact message, else generic by status.
+ */
+export const fail = (message: string, status: number, code?: string) =>
+  json({ error: message, code: code ?? codeForMessage(message, status) }, status);
 
 export function clientIp(req: Request) {
   return (
@@ -34,7 +40,7 @@ export async function releaseLimit(key: string) {
 /** 429 with Retry-After when the fixed window is full. Null when the call is allowed. */
 export async function enforceLimit(key: string, windowSeconds: number, max: number, message: string) {
   if (await allow(key, windowSeconds, max)) return null;
-  return json({ error: message }, 429, { "Retry-After": String(await retryAfterSeconds(key, windowSeconds)) });
+  return json({ error: message, code: codeForMessage(message, 429) }, 429, { "Retry-After": String(await retryAfterSeconds(key, windowSeconds)) });
 }
 
 async function retryAfterSeconds(key: string, windowSeconds: number) {
