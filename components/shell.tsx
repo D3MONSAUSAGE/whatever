@@ -15,6 +15,7 @@ import { clearLayoutStudioDraftsOnSignOut, shouldClearStudioDraftsOnAuthEvent } 
 import { isContentPath, isMainNavActive, MAIN_NAV } from "@/lib/content-nav";
 import { StudioGuardedLink, StudioLeaveProvider, useStudioRequestLeave } from "@/components/studio-leave";
 import { IconCalendar, IconGear, IconGrid, IconImage, IconList, IconTv } from "@/components/icons";
+import { useT } from "@/lib/i18n/client";
 
 const NAV_ICONS: Record<string, () => React.ReactElement> = {
   "/dashboard/screens": IconTv,
@@ -24,6 +25,11 @@ const NAV_ICONS: Record<string, () => React.ReactElement> = {
   "/dashboard/schedule": IconCalendar,
   "/dashboard/account": IconGear,
 };
+/** Phone bar: when the short label differs, screen readers also hear the full name. */
+export function phoneAria(short: string, full: string): string | undefined {
+  return short !== full ? `${short} (${full})` : undefined;
+}
+
 const NAV = MAIN_NAV.map((item) => ({ ...item, icon: NAV_ICONS[item.href] ?? IconGrid }));
 
 function SignOutButton({ onSignOut, className, children }: { onSignOut: () => void | Promise<void>; className?: string; children: React.ReactNode }) {
@@ -40,6 +46,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   const pathname = usePathname();
   const path = pathOverride ?? pathname;
   const [ready, setReady] = useState(preview);
+  const t = useT();
 
   useEffect(() => {
     if (preview) return;
@@ -81,13 +88,14 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     location.assign("/login");
   }
 
-  if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">Loading…</div>;
+  if (!ready) return <div className="min-h-dvh grid place-items-center text-muted">{t("common.loading")}</div>;
 
   const studio = path.startsWith("/dashboard/media/layout-studio") || path.startsWith("/layout-studio");
   const showContentNav = isContentPath(path);
   const isActive = (href: string) => isMainNavActive(href, path);
   const brandKit = path.startsWith("/dashboard/account/brand-kit");
-  const current = brandKit ? "Brand Kit" : (NAV.find((item) => isActive(item.href))?.label ?? "Pekko");
+  const activeItem = NAV.find((item) => isActive(item.href));
+  const current = brandKit ? t("dash.nav.brandKit") : (activeItem ? t(activeItem.labelKey) : PRODUCT_NAME);
 
   return (
     <StudioLeaveProvider>
@@ -95,7 +103,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     {preview ? null : <AccountLocaleSync />}
     <UploadsProvider>
     <div className="min-h-dvh md:flex">
-      <nav aria-label="Main" className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
+      <nav aria-label={t("nav.main")} className="hidden md:flex md:flex-col md:w-60 md:shrink-0 md:sticky md:top-0 md:h-dvh md:overflow-y-auto md:border-r md:border-line md:bg-white md:px-4 md:py-6 md:gap-1">
         <StudioGuardedLink href="/dashboard" className="px-1 mb-6" aria-label={PRODUCT_NAME}>
           <BrandLockup size="sm" />
         </StudioGuardedLink>
@@ -104,7 +112,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
             <span className="icon-tile size-8">
               <item.icon />
             </span>
-            {item.label}
+            {t(item.labelKey)}
           </StudioGuardedLink>
         ))}
         {/* Brand Kit lives inside Account, so it is a sub-item of Account rather than a top-level section. */}
@@ -113,11 +121,11 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           aria-current={brandKit ? "page" : undefined}
           className="nav-link nav-sublink"
         >
-          Brand Kit
+          {t("dash.nav.brandKit")}
         </StudioGuardedLink>
         <SignOutButton onSignOut={signOut} className="nav-link mt-auto text-left">
           <span className="icon-tile size-8" aria-hidden="true">↩</span>
-          Sign out
+          {t("dash.signOut")}
         </SignOutButton>
       </nav>
       <div className="flex-1 min-w-0">
@@ -127,7 +135,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           </StudioGuardedLink>
           <span className="flex items-center gap-3 shrink-0">
             <span className="text-sm text-muted">{current}</span>
-            <SignOutButton onSignOut={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">Sign out</SignOutButton>
+            <SignOutButton onSignOut={signOut} className="text-sm font-semibold text-primary underline underline-offset-4">{t("dash.signOut")}</SignOutButton>
           </span>
         </header>
         {/* Standard pages sit in one centred column (max 1360px) inside the space next to the sidebar.
@@ -140,14 +148,14 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
           {children}
         </main>
       </div>
-      <nav aria-label="Mobile" className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
+      <nav aria-label={t("nav.mobile")} className={`${studio ? "hidden" : "md:hidden"} fixed bottom-0 inset-x-0 z-40 grid grid-cols-6 border-t border-line bg-white shadow-[0_-6px_20px_rgb(11_18_32/0.06)] pb-[env(safe-area-inset-bottom)]`}>
         {NAV.map((item) => (
-          <StudioGuardedLink key={item.href} href={item.href} aria-label={item.short ? `${item.short} (${item.label})` : undefined} aria-current={isActive(item.href) ? "page" : undefined}
+          <StudioGuardedLink key={item.href} href={item.href} aria-label={phoneAria(t(item.shortKey ?? item.labelKey), t(item.labelKey))} aria-current={isActive(item.href) ? "page" : undefined}
             className={`flex min-w-0 flex-col items-center justify-center gap-1 min-h-16 px-0.5 text-[10px] font-semibold leading-tight ${isActive(item.href) ? "text-primary" : "text-muted"}`}>
             <span className={`icon-tile size-7 rounded-lg ${isActive(item.href) ? "icon-tile-active" : ""}`}>
               <item.icon />
             </span>
-            <span className="max-w-full truncate">{item.short ?? item.label}</span>
+            <span className="max-w-full truncate">{t(item.shortKey ?? item.labelKey)}</span>
           </StudioGuardedLink>
         ))}
       </nav>

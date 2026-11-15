@@ -54,7 +54,7 @@ describe("Menu Boards in the main navigation (t248u)", () => {
     for (const item of MAIN_NAV) expect((item.short ?? item.label).length).toBeLessThanOrEqual(9);
     const shell = readFileSync("components/shell.tsx", "utf8");
     // WCAG 2.5.3: the accessible name contains the visible text, e.g. "Menus (Menu Boards)".
-    expect(shell).toContain("aria-label={item.short ? `${item.short} (${item.label})` : undefined}");
+    expect(shell).toContain("aria-label={phoneAria(t(item.shortKey ?? item.labelKey), t(item.labelKey))}");
     expect(shell).not.toContain("sr-only");
     // Icons are keyed by href, so reordering MAIN_NAV can't mismatch them.
     expect(shell).toContain('"/dashboard/media/menus": IconGrid');

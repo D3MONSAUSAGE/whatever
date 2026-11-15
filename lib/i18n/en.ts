@@ -356,6 +356,18 @@ export const en = {
   "leaveGuard.body": "You have unsaved changes. If you leave this menu board, those edits will be lost.",
   "leaveGuard.keepEditing": "Keep editing",
   "leaveGuard.discard": "Discard changes",
+  // I18N-2: dashboard shell
+  "dash.nav.screens": "My Screens",
+  "dash.nav.screensShort": "Screens",
+  "dash.nav.menus": "Menu Boards",
+  "dash.nav.menusShort": "Menus",
+  "dash.nav.content": "Content",
+  "dash.nav.playlists": "Playlists",
+  "dash.nav.playlistsShort": "Playlists",
+  "dash.nav.schedule": "Schedules",
+  "dash.nav.account": "Account",
+  "dash.nav.brandKit": "Brand Kit",
+  "dash.signOut": "Sign out",
 } as const;
 
 export type MessageKey = keyof typeof en;
