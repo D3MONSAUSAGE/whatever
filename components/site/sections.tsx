@@ -115,8 +115,12 @@ function englishOnly(key: Parameters<T>[0]) {
   return (ENGLISH_ONLY as readonly string[]).includes(key) ? "en" : undefined;
 }
 
+/** Billing answers carried lang="en" before the Spanish courtesy translation; English pages keep it so their HTML is unchanged. */
+const BILLING_ANSWERS: readonly string[] = ["faq.trial.a", "faq.trialEnd.a", "faq.plans.a", "faq.cancel.a"];
+
 export async function FaqList({ limit }: { limit?: number }) {
   const t = await getT();
+  const locale = await getLocale();
   const ids = limit ? FAQ_IDS.slice(0, limit) : FAQ_IDS;
   return (
     <div className="mt-10 grid gap-3 max-w-3xl mx-auto" data-testid="faq-list">
@@ -126,7 +130,7 @@ export async function FaqList({ limit }: { limit?: number }) {
           <details key={id} className="card p-5 group" data-testid={`faq-${id}`}>
             <summary className="font-semibold cursor-pointer">{t(k.q)}</summary>
             {/* Answers still listed in ENGLISH_ONLY are marked lang="en" (none since the approved courtesy translation). */}
-            <p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a)}>{t(k.a, FAQ_VARS)}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a) ?? (locale === "en" && BILLING_ANSWERS.includes(k.a) ? "en" : undefined)}>{t(k.a, FAQ_VARS)}</p>
           </details>
         );
       })}
