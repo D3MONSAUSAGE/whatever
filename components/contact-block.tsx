@@ -2,8 +2,8 @@ import { LEGAL_ADDRESS, LEGAL_OPERATOR, SUPPORT_EMAIL } from "@/lib/legal";
 import { getT } from "@/lib/i18n/server";
 import { rich } from "@/components/i18n/rich";
 
-/** Published support and privacy contact. The operator name and address are legal text, never translated. */
-export async function ContactBlock() {
+/** Published support and privacy contact. The address is legal text, never translated; Spanish courtesy pages pass the Spanish operator line. */
+export async function ContactBlock({ operator = LEGAL_OPERATOR }: { operator?: string } = {}) {
   const t = await getT();
   return (
     <section className="mt-8 card p-5" aria-labelledby="contact">
@@ -13,7 +13,7 @@ export async function ContactBlock() {
           link: (c) => <a className="font-semibold underline" href={`mailto:${SUPPORT_EMAIL}`} data-testid="support-email">{c}</a>,
         })}
       </p>
-      <p className="text-sm mt-2" data-testid="support-address">{LEGAL_OPERATOR}<br />{LEGAL_ADDRESS}</p>
+      <p className="text-sm mt-2" data-testid="support-address">{operator}<br />{LEGAL_ADDRESS}</p>
     </section>
   );
 }

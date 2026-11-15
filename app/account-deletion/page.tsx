@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
 import { ContactBlock } from "@/components/contact-block";
+import { AccountDeletionEs, ACCOUNT_DELETION_TITLE_ES } from "@/components/legal/account-deletion-es";
+import { showSpanishLegal, type LegalParams } from "@/lib/legal-locale";
 
-export const metadata: Metadata = { title: "Delete your account · Pekko" };
+export async function generateMetadata({ searchParams }: { searchParams: LegalParams }): Promise<Metadata> {
+  return { title: (await showSpanishLegal(searchParams)) ? ACCOUNT_DELETION_TITLE_ES : "Delete your account · Pekko" };
+}
 
 const DELETED = [
   ["Account and sign-in (email, password hash, display name)", "Deleted"],
@@ -22,7 +26,8 @@ const RETAINED = [
 ];
 
 // Public page (works without the app; this is the URL for the Google Play listing).
-export default function AccountDeletionInfo() {
+export default async function AccountDeletionInfo({ searchParams }: { searchParams: LegalParams }) {
+  if (await showSpanishLegal(searchParams)) return <AccountDeletionEs />;
   return (
     <PublicPage>
       <h1 className="text-2xl font-semibold tracking-tight">Delete your Pekko account</h1>
