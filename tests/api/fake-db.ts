@@ -311,6 +311,21 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     session.claimed_at = new Date(now).toISOString();
     return id;
   }
+  if (name === "reconnect_display") {
+    // Mirrors 0027_reconnect_display.sql.
+    const display = store.displays.find((item) => item.id === args.p_display_id && item.account_id === args.p_account_id && item.status === "active");
+    if (!display) throw new Error("display_not_found");
+    const now = Date.now();
+    const session = store.pairing_sessions.find((item) =>
+      item.code_hash === args.p_code_hash && item.status === "pending" && new Date(String(item.expires_at)).getTime() > now);
+    if (!session) return null;
+    display.token_hash = null;
+    for (const item of store.pairing_sessions) if (item.display_id === display.id && item.status === "claimed") item.status = "expired";
+    session.status = "claimed";
+    session.display_id = display.id;
+    session.claimed_at = new Date(now).toISOString();
+    return display.id;
+  }
   if (name === "player_state") {
     const display = store.displays.find((item) => item.token_hash === args.p_token_hash && item.status === "active");
     if (!display) return [];

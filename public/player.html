@@ -43,6 +43,19 @@
   .manual .pos { display: inline-block; min-width: 10vh; color: #e3e8e6;
     font-size: 2.4vh; vertical-align: middle; }
   body.manual-cursor { cursor: default; }
+  /* E5: on-TV "Unpair this TV". Opened with OK/Enter or Menu on a remote, or a 3-second press. */
+  .unpair { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 2700000; display: none;
+    background: rgba(0, 0, 0, 0.72); cursor: default; }
+  .unpair.on { display: block; }
+  .unpair .box { position: absolute; top: 50%; left: 50%; width: 70vh; max-width: 90%;
+    -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%);
+    background: #111816; border-radius: 2vh; padding: 4vh; text-align: center; }
+  .unpair .title { font-size: 4vh; color: #fff; margin-bottom: 2vh; }
+  .unpair .muted { margin-bottom: 3.5vh; }
+  .unpair button { min-height: 7vh; padding: 0 3vh; margin: 0 1vh; border: 0.4vh solid transparent;
+    border-radius: 999px; font-size: 2.8vh; color: #fff; background: rgba(255, 255, 255, 0.16); cursor: pointer; }
+  .unpair button.danger { background: #b3261e; }
+  .unpair button:focus { border-color: #fff; outline: none; }
 </style>
 </head>
 <body>
@@ -78,6 +91,12 @@
   </div>
 </div>
 <div id="status" class="status"></div>
+<div id="unpair" class="unpair" role="dialog" aria-modal="true" aria-labelledby="unpair-title"><div class="box">
+  <div id="unpair-title" class="title">Unpair this TV?</div>
+  <div id="unpair-msg" class="muted">This TV stops showing your content and shows a new pairing code. The screen and its content stay in your Pekko account.</div>
+  <button type="button" id="unpair-yes" class="danger">Unpair this TV</button>
+  <button type="button" id="unpair-no">Cancel</button>
+</div></div>
 
 <script>
 /* Plain ES5 only: Samsung Tizen and LG webOS browsers can be years behind. */
@@ -1356,6 +1375,69 @@
         showManualUi();
       }
     });
+  })();
+
+  // E5: "Unpair this TV" on the TV itself. Only while playing with a token. Cancel has focus first,
+  // so a stray OK press never unpairs; a pointer needs a 3-second press (no single-tap on kiosks).
+  (function wireUnpair() {
+    var box = el('unpair'), yes = el('unpair-yes'), no = el('unpair-no'), msg = el('unpair-msg');
+    var hideTimer = null, pressTimer = null, busy = false;
+    var MSG = msg ? msg.innerHTML : '';
+    if (!box || !yes || !no) return;
+    function isOpen() { return box.className.indexOf(' on') !== -1; }
+    function close() {
+      box.className = 'unpair'; clearTimeout(hideTimer); busy = false;
+      if (msg) msg.innerHTML = MSG;
+    }
+    function open() {
+      if (mode !== 'playing' || !getToken() || isOpen()) return;
+      box.className = 'unpair on';
+      try { no.focus(); } catch (e) {}
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(close, 20000);
+    }
+    function unpair() {
+      var token = getToken();
+      if (busy) return;
+      if (!token) { close(); return; }
+      busy = true;
+      if (msg) msg.innerHTML = 'Unpairing&hellip;';
+      request('POST', '/api/player/unpair', {}, token, function (status) {
+        busy = false;
+        if (status === 200 || status === 401) {
+          close(); clearToken(); clearCache(); startPairing();
+          return;
+        }
+        if (msg) msg.innerHTML = 'Couldn&rsquo;t unpair. Check the connection and try again.';
+      });
+    }
+    yes.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); unpair(); };
+    no.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); close(); };
+    document.addEventListener('keydown', function (ev) {
+      var key = ev && ev.key ? ev.key : '';
+      if (isOpen()) {
+        if (key === 'Escape' || key === 'Esc' || key === 'Backspace' || key === 'GoBack' || key === 'BrowserBack') {
+          if (ev.preventDefault) ev.preventDefault();
+          close();
+        } else if (key === 'ArrowLeft' || key === 'Left' || key === 'ArrowRight' || key === 'Right') {
+          if (ev.preventDefault) ev.preventDefault();
+          try { (document.activeElement === yes ? no : yes).focus(); } catch (e) {}
+        }
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        return;
+      }
+      if ((key === 'Enter' || key === 'ContextMenu' || key === 'Menu' || key === 'Info') && mode === 'playing' && getToken()) {
+        // The same key press must not also activate the button that just received focus.
+        if (ev.preventDefault) ev.preventDefault();
+        open();
+      }
+    }, true);
+    function pressStart() { clearTimeout(pressTimer); pressTimer = setTimeout(open, 3000); }
+    function pressEnd() { clearTimeout(pressTimer); }
+    document.addEventListener('mousedown', pressStart);
+    document.addEventListener('touchstart', pressStart);
+    document.addEventListener('mouseup', pressEnd);
+    document.addEventListener('touchend', pressEnd);
   })();
 
   // Check right away when the network comes back.

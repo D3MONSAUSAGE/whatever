@@ -10,6 +10,7 @@ import { GroupPublish } from "@/components/group-publish";
 import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit } from "@/components/ui";
 import { AssignedThumb } from "@/components/assigned-thumb";
 import { ScreenActions, type ScreenLibrary } from "@/components/screen-actions";
+import { ReconnectTv } from "@/components/reconnect-tv";
 import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
@@ -155,6 +156,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
             <p className="text-sm mt-3">Nothing is assigned. <Link href="/dashboard/media" className="underline font-semibold">Add media</Link> or <Link href={unifiedEditorPath({ screen: display.id, isNew: true })} className="underline font-semibold">open Menu boards</Link>.</p>
           ) : null}
           <ScreenActions display={display} preview={Boolean(fixture)} library={library} initialPanel={initialPanel} onChanged={() => displays.reload()} />
+          <ReconnectTv display={display} preview={Boolean(fixture)} onConnected={() => { void displays.reload?.(); }} onMessage={(text, error) => toast.show(text, error)} />
         </article>
         {confirm.node}
         {toast.node}
