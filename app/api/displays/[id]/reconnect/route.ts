@@ -27,7 +27,7 @@ export const POST = withLocalizedErrors(async (req: Request, { params }: Ctx) =>
 
   const okUser = await allow(`pair-claim:user:${admin.userId}`, PAIR_CLAIM_WINDOW_SECONDS, PAIR_CLAIM_MAX_PER_USER);
   const okIp = await allow(`pair-claim:ip:${clientIp(req)}`, PAIR_CLAIM_WINDOW_SECONDS, PAIR_CLAIM_MAX_PER_IP);
-  if (!okUser || !okIp) return fail("Too many attempts. Wait 15 minutes, then try again.", 429);
+  if (!okUser || !okIp) return fail("Too many attempts. Wait 15 minutes, then try again.", 429, "rate_limited_15m");
 
   const { data: displayId, error } = await db().rpc("reconnect_display", {
     p_code_hash: hashCode(code),

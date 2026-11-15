@@ -287,7 +287,7 @@ export const es: Record<MessageKey, string> = {
   "apiError.display_not_found": "Esa pantalla no está en esta cuenta.",
   "apiError.rate_limited_15m": "Demasiados intentos. Espere 15 minutos e intente de nuevo.",
   "apiError.plan_check_unavailable": "No se pudo verificar su plan. Intente de nuevo.",
-  "apiError.pair_failed": "No se pudo conectar la TV. Intente de nuevo.",
+  "apiError.pair_failed": "No se pudo vincular la TV. Intente de nuevo.",
   "apiError.photo_not_ready": "No se pudo cargar la foto. Intente de nuevo en un momento o elija otra foto.",
   "apiError.template_required": "Elija una plantilla.",
   "apiError.business_name_required": "Escriba el nombre de su negocio.",

@@ -50,7 +50,7 @@ describe("I18N-1 dictionaries", () => {
     expect(es["nav.startTrial"]).toBe("Prueba gratis");
     expect(es["apiError.pairing_code_not_found"]).toBe("Ese código no corresponde a ninguna TV. Revise la pantalla: los códigos vencen a los 10 minutos.");
     expect(es["apiError.rate_limited_15m"]).toBe("Demasiados intentos. Espere 15 minutos e intente de nuevo.");
-    expect(es["apiError.pair_failed"]).toBe("No se pudo conectar la TV. Intente de nuevo.");
+    expect(es["apiError.pair_failed"]).toBe("No se pudo vincular la TV. Intente de nuevo."); // glossary: pair = vincular (Gother #106 low 2)
   });
 
   it("formats, falls back to English, and leaves unknown placeholders visible", () => {
@@ -72,7 +72,19 @@ describe("I18N-1 locale preference", () => {
     expect(localeFromAcceptLanguage("es-MX,es;q=0.9,en;q=0.8")).toBe("es");
     expect(localeFromAcceptLanguage("en-US,es;q=0.9")).toBe("en");
     expect(localeFromAcceptLanguage(null)).toBe("en");
+    // Gother #106 MEDIUM: q-values are stripped, the list is walked by weight, regional tags count.
+    const cases: [string, "en" | "es"][] = [
+      ["es", "es"], ["es;q=0.9", "es"], ["ES-mx", "es"], ["es-419", "es"], ["es-US;q=0.5", "es"],
+      ["es-MX,es;q=0.9,en;q=0.8", "es"], ["fr-FR,fr;q=0.9,es;q=0.8,en;q=0.7", "es"], ["de, es;q=0.3, en;q=0.2", "es"],
+      ["en;q=0.5,es;q=0.9", "es"], ["en-US,es;q=0.9", "en"], ["es;q=0.9,en", "en"], ["es;q=0,en;q=0.1", "en"],
+      ["fr,de", "en"], ["*", "en"], ["", "en"], [" es ; q=0.8 ", "es"], ["es;q=abc", "en"], ["es;q=0.8,en;q=0.8", "es"],
+    ];
+    for (const [header, want] of cases) expect([header, localeFromAcceptLanguage(header)]).toEqual([header, want]);
+    // Gother #106 low 1: Secure in production; plain on http dev.
     expect(localeCookie("es")).toBe("pekko_locale=es; Path=/; Max-Age=31536000; SameSite=Lax");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(localeCookie("es")).toBe("pekko_locale=es; Path=/; Max-Age=31536000; SameSite=Lax; Secure");
+    vi.unstubAllEnvs();
     expect(readLocaleCookie("a=1; pekko_locale=es")).toBe("es");
     expect(readLocaleCookie("pekko_locale=xx")).toBeNull();
   });
@@ -203,3 +215,14 @@ describe("I18N-1 switching language keeps unsaved work", () => {
     }
   }, 60_000);
 });
+
+describe("I18N-1 stable codes for Android", () => {
+  it("the 15-minute pair/reconnect limit always sends rate_limited_15m explicitly", async () => {
+    for (const f of ["app/api/displays/pair/route.ts", "app/api/displays/[id]/reconnect/route.ts"]) {
+      expect(readFileSync(f, "utf8")).toContain('fail("Too many attempts. Wait 15 minutes, then try again.", 429, "rate_limited_15m")');
+    }
+    const { fail } = await import("@/lib/server/http");
+    expect(await fail("Too many attempts. Wait 15 minutes, then try again.", 429, "rate_limited_15m").json()).toEqual({ error: "Too many attempts. Wait 15 minutes, then try again.", code: "rate_limited_15m" });
+  });
+});
+

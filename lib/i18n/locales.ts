@@ -24,13 +24,28 @@ export function toLocale(value: unknown): Locale {
  */
 export function localeFromAcceptLanguage(header: string | null | undefined): Locale {
   if (!header) return DEFAULT_LOCALE;
-  const first = header.split(",")[0]?.trim().toLowerCase() ?? "";
-  return first === "es" || first.startsWith("es-") ? "es" : DEFAULT_LOCALE;
+  // RFC 9110: comma-separated ranges with optional ;q= weights (default 1, 0 = not acceptable).
+  // Highest weight wins; ties keep header order. es-MX, es-419 etc. count as es; en-* as en.
+  const ranges = header.split(",").map((part, index) => {
+    const [tag = "", ...params] = part.split(";").map((x) => x.trim().toLowerCase());
+    const qParam = params.find((x) => x.startsWith("q="));
+    const q = qParam === undefined ? 1 : Number(qParam.slice(2));
+    return { base: tag.split("-")[0] ?? "", q: Number.isFinite(q) ? q : 0, index };
+  });
+  ranges.sort((a, b) => b.q - a.q || a.index - b.index);
+  for (const r of ranges) if (r.q > 0 && isLocale(r.base)) return r.base;
+  return DEFAULT_LOCALE;
+}
+
+/** Secure on https (production); left off on http://localhost so local dev and tests still store it. */
+function secureSuffix(): string {
+  if (typeof location !== "undefined") return location.protocol === "https:" ? "; Secure" : "";
+  return process.env.NODE_ENV === "production" ? "; Secure" : "";
 }
 
 /** Cookie string for document.cookie / Set-Cookie. */
 export function localeCookie(locale: Locale): string {
-  return `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax`;
+  return `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${LOCALE_COOKIE_MAX_AGE}; SameSite=Lax${secureSuffix()}`;
 }
 
 export function readLocaleCookie(cookieHeader: string | null | undefined): Locale | null {
