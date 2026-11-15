@@ -104,12 +104,9 @@ describe("I18N-3: customer content and slide output stay untouched", () => {
   });
   // Scoped to the I18N-3 merge (b275b5a) so later, separately reviewed PRs are not judged by it.
   it("does not touch the player, renderers, server routes or TV layouts", () => {
-    let changed: string[] = [];
-    try {
-      changed = execSync("git diff --name-only 03a1292 b275b5a -- .", { encoding: "utf8" }).split("\n").filter(Boolean);
-    } catch {
-      return; // no git history in this environment
-    }
+    // Full history comes from tests/global-setup.ts; a missing commit now fails instead of skipping.
+    const changed = execSync("git diff --name-only 03a1292 b275b5a -- .", { encoding: "utf8" }).split("\n").filter(Boolean);
+    expect(changed.length, "I18N-3 range resolved to no files").toBeGreaterThan(0);
     for (const f of changed) {
       expect(f, f).not.toMatch(/^(public\/|app\/api\/|lib\/server\/|app\/player|app\/tv)|render|menu-templates|layout-studio\.ts$|board-fonts/);
     }

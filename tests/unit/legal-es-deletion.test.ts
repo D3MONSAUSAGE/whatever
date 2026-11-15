@@ -79,14 +79,13 @@ describe("/account-deletion branch scope", () => {
   it("touches only the deletion page, its Spanish component, the contact block operator prop and its tests", () => {
     // Only this PR's own commits (subject "Legal ES deletion: …"), like the #116 guard, so main's other PRs are
     // never judged here and the guard stays valid after merge. It needs full history: CI's checkout is shallow
-    // (depth 1), so the test fetches the rest first; if history still can't be resolved it FAILS, never skips.
+    // (depth 1); tests/global-setup.ts unshallows once before any worker starts. If history is still shallow it FAILS, never skips.
     const git = (args: string) => execSync(`git ${args}`, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-    if (git("rev-parse --is-shallow-repository") === "true") git("fetch --unshallow --quiet --no-tags origin");
     expect(git("rev-parse --is-shallow-repository"), "shallow clone: the scope guard needs full git history").toBe("false");
     const files = git('log --no-merges --format= --name-only --grep="^Legal ES deletion: " HEAD').split("\n").filter(Boolean);
     expect(files.length, "no 'Legal ES deletion: ' commits found").toBeGreaterThan(0);
     expect(files).toContain("components/legal/account-deletion-es.tsx");
     const allowed = /^(app\/account-deletion\/page\.tsx|components\/legal\/account-deletion-es\.tsx|components\/contact-block\.tsx|tests\/unit\/legal-es-deletion\.test\.ts|tests\/unit\/helpers\/deletion-markup\.ts|tests\/fixtures\/account-deletion-en\.golden\.json)$/;
     for (const f of new Set(files)) expect(f).toMatch(allowed);
-  }, 60_000);
+  });
 });
