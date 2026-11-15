@@ -34,6 +34,7 @@ import { isNewAccount, NEW_ACCOUNT_WINDOW_MS, type Locale } from "@/lib/i18n/loc
 import { shouldAdoptDeviceLocale } from "@/components/i18n/account-locale-sync";
 import { discardRequest, useConfirmDiscard } from "@/components/studio-leave";
 import { NotFoundActions } from "@/components/not-found-actions";
+import { remainingWait, resendOutcome, RESEND_UNTIL_KEY } from "@/components/auth/resend-confirmation";
 import LoginPage from "@/app/login/page";
 import AuthConfirmPage from "@/app/auth/confirm/page";
 import { GET as getMe } from "@/app/api/me/route";
@@ -164,6 +165,42 @@ describe("Menu editor leave guard through t() (Gother's Android Spanish)", () =>
       const src = readFileSync(f, "utf8");
       expect(src).not.toContain("confirmDiscardUnsaved(");
       expect(src).not.toContain("window.confirm(");
+    }
+  });
+});
+
+describe("Gother #110 MEDIUM: the confirmation resend doesn't reveal whether an email is registered", () => {
+  it("every outcome reads as sent, except a mapped rate limit", () => {
+    expect(resendOutcome(null)).toBe("sent");
+    expect(resendOutcome({ message: "User not found" })).toBe("sent");
+    expect(resendOutcome({ message: "Email address is invalid" })).toBe("sent");
+    expect(resendOutcome({ message: "Failed to fetch" })).toBe("sent");
+    expect(resendOutcome({ message: "Email rate limit exceeded" })).toBe("rateLimit");
+    expect(resendOutcome({ message: "For security purposes, you can only request this after 42 seconds." })).toBe("rateLimit");
+  });
+  it("never shows Supabase text and starts the wait on every outcome", () => {
+    const src = readFileSync("components/auth/resend-confirmation.tsx", "utf8");
+    expect(src).not.toContain("friendlyAuthError");
+    expect(src).not.toContain("note.text");
+    expect(src).toMatch(/finally \{\s*\/\/ The wait starts on every outcome, success or failure\.\s*setWait\(startWait\(\)\);/);
+  });
+  it("the 60 s wait survives a refresh (sessionStorage)", () => {
+    const now = 1_000_000;
+    const store = (v: string | null) => ({ getItem: (k: string) => (k === RESEND_UNTIL_KEY ? v : null) });
+    expect(remainingWait(now, store(String(now + 42_000)))).toBe(42);
+    expect(remainingWait(now, store(String(now - 1)))).toBe(0);
+    expect(remainingWait(now, store(null))).toBe(0);
+    expect(remainingWait(now, store("junk"))).toBe(0);
+    expect(remainingWait(now, null)).toBe(0);
+  });
+});
+
+describe("Gother #110 LOW: site metadata uses the Pekko line", () => {
+  it("no Seemple line in layout or manifest", () => {
+    for (const f of ["app/layout.tsx", "app/manifest.ts"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src).not.toMatch(/making life simpler/i);
+      expect(src).toContain("Digital signage made simple");
     }
   });
 });
