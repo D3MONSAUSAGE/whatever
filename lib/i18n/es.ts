@@ -1,5 +1,4 @@
 import type { MessageKey } from "./en";
-import { en } from "./en";
 
 /**
  * Spanish (I18N-1). Style: formal "usted" throughout, neutral Latin American Spanish for restaurant and

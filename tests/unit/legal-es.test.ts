@@ -18,12 +18,12 @@ import { COURTESY_NOTICE_ES, LEGAL_OPERATOR_ES, legalDateEs } from "@/lib/legal-
 import { PLANS, TRIAL } from "@/lib/plans";
 import { FAQ_VARS } from "@/lib/marketing";
 import { PAYMENT_GRACE_DAYS, PLAYBACK_GRACE_DAYS, TRANSITION_DAYS, TRIAL_DAYS } from "@/lib/server/entitlements";
-import { html, legalPageSnapshot } from "./helpers/legal-render";
+import { html, legalPageSnapshot } from "./helpers/legal-markup";
 
 const golden = JSON.parse(readFileSync("tests/fixtures/legal-en.golden.json", "utf8"));
-type Page = (p?: { searchParams?: Promise<Record<string, string>> }) => Promise<ReactElement>;
-const terms = (q?: Record<string, string>) => (Terms as unknown as Page)(q ? { searchParams: Promise.resolve(q) } : undefined);
-const privacy = (q?: Record<string, string>) => (Privacy as unknown as Page)(q ? { searchParams: Promise.resolve(q) } : undefined);
+type Page = (p: { searchParams: Promise<Record<string, string>> }) => Promise<ReactElement>;
+const terms = (q?: Record<string, string>) => (Terms as unknown as Page)({ searchParams: Promise.resolve(q ?? {}) });
+const privacy = (q?: Record<string, string>) => (Privacy as unknown as Page)({ searchParams: Promise.resolve(q ?? {}) });
 
 const ES_RULES = /\b(tú|tu cuenta|tienes|puedes|quieres|elige|escribe|ingresa)\b|televisor|prueba gratuita|desconectad|programación|Inténtelo|Ingrese|tuvo contacto/i;
 const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
@@ -40,6 +40,8 @@ function pageParts(input: ReactElement) {
   return { ...snap, notice: notice ? html(notice) : null };
 }
 
+const noQuery = () => ({ searchParams: Promise.resolve({}) });
+
 beforeEach(() => { cookieLocale = undefined; });
 
 describe("Legal ES: English stays byte-identical", () => {
@@ -51,8 +53,8 @@ describe("Legal ES: English stays byte-identical", () => {
     }
     expect(golden.terms.updated).toBe(LEGAL_UPDATED);
     expect(golden.privacy.dateLine).toBe(`Effective ${LEGAL_PRIVACY_UPDATED}. Last updated ${LEGAL_PRIVACY_UPDATED}.`);
-    expect((await termsMeta()).title).toBe("Terms of Service · Pekko");
-    expect((await privacyMeta()).title).toBe("Privacy Policy · Pekko");
+    expect((await termsMeta(noQuery())).title).toBe("Terms of Service · Pekko");
+    expect((await privacyMeta(noQuery())).title).toBe("Privacy Policy · Pekko");
   });
   it("?lang=en shows the governing English original to a Spanish visitor, byte-identical", async () => {
     cookieLocale = "es";
@@ -79,8 +81,8 @@ describe("Legal ES: Spanish courtesy translation", () => {
       expect(p.html).not.toContain("These terms cover");
     }
     expect(COURTESY_NOTICE_ES).toBe("Esta traducción es solo para su comodidad. La versión en inglés es la que rige; en caso de discrepancia, prevalece la versión en inglés.");
-    expect((await termsMeta()).title).toBe("Términos del servicio · Pekko");
-    expect((await privacyMeta()).title).toBe("Política de privacidad · Pekko");
+    expect((await termsMeta(noQuery())).title).toBe("Términos del servicio · Pekko");
+    expect((await privacyMeta(noQuery())).title).toBe("Política de privacidad · Pekko");
   });
   it("keeps every number, price and date identical between EN and ES", async () => {
     cookieLocale = "es";
