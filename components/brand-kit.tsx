@@ -123,7 +123,8 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
   );
 }
 
-const FONT_OPTIONS: { id: BrandFont; label: string }[] = BOARD_FONTS.map((font) => ({ id: font.id, label: font.label }));
+// E6-F4: each option is drawn in its own face where the browser supports styled options (Chrome desktop).
+const FONT_OPTIONS: { id: BrandFont; label: string; family: string }[] = BOARD_FONTS.map((font) => ({ id: font.id, label: font.label, family: font.family }));
 
 function BrandEditor({
   form, setForm, images, custom, busy, onSave, nameFromBusiness = false, onLogoUploaded, saveResult = null,
@@ -299,7 +300,7 @@ function BrandEditor({
               >
                 <option value="">Default</option>
                 {FONT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  <option key={opt.id} value={opt.id} style={{ fontFamily: opt.family }}>{opt.label}</option>
                 ))}
               </select>
             </label>
@@ -313,7 +314,7 @@ function BrandEditor({
               >
                 <option value="">Default</option>
                 {FONT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  <option key={opt.id} value={opt.id} style={{ fontFamily: opt.family }}>{opt.label}</option>
                 ))}
               </select>
             </label>
@@ -345,7 +346,7 @@ function BrandEditor({
               <span className="font-medium">Featured item</span>
               <span
                 className="rounded-full px-2.5 py-0.5 text-sm font-semibold"
-                style={{ background: accent, color: "#1a1a1a", fontFamily: headingFamily }}
+                style={{ background: accent, color: "#1a1a1a", fontFamily: bodyFamily }}
               >
                 $12
               </span>
@@ -354,7 +355,7 @@ function BrandEditor({
               <span>House special</span>
               <span
                 className="rounded-full px-2.5 py-0.5 text-sm font-semibold"
-                style={{ background: accent, color: "#1a1a1a", fontFamily: headingFamily }}
+                style={{ background: accent, color: "#1a1a1a", fontFamily: bodyFamily }}
               >
                 $9
               </span>

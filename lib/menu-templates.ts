@@ -1,9 +1,17 @@
 /** Shared (client + server) menu-board definitions and validation. */
+import { FONT_CHOICE_ERROR, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
 
 export type MenuTemplate = "classic" | "fresh" | "bold";
 export type MenuItem = { name: string; price: string; description: string };
 export type MenuSection = { name: string; items: MenuItem[] };
-export type MenuContent = { title: string; subtitle: string; footer: string; sections: MenuSection[]; photoMediaId?: string | null; useBrand?: boolean };
+export type MenuContent = {
+  title: string; subtitle: string; footer: string; sections: MenuSection[]; photoMediaId?: string | null; useBrand?: boolean;
+  /**
+   * E6-F1: fonts for this board, copied from the Brand Kit when the board is created (never live-linked,
+   * so later Brand Kit changes leave existing boards alone). Absent = Inter, exactly as before.
+   */
+  headingFont?: BoardFontId; bodyFont?: BoardFontId;
+};
 
 export const MENU_TEMPLATES: { id: MenuTemplate; name: string; blurb: string; swatch: [string, string] }[] = [
   { id: "classic", name: "Classic night", blurb: "Dark navy with blue accents. Easy to read from across the room.", swatch: ["#0b1220", "#4d94ff"] },
@@ -91,7 +99,30 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
   }
   if (raw.useBrand != null && typeof raw.useBrand !== "boolean") return { ok: false, error: "Use brand has to be true or false." };
   const useBrand = raw.useBrand !== false;
-  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand } };
+  const fonts: Pick<MenuContent, "headingFont" | "bodyFont"> = {};
+  for (const key of ["headingFont", "bodyFont"] as const) {
+    const value = raw[key];
+    if (value == null || value === "") continue;
+    if (!isBoardFont(value)) return { ok: false, error: FONT_CHOICE_ERROR };
+    fonts[key] = value;
+  }
+  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand, ...fonts } };
+}
+
+/**
+ * PATCH merge for fonts (protects Android +13, which doesn't send them): a font key that is
+ * absent from the incoming content keeps the stored value; an explicit null or "" clears it.
+ */
+export function keepStoredFonts(incoming: unknown, parsed: MenuContent, stored: unknown): MenuContent {
+  const raw = incoming && typeof incoming === "object" ? (incoming as Record<string, unknown>) : {};
+  const old = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
+  const next: MenuContent = { ...parsed };
+  for (const key of ["headingFont", "bodyFont"] as const) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const value = old[key];
+    if (isBoardFont(value)) next[key] = value;
+  }
+  return next;
 }
 
 export const DAY_PARTS = [

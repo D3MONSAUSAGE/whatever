@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { api, authToken, type DisplayItem, type MediaItem } from "@/lib/api";
 import { MENU_LIMITS, MENU_TEMPLATES, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import { classicPreviewHits, confirmDiscardUnsaved, hasUnsavedEdits } from "@/lib/menu-board-unify";
@@ -61,6 +62,7 @@ export function ClassicEditor({
   /** Reload the media list after a direct photo upload (E3). Absent in fixtures. */
   onImageUploaded?: () => Promise<void>;
 }) {
+  const t = useT();
   const [step, setStep] = useState<ClassicStep>("content");
   const studioBp = useStudioBreakpoint();
   const [busy, setBusy] = useState(false);
@@ -241,7 +243,7 @@ export function ClassicEditor({
       if (warning) onError(warning);
       const savedId = res.id ?? draft.id;
       onSaved(
-        draft.id ? "Menu updated. Screens showing it refresh within a minute." : draft.displayIds.length ? "Menu board created and sent to your screens" : "Menu board created. It's in your media and playlists.",
+        draft.id ? t("classic.savedUpdated") : draft.displayIds.length ? t("classic.savedSent") : t("classic.savedCreated"),
         savedId ? { id: savedId, name: draft.name, playlistId: res.playlistId ?? null, tickedScreens: draft.displayIds.length } : undefined,
       );
     } catch (err) {

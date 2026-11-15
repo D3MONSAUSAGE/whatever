@@ -315,6 +315,13 @@ export const en = {
   "apiError.rate_limited": "Too many attempts. Wait a few minutes, then try again.",
   "apiError.unavailable": "This isn't available right now. Try again in a moment.",
   "apiError.server_error": "Something went wrong. Try again.",
+  // E6 fix: Studio body font and the classic save toasts.
+  "studio.bodyFont": "Body text font",
+  "studio.bodyFontSame": "Same as the font above",
+  "studio.bodyFontHelp": "Item names, prices, descriptions and the footer use the body text font.",
+  "classic.savedUpdated": "Menu updated. Screens showing it refresh within a minute.",
+  "classic.savedSent": "Menu board created and sent to your screens",
+  "classic.savedCreated": "Menu board created. It's saved in Menu Boards and Media. Add it to a playlist or a screen when you're ready.",
 } as const;
 
 export type MessageKey = keyof typeof en;

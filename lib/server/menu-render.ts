@@ -2,6 +2,7 @@ import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import type { MenuContent, MenuSection, MenuTemplate } from "@/lib/menu-templates";
 import { shownSections } from "@/lib/menu-fields";
+import { ALL_FONT_FILES, boardFont } from "@/lib/board-fonts";
 
 export const MENU_WIDTH = 1920;
 export const MENU_HEIGHT = 1080;
@@ -118,8 +119,24 @@ export function columnsFor(sections: MenuSection[], singleUpTo = 9): MenuSection
   return [sections.slice(0, best), sections.slice(best)];
 }
 
+/**
+ * E6-F1: per-board fonts. Boards without headingFont/bodyFont get no font-family attribute at all,
+ * so their SVG (and PNG) is byte-for-byte what it was. Width estimates scale for wider faces.
+ */
+function faces(content: MenuContent) {
+  const face = (id: MenuContent["headingFont"]) => {
+    if (!id) return { attr: "", scale: 1 };
+    const spec = boardFont(id);
+    return { attr: ` font-family="${spec.family}"`, scale: spec.widthScale };
+  };
+  return { heading: face(content.headingFont), body: face(content.bodyFont) };
+}
+
 export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuArt = {}) {
   const t = themeFor(template, content.useBrand === false ? null : art.brand);
+  const f = faces(content);
+  const hf = f.heading.attr, bf = f.body.attr;
+  const hs = f.heading.scale, bs = f.body.scale;
   const H = MENU_HEIGHT, pad = 96;
   const photoW = art.photo ? Math.round(MENU_WIDTH * 0.38) : 0;
   const W = MENU_WIDTH - photoW; // content area; the photo fills the right side
@@ -141,11 +158,11 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
   if (content.title) {
     // Shrink long titles further (down to 40) before shortening them with "…" (QA B1-06).
     let size = 96;
-    while (size > 40 && approxWidth(content.title, size, 800) > titleW) size -= 4;
-    out.push(`<text x="${pad}" y="${content.subtitle ? 140 : 145}" font-size="${size}" font-weight="800" fill="${t.title}">${esc(fit(content.title, size, titleW, 800))}</text>`);
+    while (size > 40 && approxWidth(content.title, size, 800) * hs > titleW) size -= 4;
+    out.push(`<text x="${pad}" y="${content.subtitle ? 140 : 145}"${hf} font-size="${size}" font-weight="800" fill="${t.title}">${esc(fit(content.title, size, titleW / hs, 800))}</text>`);
   }
   if (content.subtitle) {
-    out.push(`<text x="${pad}" y="${200}" font-size="40" fill="${t.subtitle}">${esc(fit(content.subtitle, 40, titleW))}</text>`);
+    out.push(`<text x="${pad}" y="${200}" font-size="40"${bf} fill="${t.subtitle}">${esc(fit(content.subtitle, 40, titleW / bs))}</text>`);
   }
   if (art.logo && logoBox) {
     const ly = hasHeader ? Math.max(30, (headerH - logoBox.h) / 2 - 6) : 30;
@@ -169,25 +186,25 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
     for (const section of col) {
       if (section.name) {
         y += u * 0.8;
-        out.push(`<text x="${x}" y="${y.toFixed(1)}" font-size="${sectionSize}" font-weight="800" letter-spacing="3" fill="${t.section}">${esc(fit(section.name.toUpperCase(), sectionSize, colW, 800))}</text>`);
+        out.push(`<text x="${x}" y="${y.toFixed(1)}" font-size="${sectionSize}"${hf} font-weight="800" letter-spacing="3" fill="${t.section}">${esc(fit(section.name.toUpperCase(), sectionSize, colW / hs, 800))}</text>`);
         out.push(`<rect x="${x}" y="${(y + u * 0.2).toFixed(1)}" width="${colW}" height="2" fill="${t.rule}"/>`);
         y += u * 0.5;
       }
       for (const item of section.items) {
         y += u * 0.78;
-        const priceW = item.price ? approxWidth(item.price, nameSize, 700) + (t.priceBg ? 36 : 0) : 0;
+        const priceW = item.price ? approxWidth(item.price, nameSize, 700) * bs + (t.priceBg ? 36 : 0) : 0;
         if (item.price) {
           if (t.priceBg) {
             out.push(`<rect x="${(x + colW - priceW).toFixed(1)}" y="${(y - nameSize * 0.95).toFixed(1)}" width="${priceW.toFixed(1)}" height="${(nameSize * 1.3).toFixed(1)}" rx="${(nameSize * 0.3).toFixed(1)}" fill="${t.priceBg}"/>`);
-            out.push(`<text x="${(x + colW - 18).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-size="${nameSize}" font-weight="700" fill="${t.price}">${esc(item.price)}</text>`);
+            out.push(`<text x="${(x + colW - 18).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-size="${nameSize}"${bf} font-weight="700" fill="${t.price}">${esc(item.price)}</text>`);
           } else {
-            out.push(`<text x="${(x + colW).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-size="${nameSize}" font-weight="700" fill="${t.price}">${esc(item.price)}</text>`);
+            out.push(`<text x="${(x + colW).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-size="${nameSize}"${bf} font-weight="700" fill="${t.price}">${esc(item.price)}</text>`);
           }
         }
-        out.push(`<text x="${x}" y="${y.toFixed(1)}" font-size="${nameSize}" font-weight="700" fill="${t.text}">${esc(fit(item.name, nameSize, colW - priceW - 32, 700))}</text>`);
+        out.push(`<text x="${x}" y="${y.toFixed(1)}" font-size="${nameSize}"${bf} font-weight="700" fill="${t.text}">${esc(fit(item.name, nameSize, (colW - priceW - 32) / bs, 700))}</text>`);
         if (item.description) {
           y += u * 0.55;
-          out.push(`<text x="${x}" y="${y.toFixed(1)}" font-size="${descSize}" fill="${t.muted}">${esc(fit(item.description, descSize, colW - priceW - 32))}</text>`);
+          out.push(`<text x="${x}" y="${y.toFixed(1)}" font-size="${descSize}"${bf} fill="${t.muted}">${esc(fit(item.description, descSize, (colW - priceW - 32) / bs))}</text>`);
         }
         y += u * 0.22;
       }
@@ -197,14 +214,15 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
 
   if (content.footer) {
     out.push(`<rect x="${pad}" y="${H - 104}" width="${W - 2 * pad}" height="2" fill="${t.rule}"/>`);
-    out.push(`<text x="${pad}" y="${H - 50}" font-size="34" fill="${t.footer}">${esc(fit(content.footer, 34, W - 2 * pad))}</text>`);
+    out.push(`<text x="${pad}" y="${H - 50}" font-size="34"${bf} fill="${t.footer}">${esc(fit(content.footer, 34, (W - 2 * pad) / bs))}</text>`);
   }
   out.push(`</svg>`);
   return out.join("");
 }
 
 const FONT_DIR = path.join(process.cwd(), "assets", "fonts");
-const FONTS = ["Inter-Regular.ttf", "Inter-Bold.ttf", "Inter-ExtraBold.ttf"].map((f) => path.join(FONT_DIR, f));
+// Every bundled face (E6-F1); Inter stays the default family, so boards without fonts render as before.
+const FONTS = ALL_FONT_FILES.map((f) => path.join(FONT_DIR, f));
 
 /** Render a menu to a 1920×1080 PNG with bundled open-source fonts (no paid service). */
 export function renderMenuPng(template: MenuTemplate, content: MenuContent, art: MenuArt = {}): Uint8Array {

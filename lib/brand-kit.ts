@@ -464,14 +464,19 @@ export function fontFamilyName(font: BrandFont | null | undefined): string {
 export function seedClassicMenu(content: MenuContent, kit: Partial<BrandIdentity> | null | undefined): MenuContent {
   const title = clipBrandText(kit?.displayName, MENU_LIMITS.title);
   const footer = clipBrandText(classicFooter(kit), MENU_LIMITS.footer);
-  if (!title && !footer) return content;
+  // E6-F1: copy the Brand Kit fonts onto the NEW board (a snapshot, not a live link). Only used for new boards.
+  const headingFont = isBrandFont(kit?.headingFont) && !content.headingFont ? kit.headingFont : null;
+  const bodyFont = isBrandFont(kit?.bodyFont) && !content.bodyFont ? kit.bodyFont : null;
+  if (!title && !footer && !headingFont && !bodyFont) return content;
   const nextTitle = title ?? content.title;
   const nextFooter = footer ?? content.footer;
-  if (nextTitle === content.title && nextFooter === content.footer) return content;
+  if (nextTitle === content.title && nextFooter === content.footer && !headingFont && !bodyFont) return content;
   return {
     ...content,
     ...(title ? { title } : {}),
     ...(footer ? { footer } : {}),
+    ...(headingFont ? { headingFont } : {}),
+    ...(bodyFont ? { bodyFont } : {}),
   };
 }
 

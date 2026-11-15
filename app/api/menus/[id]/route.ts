@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { keepStoredFonts } from "@/lib/menu-templates";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
 
@@ -36,11 +37,14 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (admin instanceof Response) return admin;
   const { id } = await params;
   if (!isUuid(id)) return fail("Menu not found.", 404);
-  const parsed = parseMenuBody(await readJson(req), true);
+  const body = await readJson(req);
+  const parsed = parseMenuBody(body, true);
   if (!parsed.ok) return fail(parsed.error, 400);
   const found = await load(admin.accountId, id);
   if (found.error) return found.error;
   const row = found.row;
+  // E6: clients that don't know about fonts (Android +13) must not strip them on edit.
+  if (parsed.value.content) parsed.value.content = keepStoredFonts(body.content, parsed.value.content, row.content);
 
   const photo = await checkMenuPhoto(admin.accountId, parsed.value.content);
   if (photo) return fail(photo.error, photo.status);

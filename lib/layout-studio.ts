@@ -37,8 +37,13 @@ export type LayoutDocument = {
   accentColor: string | null;
   /** Room is the television size. Counter is slightly denser and still readable. */
   typeScale: TypeScale;
-  /** Bundled face used for both the preview and the published PNG. */
+  /** Bundled face used for both the preview and the published PNG (headings, and body text unless bodyFont is set). */
   font: BoardFont;
+  /**
+   * E6-F2: body face (item names, prices, descriptions, subtitle, footer, feature detail). Set only on new boards
+   * seeded from a Brand Kit with a different body font; absent = `font`, so existing boards render as before.
+   */
+  bodyFont?: BoardFont;
   /** Menu item text. Null keeps the palette ink. A title on a color band stays light. */
   textColor: string | null;
   /** Menu paper. Null keeps the palette. The feature pane uses primaryColor. */
@@ -296,6 +301,8 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   const typeScale = raw.typeScale === "counter" ? "counter" : "room";
   const font = isBoardFont(raw.font) ? raw.font : raw.font == null || raw.font === "" ? "inter" : null;
   if (font == null) return { ok: false, error: FONT_CHOICE_ERROR };
+  if (raw.bodyFont != null && raw.bodyFont !== "" && !isBoardFont(raw.bodyFont)) return { ok: false, error: FONT_CHOICE_ERROR };
+  const bodyFont = isBoardFont(raw.bodyFont) && raw.bodyFont !== font ? raw.bodyFont : undefined;
   const primaryColor = hexColor(raw.primaryColor);
   const accentColor = hexColor(raw.accentColor);
   const textColor = hexColor(raw.textColor);
@@ -313,6 +320,7 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
     value: {
       layoutVersion: 1, template: raw.template, split, title: title ?? "", subtitle: subtitle ?? "", footer: footer ?? "",
       sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font,
+      ...(bodyFont ? { bodyFont } : {}),
       textColor, backgroundColor,
       featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
       columnWidths, imageFit, imageAnchor,
@@ -523,7 +531,8 @@ export type BrandSeed = {
  * Seed a fresh Layout document with the account brand. Used only for new
  * boards (no menuId). A document that already has a primary or accent colour
  * is treated as already branded and is left untouched.
- * Layout documents have a single `font`; headingFont wins over bodyFont.
+ * `font` takes the heading font (or the body font when only that is set); a different body font goes in
+ * `bodyFont` (E6-F2), so item text uses the body font instead of the heading font.
  * Title and footer are filled only when the kit has a display name or contact.
  */
 export function seedBrand(doc: LayoutDocument, kit: BrandSeed): LayoutDocument {
@@ -535,6 +544,7 @@ export function seedBrand(doc: LayoutDocument, kit: BrandSeed): LayoutDocument {
   const heading = isBoardFont(kit?.headingFont) ? kit.headingFont : null;
   const body = isBoardFont(kit?.bodyFont) ? kit.bodyFont : null;
   const font = heading ?? body ?? null;
+  const bodyFont = heading && body && body !== heading ? body : null;
   const title = clipSeedText(kit?.displayName, MENU_LIMITS.title);
   const footer = clipSeedText(seedFooter(kit), MENU_LIMITS.footer);
   if (!primaryColor && !accentColor && !textColor && !backgroundColor && !font && !title && !footer) return doc;
@@ -545,6 +555,7 @@ export function seedBrand(doc: LayoutDocument, kit: BrandSeed): LayoutDocument {
     ...(textColor ? { textColor } : {}),
     ...(backgroundColor ? { backgroundColor } : {}),
     ...(font ? { font } : {}),
+    ...(bodyFont ? { bodyFont } : {}),
     ...(title ? { title } : {}),
     ...(footer ? { footer } : {}),
   };
@@ -734,7 +745,11 @@ function itemUnit(sections: LayoutSection[], top: number, bottom: number, scale:
   return unit;
 }
 
-function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, family: string, spread = false, unitOverride?: number, minDescSize = 10) {
+type Families = { heading: string; body: string };
+
+function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, families: Families, spread = false, unitOverride?: number, minDescSize = 10) {
+  const family = families.heading;
+  const body = families.body;
   const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
   const nameSize = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
   // Boards up to 12 items keep the 10px floor (unchanged renders); long two-column menus use 14px.
@@ -749,16 +764,16 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
     for (const item of section.items) {
       y += unit * 0.78;
       const price = item.price || "";
-      const priceW = price ? measure(price, nameSize, family) + (colors.priceBg ? 28 : 0) : 0;
-      const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24), family);
+      const priceW = price ? measure(price, nameSize, body) + (colors.priceBg ? 28 : 0) : 0;
+      const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24), body);
       if (price && colors.priceBg) {
         parts.push(`<rect x="${(x + width - priceW).toFixed(1)}" y="${(y - nameSize).toFixed(1)}" width="${priceW.toFixed(1)}" height="${(nameSize * 1.35).toFixed(1)}" rx="8" fill="${colors.priceBg}"/>`);
       }
-      if (price) parts.push(`<text x="${(x + width - (colors.priceBg ? 12 : 0)).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-family="${family}" font-size="${nameSize}" font-weight="700" fill="${colors.price}">${esc(price)}</text>`);
-      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${nameSize}" font-weight="700" fill="${colors.ink}">${esc(name)}</text>`);
+      if (price) parts.push(`<text x="${(x + width - (colors.priceBg ? 12 : 0)).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-family="${body}" font-size="${nameSize}" font-weight="700" fill="${colors.price}">${esc(price)}</text>`);
+      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${nameSize}" font-weight="700" fill="${colors.ink}">${esc(name)}</text>`);
       if (item.description) {
         y += unit * 0.48;
-        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${descSize}" fill="${colors.muted}">${esc(fitWidth(item.description, descSize, width, family))}</text>`);
+        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${descSize}" fill="${colors.muted}">${esc(fitWidth(item.description, descSize, width, body))}</text>`);
       }
     }
     y += unit * 0.2;
@@ -802,6 +817,8 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const frame = frameFor(doc.template, doc.split, doc.columnWidths);
   const colors = colorsFor(doc);
   const family = fontFamily(doc.font);
+  const bodyFamily = fontFamily(doc.bodyFont ?? doc.font);
+  const families: Families = { heading: family, body: bodyFamily };
   const href = safeImageHref(art?.imageHref);
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${BOARD_W}" height="${BOARD_H}" viewBox="0 0 ${BOARD_W} ${BOARD_H}">`,
@@ -849,7 +866,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   parts.push(`<text x="${menu.x}" y="${colors.band && doc.template !== "signature" ? 86 : menu.y}" font-family="${family}" font-size="${titleSize}" font-weight="800" fill="${titleFill}">${esc(title)}</text>`);
   if (doc.subtitle) {
     const onBand = Boolean(colors.band && doc.template !== "signature");
-    parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${family}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w, family))}</text>`);
+    parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${bodyFamily}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w, bodyFamily))}</text>`);
   }
   const textTop = colors.band && doc.template !== "signature" ? 180 : menu.y + (doc.subtitle ? 72 : 36);
   if (doc.template === "triple-column" || doc.template === "two-column") {
@@ -860,7 +877,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const section = doc.sections[index];
       // Fixed columns keep their place; an empty column draws nothing, not even its heading (QA B1-04).
       if (!section || !sectionShows(section)) return;
-      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
+      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared);
     });
   } else if (doc.template === "two-menu-promo") {
     const textBottom = BOARD_H - 64;
@@ -870,7 +887,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const section = doc.sections[index];
       // Fixed columns keep their place; an empty column draws nothing, not even its heading (QA B1-04).
       if (!section || !sectionShows(section)) return;
-      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, family, false, shared);
+      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared);
     });
   } else {
     const shown = shownSections(doc.sections); // QA B1-04: sections with no items draw nothing
@@ -882,17 +899,17 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const colW = (menu.w - gap) / 2;
       const unit = Math.min(...columns.map((column) => itemUnit(column, textTop, menu.bottom, doc.typeScale, true)));
       columns.forEach((column, index) => {
-        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, family, true, unit, LONG_MENU_DESC_MIN);
+        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, families, true, unit, LONG_MENU_DESC_MIN);
       });
     } else {
-      paintItems(parts, shown, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, family, doc.template === "menu-banner");
+      paintItems(parts, shown, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, families, doc.template === "menu-banner");
     }
   }
   if (doc.footer && doc.template === "menu-banner") {
-    parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${family}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144, family))}</text>`);
+    parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${bodyFamily}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144, bodyFamily))}</text>`);
   } else if (doc.footer) {
     const footerY = doc.template === "signature" ? BOARD_H - 78 : BOARD_H - 40;
-    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${family}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w, family))}</text>`);
+    parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${bodyFamily}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w, bodyFamily))}</text>`);
   }
   if (doc.template === "menu-banner") {
     const head = doc.featureTitle || "Today";
@@ -903,13 +920,13 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     if (!href) {
       parts.push(`<rect x="${feature.x}" y="${feature.y}" width="10" height="${feature.h}" fill="${colors.featureInk}"/>`);
       parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="${headSize}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120, family))}</text>`);
-      if (detail) parts.push(`<text x="${hx}" y="${Math.min(feature.y + feature.h - 24, headY + headSize)}" font-family="${family}" font-size="${Math.max(16, headSize - 12)}" fill="${colors.featureInk}">${esc(fitWidth(detail, headSize - 12, feature.w - 120, family))}</text>`);
+      if (detail) parts.push(`<text x="${hx}" y="${Math.min(feature.y + feature.h - 24, headY + headSize)}" font-family="${bodyFamily}" font-size="${Math.max(16, headSize - 12)}" fill="${colors.featureInk}">${esc(fitWidth(detail, headSize - 12, feature.w - 120, bodyFamily))}</text>`);
     } else {
       const bandH = Math.min(84, Math.max(48, Math.round(feature.h * 0.42)));
       const bandY = feature.y + feature.h - bandH;
       parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${bandH}" fill="${colors.feature}"/>`);
       parts.push(`<text x="${hx}" y="${bandY + Math.round(bandH * 0.42)}" font-family="${family}" font-size="${Math.min(32, headSize)}" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, headSize, feature.w - 120, family))}</text>`);
-      if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${family}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120, family))}</text>`);
+      if (detail) parts.push(`<text x="${hx}" y="${bandY + bandH - 16}" font-family="${bodyFamily}" font-size="16" fill="${colors.featureInk}">${esc(fitWidth(detail, 16, feature.w - 120, bodyFamily))}</text>`);
     }
   } else if ((doc.template === "menu-promo-67" || doc.template === "split-50" || doc.template === "two-menu-promo") && promoBandHeight(doc) > 0) {
     const band = promoBandHeight(doc);
@@ -919,7 +936,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const detail = (doc.featureDetail || "").trim();
     parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${band}" fill="${colors.feature}"/>`);
     if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(title, 40, feature.w - 80, family))}</text>`);
-    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80, family))}</text>`);
+    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${bodyFamily}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80, bodyFamily))}</text>`);
   } else if (feature.h >= 280 && doc.template !== "triple-column" && doc.template !== "two-column" && ((doc.featureTitle || "").trim() || (doc.featureDetail || "").trim())) {
     const head = (doc.featureTitle || "").trim();
     const hx = feature.x + 48;
@@ -933,14 +950,14 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const headY = feature.y + Math.round(cap * 0.62);
       parts.push(`<text x="${hx}" y="${headY}" font-family="${family}" font-size="52" font-weight="800" fill="${ink}">${esc(fitWidth(head, 52, feature.w - 96, family))}</text>`);
       if (doc.featureDetail) {
-        parts.push(`<text x="${hx}" y="${headY + 72}" font-family="${family}" font-size="24" fill="${ink}">${esc(fitWidth(doc.featureDetail, 24, feature.w - 96, family))}</text>`);
+        parts.push(`<text x="${hx}" y="${headY + 72}" font-family="${bodyFamily}" font-size="24" fill="${ink}">${esc(fitWidth(doc.featureDetail, 24, feature.w - 96, bodyFamily))}</text>`);
       }
     } else {
       const bandY = feature.y + feature.h - 170;
       parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="170" fill="${colors.feature}"/>`);
       parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(head, 40, feature.w - 80, family))}</text>`);
       if (doc.featureDetail) {
-        parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${family}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80, family))}</text>`);
+        parts.push(`<text x="${hx}" y="${bandY + 132}" font-family="${bodyFamily}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(doc.featureDetail, 22, feature.w - 80, bodyFamily))}</text>`);
       }
     }
   }

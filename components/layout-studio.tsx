@@ -1,5 +1,6 @@
 "use client";
 import { FileUploadControl } from "@/components/file-upload";
+import { useT } from "@/lib/i18n/client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
@@ -83,6 +84,7 @@ export function LayoutStudio({
   brand?: BrandKitFixture | null;
   onClose?: () => void;
 } = {}) {
+  const t = useT();
   const accountMode = mode === "account";
   const startingTemplate = initialTemplate ?? "menu-promo-67";
   const [template, setTemplate] = useState<LayoutTemplate>(startingTemplate);
@@ -944,10 +946,28 @@ export function LayoutStudio({
               </label>
               <p className="zone-help">Room is for a television. Counter is slightly denser.</p>
               <label style={fieldLabel}>Font
-                <select className="field" aria-label="Font" value={draft.font} onChange={(event) => { if (isBoardFont(event.target.value)) update({ ...draft, font: event.target.value }); }}>
-                  {BOARD_FONTS.map((font) => <option key={font.id} value={font.id}>{font.label} · {font.hint}</option>)}
+                <select className="field" aria-label="Font" value={draft.font} onChange={(event) => {
+                  const next = event.target.value;
+                  if (!isBoardFont(next)) return;
+                  // E6-F2: a body font equal to the heading font is the same as none.
+                  const { bodyFont, ...rest } = draft;
+                  update(bodyFont && bodyFont !== next ? { ...rest, font: next, bodyFont } : { ...rest, font: next });
+                }}>
+                  {BOARD_FONTS.map((font) => <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>{font.label} · {font.hint}</option>)}
                 </select>
               </label>
+              <label style={fieldLabel}>{t("studio.bodyFont")}
+                <select className="field" aria-label={t("studio.bodyFont")} value={draft.bodyFont ?? ""} onChange={(event) => {
+                  const next = event.target.value;
+                  const { bodyFont: _old, ...rest } = draft;
+                  void _old;
+                  update(isBoardFont(next) && next !== draft.font ? { ...rest, bodyFont: next } : rest);
+                }}>
+                  <option value="">{t("studio.bodyFontSame")}</option>
+                  {BOARD_FONTS.filter((font) => font.id !== draft.font).map((font) => <option key={font.id} value={font.id} style={{ fontFamily: font.family }}>{font.label} · {font.hint}</option>)}
+                </select>
+              </label>
+              <p className="zone-help">{t("studio.bodyFontHelp")}</p>
               <p style={{ fontSize: 13, color: "#5c534c" }}>The fonts on this page are the same files drawn into the published image.</p>
               <p className="zone-help">Photo and video fit and position are under the board when you select a photo or video area.</p>
               <label style={fieldLabel}>{proportionLabel(template)} {Math.round(draft.split * 100)}%
