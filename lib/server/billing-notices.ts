@@ -97,7 +97,7 @@ export function billingTemplate(
 
 /**
  * I18N-4: Spanish reminders, same kind, deadline and facts as English. Wording is legally equivalent:
- * "free trial" = "prueba gratis", "payment grace" = "período de gracia del pago", and every line keeps the
+ * "free trial" = "prueba gratis", "payment grace" = "periodo de gracia para el pago", and every line keeps the
  * same promise (content kept, screens paused or playing, the same date and time). No plan names or prices.
  */
 function billingTemplateEs(
@@ -115,7 +115,7 @@ function billingTemplateEs(
       return notice(kind, deadline, "Pekko no pudo cobrar su pago", `No pudimos cobrar su último pago. Actualice su método de pago antes del ${when} para que sus pantallas sigan reproduciendo. Su contenido no se elimina.`);
     case "grace_ending_2":
     case "grace_ending_1":
-      return notice(kind, deadline, `Su período de gracia del pago de Pekko termina ${left}`, `Su período de gracia del pago termina el ${when}. Actualice su método de pago antes de esa fecha. Su contenido no se elimina.`);
+      return notice(kind, deadline, `Su periodo de gracia para el pago de Pekko termina ${left}`, `Su periodo de gracia para el pago termina el ${when}. Actualice su método de pago antes de entonces. Su contenido no se elimina.`);
     case "transition_14":
       return notice(kind, deadline, "Su acceso a Pekko continúa por 14 días", `Usted es uno de los primeros clientes de Pekko. Conserva acceso completo hasta el ${when}. Su contenido se conserva; no se elimina nada.`);
   }

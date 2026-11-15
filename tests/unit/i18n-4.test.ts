@@ -172,3 +172,16 @@ describe("I18N-4: Spanish templates render", () => {
     expect(es.text).not.toMatch(ES_RULES);
   });
 });
+
+describe("I18N-4: ES payment-grace wording (Gother review)", () => {
+  it("uses 'periodo de gracia para el pago' and 'antes de entonces' (the deadline includes a time)", () => {
+    const d = "2026-11-15T08:00:00.000Z";
+    for (const k of ["grace_ending_2", "grace_ending_1"] as const) {
+      const t = billingTemplate(k, d, { now: NOW, tz: "America/Mexico_City", locale: "es" });
+      const s = JSON.stringify(t);
+      expect(s).toContain("Su periodo de gracia para el pago termina el ");
+      expect(s).toContain("Actualice su método de pago antes de entonces. Su contenido no se elimina.");
+      expect(s).not.toMatch(/período de gracia del pago|antes de esa fecha/);
+    }
+  });
+});
