@@ -15,17 +15,18 @@ type Item = { name: string; price: string; description: string };
  * a required-name message, a gentle price hint (never blocks saving) and a description counter.
  */
 export function ItemNotes({ item, idBase, showNameError }: { item: Item; idBase: string; showNameError: boolean }) {
+  const t = useT();
   const nameError = showNameError && needsName(item);
-  const hint = priceHint(item.price);
+  const hint = priceHint(item.price, t);
   const descLength = item.description.length;
   return (
     <>
-      {nameError ? <p className="item-note item-note-error" id={`${idBase}-name-error`} role="alert">{ITEM_NAME_REQUIRED}</p> : null}
+      {nameError ? <p className="item-note item-note-error" id={`${idBase}-name-error`} role="alert">{t("mf.nameRequired")}</p> : null}
       {hint ? <p className="item-note item-note-hint" id={`${idBase}-price-hint`}>{hint}</p> : null}
       {descLength > 0 ? (
         <p className={`item-note item-count${descLength >= MENU_LIMITS.description - 8 ? " item-count-near" : ""}`} id={`${idBase}-desc-count`} aria-live="polite">
           {charCount(item.description, MENU_LIMITS.description)}
-          {descLength >= MENU_LIMITS.description ? " · limit reached" : ""}
+          {descLength >= MENU_LIMITS.description ? ` · ${t("mf.limitReached")}` : ""}
         </p>
       ) : null}
     </>

@@ -29,13 +29,7 @@ export const PHOTO_RETRY_MS = 1200;
 
 type ClassicStep = "preview" | "content" | "photo" | "style" | "publish";
 
-const STEP_LABEL: Record<ClassicStep, string> = {
-  preview: "Preview",
-  content: "Content",
-  photo: "Photo",
-  style: "Style",
-  publish: "Save",
-};
+const STEP_KEY = { preview: "ed.step.preview", content: "ed.step.content", photo: "ed.step.photo", style: "ed.step.style", publish: "ed.step.publish" } as const satisfies Record<ClassicStep, string>;
 
 export function ClassicEditor({
   draft,
@@ -105,7 +99,7 @@ export function ClassicEditor({
   const counts = menuCounts(c.sections);
   const hasPhoto = Boolean(c.photoMediaId);
   const hits = classicPreviewHits(hasPhoto);
-  const saveLabel = busy ? (draft.id ? "Saving…" : "Creating…") : draft.id ? "Save changes" : "Create menu board";
+  const saveLabel = busy ? (draft.id ? t("ed.saving") : t("ed.creating")) : draft.id ? t("ed.saveChanges") : t("ed.createBoard");
 
   useEffect(() => {
     if (readOnly) {
@@ -137,7 +131,7 @@ export function ClassicEditor({
             return;
           }
           if (!cancelled) {
-            setPreviewError(body.error || "Preview unavailable.");
+            setPreviewError(body.error || t("ed.previewUnavailable"));
             setPreviewLoading(false);
             setPreviewBusy(false);
           }
@@ -157,7 +151,7 @@ export function ClassicEditor({
         setPreviewBusy(false);
       } catch {
         if (!cancelled) {
-          setPreviewError("Preview unavailable.");
+          setPreviewError(t("ed.previewUnavailable"));
           setPreviewLoading(false);
           setPreviewBusy(false);
         }
@@ -230,7 +224,7 @@ export function ClassicEditor({
       setNameCheck(true);
       setRegion("menu");
       setStep("content");
-      onError(ITEM_NAME_REQUIRED);
+      onError(t("mf.nameRequired"));
       window.setTimeout(() => document.getElementById(`classic-item-${nameless.section}-${nameless.item}-name`)?.focus(), 0);
       return;
     }
@@ -264,26 +258,26 @@ export function ClassicEditor({
         style={{ aspectRatio: "16 / 9", position: "relative", background: preview ? "#111" : "#e8edf4", borderRadius: 12, overflow: "hidden" }}
       >
         {preview ? (
-          <img src={preview} alt="Menu board preview" data-testid={testId ? "menu-preview" : undefined} className="w-full h-full object-contain" />
+          <img src={preview} alt={t("ed.previewAlt")} data-testid={testId ? "menu-preview" : undefined} className="w-full h-full object-contain" />
         ) : null}
         {preview && previewBusy ? (
-          <span role="status" style={{ position: "absolute", top: 8, right: 8, padding: "2px 8px", borderRadius: 999, background: "rgba(0,0,0,.65)", color: "#fff", fontSize: 12 }}>Updating preview…</span>
+          <span role="status" style={{ position: "absolute", top: 8, right: 8, padding: "2px 8px", borderRadius: 999, background: "rgba(0,0,0,.65)", color: "#fff", fontSize: 12 }}>{t("ed.updatingPreview")}</span>
         ) : null}
         {preview && previewError && !previewBusy ? (
           <span role="alert" style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", gap: 8, padding: "2px 4px 2px 10px", borderRadius: 999, background: "rgba(120,20,20,.85)", color: "#fff", fontSize: 12 }}>
-            Preview didn&apos;t update.
-            <button type="button" onClick={() => { refreshNow.current = true; setPreviewRetry((n) => n + 1); }} style={{ background: "#fff", color: "#7a1414", borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>Try again</button>
+            {t("ed.previewStale")}
+            <button type="button" onClick={() => { refreshNow.current = true; setPreviewRetry((n) => n + 1); }} style={{ background: "#fff", color: "#7a1414", borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>{t("ed.retry")}</button>
           </span>
         ) : null}
         {preview ? null : (
-          <p style={{ margin: 0, padding: 16, fontSize: 14, color: "#5c6474", textAlign: "center" }}>{previewLoading ? "Loading preview…" : previewError || "Preview will appear here."}</p>
+          <p style={{ margin: 0, padding: 16, fontSize: 14, color: "#5c6474", textAlign: "center" }}>{previewLoading ? t("ed.loadingPreview") : previewError || t("ed.previewHere")}</p>
         )}
         {interactive
           ? hits.map((hit) => (
               <button
                 key={hit.id}
                 type="button"
-                aria-label={hit.label}
+                aria-label={hit.id === "photo" ? t("ed.editPhoto") : t("ed.editMenu")}
                 aria-pressed={region === hit.id}
                 className={`absolute border-2 ${region === hit.id ? "border-primary bg-primary/10" : "border-transparent hover:border-primary/50"}`}
                 style={{
@@ -297,36 +291,36 @@ export function ClassicEditor({
             ))
           : null}
         {interactive && !hasPhoto ? (
-          <button type="button" className="classic-add-photo" onClick={() => selectRegion("photo")}>Add a photo</button>
+          <button type="button" className="classic-add-photo" onClick={() => selectRegion("photo")}>{t("ce.addPhoto")}</button>
         ) : null}
       </div>
     );
   }
 
   const editingLabel = region && (step === "content" || step === "photo") ? (
-    <p className="text-sm font-medium">Editing: {region === "photo" ? "Photo" : "Menu"}</p>
+    <p className="text-sm font-medium">{t("ce.editing", { what: region === "photo" ? t("ce.editingPhoto") : t("ce.editingMenu") })}</p>
   ) : null;
 
   const contentPanel = (
     <details className="studio-panel" open>
-      <summary className="studio-panel-summary">Content &amp; text</summary>
+      <summary className="studio-panel-summary">{t("ce.content")}</summary>
       {region === "menu" ? editingLabel : null}
       <div id="menu-selected-editor" ref={editorRef} data-testid="menu-selected-editor" className="grid gap-3">
         <MenuLimits sections={counts.sections} items={counts.items} maxSections={counts.maxSections} maxItems={counts.maxItems} />
-        <label className="grid gap-1"><span className="form-label">Title on screen</span>
+        <label className="grid gap-1"><span className="form-label">{t("ce.title")}</span>
           <input className="field" value={c.title} maxLength={MENU_LIMITS.title} onChange={(e) => update({ ...c, title: e.target.value })} /></label>
-        <label className="grid gap-1"><span className="form-label">Subtitle</span>
+        <label className="grid gap-1"><span className="form-label">{t("ce.subtitle")}</span>
           <input className="field" value={c.subtitle} maxLength={MENU_LIMITS.subtitle} onChange={(e) => update({ ...c, subtitle: e.target.value })} /></label>
         {c.sections.map((section, si) => (
           <section key={si} className="section-card" aria-labelledby={`classic-section-${si}`}>
             <div className="section-card-head">
-              <h3 id={`classic-section-${si}`} className="section-card-legend">Section {si + 1}</h3>
+              <h3 id={`classic-section-${si}`} className="section-card-legend">{t("ed.section", { n: si + 1 })}</h3>
               <OrderButtons className="section-order" kind="section" name={section.name} scope="classic-sections" index={si} count={c.sections.length}
                 onMove={(dir) => { refreshNow.current = true; cards.sectionMoved(si, dir); update({ ...c, sections: moveSection(c.sections, si, dir) }); }} />
-              <button type="button" className="section-remove" aria-label={`Remove section ${si + 1}`}
-                onClick={() => { cards.clear(); update({ ...c, sections: c.sections.filter((_, i) => i !== si) }); }}>Remove</button>
+              <button type="button" className="section-remove" aria-label={t("ed.removeSection", { n: si + 1 })}
+                onClick={() => { cards.clear(); update({ ...c, sections: c.sections.filter((_, i) => i !== si) }); }}>{t("ed.remove")}</button>
             </div>
-            <input className="field" aria-label={`Section ${si + 1} name`} placeholder="e.g. Tacos" value={section.name} maxLength={MENU_LIMITS.sectionName}
+            <input className="field" aria-label={t("ed.sectionName", { n: si + 1 })} placeholder={t("ed.sectionPh")} value={section.name} maxLength={MENU_LIMITS.sectionName}
               onChange={(e) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, name: e.target.value } : s) })} />
             {section.items.map((item, ii) => {
               const setItem = (patch: Partial<typeof item>) => update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: s.items.map((it, j) => j === ii ? { ...it, ...patch } : it) } : s) });
@@ -350,14 +344,14 @@ export function ClassicEditor({
               );
             })}
             <button type="button" className="btn btn-quiet item-add" disabled={!canAddItem(c.sections, si)} onClick={() => { cards.open(si, section.items.length); update({ ...c, sections: c.sections.map((s, i) => i === si ? { ...s, items: [...s.items, blankItem()] } : s) }); }}>
-              {canAddItem(c.sections, si) ? `Add item (${section.items.length} of ${MENU_LIMITS.itemsPerSection})` : section.items.length >= MENU_LIMITS.itemsPerSection ? `Section full (${MENU_LIMITS.itemsPerSection} items)` : `Menu full (${MENU_LIMITS.items} items)`}
+              {canAddItem(c.sections, si) ? t("ed.addItem", { n: section.items.length, max: MENU_LIMITS.itemsPerSection }) : section.items.length >= MENU_LIMITS.itemsPerSection ? t("ed.sectionFull", { max: MENU_LIMITS.itemsPerSection }) : t("ed.menuFull", { max: MENU_LIMITS.items })}
             </button>
           </section>
         ))}
         <button type="button" className="btn btn-quiet justify-self-start min-h-11" disabled={!canAddSection(c.sections)} onClick={() => update({ ...c, sections: [...c.sections, { name: "", items: [blankItem()] }] })}>
-          {canAddSection(c.sections) ? `Add section (${c.sections.length} of ${MENU_LIMITS.sections})` : sectionLimitMessage(c.sections)}
+          {canAddSection(c.sections) ? t("ed.addSection", { n: c.sections.length, max: MENU_LIMITS.sections }) : sectionLimitMessage(c.sections, t)}
         </button>
-        <label className="grid gap-1"><span className="form-label">Footer</span>
+        <label className="grid gap-1"><span className="form-label">{t("ce.footer")}</span>
           <input className="field" value={c.footer} maxLength={MENU_LIMITS.footer} onChange={(e) => update({ ...c, footer: e.target.value })} /></label>
       </div>
     </details>
@@ -367,12 +361,12 @@ export function ClassicEditor({
     <details ref={photoPanelRef} className="studio-panel" open={step === "photo" || hasPhoto}>
       <summary className="studio-panel-summary">Photo</summary>
       {region === "photo" ? editingLabel : null}
-      <label className="grid gap-1"><span className="form-label">Photo (optional)</span>
+      <label className="grid gap-1"><span className="form-label">{t("ce.photoOptional")}</span>
         <select ref={photoSelectRef} className="field" value={c.photoMediaId ?? ""} onChange={(e) => { update({ ...c, photoMediaId: e.target.value || null }); if (e.target.value) selectRegion("photo"); }}>
-          <option value="">No photo</option>
+          <option value="">{t("ce.noPhoto")}</option>
           {images.map((m) => <option key={m.id} value={m.id}>{m.fileName}</option>)}
         </select>
-        <span className="text-xs text-muted">{images.length ? "Shows on the right side of the menu. JPG or PNG from your media." : "No photos yet. Upload one below."}</span>
+        <span className="text-xs text-muted">{images.length ? t("ce.photoHint") : t("ce.noPhotos")}</span>
       </label>
       <DirectImageUpload
         what="photo"
@@ -395,30 +389,30 @@ export function ClassicEditor({
 
   const stylePanel = (
     <details className="studio-panel" open>
-      <summary className="studio-panel-summary">Theme &amp; settings</summary>
+      <summary className="studio-panel-summary">{t("ce.themeSettings")}</summary>
       <fieldset>
-        <legend className="form-label">Theme</legend>
+        <legend className="form-label">{t("ce.theme")}</legend>
         <div className="grid gap-3 grid-cols-3 mt-1">
-          {MENU_TEMPLATES.map((t) => (
-            <label key={t.id} className={`rounded-xl border p-3 cursor-pointer ${draft.template === t.id ? "border-primary ring-2 ring-primary/30" : "border-line"}`}>
-              <input type="radio" name="menu-template" className="sr-only" checked={draft.template === t.id} onChange={() => setDraft({ ...draft, template: t.id })} />
+          {MENU_TEMPLATES.map((tpl) => (
+            <label key={tpl.id} className={`rounded-xl border p-3 cursor-pointer ${draft.template === tpl.id ? "border-primary ring-2 ring-primary/30" : "border-line"}`}>
+              <input type="radio" name="menu-template" className="sr-only" checked={draft.template === tpl.id} onChange={() => setDraft({ ...draft, template: tpl.id })} />
               <span className="flex gap-1 mb-2" aria-hidden>
-                <span className="h-6 flex-1 rounded" style={{ background: t.swatch[0], border: "1px solid #d5e2f2" }} />
-                <span className="h-6 w-8 rounded" style={{ background: t.swatch[1] }} />
+                <span className="h-6 flex-1 rounded" style={{ background: tpl.swatch[0], border: "1px solid #d5e2f2" }} />
+                <span className="h-6 w-8 rounded" style={{ background: tpl.swatch[1] }} />
               </span>
-              <span className="font-medium block">{t.name}</span>
-              <span className="text-xs text-muted">{t.blurb}</span>
+              <span className="font-medium block">{tpl.name}</span>
+              <span className="text-xs text-muted">{t(`tpl.${tpl.id}.blurb`)}</span>
             </label>
           ))}
         </div>
       </fieldset>
-      <label className="grid gap-1 mt-3"><span className="form-label">Menu name (only you see this)</span>
+      <label className="grid gap-1 mt-3"><span className="form-label">{t("ce.menuName")}</span>
         <input className="field" value={draft.name} maxLength={MENU_LIMITS.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
       <label className="flex items-center gap-2 text-sm min-h-11">
         <input type="checkbox" checked={c.useBrand !== false} onChange={(e) => update({ ...c, useBrand: e.target.checked })} />
-        Use my brand (logo and colours)
+        {t("ce.useBrand")}
       </label>
-      <p className="text-xs text-muted">Colours and the logo come from your <StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">Brand Kit</StudioGuardedLink>. There is no separate brand form here.</p>
+      <p className="text-xs text-muted">{t("ce.brandNote")} <StudioGuardedLink href="/dashboard/account/brand-kit" className="font-semibold text-primary underline underline-offset-4">{t("ce.brandLink")}</StudioGuardedLink>{t("ce.brandTail")}</p>
     </details>
   );
 
@@ -426,7 +420,7 @@ export function ClassicEditor({
     <div>
       {displays.length ? (
         <fieldset className="grid gap-1">
-          <legend className="form-label">Show on these screens now (optional)</legend>
+          <legend className="form-label">{t("ce.showOn")}</legend>
           {displays.map((d) => (
             <label key={d.id} className="flex items-center gap-2 text-sm min-h-11">
               <input type="checkbox" checked={draft.displayIds.includes(d.id)}
@@ -434,10 +428,10 @@ export function ClassicEditor({
               {d.name}
             </label>
           ))}
-          <p className="text-xs text-muted">Or leave these blank and use breakfast, lunch &amp; dinner times on the Schedule page.</p>
+          <p className="text-xs text-muted">{t("ce.orSchedule")}</p>
         </fieldset>
       ) : (
-        <p className="text-xs text-muted">Saving updates any screens already showing this board within a minute. Assign screens from here or on the Schedule page.</p>
+        <p className="text-xs text-muted">{t("ce.savingNote")}</p>
       )}
     </div>
   );
@@ -446,11 +440,11 @@ export function ClassicEditor({
     <div className="studio-app" data-testid="menu-editor" data-embedded="true" style={{ background: "transparent", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
-          <button type="button" className="studio-back" disabled={busy} onClick={requestClose}>Back to menu boards</button>
-          <h1 className="studio-heading" style={{ margin: 0, fontSize: 18, fontWeight: 750 }}>{draft.id ? draft.name || "Edit menu board" : "New menu board"}</h1>
+          <button type="button" className="studio-back" disabled={busy} onClick={requestClose}>{t("ed.back")}</button>
+          <h1 className="studio-heading" style={{ margin: 0, fontSize: 18, fontWeight: 750 }}>{draft.id ? draft.name || t("ed.editBoard") : t("ed.newBoard")}</h1>
         </div>
         <div className="studio-toolbar-actions">
-          <button type="button" className="btn btn-quiet min-h-11" onClick={goPreview}>Preview</button>
+          <button type="button" className="btn btn-quiet min-h-11" onClick={goPreview}>{t("ed.preview")}</button>
           <button type="button" className="btn btn-primary min-h-11" disabled={busy || readOnly} onClick={() => { void save(); }}>{saveLabel}</button>
         </div>
       </header>
@@ -482,13 +476,13 @@ export function ClassicEditor({
           className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
           id="studio-tv-preview"
           data-testid="studio-tv-preview"
-          aria-label="Editing canvas"
+          aria-label={t("ed.canvasAria")}
         >
-          <p className="studio-kicker">Board · preview of what your TV will show</p>
+          <p className="studio-kicker">{t("ed.kicker")}</p>
           <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
           {studioBp !== "phone" ? (
-            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label="Photo controls" tabIndex={0}>
+            <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label={t("ce.photoControls")} tabIndex={0}>
               {photoPanel}
             </div>
           ) : null}
@@ -497,7 +491,7 @@ export function ClassicEditor({
 
       <div className="studio-savebar">
         {previewError ? <p className="studio-status" role="status">{previewError}</p> : null}
-        <nav className="studio-tabs" role="tablist" aria-label="Editor steps">
+        <nav className="studio-tabs" role="tablist" aria-label={t("ed.stepsAria")}>
           {(["preview", "content", "photo", "style", "publish"] as const).map((id) => (
             <button
               key={id}
@@ -511,7 +505,7 @@ export function ClassicEditor({
                 if (id === "photo") setRegion("photo");
                 if (id === "content") setRegion("menu");
               }}
-            >{STEP_LABEL[id]}</button>
+            >{t(STEP_KEY[id])}</button>
           ))}
         </nav>
         <div className="studio-save-actions">

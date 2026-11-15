@@ -4,6 +4,9 @@
  * price field, and free text such as "Market price" is kept exactly as typed.
  */
 import { MENU_LIMITS } from "@/lib/menu-templates";
+import { makeT, type T } from "@/lib/i18n";
+
+const EN: T = makeT("en");
 
 type Item = { name: string; price: string; description: string };
 type Section = { name: string; items: Item[] };
@@ -26,12 +29,12 @@ export function normalizePrice(raw: string): string {
 }
 
 /** A gentle, non-blocking hint for a price that is not a plain number. Saves are never blocked. */
-export function priceHint(raw: string): string | null {
+export function priceHint(raw: string, t: T = EN): string | null {
   const value = raw.trim();
   if (!value) return null;
   if (PLAIN_PRICE.test(value)) return null;
   if (/^[$€£¥]\s*\d+(?:[.,]\d{1,2})?$/.test(value)) return null;
-  return "Not a number, so it shows on the board exactly as typed (fine for \"Market price\").";
+  return t("mf.priceHint");
 }
 
 /** A row that has a price or description but no name. Saving would drop it, so we ask for a name. */
@@ -48,6 +51,7 @@ export function firstNamelessItem(sections: Section[]): { section: number; item:
   return null;
 }
 
+/** English copy; the editors show t("mf.nameRequired"). */
 export const ITEM_NAME_REQUIRED = "Item name required. Add a name or remove this item.";
 
 /** Rows that will be kept on save (named items). Blank rows are ignored. */
@@ -90,11 +94,11 @@ export function canAddSection(sections: Section[]): boolean {
 }
 
 /** Message when no more section rows fit. Points at an empty section when there is one (QA B1-04 retest). */
-export function sectionLimitMessage(sections: Section[]): string {
+export function sectionLimitMessage(sections: Section[], t: T = EN): string {
   const empty = sections.findIndex((section) => !sectionShows(section));
   return empty >= 0
-    ? `${MENU_LIMITS.sections} sections is the limit. Section ${empty + 1} is empty and isn't shown; remove it to add another.`
-    : `${MENU_LIMITS.sections} sections is the limit. Remove one to add another.`;
+    ? t("mf.sectionLimitEmpty", { max: MENU_LIMITS.sections, n: empty + 1 })
+    : t("mf.sectionLimit", { max: MENU_LIMITS.sections });
 }
 
 /** Whether another item row can be added to one section. */
