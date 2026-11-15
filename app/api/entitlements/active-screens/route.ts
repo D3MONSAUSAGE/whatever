@@ -2,6 +2,7 @@ import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
+import { withLocalizedErrors } from "@/lib/server/locale";
 import { loadEffectiveEntitlement, toResponse } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  * The rest pause (billing_active = false); nothing is deleted. Returns the entitlements body.
  * 400 too many / bad body, 403 an id that isn't one of this account's screens.
  */
-export async function POST(req: Request) {
+export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
   const body = await readJson(req);
@@ -27,4 +28,4 @@ export async function POST(req: Request) {
   const e = await loadEffectiveEntitlement(admin.accountId);
   if (e === "error" || !e) return fail("Saved, but couldn't reload your plan. Refresh to see it.", 503);
   return json(toResponse(admin.accountId, e, process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin));
-}
+});

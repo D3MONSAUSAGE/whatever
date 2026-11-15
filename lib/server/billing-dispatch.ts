@@ -72,6 +72,8 @@ export function transitionNoticeKey(accountId: string): string {
  * start is still due the 14-day notice. That start is not written here.
  */
 export function planOrgReminders(account: ReminderAccount, now: string): PlannedReminder[] {
+  // Comp accounts have no trial or Stripe cycle, so they must not receive billing reminders.
+  if (account.plan === "comp") return [];
   const row: EntitlementRow = {
     state: account.state,
     plan: account.plan,

@@ -19,11 +19,51 @@ describe("commercialEntitlement", () => {
     const legacy = { ...trial, state: "grandfathered" as const, plan: "grandfathered" as const };
     expect(commercialEntitlement(legacy, false)).toBe(legacy);
   });
-  it("gives grandfathered, comp and unknown plans no access", () => {
-    for (const plan of ["grandfathered", "comp", "enterprise"]) {
+  it("gives grandfathered and unknown plans no access", () => {
+    for (const plan of ["grandfathered", "enterprise"]) {
       const e = on({ ...trial, state: "grandfathered", plan: plan as EntitlementRow["plan"], trial_started_at: null, trial_ends_at: null });
       expect(e).toMatchObject({ state: "expired", screen_limit: 0, playback_allowed: false, can_add_screen: false });
     }
+  });
+  it("lets a designated comp account stay active with 5 screens, no expiry, and no Stripe", () => {
+    const leftover = on({
+      ...trial,
+      state: "expired",
+      plan: "comp",
+      screen_limit: 0,
+      active_screens: 2,
+      trial_started_at: "2026-10-01T00:00:00Z",
+      trial_ends_at: "2026-10-15T00:00:00Z",
+      playback_ends_at: "2026-10-18T00:00:00Z",
+      subscription_status: "canceled",
+      current_period_end: "2026-10-20T00:00:00Z",
+      grace_ends_at: "2026-10-12T00:00:00Z",
+      playback_allowed: false,
+      can_add_screen: false,
+    });
+    expect(leftover).toMatchObject({
+      state: "active",
+      plan: "comp",
+      screen_limit: 5,
+      playback_allowed: true,
+      can_add_screen: true,
+      trial_started_at: null,
+      trial_ends_at: null,
+      playback_ends_at: null,
+      grace_ends_at: null,
+    });
+    expect(on({ ...leftover, active_screens: 5 })).toMatchObject({ can_add_screen: false, playback_allowed: true, screen_limit: 5 });
+  });
+  it("keeps trial, starter, business, multi, expired, canceled, past_due and grandfathered behavior unchanged", () => {
+    expect(on(trial)).toMatchObject({ state: "trial", screen_limit: 5, playback_allowed: true, can_add_screen: true });
+    expect(on(paid)).toMatchObject({ state: "active", plan: "starter", screen_limit: 1, playback_allowed: true });
+    expect(on({ ...paid, plan: "business", screen_limit: 3, can_add_screen: true })).toMatchObject({ state: "active", plan: "business", screen_limit: 3, playback_allowed: true });
+    expect(on({ ...paid, plan: "multi", screen_limit: 5, can_add_screen: true })).toMatchObject({ state: "active", plan: "multi", screen_limit: 5, playback_allowed: true });
+    expect(on({ ...trial, server_time: "2026-11-15T08:00:00Z" })).toMatchObject({ state: "expired", playback_allowed: false, can_add_screen: false, screen_limit: 0 });
+    expect(on({ ...paid, subscription_status: "canceled", server_time: "2026-12-01T00:00:00Z" })).toMatchObject({ state: "canceled", playback_allowed: false });
+    const due = { ...paid, subscription_status: "past_due", grace_ends_at: "2026-11-12T08:00:00Z" };
+    expect(on(due)).toMatchObject({ state: "past_due", playback_allowed: true, can_add_screen: false });
+    expect(on({ ...trial, state: "grandfathered" as const, plan: "grandfathered" as const, trial_started_at: null, trial_ends_at: null })).toMatchObject({ state: "expired", screen_limit: 0, playback_allowed: false });
   });
   it("keeps a normal 14-day trial with 5 screens", () => {
     expect(on(trial)).toMatchObject({ state: "trial", screen_limit: 5, playback_allowed: true, can_add_screen: true });

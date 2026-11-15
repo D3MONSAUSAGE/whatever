@@ -9,7 +9,8 @@ Source of truth: `commercialEntitlement()` in `lib/server/entitlements.ts`, appl
 | Canceled at period end | Full access until the paid-through date, then restricted. |
 | Payment failed (past_due) | 7-day grace from the first failure (playback only), then restricted. If Stripe ends the subscription after a failure, the grace end is kept; the unpaid period is not given away. |
 | unpaid, incomplete, incomplete_expired, paused, no status | Restricted. |
-| grandfathered, comp, any other plan | Restricted (no free plans). Move these orgs to `trial` before enforcing. |
+| Complimentary (`comp`) | Active, 5 screens, no expiry, no Stripe. Playback allowed. Only accounts explicitly set to `comp` (service-role `set_account_comp`). Billing reminders and billing emails skip these accounts. |
+| grandfathered, any other plan | Restricted (no free plans). Move these orgs to `trial` before enforcing. Do not treat `comp` as restricted. |
 
 Restricted means: screens show "This screen is paused" (the token is kept, so they resume once paid), no new pairings, the dashboard asks to choose a plan. Nothing is deleted.
 

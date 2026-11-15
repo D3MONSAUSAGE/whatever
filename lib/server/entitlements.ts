@@ -153,7 +153,8 @@ const RESTRICTED = (e: EntitlementRow, state: "expired" | "canceled", playbackEn
  * production, so it is not changed). Only used when BILLING_ENFORCE=1; with enforcement off the
  * SQL row is returned unchanged, so production behaves exactly as before.
  *
- * - grandfathered, comp or any unknown plan: no free access (treated as an ended trial).
+ * - comp: active, 5 screens max, no expiry, no Stripe requirement, playback allowed (SQL semantics).
+ * - grandfathered or any unknown plan: no free access (treated as an ended trial).
  * - trial: exactly TRIAL_DAYS from its start (a later trial_ends_at is capped); no playback grace after it.
  * - paid plans: active/trialing play; past_due plays only until a recorded grace end;
  *   a canceled subscription plays until the paid-through date only if no payment failure was
@@ -163,6 +164,19 @@ const RESTRICTED = (e: EntitlementRow, state: "expired" | "canceled", playbackEn
 export function commercialEntitlement(e: EntitlementRow, enforced = billingEnforced()): EntitlementRow {
   if (!enforced) return e;
   const now = Date.parse(e.server_time);
+  if (e.plan === "comp") {
+    return {
+      ...e,
+      state: "active",
+      screen_limit: 5,
+      playback_allowed: true,
+      can_add_screen: e.active_screens < 5,
+      trial_started_at: null,
+      trial_ends_at: null,
+      playback_ends_at: null,
+      grace_ends_at: null,
+    };
+  }
   if (!COMMERCIAL_PLANS.includes(e.plan)) return RESTRICTED(e, "expired");
   if (e.plan === "trial") {
     if (e.state !== "trial" && e.state !== "trial_grace" && e.state !== "expired") return RESTRICTED(e, "expired");
