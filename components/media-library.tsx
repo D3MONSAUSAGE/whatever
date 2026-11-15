@@ -9,6 +9,7 @@ import { useUploads } from "@/components/uploads";
 import { IconImage } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { FileUploadControl } from "@/components/file-upload";
+import { mediaRename } from "@/lib/media-rename";
 import { duplicateMessage, libraryLookupUrl, lookupWithTimeout, sameLibraryVideo } from "@/lib/media-dupes";
 
 type SortKey = "newest" | "oldest" | "name" | "size" | "duration";
@@ -337,7 +338,12 @@ function Meta({ item }: { item: MediaItem }) {
 
 function ItemActions({ item, onDelete, onRename, onAdd }: { item: MediaItem; onDelete: () => void; onRename: () => void; onAdd: () => void }) {
   if (item.kind !== "presentation") {
-    return <button type="button" className="btn btn-quiet text-danger mt-auto" onClick={onDelete}>Delete</button>;
+    return (
+      <div className="mt-auto flex flex-wrap gap-2">
+        <button type="button" className="btn btn-quiet" onClick={onRename} aria-label={`Rename ${item.fileName}`}>Rename</button>
+        <button type="button" className="btn btn-quiet text-danger" onClick={onDelete}>Delete</button>
+      </div>
+    );
   }
   return (
     <div className="mt-auto flex flex-wrap gap-2">
@@ -350,24 +356,37 @@ function ItemActions({ item, onDelete, onRename, onAdd }: { item: MediaItem; onD
 }
 
 function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: () => void; onSaved: () => void }) {
+  const presentation = item.kind === "presentation";
+  const noun = presentation ? "presentation" : "file";
   const [name, setName] = useState(item.fileName);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   async function save() {
+    if (busy) return;
+    // U2-05: files keep their extension and storage path; only the name shown in Pekko changes.
+    const checked = presentation ? null : mediaRename(item.fileName, name);
+    if (checked && !checked.ok) { setError(checked.error); return; }
+    setBusy(true);
+    setError(null);
     try {
-      await api(`/api/media/presentation/${item.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      await api(presentation ? `/api/media/presentation/${item.id}` : `/api/media/${item.id}`, { method: "PATCH", body: JSON.stringify({ name: checked?.ok ? checked.name : name }) });
       onSaved();
     } catch (err) {
-      setError((err as Error).message);
+      setError((err as Error).message || "Couldn't rename that file. Try again.");
+    } finally {
+      setBusy(false);
     }
   }
   return (
     <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label="Rename presentation" className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
-        <h2 className="text-lg font-semibold mb-3">Rename presentation</h2>
-        <input className="field" aria-label="Presentation name" value={name} onChange={(event) => setName(event.target.value)} />
-        {error ? <p className="text-sm text-danger mt-2">{error}</p> : null}
+      <div role="dialog" aria-modal="true" aria-label={`Rename ${noun}`} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-3">Rename {noun}</h2>
+        <input className="field" aria-label={presentation ? "Presentation name" : "File name"} value={name} maxLength={200} autoFocus
+          onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void save(); if (event.key === "Escape") onClose(); }} />
+        {presentation ? null : <p className="text-xs text-muted mt-1">Only the name shown in Pekko changes. Screens and playlists keep using this file.</p>}
+        {error ? <p className="text-sm text-danger mt-2" role="alert">{error}</p> : null}
         <div className="mt-4 flex gap-2">
-          <button type="button" className="btn btn-primary" onClick={() => void save()}>Save</button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>Cancel</button>
         </div>
       </div>
