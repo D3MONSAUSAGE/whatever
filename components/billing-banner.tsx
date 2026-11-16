@@ -15,8 +15,9 @@ export function BillingBanner() {
   if (!message) return null;
   const select = ent.data?.warning?.action === "select_screens";
   return (
-    <div role="status" data-testid="billing-banner" className="card mb-5 p-3 md:p-4 border-l-4 border-l-primary">
-      <p>{message}</p>
+    <div role="status" data-testid="billing-banner" className="card mb-3 sm:mb-5 p-3 md:p-4 border-l-4 border-l-primary">
+      {/* Parity Phase 1 (W3): smaller type and spacing on a phone. Layout only; billing logic unchanged. */}
+      <p className="text-sm sm:text-base">{message}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         <Link href={select ? "/dashboard/billing#screens" : "/dashboard/billing"} className="btn btn-quiet">
           {select ? "Choose screens" : "Review plan"}

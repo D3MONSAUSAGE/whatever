@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { api, useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
+import { api, useApi, type DisplayItem, type LocationItem, type ScreenGroupItem } from "@/lib/api";
+import { screenNameWarning } from "@/lib/screen-names";
 import { contentLabel, hasNoContent, heartbeatText, OfflineAlert, Status } from "@/components/tv";
 import { useT } from "@/lib/i18n/client";
 import { onlineNow, syncLine } from "@/lib/sync-line";
@@ -59,8 +60,9 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
               <article className="card p-4 min-w-0">
                 <div className="flex items-start gap-3">
                   <Link href={`/dashboard/screens/${display.id}`} className="block min-h-11 min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <h2 className="font-semibold truncate">{display.name}</h2>
+                    {/* Parity Phase 1 (W3): on a phone the status sits under the name so long names aren't cut short. */}
+                    <div className="flex flex-col items-start gap-1 sm:flex-row sm:justify-between sm:gap-3" data-testid="screen-card-head">
+                      <h2 className="font-semibold truncate max-w-full">{display.name}</h2>
                       <Status display={display} />
                     </div>
                     <p className="text-sm mt-2 truncate">{contentLabel(display, t)}</p>
@@ -109,6 +111,9 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   const t = useT();
   const displays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
   const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(fixture ? null : `/api/displays/${id}/timeline`, 10_000);
+  // Parity Phase 1 (W1): rename and location live here too, so My Screens covers what the legacy
+  // /dashboard/displays list did. Same PATCH /api/displays/:id calls and disp.* strings as that page.
+  const locations = useApi<LocationItem[]>(fixture ? null : "/api/locations");
   const confirm = useConfirm();
   const toast = useToast();
   const display = fixture ?? displays.data?.find((item) => item.id === id);
@@ -130,6 +135,35 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
       toast.show((err as Error).message, true);
     }
   }
+  async function rename() {
+    const name = await confirm.ask({
+      title: t("disp.renameTitle"),
+      body: t("disp.renameBody"),
+      confirmLabel: t("disp.saveName"),
+      cancelLabel: t("common.cancel"),
+      input: { label: t("disp.name"), ariaLabel: t("disp.newName"), defaultValue: display!.name, maxLength: 60 },
+    });
+    if (typeof name !== "string" || name === display!.name) return;
+    const others = (displays.data ?? []).filter((item) => item.id !== display!.id).map((item) => item.name);
+    const dup = screenNameWarning(name, others, t);
+    if (dup) toast.show(t("disp.suggested", { warning: dup.nameWarning, name: dup.suggestedName }));
+    try {
+      await api(`/api/displays/${display!.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      toast.show(t("disp.renamed"));
+      void displays.reload();
+    } catch (err) {
+      toast.show((err as Error).message, true);
+    }
+  }
+  async function setLocation(locationId: string | null) {
+    try {
+      await api(`/api/displays/${display!.id}`, { method: "PATCH", body: JSON.stringify({ locationId }) });
+      toast.show(t("disp.locationSaved"));
+      void displays.reload();
+    } catch (err) {
+      toast.show((err as Error).message, true);
+    }
+  }
   const preview = display.boardPreviewUrl || display.media?.url || display.playlist?.url;
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
   return (
@@ -139,7 +173,18 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
       />
       <div className="mb-4 flex flex-wrap gap-2">
         <Link href="/dashboard/screens/add#add-screen" className="btn btn-quiet min-h-11">{t("screens.add")}</Link>
+        {fixture ? null : <button type="button" className="btn btn-quiet min-h-11" data-testid="rename-screen" onClick={() => { void rename(); }}>{t("disp.rename")}</button>}
         {fixture ? null : <button type="button" className="btn btn-quiet text-danger min-h-11" onClick={() => { void removeScreen(); }}>{t("screens.remove")}</button>}
+        {locations.data && locations.data.length > 0 ? (
+          <label className="flex items-center gap-2 text-sm font-semibold text-muted">
+            {t("disp.location")}
+            <select aria-label={t("disp.locationFor", { name: display.name })} className="field min-h-11 w-auto" data-testid="screen-location"
+              value={display.location?.id ?? ""} onChange={(event) => { void setLocation(event.target.value || null); }}>
+              <option value="">{t("disp.noLocation")}</option>
+              {locations.data.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+            </select>
+          </label>
+        ) : null}
       </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <article className="card p-4 min-w-0">

@@ -11,6 +11,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { friendlyAuthError, MIN_PASSWORD } from "@/components/auth-frame";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { LanguageSelect } from "@/components/i18n/language-select";
 
 const NAME_MAX = 60;
 
@@ -104,6 +105,8 @@ export default function Settings() {
     <section className="max-w-2xl">
       <PageHeader title={t("settings.title")} eyebrow={t("settings.eyebrow")} icon={<IconGear />} lede={t("settings.lede")} />
 
+      {/* Parity Phase 1 (t353u, W4) order: account, business, language, alerts, security (name, password,
+          sign out), plan, help, legal, and Delete account last. Brand Kit lives on the Account hub and in the nav. */}
       <div className="grid gap-5">
         <div className="card">
           <h2 className="px-5 pt-5 font-semibold">{t("settings.account")}</h2>
@@ -116,23 +119,19 @@ export default function Settings() {
             <dl className="divide-y divide-line">
               <Row label={t("settings.email")}>{email ?? me.data?.email ?? <span className="skeleton inline-block h-5 w-48 align-middle" />}</Row>
               <Row label={t("settings.business")}>{me.data ? (me.data.accountName || <span className="text-muted">{t("settings.notSet")}</span>) : <span className="skeleton inline-block h-5 w-32 align-middle" />}</Row>
-              <Row label={t("settings.pairTv")}><span className="break-all">{origin}/pair</span></Row>
-              <Row label={t("settings.samePlayer")}><span className="break-all">{origin}/tv</span></Row>
+              {/* Parity Phase 1: one address. /pair and /tv open the same player (next.config.ts). */}
+              <Row label={t("settings.tvAddress")}><span className="break-all" data-testid="settings-tv-address">{origin}/tv</span></Row>
             </dl>
           )}
         </div>
-
         <BusinessForm current={me.data?.accountName ?? null} onSaved={() => me.reload()} />
-
-        <AlertSettings />
-
-        <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard/billing" className="font-semibold" data-testid="billing-link">{t("settings.planBilling")}</Link>
-          <ManageBilling className="btn-quiet" />
-          {locale !== "en" ? <p className="text-sm text-muted w-full" lang={locale} data-testid="english-only-note">{t("common.englishOnlyNote")}</p> : null}
+        {/* Parity Phase 1 (W4): language was only on the Account hub. Saved to the account by AccountLocaleSync. */}
+        <div className="card p-5" data-testid="settings-language">
+          <h2 className="font-semibold">{t("lang.accountTitle")}</h2>
+          <p className="text-sm text-muted mt-1 mb-3">{t("lang.accountBody")}</p>
+          <LanguageSelect refresh={false} />
         </div>
-        <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">{t("settings.help")}</Link>
-        <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">{t("settings.deleteLink")}</Link>
+        <AlertSettings />
         <form className="card p-5" onSubmit={saveName} aria-labelledby="name-heading">
           <h2 id="name-heading" className="font-semibold">{t("settings.displayName")}</h2>
           <p className="text-sm text-muted mt-1 mb-3">{t("settings.displayNameHelp")}</p>
@@ -142,7 +141,6 @@ export default function Settings() {
           {nameError ? <p role="alert" className="note-error mt-3">{nameError}</p> : null}
           <button className="btn btn-primary mt-3" disabled={nameBusy || name.trim() === savedName}>{nameBusy ? t("settings.saving") : t("settings.saveName")}</button>
         </form>
-
         <form className="card p-5" onSubmit={changePassword} aria-labelledby="pw-heading">
           <h2 id="pw-heading" className="font-semibold">{t("settings.changePassword")}</h2>
           <p className="text-sm text-muted mt-1 mb-3">{t("settings.changePasswordHelp", { min: MIN_PASSWORD })}</p>
@@ -169,13 +167,6 @@ export default function Settings() {
             <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">{t("settings.forgotCurrent")}</Link>
           </div>
         </form>
-
-        <div className="card p-5">
-          <h2 className="font-semibold">{t("settings.brandTitle")}</h2>
-          <p className="text-sm text-muted mt-1 mb-3">{t("settings.brandBody")}</p>
-          <Link href="/dashboard/account/brand-kit" className="btn btn-quiet">{t("settings.brandAction")}</Link>
-        </div>
-
         <div className="card p-5">
           <h2 className="font-semibold">{t("settings.signOutTitle")}</h2>
           <p className="text-sm text-muted mt-1 mb-3">{t("settings.signOutBody")}</p>
@@ -186,10 +177,17 @@ export default function Settings() {
             </button>
           </div>
         </div>
+        <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
+          <Link href="/dashboard/billing" className="font-semibold" data-testid="billing-link">{t("settings.planBilling")}</Link>
+          <ManageBilling className="btn-quiet" />
+          {locale !== "en" ? <p className="text-sm text-muted w-full" lang={locale} data-testid="english-only-note">{t("common.englishOnlyNote")}</p> : null}
+        </div>
+        <Link href="/support" className="card p-5 block font-semibold" data-testid="support-link">{t("settings.help")}</Link>
+        <p className="text-xs text-muted px-1" data-testid="settings-legal">
+          <a href="/terms" className="hover:underline">{t("settings.terms")}</a> · <a href="/terms#billing" className="hover:underline">{t("settings.billingTerms")}</a> · <a href="/privacy" className="hover:underline">{t("settings.privacy")}</a>
+        </p>
+        <Link href="/dashboard/settings/delete" className="card p-5 block font-semibold text-danger" data-testid="delete-account-link">{t("settings.deleteLink")}</Link>
       </div>
-      <p className="mt-6 text-xs text-muted">
-        <a href="/terms" className="hover:underline">{t("settings.terms")}</a> · <a href="/terms#billing" className="hover:underline">{t("settings.billingTerms")}</a> · <a href="/privacy" className="hover:underline">{t("settings.privacy")}</a>
-      </p>
       {confirm.node}
     </section>
   );

@@ -214,7 +214,8 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   );
 }
 
-function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[]; onPaired: (warning?: string, id?: string) => void; onSubmitting?: () => void; onError: (message: string) => void }) {
+/** The pairing form. `address` replaces the /pair address line (the focused Add screen page shows /tv with a QR). */
+export function PairForm({ names, onPaired, onSubmitting, onError, address }: { names: string[]; onPaired: (warning?: string, id?: string) => void; onSubmitting?: () => void; onError: (message: string) => void; address?: React.ReactNode }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -242,7 +243,7 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
       <h2 id="add-screen-title" className="font-semibold">{t("disp.addTitle")}</h2>
       <ol className="mt-2 mb-4 grid gap-2 text-sm text-muted list-decimal pl-5">
         <li>{t("disp.step1")}
-          <PlayerUrl />
+          {address ?? <PlayerUrl />}
         </li>
         <li>{t("disp.step2")}</li>
         <li>{t("disp.step3a")} <strong className="text-ink">{t("disp.connectTv")}</strong>. {t("disp.step3b")}</li>

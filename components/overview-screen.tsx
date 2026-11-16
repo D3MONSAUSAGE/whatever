@@ -127,7 +127,7 @@ function OverviewBody({
               const presence = screenPresence(display, t);
               return (
                 <li key={display.id}>
-                  <Link href={`/dashboard/displays#${display.id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-paper">
+                  <Link href={`/dashboard/screens/${display.id}`} className="flex items-center gap-3 px-3 py-3 hover:bg-paper">
                     <span className="relative block w-16 sm:w-24 shrink-0 aspect-video rounded-lg overflow-hidden bg-ink">
                       {url ? <img src={url} alt="" className="absolute inset-0 size-full object-contain" /> : (
                         <span className="absolute inset-0 grid place-items-center text-white [&_svg]:size-5"><IconTv /></span>

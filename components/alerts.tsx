@@ -30,6 +30,12 @@ export function AlertsBanner() {
   const [busy, setBusy] = useState(false);
   const { t, locale } = useLocale();
   const { reload } = feed;
+  // Parity Phase 1 (W3): on a phone the banner starts as one line (headline + All alerts) so the page
+  // content stays above the fold; View opens the list. Wider screens start open, as before.
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 639px)").matches) setOpen(false);
+  }, []);
   useEffect(() => {
     window.addEventListener(ALERTS_CHANGED, reload);
     return () => window.removeEventListener(ALERTS_CHANGED, reload);
@@ -46,9 +52,11 @@ export function AlertsBanner() {
     ? (offlineCount === 1 ? t("alerts.oneOffline") : t("alerts.manyOffline", { n: offlineCount }))
     : headline;
   return (
-    <details data-testid="alerts-banner" className={`group card mb-4 px-3 py-2 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`} open>
+    <details data-testid="alerts-banner" className={`group card mb-3 sm:mb-4 px-3 py-1 sm:py-2 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`} open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary className="flex items-center justify-between gap-3 min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        <p className="font-semibold min-w-0 truncate" role="status">{headline}{offlineCount ? ` · ${summary}` : ""}</p>
+        <p className="font-semibold min-w-0 truncate text-sm sm:text-base" role="status">{headline}{offlineCount ? ` · ${summary}` : ""}</p>
+        <Link href="/dashboard/alerts" className="sm:hidden text-sm font-semibold underline underline-offset-4 shrink-0 min-h-11 inline-flex items-center" onClick={(event) => event.stopPropagation()}>{t("alerts.all")}</Link>
         <span className="text-sm font-medium underline underline-offset-4 shrink-0">
           <span className="group-open:hidden">{t("tv.view")}</span>
           <span className="hidden group-open:inline">{t("tv.hide")}</span>
@@ -63,7 +71,7 @@ export function AlertsBanner() {
           </ul>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Link href="/dashboard/alerts" className="btn btn-quiet min-h-11">{t("alerts.all")}</Link>
+          <span className="hidden sm:inline-flex"><Link href="/dashboard/alerts" className="btn btn-quiet min-h-11">{t("alerts.all")}</Link></span>
           <button type="button" className="btn btn-quiet min-h-11" disabled={busy} onClick={markAll}>{t("alerts.markRead")}</button>
         </div>
       </div>
