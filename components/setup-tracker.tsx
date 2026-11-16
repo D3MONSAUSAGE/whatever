@@ -9,7 +9,7 @@ import { COMMON_ZONES, otherZones, zoneLabel } from "@/lib/time-zones";
 
 // I18N-2: copy lives in the dictionary (setup.<step>.title/body/action/altAction).
 const LINKS: Partial<Record<OnboardingStepId, { href: string; altHref?: string }>> = {
-  screen: { href: "/dashboard/displays" },
+  screen: { href: "/dashboard/screens/add" },
   media: { href: "/dashboard/media", altHref: "/dashboard/media/menus" },
   playlist: { href: "/dashboard/playlists" },
   publish: { href: "/dashboard/playlists" },

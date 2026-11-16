@@ -34,7 +34,8 @@ describe("I18N-1 dictionaries", () => {
     const same = (Object.keys(en) as (keyof typeof en)[]).filter((k) => es[k] === en[k] && !ENGLISH_ONLY.includes(k));
     // Words that are the same in both languages.
     // R12-06: "Happy hour" is now "Hora feliz" in Spanish, so ptpl.happy.name left this list.
-    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video"].sort());
+    // Parity Phase 1: an.dur.s/min/h are unit abbreviations ("{n} s", "{n} min", "{n} h"), the same in Spanish, like tv.min.
+    expect(same.sort()).toEqual(["an.dur.s", "an.dur.min", "an.dur.h", "auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video"].sort());
   });
 
   it("uses formal usted (no tú forms) and never translates Pekko", () => {
