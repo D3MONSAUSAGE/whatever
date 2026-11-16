@@ -412,6 +412,7 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
     store.media.splice(index, 1);
     return path;
   }
+  if (name === "menu_delete_cleanup") return menuDeleteCleanup(store, args);
   if (name === "save_playlist") return savePlaylist(store, args);
   if (name === "publish_playlist") return publishPlaylist(store, args);
   if (name === "delete_playlist") return deletePlaylist(store, args);
@@ -861,6 +862,51 @@ function publishPlaylist(store: Store, args: Record<string, unknown>) {
     }
   }
   return true;
+}
+
+/** Mirrors 0031 menu_delete_cleanup (the real function is exercised in tests/pg/menu-delete-cleanup-sql.test.ts). */
+function menuDeleteCleanup(store: Store, args: Record<string, unknown>) {
+  const account = args.p_account_id;
+  const index = store.menus.findIndex((row) => row.id === args.p_menu_id && row.account_id === account);
+  if (index < 0) return null;
+  const menu = store.menus[index];
+  store.menus.splice(index, 1);
+  const playlistId = (menu.playlist_id as string | null) ?? null;
+  const mediaId = (menu.media_id as string | null) ?? null;
+  const mentions = (row: Row, value: string) => JSON.stringify(row.content ?? null).includes(value);
+  let playlistKept: string | null = null;
+  let playlistDeleted = false;
+  if (playlistId) {
+    if (!store.playlists.some((row) => row.id === playlistId && row.account_id === account)) playlistKept = "missing";
+    else if (store.displays.some((row) => row.assigned_playlist_id === playlistId)) playlistKept = "screen";
+    else if (store.display_playback.some((row) => row.playlist_id === playlistId)) playlistKept = "screen";
+    else if (store.schedules.some((row) => row.playlist_id === playlistId)) playlistKept = "schedule";
+    else if (store.promos.some((row) => row.playlist_id === playlistId || row.combo_playlist_id === playlistId || mentions(row, playlistId))) playlistKept = "promo";
+    else if (store.menus.some((row) => row.playlist_id === playlistId || mentions(row, playlistId))) playlistKept = "menu";
+    else if (store.playlist_items.some((row) => row.playlist_id === playlistId && (!mediaId || row.media_id !== mediaId))) playlistKept = "other_items";
+    else {
+      store.playlist_items = store.playlist_items.filter((row) => row.playlist_id !== playlistId);
+      store.playlists = store.playlists.filter((row) => row.id !== playlistId);
+      playlistDeleted = true;
+    }
+  }
+  let mediaKept: string | null = null;
+  const paths: string[] = [];
+  if (mediaId) {
+    const media = store.media.find((row) => row.id === mediaId && row.account_id === account);
+    if (!media) mediaKept = "missing";
+    else if (store.playlist_items.some((row) => row.media_id === mediaId)) mediaKept = "playlist";
+    else if (store.displays.some((row) => row.assigned_media_id === mediaId)) mediaKept = "screen";
+    else if (store.promos.some((row) => row.media_id === mediaId || mentions(row, mediaId))) mediaKept = "promo";
+    else if (store.menus.some((row) => row.media_id === mediaId || mentions(row, mediaId))) mediaKept = "menu";
+    else if (store.media.some((row) => row.source_media_id === mediaId)) mediaKept = "media";
+    else {
+      store.media = store.media.filter((row) => row.id !== mediaId);
+      paths.push(String(media.storage_path));
+      if (media.thumbnail_path && media.thumbnail_path !== media.storage_path) paths.push(String(media.thumbnail_path));
+    }
+  }
+  return { playlistDeleted, playlistKept, mediaDeleted: Boolean(mediaId) && mediaKept === null, mediaKept, paths };
 }
 
 function deletePlaylist(store: Store, args: Record<string, unknown>) {

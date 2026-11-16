@@ -100,6 +100,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
         currentSchedule: scheduleInfo.get(d.id)?.currentSchedule ?? null,
         // Additive sync report. Old players have not acknowledged a version, so the state stays unknown.
         // contentVersion is the version assigned by the dashboard, not a claim the TV has it.
+        // Phase 1 (t353u): with no TV connected the report is "pending" (Android +14: "Waiting for TV"),
+        // never a stale "playing" from a TV that was unpaired.
         ...playbackReport({
           content_version: d.content_version,
           confirmed_version: d.confirmed_version,
@@ -107,6 +109,7 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
           acknowledged_version: d.acknowledged_version,
           acknowledged_at: d.acknowledged_at,
           hasAssignment: Boolean(media || (d.assigned_playlist_id && playlistInfo.get(d.assigned_playlist_id))),
+          connected: !!d.token_hash,
         }),
         nextChange: scheduleInfo.get(d.id)?.nextChange ?? null,
         boardPreviewUrl: d.assigned_playlist_id ? boardPreview.get(d.assigned_playlist_id) ?? null : null,

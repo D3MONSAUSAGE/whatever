@@ -36,10 +36,10 @@ Vercel Cron (Hobby, once a day) is `0 7 * * *` in `vercel.json`. The platform se
 `GET /api/overview` returns counts for the caller's account:
 
 ```json
-{ "screens": 0, "online": 0, "offline": 0, "media": 0, "playlists": 0, "activeSchedules": 0 }
+{ "screens": 0, "online": 0, "offline": 0, "media": 0, "playlists": 0, "activeSchedules": 0, "waiting": 0 }
 ```
 
-`screens` is active displays (revoked screens are omitted), the same set as `GET /api/displays`. `online` uses the same 60 second `last_seen_at` window. `offline` is `screens - online`, including screens that have never polled. `activeSchedules` counts enabled rules only. `playlists` counts every playlist.
+`screens` is active displays (revoked screens are omitted), the same set as `GET /api/displays`. Since parity Phase 1 (t353u): `online` is a screen with a connected TV (token collected) and a `last_seen_at` within `ONLINE_MS` (90 s); `offline` is a connected screen that is not online, including one that has never polled; `waiting` (additive) is a screen with no TV connected yet (never paired, or unpaired for reconnect). `screens = online + offline + waiting`. Before Phase 1, `offline` was `screens - online` and counted unpaired screens. `activeSchedules` counts enabled rules only. `playlists` counts every playlist.
 
 ## Env vars
 
@@ -51,7 +51,7 @@ No other new env var. `CRON_SECRET` is also listed in `.env.example` and `SETUP.
 
 ## Mobile API changes
 
-- `GET /api/overview` with the same `Authorization: Bearer <Supabase access token>` as the other admin routes. Use it for the home counts instead of downloading every screen, file, and playlist. `online + offline` equals `screens`.
+- `GET /api/overview` with the same `Authorization: Bearer <Supabase access token>` as the other admin routes. Use it for the home counts instead of downloading every screen, file, and playlist. `online + offline + waiting` equals `screens` (Phase 1; older apps ignore `waiting`).
 - `PATCH /api/displays/:id` accepts `{ "locationId": null }` to detach a screen from its location. The screen then follows UTC. Sending a location uuid is unchanged. Do not send `mediaId` in that request; `mediaId` still wins and ignores location.
 - Uploads, playlist publish, playlist snapshot, and creates of locations, groups, and schedules can return **429** with `Retry-After`. Wait that many seconds, then retry the same request. Success bodies are unchanged. A 400 or 415 for a bad body does not use up the budget.
 - Image upload, video init, and video complete are limited separately at 60 per 15 minutes, so a library import and a video retry do not share one bucket. Publish and snapshot are separate too.

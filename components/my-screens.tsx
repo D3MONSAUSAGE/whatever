@@ -25,16 +25,20 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   const list = displays.data ?? [];
   const onlineCount = list.filter(onlineNow).length;
   const offlineCount = list.filter((display) => display.connected && !display.online).length;
+  // Phase 1 (t353u): unpaired screens get their own count, so an account whose screens are all
+  // waiting no longer reads "0 online · 0 offline" with nothing else.
+  const waitingCount = list.filter((display) => !display.connected).length;
   return (
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader compact title={t("screens.title")} lede={t("screens.lede")}
         action={<Link href="/dashboard/screens/add#add-screen" className="btn btn-primary min-h-11">{t("screens.add")}</Link>}
       />
       {list.length ? (
-        <div className="hidden sm:grid grid-cols-3 gap-2 mb-3">
+        <div className="hidden sm:grid grid-cols-4 gap-2 mb-3" data-testid="screens-tiles">
           <Stat compact label={t("screens.total")} value={list.length} />
           <Stat compact label={t("tv.online")} value={onlineCount} tone="live" />
           <Stat compact label={t("tv.offline")} value={offlineCount} tone="danger" />
+          <Stat compact label={t("screens.waitingPair")} value={waitingCount} />
         </div>
       ) : null}
       {/* Phone: one summary line instead of three tiles and the offline banner, so the first
@@ -42,7 +46,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
       <p className="text-sm mb-3 sm:mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
         {list.length ? (
           <span className="sm:hidden" data-testid="screens-summary">
-            {t(list.length === 1 ? "screens.oneScreen" : "screens.manyScreens", { n: list.length })} · <span className="text-live-ink font-semibold">{t("screens.nOnline", { n: onlineCount })}</span>{offlineCount ? <> · <span className="text-danger font-semibold">{t("screens.nOffline", { n: offlineCount })}</span></> : null}
+            {t(list.length === 1 ? "screens.oneScreen" : "screens.manyScreens", { n: list.length })} · <span className="text-live-ink font-semibold">{t("screens.nOnline", { n: onlineCount })}</span> · <span className={offlineCount ? "text-danger font-semibold" : "text-muted"}>{t("screens.nOffline", { n: offlineCount })}</span>{waitingCount ? <> · <span className="text-muted">{t("screens.nWaiting", { n: waitingCount })}</span></> : null}
           </span>
         ) : null}
         <Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">{t("screens.groupsLink")}</Link>

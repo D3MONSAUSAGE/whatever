@@ -1,6 +1,6 @@
 import { detachPromo, PROMO_COLUMNS, type PromoRow } from "@/lib/server/promos";
 import { requireAdmin } from "@/lib/server/auth";
-import { db } from "@/lib/server/supabase";
+import { BUCKET, db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { keepStoredFonts } from "@/lib/menu-templates";
@@ -65,7 +65,11 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
   return json({ id, mediaId, playlistId, published });
 });
 
-/** Removes the editable menu only. Its last image and playlist stay, so no screen goes blank. */
+/**
+ * Removes the editable menu. Its backing playlist and rendered image go too, but only when nothing
+ * else uses them (0031 menu_delete_cleanup: no screen, schedule, promo, other menu or other playlist).
+ * Anything still in use stays, so no screen goes blank. Before 0031 only the menu row is removed.
+ */
 export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -74,6 +78,25 @@ export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { 
   // M13: take this menu's promos off first so no "menu + promo" rules are left behind.
   const promos = await db().from("promos").select(PROMO_COLUMNS).eq("menu_id", id).eq("account_id", admin.accountId);
   for (const row of (promos.data ?? []) as unknown as PromoRow[]) await detachPromo(admin.accountId, row);
+
+  const cleaned = await db().rpc("menu_delete_cleanup", { p_account_id: admin.accountId, p_menu_id: id });
+  if (!cleaned.error) {
+    if (!cleaned.data) return fail("Menu not found.", 404);
+    const result = cleaned.data as { playlistDeleted?: unknown; mediaDeleted?: unknown; paths?: unknown };
+    const paths = (Array.isArray(result.paths) ? result.paths : [])
+      .filter((path): path is string => typeof path === "string" && path.startsWith(`${admin.accountId}/`));
+    if (paths.length) {
+      try {
+        await db().storage.from(BUCKET).remove(paths);
+      } catch {
+        /* the row is gone; a leftover object is swept by the orphan-uploads cron */
+      }
+    }
+    return json({ ok: true, playlistDeleted: result.playlistDeleted === true, imageDeleted: result.mediaDeleted === true });
+  }
+  if (!isMissingSchema(cleaned.error)) return fail("Couldn't delete the menu.", 500);
+
+  // 0031 not applied yet: the earlier behaviour, menu row only.
   const del = await db().from("menus").delete().eq("id", id).eq("account_id", admin.accountId).select("id");
   if (del.error) return isMissingSchema(del.error) ? fail(MENUS_UNAVAILABLE, 503) : fail("Couldn't delete the menu.", 500);
   if (!(del.data ?? []).length) return fail("Menu not found.", 404);
