@@ -11,11 +11,11 @@ const COLS: { title: MessageKey; links: [MessageKey, string][] }[] = [
   { title: "footer.legal", links: [["footer.terms", "/terms"], ["footer.privacy", "/privacy"], ["footer.billingTerms", "/terms#billing"], ["footer.deleteAccount", "/account-deletion"]] },
 ];
 
-export async function SiteFooter() {
+export async function SiteFooter({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
   const t = await getT();
   const owner = LEGAL_COPYRIGHT;
   return (
-    <footer className="border-t border-line bg-white/60" data-testid="site-footer">
+    <footer className={tone === "dark" ? "border-t border-white/10 bg-[#030712]/60" : "border-t border-line bg-white/60"} data-testid="site-footer">
       <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:grid-cols-2 md:grid-cols-4">
         <div>
           <Link href="/" className="inline-flex items-center gap-2.5" aria-label={t("brand.homeLabel")}><LogoMark className="size-8" /><Wordmark size="sm" /></Link>

@@ -14,10 +14,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Faq() {
   const t = await getT();
   return (
-    <PublicPage bare>
-      <section className="px-5 pt-14 pb-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{t("faq.title")}</h1>
-        <p className="mt-4 text-muted text-lg">{rich(t("faq.lede"), { link: (c) => <Link href="/support" className="underline font-semibold">{c}</Link> })}</p>
+    <PublicPage bare theme="dark">
+      <section className="px-5 pt-16 md:pt-24 pb-6 text-center mk-rise">
+        <p className="mk-eyebrow">{t("home.faqEyebrow")}</p>
+        <h1 className="mt-4 text-4xl md:text-6xl font-extrabold tracking-tight text-balance"><span className="mk-gradient-text">{t("faq.title")}</span></h1>
+        <p className="mt-5 text-muted text-lg">{rich(t("faq.lede"), { link: (c) => <Link href="/support" className="underline font-semibold">{c}</Link> })}</p>
       </section>
       <section className="px-5 pb-6"><FaqList /></section>
       <div className="mx-auto max-w-3xl px-5"><ContactBlock /></div>

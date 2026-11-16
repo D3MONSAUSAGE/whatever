@@ -8,18 +8,21 @@ import { en } from "@/lib/i18n/en";
 // I18N-1: page copy lives in lib/i18n/en.ts (es.ts mirrors it); pages render it through t().
 const dict = Object.values(en).join("\n");
 
-const home = readFileSync("app/page.tsx", "utf8");
+// The home page is app/page.tsx plus its section components.
+const home = [readFileSync("app/page.tsx", "utf8"), readFileSync("components/site/marketing/showcase.tsx", "utf8")].join("\n");
 const features = readFileSync("app/features/page.tsx", "utf8");
 const pricing = readFileSync("app/pricing/page.tsx", "utf8");
 const signup = readFileSync("app/signup/page.tsx", "utf8");
 
 describe("presentation site copy", () => {
   it("uses the approved sentences and leaves trial signup in place", () => {
-    expect(en["home.title"]).toBe("Menus, offers, and presentations on your screens.");
+    // Marketing redesign: hero copy follows the approved landing-page prototype.
+    expect(en["home.title"]).toBe("Your menu and promotions, on the TV you already have.");
     expect(home).toContain('t("home.title")');
-    expect(en["home.lede"]).toBe("Show restaurant specials, business promotions, and team updates. Bring images, videos, and presentations together in playlists, and manage your screens from your phone or computer.");
+    expect(en["home.lede"]).toBe("Pekko turns a compatible smart TV’s web browser into digital signage, with no separate hardware box. Build a branded menu or upload your own artwork, then publish from your phone.");
     expect(home).toContain('data-testid="start-trial"');
-    expect(home).toContain("<TrialNote");
+    expect(home).toContain('t("mk.hero.check2")');
+    expect(en["mk.hero.check2"]).toBe("No credit card");
     expect(SIGNUP_HREF).toBe("/signup");
     expect(signup).toContain('redirect("/login?mode=up")');
 
@@ -32,8 +35,8 @@ describe("presentation site copy", () => {
     expect(en["features.row2Title"]).toBe(feature?.title);
     expect(en["features.row2Body"]).toBe(feature?.body);
     expect(features).toContain("features.row${r.n}Title");
-    expect(en["home.step3Title"]).toBe("Add your content");
-    expect(en["home.step3Body"]).toBe("Upload images, videos, or a presentation, arrange your playlist, and publish it to your connected screens.");
+    expect(en["home.step3Title"]).toBe("Upload and publish");
+    expect(en["home.step3Body"]).toBe("Add your menu, artwork, images or videos, arrange a playlist, and publish it to the screen.");
   });
 
   it("states only the verified upload limits and does not claim slide editing", () => {
@@ -103,5 +106,70 @@ describe("launch site copy", () => {
     expect(publicCopy).not.toMatch(/any device with a modern web browser/i);
     expect(publicCopy).not.toMatch(/anything with a web browser/i);
     expect(publicCopy).not.toMatch(/turns any screen with a web browser/i);
+  });
+});
+
+describe("marketing redesign: honest samples and safe scope", () => {
+  const showcase = readFileSync("components/site/marketing/showcase.tsx", "utf8");
+  const boards = readFileSync("components/site/marketing/boards.tsx", "utf8");
+  const samples = readFileSync("lib/marketing-samples.ts", "utf8");
+  const featuresPage = readFileSync("app/features/page.tsx", "utf8");
+  const es = readFileSync("lib/i18n/es.ts", "utf8");
+  const mk = Object.entries(en).filter(([k]) => k.startsWith("mk.")).map(([, v]) => v).join("\n");
+
+  it("labels every sample board as a sample and says the businesses are fictional", () => {
+    expect(en["mk.sample"]).toBe("Sample design");
+    expect(en["mk.samplesNote"]).toMatch(/fictional/);
+    // Each TV visual on the home and features pages sits next to a sample note or label.
+    expect((showcase.match(/<Tv /g) ?? []).length).toBeGreaterThan(0);
+    expect(showcase).toContain('t("mk.sample")');
+    expect(showcase).toContain('t("mk.samplesNote")');
+    expect(featuresPage).toContain('t("mk.samplesNote")');
+    for (const key of Object.keys(en).filter((k) => k.startsWith("mk.tv.") && k !== "mk.tv.pair")) {
+      expect(en[key as keyof typeof en], key).toMatch(/^Sample (design|artwork):/);
+    }
+  });
+
+  it("never presents the fictional businesses as customers", () => {
+    const copy = [mk, showcase, boards, samples].join("\n");
+    expect(copy).not.toMatch(/testimonial|trusted by|our customers|customers like|used by|loved by|case study/i);
+  });
+
+  it("does not claim universal TV compatibility or offline video", () => {
+    const copy = [mk, en["home.title"], en["home.lede"], en["home.step1Body"], en["faq.compat.a"], en["faq.connect.a"]].join("\n");
+    // "Not every TV is compatible" is the honest disclaimer itself; everything else must not promise universal support.
+    expect(copy.replace(/Not every TV is compatible\./g, "")).not.toMatch(/any (smart )?tv|every tv|all tvs|works on any|any screen/i);
+    expect(copy).not.toMatch(/offline (playback|video)/i);
+    expect(en["home.lede"]).toMatch(/compatible smart TV/);
+    expect(en["mk.feat.hardwareBody"]).toMatch(/compatible smart TV/);
+    expect(en["faq.compat.a"]).toMatch(/^Not every TV is compatible\./);
+  });
+
+  it("describes video in the media panel as muted MP4 with a still-image fallback", () => {
+    expect(en["mk.video.body"]).toMatch(/muted video/);
+    expect(en["mk.video.p1"]).toBe("MP4 (H.264) video, played muted");
+    expect(en["mk.video.p3"]).toMatch(/still image/);
+  });
+
+  it("keeps Spanish complete for the new copy", () => {
+    for (const key of Object.keys(en).filter((k) => k.startsWith("mk.") || k.startsWith("faq.compat") || k.startsWith("faq.connect"))) {
+      expect(es, key).toContain(`"${key}":`);
+    }
+  });
+
+  it("applies the dark theme only to the marketing pages", () => {
+    for (const p of ["app/page.tsx", "app/features/page.tsx", "app/pricing/page.tsx", "app/faq/page.tsx", "app/support/page.tsx", "app/contact/page.tsx"]) {
+      expect(readFileSync(p, "utf8"), p).toContain('theme="dark"');
+    }
+    for (const p of ["components/legal-page.tsx", "app/account-deletion/page.tsx", "app/not-found.tsx"]) {
+      expect(readFileSync(p, "utf8"), p).not.toContain('theme="dark"');
+    }
+    const css = readFileSync("components/site/marketing/marketing.css", "utf8");
+    // Every selector in the marketing stylesheet is scoped under .mk (or is a .mk-/.bd- class only those pages render).
+    const selectors = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@font-face\s*\{[^}]*\}/g, "").replace(/@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "")
+      .replace(/@media[^{]+\{/g, "").match(/[^{}]+(?=\{)/g) ?? [];
+    for (const sel of selectors.map((s) => s.trim()).filter(Boolean)) {
+      for (const part of sel.split(",").map((s) => s.trim())) expect(part, part).toMatch(/^\.(mk|bd)\b|^\.(mk|bd)-/);
+    }
   });
 });

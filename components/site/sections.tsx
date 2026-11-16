@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BillingDisclosure } from "@/components/billing-disclosure";
 import { PLANS, TRIAL } from "@/lib/plans";
-import { FAQ_IDS, FAQ_VARS, FEATURE_IDS, faqKeys, featureKeys, SHOTS } from "@/lib/marketing";
+import { FAQ_IDS, FAQ_VARS, FEATURE_IDS, faqKeys, featureKeys, SHOTS, type FaqId } from "@/lib/marketing";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { ENGLISH_ONLY, type T } from "@/lib/i18n/index";
 
@@ -19,9 +19,9 @@ export async function Screenshot({ shot, className = "", priority }: { shot: Sho
 export function SectionHeading({ id, eyebrow, title, intro }: { id: string; eyebrow?: string; title: string; intro?: string }) {
   return (
     <div className="text-center max-w-2xl mx-auto">
-      {eyebrow ? <p className="text-sm font-semibold uppercase tracking-wider text-primary">{eyebrow}</p> : null}
-      <h2 id={id} className="mt-2 text-3xl md:text-4xl font-extrabold tracking-tight">{title}</h2>
-      {intro ? <p className="mt-3 text-muted text-lg">{intro}</p> : null}
+      {eyebrow ? <p className="mk-eyebrow">{eyebrow}</p> : null}
+      <h2 id={id} className="mt-3 text-3xl md:text-[2.75rem] md:leading-[1.1] font-extrabold tracking-tight text-balance">{title}</h2>
+      {intro ? <p className="mt-4 text-muted text-lg leading-relaxed text-pretty">{intro}</p> : null}
     </div>
   );
 }
@@ -49,23 +49,24 @@ export async function FeatureGrid() {
 export async function PricingCards({ testPrefix = "plan", canBuy }: { testPrefix?: string; canBuy?: boolean }) {
   const t = await getT();
   return (
-    <div className="mt-10 grid gap-4 md:grid-cols-3">
+    <div className="mt-12 grid gap-5 md:grid-cols-3 md:items-stretch">
       {PLANS.map((p) => {
         const featured = p.id === "business";
         return (
-          <article key={p.id} className={`card p-6 flex flex-col ${featured ? "ring-2 ring-primary" : ""}`} data-testid={`${testPrefix}-${p.id}`}>
+          <article key={p.id} className={`card relative p-7 flex flex-col ${featured ? "ring-2 ring-primary md:-translate-y-2 shadow-[0_30px_80px_-20px_rgb(47_123_255/0.55)]" : ""}`}
+            style={featured ? { background: "linear-gradient(180deg, rgb(47 123 255 / 0.22), rgb(255 255 255 / 0.03) 60%)" } : undefined} data-testid={`${testPrefix}-${p.id}`}>
             <div className="flex items-center justify-between gap-2">
-              <h3 className="font-semibold text-lg">{p.name}</h3>
-              {featured ? <span className="text-xs font-semibold rounded-full bg-primary text-white px-2 py-0.5">{t("site.popular")}</span> : null}
+              <h3 className="font-display font-bold text-xl">{p.name}</h3>
+              {featured ? <span className="text-xs font-bold rounded-full bg-primary text-white px-2.5 py-1">{t("site.popular")}</span> : null}
             </div>
-            <p className="mt-2"><span className="text-4xl font-extrabold">${p.price}</span><span className="text-muted">{t("site.perMonth")}</span></p>
-            <p className="mt-1 text-sm text-muted">{p.screens === 1 ? t("site.oneScreen") : t("site.upToScreens", { screens: p.screens })}</p>
-            <ul className="mt-4 text-sm grid gap-1.5 flex-1">
+            <p className="mt-4"><span className="font-display text-5xl font-extrabold tracking-tight">${p.price}</span><span className="text-muted">{t("site.perMonth")}</span></p>
+            <p className="mt-1 text-sm font-semibold text-primary">{p.screens === 1 ? t("site.oneScreen") : t("site.upToScreens", { screens: p.screens })}</p>
+            <ul className="mt-5 text-sm grid gap-2 flex-1 text-muted">
               <li>{t("site.planFeature1")}</li>
               <li>{t("site.planFeature2")}</li>
               <li>{t("site.planFeature3")}</li>
             </ul>
-            <Link href={SIGNUP_HREF} className={`btn mt-5 ${featured ? "btn-primary" : "btn-quiet"}`}>{t("site.startTrial")}</Link>
+            <Link href={SIGNUP_HREF} className={`btn mt-6 ${featured ? "btn-primary" : "btn-quiet"}`}>{t("site.startTrial")}</Link>
             {canBuy === undefined ? null : canBuy ? (
               <Link href="/dashboard/billing" className="btn btn-quiet mt-2" data-testid={`buy-${p.id}`}>{t("site.choosePlan", { plan: p.name })}</Link>
             ) : (
@@ -118,17 +119,17 @@ function englishOnly(key: Parameters<T>[0]) {
 /** Billing answers carried lang="en" before the Spanish courtesy translation; English pages keep it so their HTML is unchanged. */
 const BILLING_ANSWERS: readonly string[] = ["faq.trial.a", "faq.trialEnd.a", "faq.plans.a", "faq.cancel.a"];
 
-export async function FaqList({ limit }: { limit?: number }) {
+export async function FaqList({ limit, only }: { limit?: number; only?: readonly FaqId[] }) {
   const t = await getT();
   const locale = await getLocale();
-  const ids = limit ? FAQ_IDS.slice(0, limit) : FAQ_IDS;
+  const ids = only ?? (limit ? FAQ_IDS.slice(0, limit) : FAQ_IDS);
   return (
     <div className="mt-10 grid gap-3 max-w-3xl mx-auto" data-testid="faq-list">
       {ids.map((id) => {
         const k = faqKeys(id);
         return (
           <details key={id} className="card p-5 group" data-testid={`faq-${id}`}>
-            <summary className="font-semibold cursor-pointer">{t(k.q)}</summary>
+            <summary className="font-semibold cursor-pointer text-[1.05rem]">{t(k.q)}</summary>
             {/* Answers still listed in ENGLISH_ONLY are marked lang="en" (none since the approved courtesy translation). */}
             <p className="mt-2 text-sm leading-relaxed text-muted" lang={englishOnly(k.a) ?? (locale === "en" && BILLING_ANSWERS.includes(k.a) ? "en" : undefined)}>{t(k.a, FAQ_VARS)}</p>
           </details>
@@ -141,13 +142,15 @@ export async function FaqList({ limit }: { limit?: number }) {
 export async function TrialCta() {
   const t = await getT();
   return (
-    <section className="px-5 py-16" aria-labelledby="cta">
-      <div className="mx-auto max-w-4xl rounded-3xl bg-ink text-white p-10 text-center">
-        <h2 id="cta" className="text-3xl font-extrabold tracking-tight">{t("site.ctaTitle", { days: TRIAL.days })}</h2>
-        <p className="mt-3 text-white/80">{t("site.ctaBody", { screens: TRIAL.screens })}</p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href={SIGNUP_HREF} className="btn btn-primary text-base px-6">{t("site.startTrial")}</Link>
-          <Link href="/support" className="btn text-base px-6 bg-white/10 text-white hover:bg-white/20">{t("site.getHelp")}</Link>
+    <section className="px-5 py-16 md:py-24" aria-labelledby="cta">
+      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-[32px] border border-white/15 p-10 md:p-16 text-center text-white"
+        style={{ background: "radial-gradient(80% 120% at 50% 0%, #2f7bff 0%, #1236a8 45%, #071236 100%)" }}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-40" style={{ background: "radial-gradient(40% 60% at 15% 100%, rgb(61 214 255 / 0.6), transparent 70%)" }} />
+        <h2 id="cta" className="relative text-3xl md:text-5xl font-extrabold tracking-tight text-balance">{t("mk.cta.title")}</h2>
+        <p className="relative mt-4 text-lg text-white/85">{t("mk.cta.body", { days: TRIAL.days, screens: TRIAL.screens })}</p>
+        <div className="relative mt-8 flex flex-wrap justify-center gap-3">
+          <Link href={SIGNUP_HREF} className="btn text-base px-7 bg-white text-[#0b1a4a] hover:bg-[#eaf1ff] shadow-[0_12px_30px_rgb(0_0_0/0.3)]">{t("site.startTrial")}</Link>
+          <Link href="/support" className="btn text-base px-7 bg-white/10 text-white hover:bg-white/20 border border-white/25">{t("site.getHelp")}</Link>
         </div>
       </div>
     </section>
