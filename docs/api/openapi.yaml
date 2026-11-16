@@ -474,7 +474,13 @@ paths:
     delete:
       tags: [media]
       summary: Delete a menu board's editable copy (M10)
-      description: The last image and its playlist stay, so no screen goes blank.
+      description: |
+        Parity Phase 1 (0031): the backing playlist and rendered image are
+        removed too, but only when nothing else uses them (no screen,
+        schedule, promo, other menu or other playlist). Anything in use stays,
+        so no screen goes blank. The body is `{ ok: true }` plus additive
+        `playlistDeleted` and `imageDeleted` booleans (only `{ ok: true }`
+        before 0031 is applied).
       operationId: deleteMenu
       responses:
         "200": { description: Deleted }
@@ -662,9 +668,11 @@ paths:
       summary: Dashboard counts for this account
       description: |
         Active screens only (revoked screens are omitted), matching
-        `GET /api/displays`. `online` uses the same 60 second `last_seen_at`
-        window. `offline` is `screens - online`, including screens that have
-        never polled. `activeSchedules` counts enabled rules only.
+        `GET /api/displays`. `online` is a screen with a connected TV and a
+        `last_seen_at` within 90 seconds. `offline` is a connected screen that
+        is not online, including one that has never polled. `waiting`
+        (additive, parity Phase 1) is a screen with no TV connected, so
+        `screens = online + offline + waiting`. `activeSchedules` counts enabled rules only.
         `playlists` counts every playlist, draft or published. No signed URLs
         and no row payloads.
       operationId: getOverview
@@ -681,6 +689,7 @@ paths:
                 media: 4
                 playlists: 1
                 activeSchedules: 1
+                waiting: 0
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500":
           description: A count failed
@@ -2427,11 +2436,12 @@ components:
       required: [screens, online, offline, media, playlists, activeSchedules]
       properties:
         screens: { type: integer, description: Active screens in this account. }
-        online: { type: integer, description: Active screens seen within 60 seconds. }
-        offline: { type: integer, description: Active screens that are not online. }
+        online: { type: integer, description: Active screens with a connected TV seen within 90 seconds. }
+        offline: { type: integer, description: Active screens with a connected TV that are not online. }
         media: { type: integer }
         playlists: { type: integer }
         activeSchedules: { type: integer, description: Enabled schedule rows. }
+        waiting: { type: integer, description: "Additive (parity Phase 1): active screens with no TV connected." }
     MediaUse:
       type: object
       required: [id, name]

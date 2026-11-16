@@ -652,11 +652,11 @@ describe("GET /api/overview", () => {
 
     const mine = await call(overview, "http://localhost/api/overview", auth("token-a"));
     expect(mine.status).toBe(200);
-    expect(mine.body).toEqual({ screens: 2, online: 1, offline: 1, media: 1, playlists: 2, activeSchedules: 1 });
-    expect(Object.keys(mine.body).sort()).toEqual(["activeSchedules", "media", "offline", "online", "playlists", "screens"]);
+    expect(mine.body).toEqual({ screens: 2, online: 1, offline: 1, media: 1, playlists: 2, activeSchedules: 1, waiting: 0 });
+    expect(Object.keys(mine.body).sort()).toEqual(["activeSchedules", "media", "offline", "online", "playlists", "screens", "waiting"]);
 
     const theirs = await call(overview, "http://localhost/api/overview", auth("token-b"));
     expect(theirs.status).toBe(200);
-    expect(theirs.body).toEqual({ screens: 0, online: 0, offline: 0, media: 0, playlists: 0, activeSchedules: 0 });
+    expect(theirs.body).toEqual({ screens: 0, online: 0, offline: 0, media: 0, playlists: 0, activeSchedules: 0, waiting: 0 });
   });
 });

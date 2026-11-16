@@ -8,7 +8,13 @@ function iso(value: unknown) {
   return typeof value === "string" && value ? value : null;
 }
 
-/** Sync fields for the phone. They never replace connected or online. */
+/**
+ * Sync fields for the phone. They never replace connected or online.
+ * connected === false (no TV has collected the token: never paired, or unpaired for reconnect) always
+ * reports "pending" with no acknowledged/playing time. "pending" is a value every client already knows
+ * (Android +14 reads it as "Waiting for TV"); a TV that was unpaired must not read as "playing".
+ * Omitting connected keeps the older behaviour.
+ */
 export function playbackReport(row: {
   content_version?: unknown;
   confirmed_version?: unknown;
@@ -16,6 +22,7 @@ export function playbackReport(row: {
   acknowledged_version?: unknown;
   acknowledged_at?: unknown;
   hasAssignment: boolean;
+  connected?: boolean;
 }) {
   const contentVersion = num(row.content_version);
   const playingVersion = num(row.confirmed_version);
@@ -30,6 +37,7 @@ export function playbackReport(row: {
     else if (contentVersion != null && ((playingVersion != null && playingVersion < contentVersion) || (ackVersion != null && ackVersion < contentVersion))) reportedState = "pending";
     else reportedState = "assigned";
   }
+  if (row.connected === false) reportedState = "pending";
   return {
     reportedState,
     contentVersion,

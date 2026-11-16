@@ -82,7 +82,9 @@ describe("screen API contract", () => {
     expect(row.currentSchedule).toBeNull();
     expect(kind(row.activeSchedules)).toBe("array");
     expect(kind(row.entitled)).toBe("boolean");
-    expect(row.reportedState).toBe("unknown");
+    // Claimed but the TV hasn't collected its token: Phase 1 reports "pending" ("Waiting for TV" on +14).
+    expect(row.connected).toBe(false);
+    expect(row.reportedState).toBe("pending");
     expect(kind(row.contentVersion)).toBe("number");
     expect(row.acknowledgedAt).toBeNull();
     expect(row.playingAt).toBeNull();
@@ -100,7 +102,8 @@ describe("screen API contract", () => {
 
   it("keeps the overview counts and the public urls", async () => {
     const home = await call(overview, "http://localhost/api/overview", auth("token-a"));
-    expect(Object.keys(home.body).sort()).toEqual(["activeSchedules", "media", "offline", "online", "playlists", "screens"]);
+    // Phase 1 adds waiting; the six older fields keep their names and number type (+14 reads them).
+    expect(Object.keys(home.body).sort()).toEqual(["activeSchedules", "media", "offline", "online", "playlists", "screens", "waiting"]);
     for (const key of Object.keys(home.body)) expect(kind(home.body[key])).toBe("number");
     const urls = await call(config, "http://localhost/api/config");
     expect(urls.body).toEqual({

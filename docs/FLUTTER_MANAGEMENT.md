@@ -62,14 +62,14 @@ Additive fields. Old app builds ignore them. They are never a replacement for `c
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `reportedState` | `assigned` \| `acknowledged` \| `playing` \| `pending` \| `unknown` | `assigned` until the TV accepts the version, then `acknowledged`, then `playing`. No assignment stays `unknown` |
+| `reportedState` | `assigned` \| `acknowledged` \| `playing` \| `pending` \| `unknown` | `assigned` until the TV accepts the version, then `acknowledged`, then `playing`. No assignment stays `unknown`. Phase 1 (t353u): a screen with no TV connected (`connected: false`) is always `pending`, with null `acknowledgedAt` and `playingAt` |
 | `contentVersion` | number or null | The version the dashboard has assigned |
 | `acknowledgedAt` | ISO string or null | When the TV reported that version. Null until a player reports it |
 | `playingAt` | ISO string or null | When the TV reported that version on screen. Null until a player reports it |
 | `nextChange` | `{ at, label, kind }` or null | Next time the winner changes. `kind` is `schedule` or `assignment`. Same object as `GET /api/displays/:id/timeline` |
 | `boardPreviewUrl` | string or null | Signed still of the layout board on this screen's playlist. Save Draft redraws this still without moving screens. Publish still assigns the screen. Does not replace `media.url` or `playlist.url` |
 
-`GET /api/overview` stays `{ screens, online, offline, media, playlists, activeSchedules }`, all numbers.
+`GET /api/overview` keeps `{ screens, online, offline, media, playlists, activeSchedules }`, all numbers, and adds `waiting` (number). Phase 1: `online` and `offline` count only screens with a connected TV; `waiting` counts the rest, so `screens = online + offline + waiting`.
 
 `POST /api/displays/pair` stays `{ code, name }` and still returns `{ id }`. It may also return `nameWarning` and `suggestedName` when another screen already uses that name, ignoring case and extra spaces. Pairing is never refused for a duplicate name. `PATCH /api/displays/:id` with `{ name }` may return the same warning. `DELETE /api/displays/:id` is unchanged. `GET /api/screen-groups` stays `{ id, name, displayIds, updatedAt }`.
 
