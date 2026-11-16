@@ -38,7 +38,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       <h2 className="font-semibold text-lg" id="staff-access">Who at Pekko can see your account details</h2>
       <p>
         A small number of authorized Pekko staff can see account and usage details on a private internal page, to support customers and run the Service.
-        That page shows the account email, sign-up date, plan, trial and subscription status, whether screens are paired and have shown content, the date of the latest activity, and the first-visit campaign source described below.
+        That page shows the account email and whether it is confirmed, the sign-up date, plan, trial and subscription status, whether screens are paired and have shown content, screen counts and the last check-in time, the date and type of the latest activity (including the last sign-in), whether the account is marked as internal or test, whether the account is marked for deletion, and the first-visit campaign source described below.
         It does not show passwords, payment card details, your uploaded content, playlists, menus, or messages.
         It reads the current account records, so a deleted account no longer appears there.
       </p>

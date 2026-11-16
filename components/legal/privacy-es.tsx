@@ -33,7 +33,7 @@ export function PrivacyEs() {
       <h2 className="font-semibold text-lg" id="staff-access">Quién en Pekko puede ver los datos de su cuenta</h2>
       <p>
         Un número reducido de personal autorizado de Pekko puede ver datos de la cuenta y de uso en una página interna privada, para dar soporte a los clientes y operar el Servicio.
-        Esa página muestra el correo de la cuenta, la fecha de registro, el plan, el estado de la prueba y de la suscripción, si hay pantallas vinculadas y si han mostrado contenido, la fecha de la actividad más reciente y el origen de campaña de la primera visita que se describe más abajo.
+        Esa página muestra el correo de la cuenta y si está confirmado, la fecha de registro, el plan, el estado de la prueba y de la suscripción, si hay pantallas vinculadas y si han mostrado contenido, la cantidad de pantallas y la hora de su última conexión, la fecha y el tipo de la actividad más reciente (incluido el último inicio de sesión), si la cuenta está marcada como interna o de prueba, si la cuenta está marcada para eliminación y el origen de campaña de la primera visita que se describe más abajo.
         No muestra contraseñas, datos de tarjetas de pago, su contenido subido, listas de reproducción, menús ni mensajes.
         Lee los registros actuales de la cuenta, así que una cuenta eliminada deja de aparecer allí.
       </p>
