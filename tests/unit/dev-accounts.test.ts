@@ -134,3 +134,19 @@ describe("DA-2 customer accounts: search, sort, pages", () => {
     expect(ids.indexOf(A.paid)).toBeLessThan(ids.indexOf("a9000000-0000-4000-8000-000000000009"));
   });
 });
+
+describe("DA-2 customer accounts: Gother lows", () => {
+  it("screen.content_changed is never a meaningful owner action (system propagation fires it too)", () => {
+    const l = list();
+    const a = l.accounts.find((x) => x.id === A.expired)!;
+    // Even if a list ever carried it, the row doesn't call it an owner action.
+    a.last_owner_action_at = "2026-11-15T12:00:00Z";
+    a.last_owner_action_kind = "screen.content_changed";
+    const r = buildAccounts({ list: l, billing: billing(), query: q("population=all"), domains: DOMAINS }).rows.find((x) => x.id === A.expired)!;
+    expect(r.lastActivity).toEqual({ at: null, source: null, action: null, lastSignInAt: null });
+  });
+  it("labels first confirmed playback as inside the 90-day window", () => {
+    expect(build().notes.map((n) => n.key)).toContain("firstPlaybackWindow");
+  });
+});
+

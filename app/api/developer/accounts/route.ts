@@ -21,20 +21,59 @@ const RATE_MAX = 30;
  * DA-2 (t348u): developer-only Customer Accounts list. One row per registered person with the fields
  * Francisco asked for and nothing else (see lib/dev-accounts.ts). Read live on every request (no copies), so
  * deleted accounts vanish. DEV_ANALYTICS_DISABLED=1 or DEV_ACCOUNTS_DISABLED=1 turns it off for everyone.
+ *
+ * The page uses POST with a JSON body so an email search never sits in a URL (browser history, Vercel request
+ * logs). GET still works for filters, sort and paging, but ignores any ?q= so a search can't be sent that way.
+ * Both methods are gated identically, and the body is only read after the caller is confirmed a developer.
  */
 export const GET = async (req: Request): Promise<Response> => {
   if (process.env.DEV_ACCOUNTS_DISABLED === "1") return notFound();
   const userId = await developerFromRequest(req);
   if (!userId) return notFound();
-  return forDeveloper(req, userId);
+  return forDeveloper(req, userId, "GET");
 };
 
-const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Request, userId: string) {
+export const POST = async (req: Request): Promise<Response> => {
+  if (process.env.DEV_ACCOUNTS_DISABLED === "1") return notFound();
+  const userId = await developerFromRequest(req);
+  if (!userId) return notFound();
+  return forDeveloper(req, userId, "POST");
+};
+
+/** Largest accepted POST body. The real one is a few small fields. */
+const MAX_BODY_BYTES = 2048;
+const BODY_FIELDS = ["population", "q", "sort", "dir", "page", "pageSize"] as const;
+
+/** Allowlisted body fields as search params, so GET and POST share one parser. null = malformed. */
+async function bodyParams(req: Request): Promise<URLSearchParams | null> {
+  const text = await req.text().catch(() => null);
+  if (text === null || text.length > MAX_BODY_BYTES) return null;
+  let body: unknown;
+  try { body = text ? JSON.parse(text) : {}; } catch { return null; }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const out = new URLSearchParams();
+  for (const k of BODY_FIELDS) {
+    const v = (body as Record<string, unknown>)[k];
+    if (typeof v === "string" || typeof v === "number") out.set(k, String(v));
+  }
+  return out;
+}
+
+const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Request, userId: string, method: "GET" | "POST") {
   const limited = await enforceLimit(`dev-accounts:${userId}`, RATE_WINDOW_S, RATE_MAX, "Too many requests. Wait a minute, then try again.")
     .catch(() => fail("Too many requests. Wait a minute, then try again.", 429));
   if (limited) return limited;
 
-  const query = parseAccountsQuery(new URL(req.url).searchParams);
+  let params: URLSearchParams;
+  if (method === "POST") {
+    const parsed = await bodyParams(req);
+    if (!parsed) return fail("Send a valid request.", 400, "bad_request");
+    params = parsed;
+  } else {
+    params = new URL(req.url).searchParams;
+    params.delete("q");
+  }
+  const query = parseAccountsQuery(params);
   const [list, billing] = await Promise.all([
     db().rpc("dev_accounts_list", { p_actor: userId }),
     loadBilling(Date.now()),

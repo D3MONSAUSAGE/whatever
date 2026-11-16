@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { GET } from "@/app/api/developer/accounts/route";
+import { GET, POST } from "@/app/api/developer/accounts/route";
 import { ACCOUNT_ROW_KEYS } from "@/lib/dev-accounts";
 import { setTestBillingLoader } from "@/lib/server/dev-analytics/stripe-source";
 import { setTestDb } from "@/lib/server/supabase";
@@ -63,6 +63,12 @@ afterEach(() => {
   }
 });
 
+const post = (token?: string, body: unknown = {}) =>
+  new Request("https://pekkotv.com/api/developer/accounts", {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), "Content-Type": "application/json" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
 const req = (token?: string, query = "") =>
   new Request(`https://pekkotv.com/api/developer/accounts${query}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
 const NOT_FOUND = { error: "Not found.", code: "not_found" };
@@ -158,5 +164,47 @@ describe("DA-2 /api/developer/accounts for developers", () => {
     const res = await GET(req("token-dev"));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe("Couldn't load accounts.");
+  });
+});
+
+describe("DA-2 POST /api/developer/accounts (search kept out of URLs)", () => {
+  it("is gated exactly like GET: plain 404, no data read, no body read, no ensure_account", async () => {
+    for (const token of [undefined, "nope", "token-other"]) {
+      const res = await POST(post(token, { population: "all", q: "public-mail" }));
+      expect(res.status).toBe(404);
+      expect(res.headers.get("cache-control")).toContain("no-store");
+      expect(await res.json()).toEqual(NOT_FOUND);
+    }
+    // A malformed body from a non-developer still gets the 404, never a 400 that would reveal the route.
+    expect((await POST(post("token-other", "{not json"))).status).toBe(404);
+    expect(listCalls).toEqual([]);
+    expect(rpcCalls.filter((n) => n !== "is_developer")).toEqual([]);
+    expect(store.accounts).toHaveLength(0);
+  });
+  it("honours both kill switches", async () => {
+    process.env.DEV_ACCOUNTS_DISABLED = "1";
+    expect((await POST(post("token-dev"))).status).toBe(404);
+    delete process.env.DEV_ACCOUNTS_DISABLED;
+    process.env.DEV_ANALYTICS_DISABLED = "1";
+    expect((await POST(post("token-dev"))).status).toBe(404);
+    expect(listCalls).toEqual([]);
+  });
+  it("searches by email from the body for a developer", async () => {
+    const res = await POST(post("token-dev", { population: "all", q: "PUBLIC-MAIL", sort: "email" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.query).toBe("public-mail");
+    expect(body.rows.map((r: { email: string }) => r.email).every((e: string) => e.includes("public-mail"))).toBe(true);
+    expect(body.total).toBe(5);
+  });
+  it("GET ignores ?q= so a search can't ride in a URL", async () => {
+    const body = await (await GET(req("token-dev", "?population=all&q=public-mail"))).json();
+    expect(body.query).toBe("");
+    expect(body.total).toBe(9);
+  });
+  it("answers 400 to a developer for a malformed or oversized body", async () => {
+    expect((await POST(post("token-dev", "{not json"))).status).toBe(400);
+    expect((await POST(post("token-dev", "[1]"))).status).toBe(400);
+    expect((await POST(post("token-dev", { q: "x".repeat(3000) }))).status).toBe(400);
   });
 });

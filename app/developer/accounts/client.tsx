@@ -34,11 +34,13 @@ export function DeveloperAccounts({ notFound }: { notFound: React.ReactNode }) {
     const token = session.session?.access_token;
     if (!token) { setLoad({ state: "notFound" }); return; }
     setLoad({ state: "loading" });
-    const qs = new URLSearchParams({ population: params.population, sort: params.sort, dir: params.dir, page: String(params.page) });
-    if (params.q) qs.set("q", params.q);
+    // POST so the email search stays out of URLs, history and request logs.
+    const payload = JSON.stringify({ population: params.population, q: params.q, sort: params.sort, dir: params.dir, page: params.page });
     try {
-      const res = await fetch(`/api/developer/accounts?${qs}`, {
-        headers: { Authorization: `Bearer ${token}`, "Accept-Language": currentLocale() },
+      const res = await fetch("/api/developer/accounts", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Accept-Language": currentLocale(), "Content-Type": "application/json" },
+        body: payload,
         cache: "no-store",
       });
       if (res.status === 404 || res.status === 401) { setLoad({ state: "notFound" }); return; }
@@ -175,7 +177,9 @@ function AccountsTable({ data, onPage }: { data: DevAccounts; onPage: (page: num
   const notes = data.notes.map((n) => {
     const vars: Record<string, string | number> = {};
     for (const [k, v] of Object.entries(n.vars ?? {})) vars[k] = k === "date" && typeof v === "string" ? f.day(v.slice(0, 10)) : v;
-    return { key: n.key, text: t(`dacct.note.${n.key}` as MessageKey, vars) };
+    // firstPlaybackWindow is the aggregate dashboard's own note, reused word for word.
+    const key = (n.key === "firstPlaybackWindow" ? "dev.note.firstPlaybackWindow" : `dacct.note.${n.key}`) as MessageKey;
+    return { key: n.key, text: t(key, vars) };
   });
 
   return (

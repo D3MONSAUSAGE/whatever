@@ -105,7 +105,9 @@ describe.skipIf(!databaseUrl)("0030 dev_accounts_list", () => {
       insert into public.playback_events (account_id, at) values ('${ACCOUNT}', now() - interval '2 days');
       insert into public.activity_events (account_id, at, kind, subject_name, detail) values
         ('${ACCOUNT}', now() - interval '5 hours', 'playlist.published', 'Secret Playlist Name', '{"x":"Secret Detail"}'),
-        ('${ACCOUNT}', now() - interval '1 hour', 'media.deleted', 'Secret File Name', '{}');
+        ('${ACCOUNT}', now() - interval '1 hour', 'media.deleted', 'Secret File Name', '{}'),
+        -- Fired by promo/schedule/playlist propagation too, so not an owner action (#132 OWNER_KINDS).
+        ('${ACCOUNT}', now() - interval '30 minutes', 'screen.content_changed', 'Secret Screen Name', '{}');
       insert into public.account_deletion_requests (account_id, user_id, scheduled_for) values ('${ACCOUNT}', '${OWNER}', now() + interval '7 days');
       insert into public.developer_users (user_id) values ('${DEV}');
       insert into public.analytics_exclusions (account_id, reason) values ('${DEV_ACCOUNT}', 'internal');

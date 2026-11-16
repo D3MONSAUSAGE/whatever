@@ -246,6 +246,7 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Couldn't load analytics.": "No se pudieron cargar las estadísticas.",
   // DA-2 developer customer accounts
   "Couldn't load accounts.": "No se pudieron cargar las cuentas.",
+  "Send a valid request.": "Envíe una solicitud válida.",
   "Not found": "No se encontró.",
   "Unauthorized.": "No autorizado.",
 };

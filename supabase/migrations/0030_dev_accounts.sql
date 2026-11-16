@@ -86,10 +86,12 @@ begin
           from public.displays dd where dd.account_id = a.id
       ) d on true
       -- Latest meaningful owner action. Kind only; subject_name and detail are never read.
+      -- Same set as the aggregate dashboard (metrics.ts OWNER_KINDS): screen.content_changed is left out
+      -- because promo, schedule and playlist propagation fire it too, not only the owner.
       left join lateral (
         select ev.at, ev.kind from public.activity_events ev
          where ev.account_id = a.id
-           and ev.kind in ('media.uploaded', 'playlist.published', 'screen.paired', 'screen.content_changed',
+           and ev.kind in ('media.uploaded', 'playlist.published', 'screen.paired',
                            'schedule.created', 'schedule.updated', 'schedule.deleted')
          order by ev.at desc limit 1
       ) o on true

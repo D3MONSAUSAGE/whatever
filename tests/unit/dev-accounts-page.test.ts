@@ -20,7 +20,10 @@ describe("DA-2 /developer/accounts page", () => {
     }
     const client = read("app/developer/accounts/client.tsx");
     expect(client.match(/fetch\(/g)).toHaveLength(1);
-    expect(client).toContain("/api/developer/accounts?");
+    expect(client).toContain('fetch("/api/developer/accounts", {');
+    expect(client).toContain('method: "POST"');
+    // The search never goes into a URL.
+    expect(client).not.toMatch(/\/api\/developer\/accounts\?|URLSearchParams/);
   });
   it("is linked from the aggregate dashboard, which keeps its own API", () => {
     const analytics = read("app/developer/analytics/client.tsx");
@@ -33,6 +36,7 @@ describe("DA-2 /developer/accounts page", () => {
     expect(sql).not.toMatch(/create\s+table|alter\s+table|insert\s+into|update\s+public|delete\s+from|drop\s|create\s+trigger/i);
     expect(sql).toMatch(/revoke execute on function public\.dev_accounts_list\(uuid\) from public, anon, authenticated/);
     expect(sql).not.toMatch(/grant execute[^;]*to[^;]*(anon|authenticated)/i);
+    expect(sql).not.toContain("screen.content_changed");
     expect(sql).not.toMatch(/subject_name|detail|storage_path|file_name|token|encrypted_password|stripe_customer_id|stripe_subscription_id|raw_user_meta_data|phone|\bname\b/i);
   });
 });

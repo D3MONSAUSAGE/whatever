@@ -21,7 +21,7 @@ export type TrialStatus = "active" | "grace" | "expired" | "not_on_trial" | "not
 
 export type DisplayedStatus = "yes" | "not_yet" | "no_tv" | "unknown";
 
-export type ActivityAction = "publish" | "upload" | "pair" | "content_change" | "schedule";
+export type ActivityAction = "publish" | "upload" | "pair" | "schedule";
 
 export type AccountRow = {
   /** Account id, or the user id when the person never reached an account ("userOnly"). */
@@ -44,6 +44,7 @@ export type AccountRow = {
     mismatch: boolean;
   };
   tv: { paired: boolean; activeScreens: number; screensEver: number; firstPairedAt: string | null; lastCheckInAt: string | null };
+  /** firstConfirmedAt is the first confirmed playback inside the 90-day playback window, not ever (note firstPlaybackWindow). */
   displayed: { status: DisplayedStatus; firstConfirmedAt: string | null; lastConfirmedAt: string | null };
   lastActivity: { at: string | null; source: "owner_action" | "sign_in" | null; action: ActivityAction | null; lastSignInAt: string | null };
   signupSource: { channel: ChannelKey; utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; referrerHost: string | null };
@@ -54,7 +55,8 @@ export type AccountRow = {
   deletionPending: boolean;
 };
 
-export type AccountsNoteKey = "billingFromStripe" | "billingUnavailable" | "billingTestMode" | "activitySince" | "attributionSince" | "displayedSince";
+/** firstPlaybackWindow reuses the aggregate dashboard's note (dev.note.firstPlaybackWindow). */
+export type AccountsNoteKey = "billingFromStripe" | "billingUnavailable" | "billingTestMode" | "activitySince" | "attributionSince" | "displayedSince" | "firstPlaybackWindow";
 export type AccountsNote = { key: AccountsNoteKey; vars?: Record<string, string | number> };
 
 export type DevAccounts = {

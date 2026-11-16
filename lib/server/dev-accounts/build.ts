@@ -65,11 +65,14 @@ export type AccountsList = {
  */
 export const DISPLAY_TRACKING_FROM = "2026-10-30T01:05:17Z";
 
+/**
+ * Meaningful owner actions, the same set as the aggregate dashboard (OWNER_KINDS in dev-analytics/metrics.ts).
+ * screen.content_changed is not one: promo, schedule and playlist propagation fire it too, not only the owner.
+ */
 const ACTION: Record<string, ActivityAction> = {
   "playlist.published": "publish",
   "media.uploaded": "upload",
   "screen.paired": "pair",
-  "screen.content_changed": "content_change",
   "schedule.created": "schedule",
   "schedule.updated": "schedule",
   "schedule.deleted": "schedule",
@@ -149,7 +152,8 @@ function internalReason(explicit: string | null, rule: string | null): InternalR
 
 export function accountRow(a: ListAccount, billing: BillingSnapshot, subs: BillingSub[], domains: readonly string[]): AccountRow {
   const c = classifyAccount({ id: a.id, created_at: a.created_at, comp: a.comp, email_domain: a.email_domain, plus_alias: a.plus_alias, excluded_reason: a.excluded_reason }, domains);
-  const ownerAt = a.last_owner_action_at;
+  // Only kinds in ACTION count; anything else (e.g. screen.content_changed) is ignored, not shown as activity.
+  const ownerAt = a.last_owner_action_kind && ACTION[a.last_owner_action_kind] ? a.last_owner_action_at : null;
   const at = later(ownerAt, a.last_sign_in_at);
   return {
     id: a.id,
@@ -239,6 +243,8 @@ export function buildAccounts(input: { list: AccountsList; billing: BillingSnaps
   }
   notes.push({ key: "activitySince", vars: { date: pacificDay(list.coverage.activity_from || ACTIVITY_FALLBACK_FROM) } });
   notes.push({ key: "displayedSince", vars: { date: pacificDay(DISPLAY_TRACKING_FROM) } });
+  // first_playback_at (firstConfirmedAt) only reaches back over the 90-day playback_events window.
+  notes.push({ key: "firstPlaybackWindow" });
   notes.push({ key: "attributionSince", vars: { date: pacificDay(ATTRIBUTION_FROM) } });
 
   return {
