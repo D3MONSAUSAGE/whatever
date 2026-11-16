@@ -81,7 +81,14 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
         await expect(page.getByTestId(`plan-${id}`)).toContainText(price);
         await expect(page.getByTestId(`plan-${id}`)).toContainText(screens);
       }
-      expect(await page.locator("main").innerText()).not.toMatch(/checkout|pay online|credit card required/i);
+      // Marketing copy must not promise online payment. The per-plan billing status line (data-testid="buy-*",
+      // "Online checkout coming soon" until Stripe checkout is configured) is billing UI, not a claim, so it is left out.
+      const marketingText = await page.locator("main").evaluate((m) => {
+        const copy = m.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll('[data-testid^="buy-"]').forEach((el) => el.remove());
+        return copy.innerText ?? copy.textContent ?? "";
+      });
+      expect(marketingText).not.toMatch(/checkout|pay online|credit card required/i);
       await page.goto("/faq");
       const q = page.getByText("What happens when the trial ends?");
       await q.click();
