@@ -23,7 +23,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
 
       <h2 className="font-semibold text-lg">Information used to operate Pekko</h2>
       <ul className="list-disc pl-5 grid gap-1">
-        <li><strong>Account.</strong> Email address, business name, and an optional display name. Sign-in passwords are stored by Supabase Auth, not as plain text in Pekko&apos;s account rows.</li>
+        <li><strong>Account.</strong> Email address, business name, an optional display name, and when the account was created and last signed in. Sign-in passwords are stored by Supabase Auth, not as plain text in Pekko&apos;s account rows.</li>
         <li><strong>Content and setup.</strong> Images, videos, menu boards, and brand settings you upload, plus playlists, schedules, promotions, locations, screen groups, and screen names.</li>
         <li><strong>Screens.</strong> For each paired screen: when it last checked in, what it reported playing, playback errors, offline periods, and a device token stored only as a hash. Nothing is collected about people walking past a screen.</li>
         <li><strong>First-party activity.</strong> Records of publishes, screen-content changes, pairing and removal, schedule changes, and uploads or deletions. Also hourly screen uptime and confirmed playback. Product milestones for the account record trial started, first screen paired, first publish, plan change, cancellation, how many screens were paired during the trial, and trial expired. Those milestone rows are not shown in your activity list.</li>
@@ -33,7 +33,15 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       </ul>
 
       <h2 className="font-semibold text-lg">Why it is used</h2>
-      <p>To sign you in, store and deliver your content to your screens, show screen status, send account and screen alerts, run billing when a paid plan is started, measure which ads and channels bring new sign-ups, limit abuse, and troubleshoot the Service. You keep ownership of your content. We do not sell personal information. There is no sale to opt out of, and this policy is not a claim of compliance with any particular privacy statute.</p>
+      <p>To sign you in, store and deliver your content to your screens, show screen status, send account and screen alerts, run billing when a paid plan is started, measure which ads and channels bring new sign-ups, produce internal statistics about how the Service is used, support customers, limit abuse, and troubleshoot the Service. You keep ownership of your content. We do not sell personal information. There is no sale to opt out of, and this policy is not a claim of compliance with any particular privacy statute.</p>
+
+      <h2 className="font-semibold text-lg" id="staff-access">Who at Pekko can see your account details</h2>
+      <p>
+        A small number of authorized Pekko staff can see account and usage details on a private internal page, to support customers and run the Service.
+        That page shows the account email and whether it is confirmed, the sign-up date, plan, trial and subscription status, whether screens are paired and have shown content, screen counts and the last check-in time, the date and type of the latest activity (including the last sign-in), whether the account is marked as internal or test, whether the account is marked for deletion, and the first-visit campaign source described below.
+        It does not show passwords, payment card details, your uploaded content, playlists, menus, or messages.
+        It reads the current account records, so a deleted account no longer appears there.
+      </p>
 
       <h2 className="font-semibold text-lg">What is measured, and what is not</h2>
       <p>The records above are first-party records of the account&apos;s own screens and changes. This application does not include an advertising network or a third-party website-analytics script. The dashboard sign-in client stores the session in the browser and calls Pekko&apos;s API with a bearer token.</p>
@@ -43,7 +51,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       <p>
         When you first arrive at pekkotv.com, we may save campaign tags from the link (source, medium, campaign, content and term) and the address of the site that sent you (the referrer) in a first-party cookie and your browser&apos;s local storage for up to 90 days.
         If you create an account in that time, we copy this first-visit information to your account once, at sign-up, and we do not overwrite it later.
-        We use it only to measure which ads and channels bring new sign-ups. We don&apos;t sell it or share it with advertisers or ad networks, and we don&apos;t use advertising pixels or third-party analytics scripts.
+        We use it only to measure which ads and channels bring new sign-ups, and authorized Pekko staff can see an account&apos;s first-visit source on the internal page described above. We don&apos;t sell it or share it with advertisers or ad networks, and we don&apos;t use advertising pixels or third-party analytics scripts.
         The copy on your account is deleted when your account is deleted.
       </p>
 

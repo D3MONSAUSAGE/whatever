@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { LoadState, PageHeader, Stat } from "@/components/ui";
 import { currentLocale, useT } from "@/lib/i18n/client";
@@ -60,7 +61,8 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
 
   return (
     <main id="main" className="mx-auto max-w-6xl px-5 py-8 grid gap-6" data-testid="dev-analytics">
-      <PageHeader eyebrow={t("dev.eyebrow")} title={t("dev.title")} lede={t("dev.lede")} />
+      <PageHeader eyebrow={t("dev.eyebrow")} title={t("dev.title")} lede={t("dev.lede")}
+        action={<Link href="/developer/accounts" className="btn btn-quiet" data-testid="to-accounts">{t("dacct.toAccounts")}</Link>} />
       <p className="text-sm text-muted">{t("dev.legend")}</p>
 
       <section className="card p-4 grid gap-3" aria-label={t("dev.range.label")}>

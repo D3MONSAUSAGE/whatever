@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { billingMode, stripe } from "@/lib/server/stripe";
+import { billingMode, periodEndSeconds, planForPrice, stripe } from "@/lib/server/stripe";
 
 /** One Stripe subscription reduced to what the dashboard needs. No customer, email or card data. */
 export type BillingSub = {
@@ -12,6 +12,10 @@ export type BillingSub = {
   monthlyAmount: number;
   currency: string;
   livemode: boolean;
+  /** DA-2: Pekko plan for the first item's price (from the configured price ids), else null. Never the price id. */
+  plan: string | null;
+  /** DA-2: end of the current paid period (or trial end while trialing). */
+  currentPeriodEnd: string | null;
 };
 
 export type BillingSnapshot = { available: boolean; livemode: boolean | null; subs: BillingSub[] };
@@ -48,6 +52,8 @@ export function toBillingSub(s: Stripe.Subscription): BillingSub {
     monthlyAmount: items.reduce((sum, item) => sum + monthly(item), 0),
     currency: (items[0]?.price?.currency || s.currency || "usd").toLowerCase(),
     livemode: !!s.livemode,
+    plan: planForPrice(items[0]?.price?.id ?? null),
+    currentPeriodEnd: iso(periodEndSeconds(s)),
   };
 }
 

@@ -40,11 +40,11 @@ describe.skipIf(!databaseUrl)("0029 dev_analytics_snapshot service-role backstop
     client = new Client({ connectionString: urlFor(dbName) });
     await client.connect();
     await client.query(`
-      do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
-      do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
-      do $$ begin create role service_role nologin; exception when duplicate_object then null; end $$;
-      do $$ begin create role authenticator nologin; exception when duplicate_object then null; end $$;
-      do $$ begin create role supabase_admin nologin; exception when duplicate_object then null; end $$;
+      do $$ begin create role anon nologin; exception when duplicate_object or unique_violation then null; end $$;
+      do $$ begin create role authenticated nologin; exception when duplicate_object or unique_violation then null; end $$;
+      do $$ begin create role service_role nologin; exception when duplicate_object or unique_violation then null; end $$;
+      do $$ begin create role authenticator nologin; exception when duplicate_object or unique_violation then null; end $$;
+      do $$ begin create role supabase_admin nologin; exception when duplicate_object or unique_violation then null; end $$;
       grant anon, authenticated, service_role to authenticator;
       create schema auth;
       create table auth.users (id uuid primary key, email text, created_at timestamptz default now(), email_confirmed_at timestamptz);

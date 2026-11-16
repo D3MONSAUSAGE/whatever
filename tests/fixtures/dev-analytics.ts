@@ -76,7 +76,7 @@ export function snapshot(): Snapshot {
 export function billing(): BillingSnapshot {
   const sub = (accountId: string | null, status: string, extra: Partial<BillingSnapshot["subs"][number]> = {}) => ({
     accountId, status, createdAt: "2026-11-02T00:00:00Z", canceledAt: null, cancelAtPeriodEnd: false,
-    monthlyAmount: 5900, currency: "usd", livemode: true, ...extra,
+    monthlyAmount: 5900, currency: "usd", livemode: true, plan: "multi", currentPeriodEnd: "2026-12-02T00:00:00Z", ...extra,
   });
   return {
     available: true,
@@ -104,7 +104,7 @@ export function teamtegrateBilling(): BillingSnapshot {
     livemode: true,
     subs: [{
       accountId: TEAMTEGRATE, status: "active", createdAt: "2026-11-11T18:00:00Z", canceledAt: null,
-      cancelAtPeriodEnd: true, monthlyAmount: 5900, currency: "usd", livemode: true,
+      cancelAtPeriodEnd: true, monthlyAmount: 5900, currency: "usd", livemode: true, plan: "multi", currentPeriodEnd: "2026-12-11T18:00:00Z",
     }],
   };
 }

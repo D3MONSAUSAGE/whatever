@@ -244,6 +244,9 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Too many requests. Wait a minute, then try again.": "Demasiadas solicitudes. Espere un minuto y vuelva a intentarlo.",
   "Choose a valid date range (up to 366 days, not in the future).": "Elija un rango de fechas válido (hasta 366 días, sin fechas futuras).",
   "Couldn't load analytics.": "No se pudieron cargar las estadísticas.",
+  // DA-2 developer customer accounts
+  "Couldn't load accounts.": "No se pudieron cargar las cuentas.",
+  "Send a valid request.": "Envíe una solicitud válida.",
   "Not found": "No se encontró.",
   "Unauthorized.": "No autorizado.",
 };
