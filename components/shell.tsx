@@ -1,5 +1,6 @@
 "use client";
 import { usePathname, useRouter } from "next/navigation";
+import { clearDeveloperAccess, useDeveloperAccess } from "@/lib/dev-access";
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase-browser";
 import { ToastProvider } from "@/components/toast";
@@ -47,6 +48,8 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
   const path = pathOverride ?? pathname;
   const [ready, setReady] = useState(preview);
   const t = useT();
+  // Developer-only link (developer_users, checked on the server). Customers never see it.
+  const developer = useDeveloperAccess() && !preview;
 
   useEffect(() => {
     if (preview) return;
@@ -83,6 +86,7 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
     // easy to miss while a fixed panel sat above the header.
     clearSlideSrcCache();
     clearLayoutStudioDraftsOnSignOut();
+    clearDeveloperAccess();
     const done = getSupabase().auth.signOut({ scope: "local" }).catch(() => undefined);
     await Promise.race([done, new Promise((resolve) => setTimeout(resolve, 1200))]);
     location.assign("/login");
@@ -123,7 +127,15 @@ export function DashboardShell({ children, preview = false, pathOverride }: { ch
         >
           {t("dash.nav.brandKit")}
         </StudioGuardedLink>
-        <SignOutButton onSignOut={signOut} className="nav-link mt-auto text-left">
+        {developer ? (
+          <StudioGuardedLink href="/developer/analytics" className="nav-link mt-auto" data-testid="nav-developer">
+            <span className="icon-tile size-8" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6" /></svg>
+            </span>
+            {t("dash.nav.developer")}
+          </StudioGuardedLink>
+        ) : null}
+        <SignOutButton onSignOut={signOut} className={`nav-link ${developer ? "" : "mt-auto"} text-left`}>
           <span className="icon-tile size-8" aria-hidden="true">↩</span>
           {t("dash.signOut")}
         </SignOutButton>

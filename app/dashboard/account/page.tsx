@@ -5,6 +5,7 @@ import { IconGear } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
 import { LanguageSelect } from "@/components/i18n/language-select";
+import { useDeveloperAccess } from "@/lib/dev-access";
 
 // I18N-2: copy lives in the dictionary (acct.<id>.title/body/action).
 const CARDS = [
@@ -16,6 +17,7 @@ const CARDS = [
 
 export default function AccountHub() {
   const t = useT();
+  const developer = useDeveloperAccess();
   return (
     <section className="min-w-0 pb-28 lg:pb-0">
       <PageHeader title={t("acct.title")} eyebrow="Pekko" lede={t("acct.lede")} icon={<IconGear />} />
@@ -33,6 +35,14 @@ export default function AccountHub() {
           <p className="text-sm text-muted mt-1 flex-1">{t("lang.accountBody")}</p>
           <LanguageSelect refresh={false} className="mt-auto" />
         </li>
+        {/* Developer-only (developer_users, checked on the server). Phones only: desktop has it in the sidebar. */}
+        {developer ? (
+          <li className="card flex flex-col p-5 min-h-[13.5rem] md:hidden" data-testid="developer-card">
+            <h2 className="font-semibold">{t("acct.developer.title")}</h2>
+            <p className="text-sm text-muted mt-1 flex-1">{t("acct.developer.body")}</p>
+            <Link href="/developer/analytics" className="btn btn-primary min-h-11 mt-auto w-full">{t("acct.developer.action")}</Link>
+          </li>
+        ) : null}
       </ul>
     </section>
   );
