@@ -36,7 +36,7 @@ function Check({ children }: { children: React.ReactNode }) {
 export function Hero({ t, c }: { t: T; c: SampleCopy }) {
   return (
     <section className="relative overflow-hidden px-5 pt-12 pb-20 md:pt-20 md:pb-28" data-testid="landing-hero">
-      <img src={SAMPLE_MEDIA.interior} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.13]"
+      <img src={SAMPLE_MEDIA.interior} alt="" aria-hidden="true" loading="lazy" decoding="async" className="pointer-events-none absolute inset-0 hidden h-full w-full object-cover opacity-[0.13] lg:block"
         style={{ maskImage: "radial-gradient(70% 70% at 70% 45%, #000 20%, transparent 80%)", WebkitMaskImage: "radial-gradient(70% 70% at 70% 45%, #000 20%, transparent 80%)" }} />
       <div aria-hidden="true" className="pointer-events-none absolute -right-40 top-10 size-[640px] rounded-full opacity-50 blur-3xl" style={{ background: "radial-gradient(circle, rgb(47 123 255 / 0.55), transparent 65%)" }} />
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10">

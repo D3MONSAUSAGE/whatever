@@ -4,6 +4,7 @@ import { PLANS, TRIAL } from "@/lib/plans";
 import { FAQ_IDS, FAQ_VARS, FEATURE_IDS, faqKeys, featureKeys, SHOTS, type FaqId } from "@/lib/marketing";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { ENGLISH_ONLY, type T } from "@/lib/i18n/index";
+import { marketingHref } from "@/lib/seo";
 
 export const SIGNUP_HREF = "/signup";
 type Shot = (typeof SHOTS)[keyof typeof SHOTS];
@@ -141,6 +142,7 @@ export async function FaqList({ limit, only }: { limit?: number; only?: readonly
 
 export async function TrialCta() {
   const t = await getT();
+  const locale = await getLocale();
   return (
     <section className="px-5 py-16 md:py-24" aria-labelledby="cta">
       <div className="relative mx-auto max-w-5xl overflow-hidden rounded-[32px] border border-white/15 p-10 md:p-16 text-center text-white"
@@ -150,7 +152,7 @@ export async function TrialCta() {
         <p className="relative mt-4 text-lg text-white/85">{t("mk.cta.body", { days: TRIAL.days, screens: TRIAL.screens })}</p>
         <div className="relative mt-8 flex flex-wrap justify-center gap-3">
           <Link href={SIGNUP_HREF} className="btn text-base px-7 bg-white text-[#0b1a4a] hover:bg-[#eaf1ff] shadow-[0_12px_30px_rgb(0_0_0/0.3)]">{t("site.startTrial")}</Link>
-          <Link href="/support" className="btn text-base px-7 bg-white/10 text-white hover:bg-white/20 border border-white/25">{t("site.getHelp")}</Link>
+          <Link href={marketingHref("/support", locale)} className="btn text-base px-7 bg-white/10 text-white hover:bg-white/20 border border-white/25">{t("site.getHelp")}</Link>
         </div>
       </div>
     </section>

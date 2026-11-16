@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
 import { ContactBlock } from "@/components/contact-block";
-import { getT } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { marketingMetadata } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
 import { rich } from "@/components/i18n/rich";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t("support.metaTitle") };
+  const [t, locale] = [await getT(), await getLocale()];
+  return marketingMetadata({ path: "/support", locale, title: t("support.metaTitle"), description: t("support.metaDescription") });
 }
 
 const ITEMS: { id: string; href?: string }[] = [

@@ -4,6 +4,7 @@ import { PublicPage } from "@/components/public-page";
 import { SHOTS } from "@/lib/marketing";
 import { sampleCopy, SAMPLE_MEDIA, type SampleCopy } from "@/lib/marketing-samples";
 import { getLocale, getT } from "@/lib/i18n/server";
+import { marketingHref, marketingMetadata } from "@/lib/seo";
 import type { MessageKey, T } from "@/lib/i18n/index";
 import { FeatureGrid, Screenshot, SectionHeading, SIGNUP_HREF, TrialCta } from "@/components/site/sections";
 import { Tv, SampleNote } from "@/components/site/marketing/tv";
@@ -12,8 +13,8 @@ import { Check, PlaylistMock } from "@/components/site/marketing/showcase";
 import { Reveal } from "@/components/site/marketing/reveal";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return { title: t("features.metaTitle"), description: t("features.metaDescription"), alternates: { canonical: "/features" } };
+  const [t, locale] = [await getT(), await getLocale()];
+  return marketingMetadata({ path: "/features", locale, title: t("features.metaTitle"), description: t("features.metaDescription") });
 }
 
 type Row = { title: MessageKey; body: MessageKey; visual: (t: T, c: SampleCopy) => React.ReactNode };
@@ -93,7 +94,8 @@ function StatusCard({ t }: { t: T }) {
 
 export default async function Features() {
   const t = await getT();
-  const c = sampleCopy(await getLocale());
+  const locale = await getLocale();
+  const c = sampleCopy(locale);
   return (
     <PublicPage bare theme="dark">
       <section className="px-5 pt-16 pb-8 md:pt-24">
@@ -103,7 +105,7 @@ export default async function Features() {
           <p className="mt-5 text-muted text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">{t("features.lede")}</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href={SIGNUP_HREF} className="btn btn-primary text-base px-7">{t("site.startTrial")}</Link>
-            <Link href="/pricing" className="btn btn-quiet text-base px-7">{t("site.seePricing")}</Link>
+            <Link href={marketingHref("/pricing", locale)} className="btn btn-quiet text-base px-7">{t("site.seePricing")}</Link>
           </div>
         </div>
       </section>

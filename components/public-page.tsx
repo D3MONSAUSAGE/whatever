@@ -1,6 +1,7 @@
 import { SiteNav } from "@/components/site/site-nav";
 import { SiteFooter } from "@/components/site/site-footer";
 import "@/components/site/marketing/marketing.css";
+import { preload } from "react-dom";
 
 /**
  * Shared shell for every public page: site nav, content, site footer. `bare` lets full-width marketing sections handle their own layout.
@@ -9,6 +10,8 @@ import "@/components/site/marketing/marketing.css";
  */
 export function PublicPage({ children, wide, bare, theme }: { children: React.ReactNode; wide?: boolean; bare?: boolean; theme?: "dark" }) {
   const dark = theme === "dark";
+  // Performance: the headline face is the largest text on first paint, so fetch it with the HTML.
+  if (dark) preload("/marketing/fonts/Montserrat-ExtraBold.woff2", { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
     <div className={dark ? "mk min-h-dvh flex flex-col" : "min-h-dvh flex flex-col bg-paper"}>
       {dark ? <SiteNav tone="dark" /> : <SiteNav />}

@@ -4,17 +4,15 @@ import { PublicPage } from "@/components/public-page";
 import { TRIAL } from "@/lib/plans";
 import { HOME_FAQ_IDS } from "@/lib/marketing";
 import { sampleCopy } from "@/lib/marketing-samples";
+import { marketingHref, marketingMetadata } from "@/lib/seo";
 import { getLocale, getT } from "@/lib/i18n/server";
+import { HomeStructuredData } from "@/components/site/structured-data";
 import { FaqList, PricingCards, SectionHeading, TrialCta } from "@/components/site/sections";
 import { ArtworkSection, BrandSection, Examples, FeatureCards, Hero, MakeSection, Steps, VideoSection } from "@/components/site/marketing/showcase";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
-  return {
-    title: t("home.metaTitle"),
-    description: t("home.metaDescription", { days: TRIAL.days }),
-    alternates: { canonical: "/" },
-  };
+  const [t, locale] = [await getT(), await getLocale()];
+  return marketingMetadata({ path: "/", locale, title: t("home.metaTitle"), description: t("home.metaDescription", { days: TRIAL.days }) });
 }
 
 // Signed-in visitors keep going straight to /dashboard, as before. The session lives in
@@ -23,10 +21,13 @@ const SIGNED_IN_REDIRECT = `try{for(var i=0;i<localStorage.length;i++){var k=loc
 
 export default async function Home() {
   const t = await getT();
-  const c = sampleCopy(await getLocale());
+  const locale = await getLocale();
+  const c = sampleCopy(locale);
+  const href = (path: string) => marketingHref(path, locale);
   return (
     <PublicPage bare theme="dark">
       <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_REDIRECT }} />
+      <HomeStructuredData locale={locale} t={t} />
       <Hero t={t} c={c} />
       <MakeSection t={t} c={c} />
       <Steps t={t} c={c} />
@@ -40,14 +41,14 @@ export default async function Home() {
         <div className="mx-auto max-w-5xl">
           <SectionHeading id="plans" eyebrow={t("home.pricingEyebrow")} title={t("home.pricingTitle")} intro={t("home.pricingIntro", { days: TRIAL.days, screens: TRIAL.screens })} />
           <PricingCards testPrefix="landing-plan" />
-          <p className="mt-8 text-center text-sm text-muted"><Link href="/pricing" className="underline font-semibold text-white">{t("home.fullPricing")}</Link></p>
+          <p className="mt-8 text-center text-sm text-muted"><Link href={href("/pricing")} className="underline font-semibold text-white">{t("home.fullPricing")}</Link></p>
         </div>
       </section>
 
       <section className="mk-section" aria-labelledby="faq-title" id="faq">
         <SectionHeading id="faq-title" eyebrow={t("home.faqEyebrow")} title={t("home.faqTitle")} />
         <FaqList only={HOME_FAQ_IDS} />
-        <p className="mt-8 text-center text-sm text-muted"><Link href="/faq" className="underline font-semibold text-white">{t("home.allQuestions")}</Link> · <Link href="/support" className="underline font-semibold text-white">{t("common.support")}</Link> · <Link href="/contact" className="underline font-semibold text-white">{t("footer.contact")}</Link></p>
+        <p className="mt-8 text-center text-sm text-muted"><Link href={href("/faq")} className="underline font-semibold text-white">{t("home.allQuestions")}</Link> · <Link href={href("/support")} className="underline font-semibold text-white">{t("common.support")}</Link> · <Link href={href("/contact")} className="underline font-semibold text-white">{t("footer.contact")}</Link></p>
       </section>
 
       <TrialCta />

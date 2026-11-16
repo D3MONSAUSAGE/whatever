@@ -1,5 +1,5 @@
 import type { SampleCopy } from "@/lib/marketing-samples";
-import { SAMPLE_MEDIA } from "@/lib/marketing-samples";
+import { SAMPLE_MEDIA, sampleImage } from "@/lib/marketing-samples";
 import { MutedVideo } from "./muted-video";
 
 /**
@@ -74,7 +74,7 @@ export function EmberOakBoard({ c, animate, special }: { c: SampleCopy; animate?
         <div className="bd-foot">{b.foot}</div>
       </div>
       <div className="bd-media bd-media-shade">
-        <img src={special ? SAMPLE_MEDIA.steak : SAMPLE_MEDIA.burger} alt="" className={animate ? "mk-kenburns" : undefined} fetchPriority={animate ? "high" : undefined} loading={animate ? "eager" : "lazy"} decoding="async" />
+        <img {...sampleImage(special ? SAMPLE_MEDIA.steak : SAMPLE_MEDIA.burger)} alt="" className={animate ? "mk-kenburns" : undefined} fetchPriority={animate ? "high" : undefined} loading={animate ? "eager" : "lazy"} decoding="async" />
         <div className="bd-feature">
           <div className="bd-kicker">{feature.kicker}</div>
           <div className="bd-feature-title">{feature.title}</div>
@@ -105,7 +105,7 @@ export function BeanThereBoard({ c }: { c: SampleCopy }) {
         <div className="bd-foot">{b.foot} <b>{b.extra}</b></div>
       </div>
       <div className="bd-media bd-media-shade">
-        <img src={SAMPLE_MEDIA.latte} alt="" loading="lazy" decoding="async" />
+        <img {...sampleImage(SAMPLE_MEDIA.latte)} alt="" loading="lazy" decoding="async" />
         <div className="bd-feature">
           <div className="bd-kicker">{b.feature.kicker}</div>
           <div className="bd-feature-title">{b.feature.title}</div>
@@ -148,7 +148,7 @@ export function BrunchArtwork({ c }: { c: SampleCopy }) {
   return (
     <div className="bd-art bd-brunch">
       <div className="bd-sun" />
-      <div className="bd-photo"><img src={SAMPLE_MEDIA.pancakes} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+      <div className="bd-photo"><img {...sampleImage(SAMPLE_MEDIA.pancakes)} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
       <div className="bd-copy">
         <div className="bd-script">{b.script}</div>
         <div className="bd-title">{b.title}</div>
@@ -164,7 +164,7 @@ export function ColdBrewArtwork({ c }: { c: SampleCopy }) {
   const b = c.coldbrew;
   return (
     <div className="bd-art bd-coldbrew">
-      <img src={SAMPLE_MEDIA.coldBrew} alt="" loading="lazy" decoding="async" />
+      <img {...sampleImage(SAMPLE_MEDIA.coldBrew, "full")} alt="" loading="lazy" decoding="async" />
       <div className="bd-copy">
         <div className="bd-brandline">Bean There</div>
         <div className="bd-title">{b.title}</div>
@@ -192,7 +192,7 @@ export function SmokeWheelsBoard({ c }: { c: SampleCopy }) {
         </div>
         <div className="bd-banner"><span>{b.bannerLeft}</span><span>{b.bannerRight}</span></div>
       </div>
-      <div className="bd-media"><img src={SAMPLE_MEDIA.ribs} alt="" loading="lazy" decoding="async" /></div>
+      <div className="bd-media"><img {...sampleImage(SAMPLE_MEDIA.ribs)} alt="" loading="lazy" decoding="async" /></div>
     </div>
   );
 }
@@ -207,7 +207,7 @@ export function PawsBoard({ c }: { c: SampleCopy }) {
         <div className="bd-detail">{b.detail}</div>
         <div className="bd-badge">{b.badge}</div>
       </div>
-      <div className="bd-media"><img src={SAMPLE_MEDIA.beagle} alt="" loading="lazy" decoding="async" /></div>
+      <div className="bd-media"><img {...sampleImage(SAMPLE_MEDIA.beagle)} alt="" loading="lazy" decoding="async" /></div>
     </div>
   );
 }
@@ -216,7 +216,7 @@ export function LindenBoard({ c }: { c: SampleCopy }) {
   const b = c.linden;
   return (
     <div className="bd-art bd-linden">
-      <img src={SAMPLE_MEDIA.bags} alt="" loading="lazy" decoding="async" />
+      <img {...sampleImage(SAMPLE_MEDIA.bags, "full")} alt="" loading="lazy" decoding="async" />
       <div className="bd-copy">
         <div className="bd-name">LINDEN &amp; CO.</div>
         <div className="bd-title">{b.title}</div>
