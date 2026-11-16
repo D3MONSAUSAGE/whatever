@@ -18,7 +18,7 @@ export function PrivacyEs() {
 
       <h2 className="font-semibold text-lg">Información que se usa para operar Pekko</h2>
       <ul className="list-disc pl-5 grid gap-1">
-        <li><strong>Cuenta.</strong> Dirección de correo electrónico, nombre del negocio y un nombre visible opcional. Las contraseñas de inicio de sesión las almacena Supabase Auth, no como texto plano en los registros de cuentas de Pekko.</li>
+        <li><strong>Cuenta.</strong> Dirección de correo electrónico, nombre del negocio, un nombre visible opcional, y cuándo se creó la cuenta y cuándo inició sesión por última vez. Las contraseñas de inicio de sesión las almacena Supabase Auth, no como texto plano en los registros de cuentas de Pekko.</li>
         <li><strong>Contenido y configuración.</strong> Imágenes, videos, menús digitales y configuración de marca que usted sube, además de listas de reproducción, horarios, promociones, ubicaciones, grupos de pantallas y nombres de pantallas.</li>
         <li><strong>Pantallas.</strong> Para cada pantalla vinculada: cuándo se reportó por última vez, lo que informó que estaba reproduciendo, errores de reproducción, períodos sin conexión y un token del dispositivo que se almacena solo como hash. No se recopila nada sobre las personas que pasan frente a una pantalla.</li>
         <li><strong>Actividad propia (de primera parte).</strong> Registros de publicaciones, cambios del contenido de las pantallas, vinculación y eliminación de pantallas, cambios de horarios, y cargas o eliminaciones. También el tiempo de actividad por hora de las pantallas y la reproducción confirmada. Los hitos del producto de la cuenta registran el inicio de la prueba, la primera pantalla vinculada, la primera publicación, el cambio de plan, la cancelación, cuántas pantallas se vincularon durante la prueba y el vencimiento de la prueba. Esas filas de hitos no se muestran en su lista de actividad.</li>
@@ -28,7 +28,15 @@ export function PrivacyEs() {
       </ul>
 
       <h2 className="font-semibold text-lg">Para qué se usa</h2>
-      <p>Para iniciar su sesión, almacenar y entregar su contenido a sus pantallas, mostrar el estado de las pantallas, enviar alertas de la cuenta y de las pantallas, gestionar la facturación cuando se inicia un plan de pago, medir qué anuncios y canales traen nuevos registros, limitar el abuso y solucionar problemas del Servicio. Usted conserva la propiedad de su contenido. No vendemos información personal. No hay ninguna venta de la cual excluirse, y esta política no es una declaración de cumplimiento de ninguna ley de privacidad en particular.</p>
+      <p>Para iniciar su sesión, almacenar y entregar su contenido a sus pantallas, mostrar el estado de las pantallas, enviar alertas de la cuenta y de las pantallas, gestionar la facturación cuando se inicia un plan de pago, medir qué anuncios y canales traen nuevos registros, elaborar estadísticas internas sobre el uso del Servicio, dar soporte a los clientes, limitar el abuso y solucionar problemas del Servicio. Usted conserva la propiedad de su contenido. No vendemos información personal. No hay ninguna venta de la cual excluirse, y esta política no es una declaración de cumplimiento de ninguna ley de privacidad en particular.</p>
+
+      <h2 className="font-semibold text-lg" id="staff-access">Quién en Pekko puede ver los datos de su cuenta</h2>
+      <p>
+        Un número reducido de personal autorizado de Pekko puede ver datos de la cuenta y de uso en una página interna privada, para dar soporte a los clientes y operar el Servicio.
+        Esa página muestra el correo de la cuenta, la fecha de registro, el plan, el estado de la prueba y de la suscripción, si hay pantallas vinculadas y si han mostrado contenido, la fecha de la actividad más reciente y el origen de campaña de la primera visita que se describe más abajo.
+        No muestra contraseñas, datos de tarjetas de pago, su contenido subido, listas de reproducción, menús ni mensajes.
+        Lee los registros actuales de la cuenta, así que una cuenta eliminada deja de aparecer allí.
+      </p>
 
       <h2 className="font-semibold text-lg">Qué se mide y qué no</h2>
       <p>Los registros anteriores son registros propios de las pantallas y los cambios de la propia cuenta. Esta aplicación no incluye una red publicitaria ni un script de analítica web de terceros. El cliente de inicio de sesión del panel almacena la sesión en el navegador y llama a la API de Pekko con un token de portador (bearer token).</p>
@@ -38,7 +46,7 @@ export function PrivacyEs() {
       <p>
         Cuando usted llega por primera vez a pekkotv.com, podemos guardar las etiquetas de campaña del enlace (fuente, medio, campaña, contenido y término) y la dirección del sitio que lo envió (el referente) en una cookie propia y en el almacenamiento local de su navegador por hasta 90 días.
         Si crea una cuenta en ese tiempo, copiamos esta información de la primera visita a su cuenta una sola vez, al registrarse, y no la sobrescribimos después.
-        La usamos solo para medir qué anuncios y canales traen nuevos registros. No la vendemos ni la compartimos con anunciantes ni redes publicitarias, y no usamos píxeles publicitarios ni scripts de analítica de terceros.
+        La usamos solo para medir qué anuncios y canales traen nuevos registros, y el personal autorizado de Pekko puede ver el origen de la primera visita de una cuenta en la página interna descrita arriba. No la vendemos ni la compartimos con anunciantes ni redes publicitarias, y no usamos píxeles publicitarios ni scripts de analítica de terceros.
         La copia en su cuenta se elimina cuando se elimina su cuenta.
       </p>
 
