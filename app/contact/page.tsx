@@ -13,9 +13,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Contact() {
   const t = await getT();
   return (
-    <PublicPage>
-      <h1 className="text-2xl font-semibold tracking-tight">{t("contact.title")}</h1>
-      <p className="text-muted mt-1">{rich(t("contact.lede"), { link: (c) => <Link className="underline" href="/support">{c}</Link> })}</p>
+    <PublicPage theme="dark">
+      <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight"><span className="mk-gradient-text">{t("contact.title")}</span></h1>
+      <p className="text-muted mt-3 text-lg">{rich(t("contact.lede"), { link: (c) => <Link className="underline" href="/support">{c}</Link> })}</p>
       <ContactBlock />
     </PublicPage>
   );

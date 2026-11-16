@@ -20,9 +20,9 @@ const ITEMS: { id: string; href?: string }[] = [
 export default async function Support() {
   const t = await getT();
   return (
-    <PublicPage>
-      <h1 className="text-2xl font-semibold tracking-tight">{t("support.title")}</h1>
-      <p className="text-muted mt-1">{t("support.lede")}</p>
+    <PublicPage theme="dark">
+      <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight"><span className="mk-gradient-text">{t("support.title")}</span></h1>
+      <p className="text-muted mt-3 text-lg">{t("support.lede")}</p>
       <div className="mt-6 grid gap-3">
         {ITEMS.map((f) => (
           <details key={f.id} className="card p-4">

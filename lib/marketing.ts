@@ -21,7 +21,9 @@ export const SHOTS = {
   tvPromo: { src: "/marketing/tv-promo.webp", altKey: "shot.tvPromo", w: 1200, h: 675 },
 } as const satisfies Record<string, { src: string; altKey: MessageKey; w: number; h: number }>;
 
-export const FAQ_IDS = ["trial", "trialEnd", "screen", "plans", "devices", "hardware", "internet", "cancel", "pptx"] as const;
+export const FAQ_IDS = ["trial", "trialEnd", "screen", "plans", "devices", "hardware", "internet", "cancel", "pptx", "compat", "connect"] as const;
+/** The short list on the home page, in the order the landing page asks them. */
+export const HOME_FAQ_IDS = ["hardware", "compat", "trial", "connect", "plans"] as const satisfies readonly FaqId[];
 export type FaqId = (typeof FAQ_IDS)[number];
 export const faqKeys = (id: FaqId) => ({ q: `faq.${id}.q` as MessageKey, a: `faq.${id}.a` as MessageKey });
 export const FAQ_VARS = { days: TRIAL.days, screens: TRIAL.screens };
