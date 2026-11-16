@@ -70,8 +70,8 @@ export const en = {
   "site.getHelp": "Get help",
 
   // Home
-  "home.metaTitle": "Pekko · Digital signage for your business",
-  "home.metaDescription": "Menus, offers, and presentations on your screens. Try Pekko free for {days} days, no card needed.",
+  "home.metaTitle": "Digital Menu Boards & Signage for Your Smart TV | Pekko",
+  "home.metaDescription": "Turn a compatible smart TV into a digital menu board or promo screen, with no extra hardware box. Branded menus, photos, video and playlists. Free for {days} days.",
   "home.eyebrow": "Digital signage for restaurants and local businesses",
   "home.title": "Your menu and promotions, on the TV you already have.",
   "home.lede": "Pekko turns a compatible smart TV’s web browser into digital signage, with no separate hardware box. Build a branded menu or upload your own artwork, then publish from your phone.",
@@ -142,7 +142,7 @@ export const en = {
   "mk.publish.title": "Publish to screen",
   "mk.publish.live": "Live on Dining room TV",
   "mk.brand.eyebrow": "Menu boards",
-  "mk.brand.title": "Menus that look professionally designed",
+  "mk.brand.title": "Digital menu boards that look professionally designed",
   "mk.brand.intro": "Pick a layout, add your items and prices, and Pekko builds a sharp full-screen board. Your Brand Kit keeps every menu on brand.",
   "mk.brand.p1": "Your logo, brand colors and fonts",
   "mk.brand.p2": "Two columns of items plus a photo or video panel",
@@ -239,9 +239,9 @@ export const en = {
   "feature.analytics.body": "Analytics show screen uptime, what's on each screen, and recent activity in your account.",
 
   // Features page
-  "features.metaTitle": "Features · Pekko",
-  "features.metaDescription": "Digital signage that runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia: images, videos, PowerPoint and PDF presentations, playlists, schedules, multiple screens and status alerts.",
-  "features.title": "Features",
+  "features.metaTitle": "Features: Digital Menu Boards, Playlists & Scheduling | Pekko",
+  "features.metaDescription": "Branded digital menu boards with a photo or video, Canva or PowerPoint uploads, playlists, day-part schedules and offline alerts. Runs in your smart TV's web browser, tested on LG, Samsung, Vizio and Insignia.",
+  "features.title": "Digital signage features",
   "features.lede": "Pekko runs in your smart TV's web browser, tested on major brands including LG, Samsung, Vizio and Insignia, and you control it from anywhere.",
   "features.row1Title": "Manage everything from one dashboard",
   "features.row1Body": "See your screens, media, playlists and schedules at a glance, from your computer or phone.",
@@ -258,16 +258,16 @@ export const en = {
   "features.allTitle": "All features",
 
   // Pricing page
-  "pricing.metaTitle": "Pricing · Pekko",
-  "pricing.metaDescription": "Simple digital signage for your business. Try Pekko free for 14 days.",
+  "pricing.metaTitle": "Pricing: Digital Signage from $19/month | Pekko",
+  "pricing.metaDescription": "Starter is $19/month for 1 screen, Business $39 for up to 3, Multi-screen $59 for up to 5. Every plan starts with a 14-day free trial, no card needed.",
   "pricing.title": "Simple monthly pricing",
   "pricing.lede": "Upload, build a playlist, and publish to your screens from your phone or computer.",
   "pricing.plansLabel": "Plans",
   "pricing.questions": "Questions? See the <link>FAQ</link>.",
 
   // FAQ
-  "faq.metaTitle": "FAQ · Pekko",
-  "faq.metaDescription": "Answers about PowerPoint and PDF uploads, the Pekko free trial, plans, screens, devices and account deletion.",
+  "faq.metaTitle": "Digital Signage FAQ: Smart TVs, Hardware & Pricing | Pekko",
+  "faq.metaDescription": "Will Pekko work on my TV? Do I need extra hardware? How does the free trial work? Answers about smart TV digital signage, plans, uploads and setup.",
   "faq.title": "Frequently asked questions",
   "faq.lede": "Need help with a screen? See <link>Support</link>.",
   "faq.trial.q": "How does the free trial work?",
@@ -294,7 +294,8 @@ export const en = {
   "faq.connect.a": "Open pekkotv.com/pair in the TV's web browser, then enter the six-digit code in Pekko on your phone or computer.",
 
   // Support / contact
-  "support.metaTitle": "Support · Pekko",
+  "support.metaTitle": "Support: Set Up Your Smart TV Screen | Pekko",
+  "support.metaDescription": "Quick fixes for pairing codes, the TV player address, offline screens, video uploads and your Pekko account.",
   "support.title": "Support",
   "support.lede": "Quick fixes for common problems.",
   "support.code.q": "The TV shows a 6-digit code and nothing else",
@@ -313,7 +314,8 @@ export const en = {
   "support.password.a": "Use <link>Forgot password</link>. The link works once and expires in an hour; check spam.",
   "support.delete.q": "How do I delete my account?",
   "support.delete.a": "See <link>Delete your account</link>.",
-  "contact.metaTitle": "Contact · Pekko",
+  "contact.metaTitle": "Contact Pekko | Digital Signage Support",
+  "contact.metaDescription": "Email Pekko support about your screens, your account or your plan.",
   "contact.title": "Contact",
   "contact.lede": "Most questions are answered on the <link>Support</link> page.",
   "contact.heading": "Contact us",

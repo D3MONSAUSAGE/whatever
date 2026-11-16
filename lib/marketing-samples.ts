@@ -220,3 +220,19 @@ export const SAMPLE_MEDIA = {
   steak: "/marketing/samples/steak-portrait.webp",
   interior: "/marketing/samples/restaurant-interior.webp",
 } as const;
+
+/**
+ * Responsive image attributes for a sample photo: phones download the half-size file (-sm.webp).
+ * `panel` images fill a board's side panel; `full` images fill the whole board.
+ */
+const FULL_WIDTH: Record<string, number> = { "cold-brew": 1600, bags: 1600, "pizza-poster": 720 };
+export function sampleImage(src: string, fill: "panel" | "full" = "panel") {
+  const name = src.split("/").pop()!.replace(/\.webp$/, "");
+  const full = FULL_WIDTH[name] ?? 900;
+  return {
+    src,
+    srcSet: `${src.replace(/\.webp$/, "-sm.webp")} ${Math.round(full / 2)}w, ${src} ${full}w`,
+    sizes: fill === "full" ? "(max-width: 768px) 92vw, 50vw" : "(max-width: 768px) 40vw, 24vw",
+  };
+}
+

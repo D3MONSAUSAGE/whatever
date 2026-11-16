@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { LogoMark, Wordmark } from "@/components/brand";
 import { LEGAL_COPYRIGHT } from "@/lib/legal";
-import { getT } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { marketingHref } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
 import { LanguageSelect } from "@/components/i18n/language-select";
 
@@ -13,12 +14,13 @@ const COLS: { title: MessageKey; links: [MessageKey, string][] }[] = [
 
 export async function SiteFooter({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
   const t = await getT();
+  const locale = await getLocale();
   const owner = LEGAL_COPYRIGHT;
   return (
     <footer className={tone === "dark" ? "border-t border-white/10 bg-[#030712]/60" : "border-t border-line bg-white/60"} data-testid="site-footer">
       <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:grid-cols-2 md:grid-cols-4">
         <div>
-          <Link href="/" className="inline-flex items-center gap-2.5" aria-label={t("brand.homeLabel")}><LogoMark className="size-8" /><Wordmark size="sm" /></Link>
+          <Link href={marketingHref("/", locale)} className="inline-flex items-center gap-2.5" aria-label={t("brand.homeLabel")}><LogoMark className="size-8" /><Wordmark size="sm" /></Link>
           <p className="mt-3 text-sm text-muted">{t("brand.footerTagline")}</p>
           <LanguageSelect className="mt-4" />
         </div>
@@ -26,7 +28,7 @@ export async function SiteFooter({ tone = "light" }: { tone?: "light" | "dark" }
           <nav key={c.title} aria-label={t(c.title)}>
             <h2 className="text-sm font-semibold">{t(c.title)}</h2>
             <ul className="mt-3 grid gap-2 text-sm text-muted">
-              {c.links.map(([label, href]) => <li key={href}><Link href={href} className="hover:underline">{t(label)}</Link></li>)}
+              {c.links.map(([label, href]) => <li key={href}><Link href={marketingHref(href, locale)} className="hover:underline">{t(label)}</Link></li>)}
             </ul>
           </nav>
         ))}

@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // SEO: Next 15 streams page metadata (description, canonical, hreflang) after <head> for most user agents,
+  // including Googlebot, and Google ignores a canonical outside <head>. Our metadata only reads the locale
+  // cookie, so rendering it in <head> for every request costs nothing noticeable.
+  htmlLimitedBots: /.*/,
   // Menu boards render PNGs with resvg (native, free) and bundled Inter fonts.
   serverExternalPackages: ["@resvg/resvg-js", "pptx-glimpse", "pdfjs-dist", "@napi-rs/canvas"],
   outputFileTracingIncludes: {
@@ -45,6 +49,9 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/:path*", headers: security },
+      // SEO: the old production alias serves the same pages as pekkotv.com (TVs and the Android app still use
+      // it). Keep it working, but out of search results; canonical tags already point to pekkotv.com.
+      { source: "/:path*", has: [{ type: "host", value: "pantalla-chi.vercel.app" }], headers: [{ key: "X-Robots-Tag", value: "noindex" }] },
       // B2-07A: email links carry a one-time token_hash in the URL; never send it on as a Referer.
       { source: "/auth/:path*", headers: [...security.filter((h) => h.key !== "Referrer-Policy"), { key: "Referrer-Policy", value: "no-referrer" }] },
       ...["/player", "/player.html", "/tv", "/pair"].map((source) => ({

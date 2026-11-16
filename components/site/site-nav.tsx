@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogoMark, Wordmark } from "@/components/brand";
-import { useT } from "@/lib/i18n/client";
+import { useLocale } from "@/lib/i18n/client";
+import { marketingBaseOf, marketingHref } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
 import { LanguageSelect } from "@/components/i18n/language-select";
 
@@ -17,8 +18,10 @@ export const NAV_LINKS: readonly { href: string; label: MessageKey }[] = [
 /** `tone="dark"` is the marketing look (PublicPage theme="dark"); the default is unchanged for legal and other pages. */
 export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
   const dark = tone === "dark";
-  const t = useT();
+  const { t, locale } = useLocale();
   const pathname = usePathname();
+  const current = marketingBaseOf(pathname ?? "") ?? pathname;
+  const href = (path: string) => marketingHref(path, locale);
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
@@ -30,18 +33,18 @@ export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
   const hover = dark ? "hover:bg-white/10 hover:text-white" : "hover:bg-black/5";
   const cls = (href: string) =>
     dark
-      ? `rounded-full px-3.5 py-2 ${hover} ${pathname === href ? "text-white bg-white/10" : "text-[#c5d3ee]"}`
-      : `rounded-lg px-3 py-2 hover:bg-black/5 ${pathname === href ? "text-primary" : ""}`;
+      ? `rounded-full px-3.5 py-2 ${hover} ${current === href ? "text-white bg-white/10" : "text-[#c5d3ee]"}`
+      : `rounded-lg px-3 py-2 hover:bg-black/5 ${current === href ? "text-primary" : ""}`;
   return (
     <header className={dark ? "sticky top-0 z-40 border-b border-white/10 bg-[#040916]/75 backdrop-blur-xl" : "sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur"} data-testid="site-nav">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
-        <Link href="/" className="inline-flex items-center gap-2.5" aria-label={t("brand.homeLabel")}>
+        <Link href={href("/")} className="inline-flex items-center gap-2.5" aria-label={t("brand.homeLabel")}>
           <LogoMark className="size-9" />
           <Wordmark />
         </Link>
         <nav className="hidden md:flex items-center gap-1 text-sm font-semibold" aria-label={t("nav.main")}>
           {NAV_LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className={cls(l.href)} aria-current={pathname === l.href ? "page" : undefined}>{t(l.label)}</Link>
+            <Link key={l.href} href={href(l.href)} className={cls(l.href)} aria-current={current === l.href ? "page" : undefined}>{t(l.label)}</Link>
           ))}
         </nav>
         <div className="hidden md:flex items-center gap-2 text-sm font-semibold">
@@ -60,7 +63,7 @@ export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
         <nav id="mobile-menu" className={dark ? "md:hidden border-t border-white/10 bg-[#060d22] px-5 pb-5 pt-2 text-base font-semibold" : "md:hidden border-t border-line bg-paper px-5 pb-5 pt-2 text-base font-semibold"} aria-label={t("nav.mobile")}>
           <ul className="grid">
             {NAV_LINKS.map((l) => (
-              <li key={l.href}><Link href={l.href} className="block py-3" onClick={() => setOpen(false)} aria-current={pathname === l.href ? "page" : undefined}>{t(l.label)}</Link></li>
+              <li key={l.href}><Link href={href(l.href)} className="block py-3" onClick={() => setOpen(false)} aria-current={current === l.href ? "page" : undefined}>{t(l.label)}</Link></li>
             ))}
             <li><Link href="/login" className="block py-3" onClick={() => setOpen(false)}>{t("nav.login")}</Link></li>
           </ul>

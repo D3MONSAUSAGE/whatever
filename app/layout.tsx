@@ -4,6 +4,7 @@ import "./globals.css";
 import { SignupAttribution } from "@/components/signup-attribution";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { getLocale } from "@/lib/i18n/server";
+import { publicAppOrigin } from "@/lib/public-url";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,7 +13,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://pantalla-chi.vercel.app"),
+  // Canonical/OG URLs are always on the customer domain (never a *.vercel.app host); see lib/public-url.ts.
+  metadataBase: new URL(publicAppOrigin()),
   title: "Pekko",
   description: "Pekko. Digital signage made simple.",
   applicationName: "Pekko",
