@@ -18,16 +18,25 @@ describe("DA-2 /developer/accounts page", () => {
       expect(site).toContain(line);
       expect(seg).toContain(line);
     }
-    const client = read("app/developer/accounts/client.tsx");
-    expect(client.match(/fetch\(/g)).toHaveLength(1);
-    expect(client).toContain('fetch("/api/developer/accounts", {');
-    expect(client).toContain('method: "POST"');
+    // Consolidated console: the list is the "Customer accounts" tab; the data still comes only from the gated API.
+    const tab = read("components/developer/accounts-view.tsx");
+    expect(tab.match(/fetch\(/g)).toHaveLength(1);
+    expect(tab).toContain('fetch("/api/developer/accounts", {');
+    expect(tab).toContain('method: "POST"');
     // The search never goes into a URL.
-    expect(client).not.toMatch(/\/api\/developer\/accounts\?|URLSearchParams/);
+    expect(tab).not.toMatch(/\/api\/developer\/accounts\?|URLSearchParams/);
+    // The old URL only redirects a confirmed developer (server-checked) to the tab; everyone else sees the 404.
+    const old = read("app/developer/accounts/client.tsx");
+    expect(old.match(/fetch\(/g)).toHaveLength(1);
+    expect(old).toContain('fetch("/api/developer/access"');
+    expect(old).toContain("if (res.status === 200) location.replace(ACCOUNTS_TAB_URL);");
+    expect(old).toContain('export const ACCOUNTS_TAB_URL = "/developer/analytics?view=accounts";');
   });
-  it("is linked from the aggregate dashboard, which keeps its own API", () => {
+  it("is a tab of the console, which keeps its own aggregate API", () => {
     const analytics = read("app/developer/analytics/client.tsx");
-    expect(analytics).toContain('href="/developer/accounts"');
+    expect(analytics).toContain('const ACCOUNTS_VIEW_URL = "/developer/analytics?view=accounts";');
+    expect(analytics).toContain('data-testid="tab-accounts"');
+    expect(analytics).toContain("<AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} />");
     expect(analytics).toContain("/api/developer/analytics?");
     expect(analytics).not.toContain("/api/developer/accounts");
   });
