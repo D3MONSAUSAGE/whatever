@@ -51,6 +51,8 @@ describe("DA-1 migration 0029 (static checks)", () => {
     const statements = seed.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
     for (const v of ["dev_user_id", "reviewer_account_id", "internal_account_id"]) expect(statements).toContain(`:'${v}'::uuid`);
     expect(seed).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    expect(seed).not.toMatch(/gmail|hotmail|guanatos|dreamdesign|gcorp|francisco/i);
+    // The only domains named are the internal/test ones; no customer domains or names.
+    expect(statements.match(/'[a-z0-9.-]+\.[a-z]{2,}'/gi)).toEqual(["'mail.grokbot.com'", "'example.com'"]);
+    expect(statements).not.toMatch(/@[a-z0-9-]+\./i);
   });
 });
