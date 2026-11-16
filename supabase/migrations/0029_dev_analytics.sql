@@ -73,7 +73,8 @@ begin
   -- PostgREST sets request.jwt.claims; only the service-role key may call this. Without claims (a direct
   -- SQL session) only the database owner roles may. session_user, not current_user: this is security definer.
   v_role := coalesce(v_claims::jsonb->>'role', nullif(current_setting('request.jwt.claim.role', true), ''));
-  if not (v_role = 'service_role' or (v_role is null and session_user in ('postgres', 'supabase_admin'))) then
+  -- coalesce(..., false): a missing role makes the comparison NULL, which must refuse, not fall through.
+  if not coalesce(v_role = 'service_role' or (v_role is null and session_user in ('postgres', 'supabase_admin')), false) then
     raise exception 'not_authorized' using errcode = '42501';
   end if;
   if not public.is_developer(p_actor) then

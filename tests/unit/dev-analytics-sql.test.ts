@@ -33,6 +33,8 @@ describe("DA-1 migration 0029 (static checks)", () => {
   it("requires the service role inside the snapshot function (defense in depth)", () => {
     expect(code).toMatch(/current_setting\('request\.jwt\.claims', true\)/);
     expect(code).toMatch(/v_role = 'service_role'/);
+    // NULL-safe: a missing role claim must raise.
+    expect(code).toMatch(/if not coalesce\(v_role = 'service_role' or \(v_role is null and session_user in \('postgres', 'supabase_admin'\)\), false\) then/);
     expect(code).toMatch(/session_user in \('postgres', 'supabase_admin'\)/);
     // The role check comes before the developer check.
     expect(code.indexOf("v_role = 'service_role'")).toBeLessThan(code.indexOf("if not public.is_developer(p_actor)"));
