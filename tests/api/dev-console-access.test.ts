@@ -110,7 +110,7 @@ describe("/developer/analytics page", () => {
     expect(nf).toContain("<DeveloperAnalytics notFound={notFound} />");
     const client = readFileSync("app/developer/analytics/client.tsx", "utf8");
     // The console shows nothing until the gated API confirms a developer.
-    expect(client).toContain('if (load.state === "notFound") return <>{notFound}</>;');
+    expect(client).toContain('if (load.state === "notFound" || denied) return <>{notFound}</>;');
     expect(client).toContain("if (!confirmed)");
     expect(client.match(/fetch\(/g)).toHaveLength(1);
   });

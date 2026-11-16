@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LoadState } from "@/components/ui";
 import { LogoMark } from "@/components/brand";
 import { LanguageSelect } from "@/components/i18n/language-select";
+import { AccountsView } from "@/components/developer/accounts-view";
 import { BarRows, ColumnChart, Legend, LineChart, Meter, ORDINAL_BLUE, NEUTRAL, SegmentedBar, SERIES, TableView } from "@/components/developer/charts";
 import { currentLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
@@ -24,8 +25,13 @@ type Load = { state: "loading" } | { state: "notFound" } | { state: "error"; mes
 const SECTIONS = ["overview", "activation", "revenue", "screens", "health"] as const;
 type SectionId = (typeof SECTIONS)[number];
 
+type View = "analytics" | "accounts";
+/** ?view=accounts opens the Customer Accounts tab (the old /developer/accounts URL redirects here). */
+const ACCOUNTS_VIEW_URL = "/developer/analytics?view=accounts";
+
 export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) {
   const t = useT();
+  const [view, setViewState] = useState<View>("analytics");
   const [preset, setPreset] = useState<RangePreset>("30d");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -33,6 +39,19 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
   const [includeInternal, setIncludeInternal] = useState(false);
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [confirmed, setConfirmed] = useState(false);
+  const [denied, setDenied] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("view") === "accounts") setViewState("accounts");
+  }, []);
+  const setView = useCallback((next: View, section?: SectionId) => {
+    setViewState(next);
+    history.replaceState(null, "", next === "accounts" ? ACCOUNTS_VIEW_URL : `/developer/analytics${section ? `#dev-sec-${section}` : ""}`);
+    if (section) requestAnimationFrame(() => document.getElementById(`dev-sec-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    else window.scrollTo({ top: 0 });
+  }, []);
+  const onConfirmed = useCallback(() => setConfirmed(true), []);
+  const onDenied = useCallback(() => setDenied(true), []);
 
   const fetchData = useCallback(async () => {
     if (!supabaseConfigured()) { setLoad({ state: "notFound" }); return; }
@@ -58,11 +77,19 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
     }
   }, [applied, includeInternal, t]);
 
-  useEffect(() => { void fetchData(); }, [fetchData]);
+  // The aggregate numbers load only while their view is open; Customer Accounts loads its own rows.
+  useEffect(() => { if (view === "analytics") void fetchData(); }, [fetchData, view]);
 
-  if (load.state === "notFound") return <>{notFound}</>;
-  // Nothing about the console is shown until the API confirms a developer.
-  if (!confirmed) return <main id="main" className="mx-auto max-w-6xl px-5 py-8"><LoadState error={load.state === "error" ? load.message : null} /></main>;
+  if (load.state === "notFound" || denied) return <>{notFound}</>;
+  // Nothing about the console is shown until a developer API confirms a developer.
+  if (!confirmed) {
+    return (
+      <main id="main" className="mx-auto max-w-6xl px-5 py-8">
+        <LoadState error={load.state === "error" ? load.message : null} />
+        {view === "accounts" ? <div hidden><AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} /></div> : null}
+      </main>
+    );
+  }
 
   const choose = (p: RangePreset) => {
     setPreset(p);
@@ -71,48 +98,54 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
 
   return (
     <div className="mk dc" data-testid="dev-analytics">
-      <ConsoleHeader />
-      <SectionTabs />
+      <ConsoleHeader view={view} setView={setView} />
+      <SectionTabs view={view} setView={setView} />
       <main id="main" className="dc-main">
-        <div className="dc-intro">
-          <div>
-            <p className="mk-eyebrow">{t("dev.eyebrow")}</p>
-            <h1 className="dc-title">{t("dev.title")}</h1>
-            <p className="dc-lede">{t("dev.lede")}</p>
-            <p className="dc-legend-text">{t("dev.legend")}</p>
-          </div>
-          <Link href="/developer/accounts" className="btn btn-quiet" data-testid="to-accounts">{t("dacct.toAccounts")}</Link>
-        </div>
+        {view === "accounts" ? <AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} /> : (
+          <>
+            <div className="dc-intro">
+              <div>
+                <p className="mk-eyebrow">{t("dev.eyebrow")}</p>
+                <h1 className="dc-title">{t("dev.title")}</h1>
+                <p className="dc-lede">{t("dev.lede")}</p>
+                <p className="dc-legend-text">{t("dev.legend")}</p>
+              </div>
+              <a href={ACCOUNTS_VIEW_URL} className="btn btn-quiet" data-testid="to-accounts" onClick={(e) => { e.preventDefault(); setView("accounts"); }}>{t("dacct.toAccounts")}</a>
+            </div>
 
-        <section className="dc-filters" aria-label={t("dev.range.label")}>
-          <div className="dc-segmented" role="group" aria-label={t("dev.range.label")}>
-            {RANGE_PRESETS.map((p) => (
-              <button key={p} type="button" className={preset === p ? "is-on" : ""} aria-pressed={preset === p} onClick={() => choose(p)} data-testid={`range-${p}`}>
-                {t(`dev.range.${p}` as MessageKey)}
-              </button>
-            ))}
-          </div>
-          {preset === "custom" ? (
-            <form className="dc-custom" onSubmit={(e) => { e.preventDefault(); setApplied({ preset: "custom", from, to }); }}>
-              <label>{t("dev.range.from")}<input type="date" className="dc-input" value={from} onChange={(e) => setFrom(e.target.value)} required /></label>
-              <label>{t("dev.range.to")}<input type="date" className="dc-input" value={to} onChange={(e) => setTo(e.target.value)} required /></label>
-              <button type="submit" className="btn btn-primary">{t("dev.range.apply")}</button>
-            </form>
-          ) : null}
-          <label className="dc-switch">
-            <input type="checkbox" role="switch" checked={includeInternal} onChange={(e) => setIncludeInternal(e.target.checked)} data-testid="include-internal" />
-            <span aria-hidden="true" />
-            {t("dev.include")}
-          </label>
-        </section>
+            <section className="dc-filters" aria-label={t("dev.range.label")}>
+              <div className="dc-segmented" role="group" aria-label={t("dev.range.label")}>
+                {RANGE_PRESETS.map((p) => (
+                  <button key={p} type="button" className={preset === p ? "is-on" : ""} aria-pressed={preset === p} onClick={() => choose(p)} data-testid={`range-${p}`}>
+                    {t(`dev.range.${p}` as MessageKey)}
+                  </button>
+                ))}
+              </div>
+              {preset === "custom" ? (
+                <form className="dc-custom" onSubmit={(e) => { e.preventDefault(); setApplied({ preset: "custom", from, to }); }}>
+                  <label>{t("dev.range.from")}<input type="date" className="dc-input" value={from} onChange={(e) => setFrom(e.target.value)} required /></label>
+                  <label>{t("dev.range.to")}<input type="date" className="dc-input" value={to} onChange={(e) => setTo(e.target.value)} required /></label>
+                  <button type="submit" className="btn btn-primary">{t("dev.range.apply")}</button>
+                </form>
+              ) : null}
+              <label className="dc-switch">
+                <input type="checkbox" role="switch" checked={includeInternal} onChange={(e) => setIncludeInternal(e.target.checked)} data-testid="include-internal" />
+                <span aria-hidden="true" />
+                {t("dev.include")}
+              </label>
+            </section>
 
-        {load.state === "ready" ? <Dashboard data={load.data} /> : <LoadState error={load.state === "error" ? load.message : null} />}
+            {load.state === "ready" ? <Dashboard data={load.data} /> : <LoadState error={load.state === "error" ? load.message : null} />}
+          </>
+        )}
       </main>
     </div>
   );
 }
 
-function ConsoleHeader() {
+type ViewProps = { view: View; setView: (next: View, section?: SectionId) => void };
+
+function ConsoleHeader({ view, setView }: ViewProps) {
   const t = useT();
   return (
     <header className="dc-top">
@@ -123,8 +156,8 @@ function ConsoleHeader() {
           <span className="dc-badge">{t("dc.console")}</span>
         </Link>
         <nav className="dc-top-nav" aria-label={t("dc.console")}>
-          <span className="is-on" aria-current="page">{t("dacct.toAnalytics")}</span>
-          <Link href="/developer/accounts">{t("dacct.toAccounts")}</Link>
+          <button type="button" className={view === "analytics" ? "is-on" : ""} aria-current={view === "analytics" ? "page" : undefined} onClick={() => setView("analytics")}>{t("dacct.toAnalytics")}</button>
+          <button type="button" className={view === "accounts" ? "is-on" : ""} aria-current={view === "accounts" ? "page" : undefined} onClick={() => setView("accounts")}>{t("dacct.toAccounts")}</button>
           <Link href="/dashboard">{t("dc.backToApp")}</Link>
         </nav>
         <LanguageSelect compact refresh={false} />
@@ -133,11 +166,11 @@ function ConsoleHeader() {
   );
 }
 
-function SectionTabs() {
+function SectionTabs({ view, setView }: ViewProps) {
   const t = useT();
   const [active, setActive] = useState<SectionId>("overview");
   useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
+    if (view !== "analytics" || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver((entries) => {
       const seen = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
       if (seen) setActive(seen.target.id.replace("dev-sec-", "") as SectionId);
@@ -148,9 +181,15 @@ function SectionTabs() {
   return (
     <nav className="dc-tabs" aria-label={t("dc.sections")}>
       <div className="dc-tabs-inner">
-        {SECTIONS.map((id) => (
-          <a key={id} href={`#dev-sec-${id}`} className={active === id ? "is-on" : ""} aria-current={active === id ? "true" : undefined}>{t(`dc.tab.${id}` as MessageKey)}</a>
-        ))}
+        {SECTIONS.map((id) => {
+          const on = view === "analytics" && active === id;
+          return (
+            <a key={id} href={`#dev-sec-${id}`} className={on ? "is-on" : ""} aria-current={on ? "true" : undefined}
+              onClick={(e) => { if (view !== "analytics") { e.preventDefault(); setView("analytics", id); } }}>{t(`dc.tab.${id}` as MessageKey)}</a>
+          );
+        })}
+        <a href={ACCOUNTS_VIEW_URL} className={`dc-tab-accounts ${view === "accounts" ? "is-on" : ""}`} aria-current={view === "accounts" ? "page" : undefined}
+          data-testid="tab-accounts" onClick={(e) => { e.preventDefault(); setView("accounts"); }}>{t("dacct.toAccounts")}</a>
       </div>
     </nav>
   );
