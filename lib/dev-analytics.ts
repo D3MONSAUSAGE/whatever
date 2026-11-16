@@ -22,6 +22,7 @@ export type NoteKey =
   | "notMature"
   | "playlistCaveat"
   | "firstDisplayRetention"
+  | "firstPlaybackWindow"
   | "billingFromStripe"
   | "billingUnavailable"
   | "billingTestMode"

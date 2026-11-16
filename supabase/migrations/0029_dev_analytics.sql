@@ -1,13 +1,17 @@
 -- DA-1 (t337u Phase 1): private developer analytics, read-only over existing data.
 -- Additive only: two new server-only tables and three new functions. No existing table, column,
 -- trigger, policy, grant, purge or billing rule is changed. No data is written by this migration
--- (seeds live in supabase/manual/0029_dev_analytics_seed.sql and are applied by hand, if approved).
+-- (a seed template with psql variables lives in supabase/manual/0029_dev_analytics_seed.template.sql;
+-- real ids are never committed and it is applied by hand, if approved).
 -- Safe to re-run. Rollback: supabase/rollback/0029_dev_analytics.sql.
 --
 -- Privacy: the snapshot function returns only ids, timestamps, plan/status values, counts, an
 -- email DOMAIN (never the local part), a "+alias" flag and the first-touch UTM source/medium/campaign
 -- and referrer HOST. No names, file names, menu/playlist content, subject_name/detail, IPs or tokens.
 -- The server reduces it to aggregates before anything reaches a browser.
+-- One transaction, so there is no window between creating a function and revoking client access.
+
+begin;
 
 -- ---------------------------------------------------------------- tables
 -- Who may open /developer/analytics. Keyed by user id (emails can change). Service role only.
@@ -44,25 +48,34 @@ as $$
   select p_user is not null and exists (select 1 from public.developer_users d where d.user_id = p_user);
 $$;
 
--- Referrer host only (scheme, path, query and fragment dropped). Null when it isn't an http(s) URL.
+-- Referrer host only (scheme, user:password@, port, path, query and fragment dropped). Null when it isn't an http(s) URL.
 create or replace function public.dev_analytics_referrer_host(p_referrer text)
 returns text
 language sql immutable
 set search_path = ''
 as $$
-  select lower(substring(p_referrer from '^[hH][tT][tT][pP][sS]?://([^/:?#@]+)'));
+  select lower(substring(p_referrer from '^[hH][tT][tT][pP][sS]?://(?:[^/?#@]*@)?([^/:?#@]+)'));
 $$;
 
--- Minimal per-account rows for the developer dashboard. Raises unless p_actor is a developer, so a
--- route that forgot its own check still gets nothing. Activity and screen-days are bounded by p_since.
+-- Minimal per-account rows for the developer dashboard. Raises unless the caller is the service role
+-- (defense in depth on top of the EXECUTE revoke) AND p_actor is a developer, so a route that forgot its
+-- own check still gets nothing. Activity and screen-days are bounded by p_since.
 create or replace function public.dev_analytics_snapshot(p_actor uuid, p_since timestamptz)
 returns jsonb
 language plpgsql stable security definer
 set search_path = ''
 as $$
 declare
+  v_claims text := nullif(current_setting('request.jwt.claims', true), '');
+  v_role text;
   v_since timestamptz := greatest(coalesce(p_since, now() - interval '90 days'), now() - interval '400 days');
 begin
+  -- PostgREST sets request.jwt.claims; only the service-role key may call this. Without claims (a direct
+  -- SQL session) only the database owner roles may. session_user, not current_user: this is security definer.
+  v_role := coalesce(v_claims::jsonb->>'role', nullif(current_setting('request.jwt.claim.role', true), ''));
+  if not (v_role = 'service_role' or (v_role is null and session_user in ('postgres', 'supabase_admin'))) then
+    raise exception 'not_authorized' using errcode = '42501';
+  end if;
   if not public.is_developer(p_actor) then
     raise exception 'not_authorized' using errcode = '42501';
   end if;
@@ -149,3 +162,5 @@ revoke execute on function public.dev_analytics_snapshot(uuid, timestamptz) from
 grant execute on function public.is_developer(uuid) to service_role;
 grant execute on function public.dev_analytics_referrer_host(text) to service_role;
 grant execute on function public.dev_analytics_snapshot(uuid, timestamptz) to service_role;
+
+commit;

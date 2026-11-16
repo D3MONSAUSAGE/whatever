@@ -228,7 +228,7 @@ export function computeDashboard(input: ComputeInput): DevAnalytics {
   const order: FunnelStepKey[] = ["registered", "trialStarted", "tvPaired", "contentDisplayed", "playlistCreated", "paid"];
   const stepNotes: Partial<Record<FunnelStepKey, Note[]>> = {
     trialStarted: [dayNote("trialsBeforeBilling", BILLING_TRIALS_FROM), { key: "trialAutoStarts" }],
-    contentDisplayed: [{ key: "firstDisplayRetention" }],
+    contentDisplayed: [{ key: "firstDisplayRetention" }, { key: "firstPlaybackWindow" }],
     playlistCreated: [{ key: "playlistCaveat" }],
     paid: billingNotes.filter((n) => n.key !== "mrrBeforeDiscounts"),
   };
@@ -366,7 +366,7 @@ export function computeDashboard(input: ComputeInput): DevAnalytics {
     timeToFirstTv: summary(tvHours),
     timeToFirstDisplay: summary(playHours),
     stopped: { activated: activated.length, dormant14: suppress(dormant(14)), dormant30: suppress(dormant(30)), billingCanceledInRange: overview.billing.canceledInRange },
-    notes: [...retentionNotes, { key: "firstDisplayRetention" }, ...billingNotes.filter((n) => n.key !== "mrrBeforeDiscounts")],
+    notes: [...retentionNotes, { key: "firstDisplayRetention" }, { key: "firstPlaybackWindow" }, ...billingNotes.filter((n) => n.key !== "mrrBeforeDiscounts")],
   };
 
   // ------------------------------------------------ attribution (cohort, aggregate only)

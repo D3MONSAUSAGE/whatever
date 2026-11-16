@@ -2,7 +2,8 @@ import { db } from "@/lib/server/supabase";
 
 /**
  * The signed-in user id when the request comes from an allowlisted developer (public.developer_users),
- * else null. Never creates an account and never says why access was refused: callers answer 404.
+ * else null. Creates no account itself and never says why access was refused. The route answers its 404
+ * outside withLocalizedErrors, so a refused caller never reaches requireAdmin/ensure_account either.
  * DEV_ANALYTICS_DISABLED=1 turns the dashboard off for everyone.
  */
 export async function developerFromRequest(req: Request, env: Record<string, string | undefined> = process.env): Promise<string | null> {

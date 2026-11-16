@@ -95,7 +95,8 @@ function useFormat() {
   const num = (n: number) => new Intl.NumberFormat(locale).format(n);
   const count = (n: GroupCount) => (n === null ? t("dev.hidden") : num(n));
   const pct = (r: Rate) => (r === null ? "–" : new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(r));
-  const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency: currency.toUpperCase() }).format(amount);
+  // Stripe amounts are minor units (cents).
+  const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency: currency.toUpperCase() }).format(amount / 100);
   const date = (iso: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "America/Los_Angeles" }).format(new Date(iso));
   const dateTime = (iso: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "America/Los_Angeles" }).format(new Date(iso));
   const day = (d: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
@@ -143,16 +144,23 @@ function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) 
   );
 }
 
-function Dashboard({ data }: { data: DevAnalytics }) {
+export function Dashboard({ data }: { data: DevAnalytics }) {
   const t = useT();
   const f = useFormat();
   const { overview: ov, funnel, engagement: en, retention: rt, attribution: at, review } = data;
   const billing = ov.billing;
+  // Headline numbers say so when internal/test accounts are counted.
+  const head = (key: MessageKey) => (data.population.includeInternal ? t("dev.withInternal", { label: t(key) }) : t(key));
   const hours = (x: { accounts: number; medianHours: number | null; p75Hours: number | null }) =>
     x.medianHours === null ? t("dev.hidden") : t("dev.rt.hours", { median: f.num(x.medianHours), p75: f.num(x.p75Hours ?? x.medianHours) });
 
   return (
     <div className="grid gap-8">
+      {data.population.includeInternal ? (
+        <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-sm font-semibold" data-testid="dev-internal-banner">
+          {t("dev.internalBanner")}
+        </div>
+      ) : null}
       <p className="text-sm text-muted" data-testid="dev-population">
         {t("dev.generated", { time: f.dateTime(data.generatedAt), tz: "PT", from: f.day(data.range.fromDay), to: f.day(data.range.toDay) })}{" "}
         {t("dev.population", { customers: f.num(data.population.customerAccounts), excluded: f.num(data.population.excludedExplicit + data.population.excludedByRule), explicit: f.num(data.population.excludedExplicit), rule: f.num(data.population.excludedByRule) })}
@@ -160,14 +168,14 @@ function Dashboard({ data }: { data: DevAnalytics }) {
 
       <Section id="overview" title={t("dev.overview")} notes={ov.notes}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label={t("dev.ov.accounts")} value={f.num(ov.accounts.total)} hint={t("dev.ov.newAccounts", { n: ov.accounts.newInRange })} />
-          <Stat label={t("dev.ov.users")} value={f.num(ov.users.total)} hint={t("dev.ov.withoutAccount", { n: ov.users.withoutAccount })} />
-          <Stat label={t("dev.ov.newUsers")} value={f.num(ov.users.newInRange)} hint={t("dev.ov.confirmed", { n: ov.users.confirmedNewInRange })} />
-          <Stat label={t("dev.ov.screens")} value={f.num(ov.screens.connected)} hint={t("dev.ov.online", { n: ov.screens.onlineNow })} />
-          <Stat label={t("dev.ov.trialsActive")} value={f.num(ov.trials.active)} hint={t("dev.ov.trialsGrace", { n: ov.trials.grace })} />
-          <Stat label={t("dev.ov.trialsExpired")} value={f.num(ov.trials.expired)} hint={t("dev.ov.trialsStarted", { n: ov.trials.startedInRange })} />
-          <Stat label={t("dev.ov.paying")} value={billing.available ? f.num(billing.paying) : t("dev.ov.unavailable")} hint={billing.available ? t("dev.ov.scheduled", { n: billing.scheduledToCancel }) : undefined} />
-          <Stat label={t("dev.ov.mrr")} value={billing.available && billing.mrr ? f.money(billing.mrr.amount, billing.mrr.currency) : t("dev.ov.unavailable")} />
+          <Stat label={head("dev.ov.accounts")} value={f.num(ov.accounts.total)} hint={t("dev.ov.newAccounts", { n: ov.accounts.newInRange })} />
+          <Stat label={head("dev.ov.users")} value={f.num(ov.users.total)} hint={t("dev.ov.withoutAccount", { n: ov.users.withoutAccount })} />
+          <Stat label={head("dev.ov.newUsers")} value={f.num(ov.users.newInRange)} hint={t("dev.ov.confirmed", { n: ov.users.confirmedNewInRange })} />
+          <Stat label={head("dev.ov.screens")} value={f.num(ov.screens.connected)} hint={t("dev.ov.online", { n: ov.screens.onlineNow })} />
+          <Stat label={head("dev.ov.trialsActive")} value={f.num(ov.trials.active)} hint={t("dev.ov.trialsGrace", { n: ov.trials.grace })} />
+          <Stat label={head("dev.ov.trialsExpired")} value={f.num(ov.trials.expired)} hint={t("dev.ov.trialsStarted", { n: ov.trials.startedInRange })} />
+          <Stat label={head("dev.ov.paying")} value={billing.available ? f.num(billing.paying) : t("dev.ov.unavailable")} hint={billing.available ? t("dev.ov.scheduled", { n: billing.scheduledToCancel }) : undefined} />
+          <Stat label={head("dev.ov.mrr")} value={billing.available && billing.mrr ? f.money(billing.mrr.amount, billing.mrr.currency) : t("dev.ov.unavailable")} />
         </div>
         <ul className="text-sm text-muted grid gap-0.5">
           <li>{t("dev.ov.paired", { n: f.num(ov.screens.pairedInRange) })}</li>

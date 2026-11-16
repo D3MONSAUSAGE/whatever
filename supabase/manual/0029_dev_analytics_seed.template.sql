@@ -1,27 +1,33 @@
--- DA-1 seed for 0029_dev_analytics.sql. NOT a migration and NOT applied automatically.
--- Run by hand in the Supabase SQL editor only after Francisco approves it. Inserts only; re-runnable
--- (on conflict do nothing). Writes no customer data: only the allowlist and the exclusion list.
+-- DA-1 seed TEMPLATE for 0029_dev_analytics.sql. NOT a migration and NOT applied automatically.
+-- Real ids are never committed. Run by hand with psql variables after approval, e.g.:
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+--     -v dev_user_id=<auth user uuid> \
+--     -v reviewer_account_id=<reviewer account uuid> \
+--     -v internal_account_id=<internal account uuid> \
+--     -f supabase/manual/0029_dev_analytics_seed.template.sql
+-- Inserts only; re-runnable (on conflict do nothing). Writes no customer data.
+-- Never add real customer accounts here: developer access and customer exclusion are separate.
 
--- 1) Developer allowlist: Francisco Lopez (owner of the DreamDesigns account).
+begin;
+
+-- 1) Developer allowlist (dashboard access only; it does not exclude that user's own account).
 insert into public.developer_users (user_id, role, note)
-select u.id, 'admin', 'Francisco Lopez' from auth.users u
-where u.id = 'e00a7307-d3dd-4d9f-ae59-59b84963a392'
+select u.id, 'admin', 'developer' from auth.users u
+where u.id = :'dev_user_id'::uuid
 on conflict (user_id) do nothing;
 
 -- 2) Exclusions from customer metrics.
--- Google Play reviewer (comp).
 insert into public.analytics_exclusions (account_id, reason, note)
-select a.id, 'reviewer', 'Google Play reviewer (comp)' from public.accounts a
-where a.id = 'f49a1edf-cb36-44eb-a562-d908db50a14d'
+select a.id, 'reviewer', 'store reviewer (comp)' from public.accounts a
+where a.id = :'reviewer_account_id'::uuid
 on conflict (account_id) do nothing;
 
--- Teamtegrate internal account (holds the one live test subscription).
 insert into public.analytics_exclusions (account_id, reason, note)
-select a.id, 'internal', 'Teamtegrate internal' from public.accounts a
-where a.id = 'b2116f5b-8648-4284-9f21-0615f1129e04'
+select a.id, 'internal', 'internal account' from public.accounts a
+where a.id = :'internal_account_id'::uuid
 on conflict (account_id) do nothing;
 
--- Every account owned by an @mail.grokbot.com address (QA personas, Harbor Street QA, +aliases).
+-- Every account owned by an @mail.grokbot.com address (QA personas and +aliases).
 insert into public.analytics_exclusions (account_id, reason, note)
 select a.id, 'qa', 'mail.grokbot.com owner'
 from public.accounts a join auth.users u on u.id = a.owner_user_id
@@ -42,11 +48,9 @@ from public.accounts a
 where a.plan = 'comp' or a.comp_note is not null
 on conflict (account_id) do nothing;
 
--- The 7 gmail.com / hotmail.com / guanatostacos.com accounts (including DreamDesigns, Guanatos Tacos and
--- GCorp) are REAL CUSTOMER accounts (Francisco, t340u). Never add them here. Francisco's developer_users
--- row above only grants dashboard access; it does not exclude his DreamDesigns account from customer metrics.
---
--- To exclude another internal account later, one line (copy the id from the dashboard's review list):
+commit;
+
+-- To exclude another internal account later (copy the id from the dashboard's review list):
 --   insert into public.analytics_exclusions (account_id, reason) values ('<account-id>', 'internal') on conflict do nothing;
 -- To un-exclude:
 --   delete from public.analytics_exclusions where account_id = '<account-id>';

@@ -29,13 +29,13 @@ describe("DA-1 small-group suppression", () => {
 
 describe("DA-1 exclusions", () => {
   it("never flags real customers on public or own domains (t340u)", () => {
-    for (const domain of ["gmail.com", "hotmail.com", "guanatostacos.com"]) {
+    for (const domain of ["public-mail.test", "other-mail.test", "customer-biz.test"]) {
       expect(classifyAccount({ id: "x", created_at: NOW.toISOString(), comp: false, email_domain: domain, plus_alias: false, excluded_reason: null }, domains))
         .toEqual({ excluded: false, explicit: false, rule: null });
     }
   });
   it("excludes listed, comp and internal-domain accounts; a +alias is review-only", () => {
-    const base = { id: "x", created_at: NOW.toISOString(), comp: false, email_domain: "gmail.com", plus_alias: false, excluded_reason: null };
+    const base = { id: "x", created_at: NOW.toISOString(), comp: false, email_domain: "public-mail.test", plus_alias: false, excluded_reason: null };
     expect(classifyAccount({ ...base, excluded_reason: "qa" }, domains).excluded).toBe(true);
     expect(classifyAccount({ ...base, comp: true }, domains)).toMatchObject({ excluded: true, rule: "comp" });
     expect(classifyAccount({ ...base, email_domain: "MAIL.GROKBOT.COM" }, domains)).toMatchObject({ excluded: true, rule: "internal_domain" });
@@ -181,6 +181,6 @@ describe("DA-1 metric math on fixtures", () => {
   });
   it("never returns emails, domains or names", () => {
     const text = JSON.stringify(run(true));
-    expect(text).not.toMatch(/@|gmail|hotmail|guanatostacos|grokbot/);
+    expect(text).not.toMatch(/@|public-mail|other-mail|customer-biz|grokbot/);
   });
 });

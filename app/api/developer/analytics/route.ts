@@ -1,4 +1,4 @@
-import { allow, fail, json } from "@/lib/server/http";
+import { enforceLimit, fail, json } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { db } from "@/lib/server/supabase";
 import { developerFromRequest } from "@/lib/server/dev-analytics/authz";
@@ -14,17 +14,32 @@ const DAY = 86_400_000;
 /** Dormant-30 and 30-day active windows need a little more than 30 days behind "now". */
 const LOOKBACK_DAYS = 37;
 
-const notFound = () => fail("Not found.", 404);
+/**
+ * The 404 for everyone who isn't a developer. Built directly, NOT through withLocalizedErrors: that path
+ * resolves the session locale via requireAdmin, which runs ensure_account and would create an account for a
+ * signed-in non-developer. Same body and status as the catalog 404, English only.
+ */
+const notFound = () => json({ error: "Not found.", code: "not_found" }, 404);
+/** 60 s window, 30 requests. enforceLimit adds Retry-After. */
+const RATE_WINDOW_S = 60;
+const RATE_MAX = 30;
 
 /**
  * DA-1: private developer analytics. Aggregates only; no names, emails, content or per-account rows except
  * the internal-looking review list (opaque account ids). Anyone who is not an allowlisted developer,
  * signed out included, gets the same plain 404. The database function re-checks the caller.
  */
-export const GET = withLocalizedErrors(async function GET(req: Request) {
+export const GET = async (req: Request): Promise<Response> => {
   const userId = await developerFromRequest(req);
   if (!userId) return notFound();
-  if (!(await allow(`dev-analytics:${userId}`, 60, 30).catch(() => false))) return fail("Too many attempts. Wait a few minutes, then try again.", 429);
+  return forDeveloper(req, userId);
+};
+
+// Only developers reach this; their error text is localized like every other customer route.
+const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Request, userId: string) {
+  const limited = await enforceLimit(`dev-analytics:${userId}`, RATE_WINDOW_S, RATE_MAX, "Too many requests. Wait a minute, then try again.")
+    .catch(() => fail("Too many requests. Wait a minute, then try again.", 429));
+  if (limited) return limited;
 
   const url = new URL(req.url);
   const now = new Date();

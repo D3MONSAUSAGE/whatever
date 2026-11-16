@@ -2,8 +2,8 @@ import type { ReviewCandidate } from "@/lib/dev-analytics";
 
 /**
  * Domains whose owners are always internal/QA/test. Only these (plus comp accounts) are excluded without an
- * explicit analytics_exclusions row. Public mail domains (gmail.com, hotmail.com, ...) are never on this
- * list: Francisco confirmed those accounts are real customers (t340u).
+ * explicit analytics_exclusions row. Public mail domains are never on this list: owners on them are
+ * counted as customers unless an explicit row says otherwise (t340u).
  */
 export const DEFAULT_INTERNAL_DOMAINS = ["mail.grokbot.com", "teamtegrate.com", "example.com"] as const;
 

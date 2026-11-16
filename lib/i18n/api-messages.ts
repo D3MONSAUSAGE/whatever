@@ -241,6 +241,7 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Type DELETE to confirm.": "Escriba DELETE para confirmar.",
   "Not found.": "No se encontró.",
   // DA-1 developer analytics
+  "Too many requests. Wait a minute, then try again.": "Demasiadas solicitudes. Espere un minuto y vuelva a intentarlo.",
   "Choose a valid date range (up to 366 days, not in the future).": "Elija un rango de fechas válido (hasta 366 días, sin fechas futuras).",
   "Couldn't load analytics.": "No se pudieron cargar las estadísticas.",
   "Not found": "No se encontró.",
