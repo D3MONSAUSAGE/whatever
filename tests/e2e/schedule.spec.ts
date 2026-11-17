@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
 import { libraryFile, waitForLibraryFile } from "./media-locators";
 import { expectStatus } from "./status";
+import { signOut } from "./nav";
 
 /**
  * Phase 2D dashboard flows at 1440 and 390.
@@ -118,8 +119,7 @@ test("locations, groups, a weekday schedule, and the 7-day preview at desktop an
     await page.getByLabel("Preview screen").selectOption({ label: "Front counter" });
     await expect(page.getByText("Saved assignment").first()).toBeVisible();
 
-    await page.getByRole("link", { name: "Account" }).click();
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await signOut(page);
     await signUp(page, other);
     const foreign = await authed(page, "/api/locations");
     expect(JSON.stringify(foreign.body)).not.toContain("Kitchen");

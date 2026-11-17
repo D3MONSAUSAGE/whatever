@@ -4,6 +4,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
 import { libraryFile, waitForLibraryFile } from "./media-locators";
 import { expectStatus } from "./status";
+import { signOut, openFromMore } from "./nav";
 
 /**
  * Phase 2C dashboard coverage at desktop (1440), tablet (768), and phone (390).
@@ -55,8 +56,7 @@ test("login, logout, and navigation at desktop, tablet, and mobile", async ({ br
       }
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole("link", { name: "Account" }).click();
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await signOut(page);
     await expect(page).toHaveURL(/\/login/);
     await signIn(page, owner);
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
@@ -121,7 +121,7 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await pair(phone, tv, "Front counter");
     await pair(phone, second, "Bar TV");
 
-    await phone.getByRole("link", { name: "Playlists" }).click();
+    await openFromMore(phone, "Playlists");
     await phone.getByLabel("Playlist name").fill("Lunch loop");
     await phone.getByRole("button", { name: "Create playlist" }).click();
     await expect(phone.getByRole("heading", { name: "Edit playlist" })).toBeVisible();
@@ -166,8 +166,7 @@ test("playlist draft, reorder, duplicate, preview, publish, and a second screen"
     await phone.getByRole("button", { name: "Publish to selected screens" }).click();
     await expectStatus(phone, "Published");
 
-    await phone.getByRole("link", { name: "Account" }).click();
-    await phone.getByRole("button", { name: "Sign out", exact: true }).click();
+    await signOut(phone);
     await signUp(phone, other);
     await phone.goto("/dashboard/media");
     await expect(phone.getByText("No images yet")).toBeVisible();
@@ -204,7 +203,7 @@ test("video upload and playback, or an explicit skip when the database cannot st
     await expect(ctx.phone.locator("[data-media-library]").getByText(/s ·/)).toBeVisible();
     await ctx.tv.goto("/player");
     await pair(ctx.phone, ctx.tv, "Video screen");
-    await ctx.phone.getByRole("link", { name: "Playlists" }).click();
+    await openFromMore(ctx.phone, "Playlists");
     await ctx.phone.getByLabel("Playlist name").fill("Video loop");
     await ctx.phone.getByRole("button", { name: "Create playlist" }).click();
     await ctx.phone.getByRole("button", { name: "Add images" }).click();

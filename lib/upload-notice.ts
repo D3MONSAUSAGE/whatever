@@ -9,14 +9,18 @@ export function bannerJobs<T extends { state: string }>(jobs: T[]) {
   return jobs.filter((job) => job.state !== "done");
 }
 
+/** Default lifetime of a routine (success or info) toast. */
+export const TOAST_MS = 5_000;
+
 /**
  * Milliseconds until a toast dismisses itself.
- * `null` means it stays until the person dismisses it (upload errors).
+ * `null` means it stays until the person dismisses it: every error (design system rule: an error is never
+ * only a passing message), or an explicit `durationMs: null`.
  */
 export function toastDurationMs(error: boolean, durationMs?: number | null) {
   if (durationMs === null) return null;
   if (typeof durationMs === "number") return durationMs;
-  return error ? 8_000 : 3_500;
+  return error ? null : TOAST_MS;
 }
 
 export function armToastTimer(

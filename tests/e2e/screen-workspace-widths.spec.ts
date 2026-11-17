@@ -13,7 +13,9 @@ for (const width of widths) {
     const nav = page.getByRole("navigation", { name: width < 768 ? "Mobile" : "Main" });
     await expect(nav.getByRole("link", { name: "Content" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Schedules" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Account" })).toBeVisible();
+    // Phones keep four section tabs plus More (Account lives behind More); wider screens show the sidebar link.
+    if (width < 768) await expect(nav.getByRole("button", { name: "More" })).toBeVisible();
+    else await expect(nav.getByRole("link", { name: "Account" })).toBeVisible();
     for (const name of ["Change content", "Schedule", "Edit playlist", "Upload media", "Create content"]) {
       await page.getByRole("button", { name, exact: true }).click();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

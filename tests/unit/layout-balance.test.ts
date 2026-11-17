@@ -19,8 +19,10 @@ describe("t244u fix 1: centred dashboard container", () => {
     const shell = readFileSync("components/shell.tsx", "utf8");
     expect(shell).toContain("w-full max-w-[1360px] mx-auto px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12");
     expect(shell).not.toContain('"max-w-6xl px-4');
-    // The sidebar stays a fixed-width left column.
-    expect(shell).toContain("md:w-60 md:shrink-0 md:sticky");
+    // The sidebar stays a fixed-width left column (15rem, an icon rail on tablets), sticky beside the page.
+    expect(shell).toContain('className="ps-side hidden md:flex"');
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/\.ps-side \{[^}]*width: 15rem; flex-shrink: 0; position: sticky; top: 0; height: 100dvh;/);
   });
 
   it("gives the menu-board workspace its own wider, centred cap", () => {

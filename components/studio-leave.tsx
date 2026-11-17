@@ -105,7 +105,7 @@ export function StudioGuardedLink({
   children,
   target,
   ...props
-}: LinkProps & { href: string; className?: string; "aria-label"?: string; "aria-current"?: "page" | undefined; style?: CSSProperties; target?: string; children?: ReactNode }) {
+}: LinkProps & { href: string; className?: string; "aria-label"?: string; "aria-current"?: "page" | undefined; style?: CSSProperties; target?: string; title?: string; role?: string; tabIndex?: number; children?: ReactNode }) {
   const ctx = useContext(StudioLeaveContext);
   return (
     <Link
