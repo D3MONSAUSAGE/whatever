@@ -54,7 +54,12 @@ describe.skipIf(!databaseUrl)("0031 website traffic", () => {
     await client.query(readFileSync(path.join(process.cwd(), "supabase/migrations/0031_website_traffic.sql"), "utf8"));
     // Re-running the migration is safe.
     await client.query(readFileSync(path.join(process.cwd(), "supabase/migrations/0031_website_traffic.sql"), "utf8"));
+    await actAsService(client);
   });
+
+  // The app calls these functions with the service role's claims (PostgREST sets request.jwt.claims). Do the same,
+  // so the test doesn't depend on which database user it connects as (CI connects as a non-owner role).
+  const actAsService = (c: Client) => c.query(`select set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
 
   afterAll(async () => {
     await client?.end();
@@ -101,6 +106,7 @@ describe.skipIf(!databaseUrl)("0031 website traffic", () => {
     // A second connection racing the same rollup must not count yesterday twice.
     const other = new Client({ connectionString: urlFor(dbName) });
     await other.connect();
+    await actAsService(other);
     try {
       await Promise.all([
         rec("2026-11-13", H(9), "/", true),
