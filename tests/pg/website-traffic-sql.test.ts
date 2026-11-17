@@ -117,17 +117,18 @@ describe.skipIf(!databaseUrl)("0031 website traffic", () => {
     }
     expect((await client.query(`select count(*)::int as n from public.traffic_visitors where day < '2026-11-13'`)).rows[0].n).toBe(0);
     expect((await client.query(`select visitors from public.traffic_unique_daily where day = '2026-11-12'`)).rows[0].visitors).toBe(2);
-    // A late write for an already rolled-up day adds to it rather than replacing it.
+    // A late write for an already closed day counts its page view but never changes the visitor count.
     await rec("2026-11-12", H(5), "/", true);
     await rec("2026-11-14", H(6), "/", true);
-    expect((await client.query(`select visitors from public.traffic_unique_daily where day = '2026-11-12'`)).rows[0].visitors).toBe(3);
+    expect((await client.query(`select visitors from public.traffic_unique_daily where day = '2026-11-12'`)).rows[0].visitors).toBe(2);
+    expect((await client.query(`select count(*)::int as n from public.traffic_visitors where day < '2026-11-14'`)).rows[0].n).toBe(0);
   });
 
   it("gives developers daily totals, top pages and sources for the range", async () => {
     const s = await snap(DEV, "2026-11-11", "2026-11-14");
     expect(s.daily).toEqual([
       { day: "2026-11-11", visitors: 0, page_views: 0, landings: 0 },
-      { day: "2026-11-12", visitors: 3, page_views: 5, landings: 3 },
+      { day: "2026-11-12", visitors: 2, page_views: 5, landings: 3 },
       { day: "2026-11-13", visitors: 2, page_views: 2, landings: 2 },
       { day: "2026-11-14", visitors: 1, page_views: 1, landings: 1 },
     ]);
@@ -196,5 +197,68 @@ describe.skipIf(!databaseUrl)("0031 website traffic", () => {
     await rec("2026-11-15", H(11), "/", true);
     expect((await client.query(`select count(*)::int as n from public.traffic_daily where day = '2025-01-01'`)).rows[0].n).toBe(0);
     expect((await client.query(`select count(*)::int as n from public.traffic_unique_daily where day = '2025-01-01'`)).rows[0].n).toBe(0);
+  });
+
+  // Late-arriving requests: a request for day D-1 can reach the database after a day-D request has already
+  // closed D-1 (e.g. one sent just before midnight Pacific, or a small clock difference between server instances).
+  const uniques = async (day: string) => (await client.query(`select visitors from public.traffic_unique_daily where day = $1`, [day])).rows[0]?.visitors ?? null;
+  const hashesOn = async (day: string) => (await client.query(`select count(*)::int as n from public.traffic_visitors where day = $1`, [day])).rows[0].n;
+  const viewsOn = async (day: string) => (await client.query(`select coalesce(sum(page_views), 0)::int as n from public.traffic_daily where day = $1`, [day])).rows[0].n;
+  const settled = (p: Promise<unknown>) => Promise.race([p.then(() => true, () => true), new Promise((r) => setTimeout(() => r(false), 400))]);
+
+  it("a late request for a closed day counts as a page view, never as a second visitor, and leaves no hash behind", async () => {
+    await rec("2026-12-01", H(20), "/", true);
+    await rec("2026-12-02", H(21), "/", true); // closes 2026-12-01
+    expect(await uniques("2026-12-01")).toBe(1);
+    await rec("2026-12-01", H(20), "/pricing", false); // the same visitor, late
+    await rec("2026-12-01", H(23), "/", true); // a new visitor, late: can't be told apart from a repeat, so not counted
+    expect(await hashesOn("2026-12-01")).toBe(0);
+    await rec("2026-12-03", H(22), "/", true); // the next rollup must not add anything to 2026-12-01
+    expect(await uniques("2026-12-01")).toBe(1);
+    expect(await hashesOn("2026-12-01")).toBe(0);
+    expect(await viewsOn("2026-12-01")).toBe(3);
+    const s = await snap(DEV, "2026-12-01", "2026-12-01");
+    expect(s.daily).toEqual([{ day: "2026-12-01", visitors: 1, page_views: 3, landings: 2 }]);
+  });
+
+  it("a late request that is mid-write when the day closes is rolled up exactly once", async () => {
+    const other = new Client({ connectionString: urlFor(dbName) });
+    await other.connect();
+    await actAsService(other);
+    try {
+      await other.query("begin");
+      await other.query(`select public.traffic_record('2026-12-03'::date, $1, '/', true, 'direct', '', '')`, [H(24)]);
+      const closing = rec("2026-12-04", H(25), "/", true); // must wait for the open write to finish
+      expect(await settled(closing)).toBe(false);
+      await other.query("commit");
+      await closing;
+    } finally {
+      await other.query("rollback").catch(() => {});
+      await other.end();
+    }
+    expect(await uniques("2026-12-03")).toBe(2); // H(22) and H(24), once each
+    expect(await hashesOn("2026-12-03")).toBe(0);
+  });
+
+  it("a late request that arrives while the day is closing waits, then adds no visitor", async () => {
+    const other = new Client({ connectionString: urlFor(dbName) });
+    await other.connect();
+    await actAsService(other);
+    try {
+      await client.query("begin");
+      await rec("2026-12-05", H(26), "/", true); // closes 2026-12-04 (H(25)) and keeps the transaction open
+      const late = other.query(`select public.traffic_record('2026-12-04'::date, $1, '/features', false, 'direct', '', '')`, [H(25)]);
+      expect(await settled(late)).toBe(false);
+      await client.query("commit");
+      await late;
+    } finally {
+      await client.query("rollback").catch(() => {});
+      await other.end();
+    }
+    expect(await uniques("2026-12-04")).toBe(1);
+    expect(await hashesOn("2026-12-04")).toBe(0);
+    expect(await viewsOn("2026-12-04")).toBe(2);
+    await rec("2026-12-06", H(27), "/", true);
+    expect(await uniques("2026-12-04")).toBe(1);
   });
 });

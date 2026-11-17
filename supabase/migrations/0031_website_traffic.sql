@@ -101,17 +101,30 @@ begin
     raise exception 'not_authorized' using errcode = '42501';
   end if;
 
-  -- Roll finished days into plain counts and delete their hashes. DELETE ... RETURNING is atomic, so two
-  -- concurrent requests can never count the same hash twice.
-  with gone as (
-    delete from public.traffic_visitors where day < p_day returning day
-  )
-  insert into public.traffic_unique_daily (day, visitors)
-  select day, count(*)::int from gone group by day
-  on conflict (day) do update set visitors = public.traffic_unique_daily.visitors + excluded.visitors;
+  -- Close finished days: roll their hashes into a plain count and delete them. A day with a
+  -- traffic_unique_daily row is closed for good. DELETE ... RETURNING is atomic, so two concurrent
+  -- rollups can never count the same hash twice. The exclusive lock waits for any visitor write
+  -- still in progress (they hold the shared lock below), so a hash being written as its day closes is
+  -- rolled up exactly once.
+  if exists (select 1 from public.traffic_visitors where day < p_day) then
+    perform pg_advisory_xact_lock(31, 1);
+    with gone as (
+      delete from public.traffic_visitors where day < p_day returning day
+    )
+    insert into public.traffic_unique_daily (day, visitors)
+    select day, count(*)::int from gone group by day
+    on conflict (day) do update set visitors = public.traffic_unique_daily.visitors + excluded.visitors;
+  end if;
 
-  insert into public.traffic_visitors (day, visitor_hash) values (p_day, p_visitor_hash)
-  on conflict do nothing;
+  -- Count the visitor only while the day is open. A late request for a day that is already closed (sent
+  -- just before midnight Pacific, or from a server whose clock is slightly behind) still counts as a page
+  -- view below, but not as a visitor: its day's hashes are gone, so a repeat visitor could not be told
+  -- apart and would be counted twice. No hash is stored for a closed day.
+  perform pg_advisory_xact_lock_shared(31, 1);
+  if not exists (select 1 from public.traffic_unique_daily where day = p_day) then
+    insert into public.traffic_visitors (day, visitor_hash) values (p_day, p_visitor_hash)
+    on conflict do nothing;
+  end if;
 
   insert into public.traffic_daily (day, path, channel, referrer_host, utm_source, page_views, landings)
   values (
