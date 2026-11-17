@@ -9,7 +9,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 test.skip(!baseURL || !key, "Skipped: BASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set. Alert checks did not run and are not a pass.");
 
-test("an offline screen raises a banner, settings save, and alerts can be marked read", async ({ browser }) => {
+test("an offline screen shows in the notification center, settings save, and alerts can be marked read", async ({ browser }) => {
   const admin = createClient(url, key, { auth: { persistSession: false } });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
@@ -37,14 +37,21 @@ test("an offline screen raises a banner, settings save, and alerts can be marked
     await admin.from("displays").insert({ account_id: acct!.id, name: "Window TV", token_hash: `h-${randomUUID()}`, last_seen_at: new Date(Date.now() - 20 * 60_000).toISOString() });
     await admin.rpc("check_offline_alerts");
 
+    // Redesign phase 1: no banner on the page; the bell shows the alert and opens the notification center.
     await page.goto("/dashboard");
-    const banner = page.getByTestId("alerts-banner");
-    await expect(banner).toContainText("1 new screen alert");
-    await expect(banner).toContainText('"Window TV" went offline');
-    await banner.getByRole("link", { name: "All alerts" }).click();
-    await expect(page.getByTestId("alerts-list")).toContainText("Offline");
+    await expect(page.getByTestId("alerts-banner")).toHaveCount(0);
+    const bell = page.getByTestId("nc-bell");
+    await expect(bell).toHaveAccessibleName("Notifications, 1 unread", { timeout: 15_000 });
+    await bell.click();
+    const panel = page.getByTestId("nc-panel");
+    await expect(panel).toContainText("Window TV is offline");
+    await panel.getByRole("link", { name: "View all notifications" }).click();
+    await expect(page.getByTestId("alerts-list")).toContainText("Window TV is offline");
     await page.getByRole("button", { name: "Mark all as read" }).click();
-    await expect(page.getByTestId("alerts-banner")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByTestId("nc-badge")).toHaveCount(0, { timeout: 15_000 });
+    // Still offline, so it stays under Needs attention after it is read.
+    await page.getByTestId("nc-bell").click();
+    await expect(page.getByTestId("nc-panel")).toContainText("Window TV is offline");
   } finally {
     await context.close();
     await removeCreatedTestEmails(admin, [user.email]);

@@ -5,6 +5,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { removeCreatedTestEmails } from "../helpers/account-cleanup";
 import { libraryFile, waitForLibraryFile } from "./media-locators";
 import { expectStatus } from "./status";
+import { signOut, openFromMore } from "./nav";
 
 const pendingEmails: string[] = [];
 
@@ -42,8 +43,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
     });
 
     await test.step("sign out and sign in", async () => {
-      await phone.getByRole("link", { name: "Account" }).click();
-      await phone.getByRole("button", { name: "Sign out", exact: true }).click();
+      await signOut(phone);
       await expect(phone).toHaveURL(/\/login/);
       await signIn(phone, accountA);
     });
@@ -118,8 +118,7 @@ test("phone publishes to a TV, and a second account cannot read it", async ({ br
     });
 
     await test.step("another account cannot read the menu", async () => {
-      await phone.getByRole("link", { name: "Account" }).click();
-      await phone.getByRole("button", { name: "Sign out", exact: true }).click();
+      await signOut(phone);
       await expect(phone).toHaveURL(/\/login/);
       await signUp(phone, accountB);
       await phone.goto("/dashboard/media");
@@ -290,7 +289,7 @@ test("a playlist loops three slides, then a single image holds", async ({ browse
     const ids = { a: idOf("slide-a.png"), b: idOf("slide-b.png"), c: idOf("slide-c.png") };
     expect(ids.a && ids.b && ids.c).toBeTruthy();
 
-    await phone.getByRole("link", { name: "Playlists" }).click();
+    await openFromMore(phone, "Playlists");
     await phone.getByLabel("Playlist name").fill("Lunch loop");
     await phone.getByRole("button", { name: "Create playlist" }).click();
     await expect(phone.getByRole("heading", { name: "Edit playlist" })).toBeVisible();
@@ -431,7 +430,7 @@ test("a video playlist plays on the TV and survives a dropped connection", async
     await phone.getByRole("button", { name: "Connect TV", exact: true }).click();
     await expect(phone.getByRole("heading", { name: "Video screen" })).toBeVisible();
 
-    await phone.getByRole("link", { name: "Playlists" }).click();
+    await openFromMore(phone, "Playlists");
     await phone.getByLabel("Playlist name").fill("Video loop");
     await phone.getByRole("button", { name: "Create playlist" }).click();
     await expect(phone.getByRole("heading", { name: "Edit playlist" })).toBeVisible();
@@ -595,7 +594,7 @@ async function pairTv(phone: Page, tv: Page, name: string) {
 }
 
 async function publishSlides(phone: Page, playlistName: string, slides: { name: string; seconds: string | null }[], displayName: string) {
-  await phone.getByRole("link", { name: "Playlists" }).click();
+  await openFromMore(phone, "Playlists");
   await phone.getByLabel("Playlist name").fill(playlistName);
   await phone.getByRole("button", { name: "Create playlist" }).click();
   await expect(phone.getByRole("heading", { name: "Edit playlist" })).toBeVisible();

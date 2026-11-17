@@ -121,9 +121,12 @@ describe("developer-only navigation", () => {
     const shell = readFileSync("components/shell.tsx", "utf8");
     const account = readFileSync("app/dashboard/account/page.tsx", "utf8");
     const hook = readFileSync("lib/dev-access.ts", "utf8");
-    expect(shell).toMatch(/\{developer \? \(\s*<StudioGuardedLink href="\/developer\/analytics"/);
-    // The link sits above Sign out at the bottom of the desktop sidebar.
-    expect(shell.indexOf('data-testid="nav-developer"')).toBeLessThan(shell.indexOf("<SignOutButton onSignOut={signOut} className={`nav-link"));
+    // Redesign phase 1: the sidebar link and the phone "More" entry both depend on the server-confirmed flag.
+    expect(shell).toContain('{developer ? sideLink({ href: "/developer/analytics", labelKey: "dash.nav.developer", icon: IconChart }, "nav-developer") : null}');
+    expect(shell).toContain('{developer ? sheetLink("/developer/analytics", "dash.nav.developer", IconChart) : null}');
+    expect(shell).toContain("const developer = useDeveloperAccess() && !preview;");
+    // It sits at the bottom of the desktop sidebar, above Account.
+    expect(shell.indexOf('"nav-developer"')).toBeLessThan(shell.indexOf("{sideLink(ACCOUNT)}"));
     expect(account).toMatch(/\{developer \? \(\s*<li className="card[^"]*md:hidden" data-testid="developer-card">/);
     expect(hook).toContain('fetch("/api/developer/access"');
     // Signing out forgets the cached answer.

@@ -40,11 +40,13 @@ describe("Menu Boards in the main navigation (t248u)", () => {
     expect(active("/dashboard/account/brand-kit")).toEqual(["Account"]);
   });
 
-  it("renders the item in the sidebar and a six-column mobile bar from the shared list, with an existing icon", () => {
+  it("renders the item in the sidebar and in the five-tab phone bar from the shared list, with an existing icon", () => {
     const shell = readFileSync("components/shell.tsx", "utf8");
     expect(shell).toContain("MAIN_NAV.map");
     expect(shell).toContain("IconGrid");
-    expect(shell).toContain("grid grid-cols-6 border-t");
+    // Redesign phase 1: four section tabs plus More (Overview, Playlists, Account live in More).
+    expect(shell).toContain('const PHONE_TABS = ["/dashboard/screens", "/dashboard/media/menus", "/dashboard/content", "/dashboard/schedule"]');
+    expect(readFileSync("app/globals.css", "utf8")).toMatch(/\.ps-mtabs \{[^}]*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
     expect(shell).toContain("isMainNavActive(href, path)");
     expect(readFileSync("components/icons.tsx", "utf8")).toContain("export function IconGrid()");
   });
@@ -64,13 +66,13 @@ describe("Menu Boards in the main navigation (t248u)", () => {
     expect(en["mb.eyebrow"]).toBe("Menu Boards");
   });
 
-  it("styles Brand Kit as a proper sub-item of Account, not a bare text line or a new section", () => {
+  it("keeps Brand Kit reachable from the account menu and the phone More sheet, not as a new section", () => {
     const shell = readFileSync("components/shell.tsx", "utf8");
-    expect(shell).toContain('className="nav-link nav-sublink"');
-    expect(shell).not.toContain("md:pl-8 text-[13px]");
+    expect(shell).toContain('item("/dashboard/account/brand-kit", t("dash.nav.brandKit"), <IconBrush />)');
+    expect(shell).toContain('sheetLink("/dashboard/account/brand-kit", "dash.nav.brandKit", IconBrush)');
     expect(MAIN_NAV.some((item) => item.label === "Brand Kit")).toBe(false);
-    const css = readFileSync("app/globals.css", "utf8");
-    expect(css).toMatch(/\.nav-sublink \{[^}]*min-height: 36px/);
-    expect(css).toContain('.nav-sublink[aria-current="page"]');
+    // Brand Kit pages still mark Account as the current section.
+    expect(active("/dashboard/account/brand-kit")).toEqual(["Account"]);
   });
+
 });

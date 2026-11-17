@@ -1,9 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { api, useApi, type AlertFeed, type AlertItem, type AlertPrefs } from "@/lib/api";
 import { EmptyState, LoadState, PageHeader } from "@/components/ui";
-import { IconTv } from "@/components/icons";
+import { IconBell } from "@/components/icons";
+import { ALERTS_CHANGED, DayGroups, NoticeRow, groupHref, useNotifications, type NoticeItem } from "@/components/notifications";
+import { groupAlerts, type NotificationGroup } from "@/lib/notifications";
 import { useLocale } from "@/lib/i18n/client";
 import { makeT, type Locale, type T } from "@/lib/i18n";
 
@@ -22,99 +25,77 @@ export function alertText(a: AlertItem, t: T = EN, locale?: Locale) {
     : t("alerts.backOnline", { name: a.screenName, dur: dur(a.offlineSeconds) });
 }
 
-const ALERTS_CHANGED = "seemple-alerts-changed";
-
-/** Banner at the top of every dashboard page while there are unread alerts. */
-export function AlertsBanner() {
-  const feed = useApi<AlertFeed>("/api/alerts?unread=1&limit=3", 60_000);
-  const [busy, setBusy] = useState(false);
-  const { t, locale } = useLocale();
-  const { reload } = feed;
-  useEffect(() => {
-    window.addEventListener(ALERTS_CHANGED, reload);
-    return () => window.removeEventListener(ALERTS_CHANGED, reload);
-  }, [reload]);
-  if (!feed.data || feed.data.unread === 0) return null;
-  const offline = feed.data.alerts.some((a) => a.kind === "screen.offline");
-  async function markAll() {
-    setBusy(true);
-    try { await api("/api/alerts/read", { method: "POST", body: JSON.stringify({ all: true }) }); await feed.reload(); } finally { setBusy(false); }
-  }
-  const headline = feed.data.unread === 1 ? t("alerts.oneNew") : t("alerts.manyNew", { n: feed.data.unread });
-  const offlineCount = feed.data.alerts.filter((a) => a.kind === "screen.offline").length;
-  const summary = offlineCount
-    ? (offlineCount === 1 ? t("alerts.oneOffline") : t("alerts.manyOffline", { n: offlineCount }))
-    : headline;
-  return (
-    <details data-testid="alerts-banner" className={`group card mb-4 px-3 py-2 border-l-4 ${offline ? "border-l-danger" : "border-l-live-strong"}`} open>
-      <summary className="flex items-center justify-between gap-3 min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        <p className="font-semibold min-w-0 truncate" role="status">{headline}{offlineCount ? ` · ${summary}` : ""}</p>
-        <span className="text-sm font-medium underline underline-offset-4 shrink-0">
-          <span className="group-open:hidden">{t("tv.view")}</span>
-          <span className="hidden group-open:inline">{t("tv.hide")}</span>
-        </span>
-      </summary>
-      <div className="flex flex-wrap items-start justify-between gap-2 pb-2">
-        <div className="min-w-0">
-          <ul className="text-sm mt-1 grid gap-0.5">
-            {feed.data.alerts.map((a) => (
-              <li key={a.id}><span aria-hidden>{a.kind === "screen.offline" ? "🔴 " : "🟢 "}</span>{alertText(a, t, locale)}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Link href="/dashboard/alerts" className="btn btn-quiet min-h-11">{t("alerts.all")}</Link>
-          <button type="button" className="btn btn-quiet min-h-11" disabled={busy} onClick={markAll}>{t("alerts.markRead")}</button>
-        </div>
-      </div>
-    </details>
-  );
-}
-
-export function AlertsScreen() {
-  const first = useApi<AlertFeed>("/api/alerts?limit=30", 60_000);
+/**
+ * Notification history (/dashboard/notifications, also /dashboard/alerts). Same /api/alerts feed and
+ * "Show older" paging as the old alerts page, shown as the notification center's grouped rows, with the
+ * billing and rollout notices pinned on top. Nothing is deleted: every alert keeps its row in the database.
+ */
+export function AlertsScreen({ fixture }: { fixture?: AlertItem[] } = {}) {
+  const live = useApi<AlertFeed>(fixture ? null : "/api/alerts?limit=50", 60_000);
+  const first = fixture ? { data: { alerts: fixture, unread: fixture.filter((a) => !a.read).length, nextBefore: null } as AlertFeed, error: null, reload: async () => {} } : live;
+  const nc = useNotifications();
+  const router = useRouter();
   const [more, setMore] = useState<AlertItem[]>([]);
   const [next, setNext] = useState<string | null | undefined>(undefined);
-  const { t, locale } = useLocale();
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const { t } = useLocale();
+  const { reload } = first;
+  useEffect(() => {
+    const onChange = () => { void reload(); };
+    window.addEventListener(ALERTS_CHANGED, onChange);
+    return () => window.removeEventListener(ALERTS_CHANGED, onChange);
+  }, [reload]);
   const cursor = next === undefined ? first.data?.nextBefore ?? null : next;
-  const alerts = [...(first.data?.alerts ?? []), ...more];
+  const alerts = useMemo(
+    () => [...(first.data?.alerts ?? []), ...more].map((a) => (readIds.has(a.id) ? { ...a, read: true } : a)),
+    [first.data, more, readIds],
+  );
+  const groups = useMemo(() => groupAlerts(alerts), [alerts]);
+  const unreadGroups = groups.filter((g) => !g.read);
+  const shown = filter === "unread" ? unreadGroups : groups;
+  const notices = filter === "unread" ? nc.notices.filter((n) => !n.read) : nc.notices;
   async function loadMore() {
     if (!cursor) return;
-    const page = await api<AlertFeed>(`/api/alerts?limit=30&before=${encodeURIComponent(cursor)}`);
+    const page = await api<AlertFeed>(`/api/alerts?limit=50&before=${encodeURIComponent(cursor)}`);
     setMore((m) => [...m, ...page.alerts]);
     setNext(page.nextBefore);
   }
   async function markAll() {
-    await api("/api/alerts/read", { method: "POST", body: JSON.stringify({ all: true }) });
-    setMore((m) => m.map((a) => ({ ...a, read: true })));
-    await first.reload();
-    window.dispatchEvent(new Event(ALERTS_CHANGED));
+    setReadIds(new Set(alerts.map((a) => a.id)));
+    await nc.markAll();
   }
+  function openGroup(g: NotificationGroup) {
+    setReadIds((cur) => new Set([...cur, ...g.ids]));
+    void nc.markGroup(g);
+    router.push(groupHref(g));
+  }
+  function openNotice(n: NoticeItem) {
+    nc.markNotice(n);
+    if (n.href) router.push(n.href);
+  }
+  const unreadCount = unreadGroups.length + nc.notices.filter((n) => !n.read).length;
   return (
     <section>
-      <PageHeader title={t("alerts.title")} eyebrow="Pekko" icon={<IconTv />}
-        lede={t("alerts.lede")} />
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Link href="/dashboard/settings#alerts" className="btn btn-quiet">{t("alerts.settings")}</Link>
-        {first.data && first.data.unread > 0 ? <button type="button" className="btn btn-quiet" onClick={markAll}>{t("alerts.markAll")}</button> : null}
+      <PageHeader title={t("dash.nav.notifications")} eyebrow="Pekko" icon={<IconBell />} lede={t("nc.lede")} />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="seg" role="group" aria-label={t("nc.filterAria")}>
+          <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>{t("nc.all")}</button>
+          <button type="button" aria-pressed={filter === "unread"} onClick={() => setFilter("unread")}>{t("nc.filterUnread", { n: unreadCount })}</button>
+        </div>
+        <span className="flex-1" />
+        <Link href="/dashboard/settings#alerts" className="btn btn-quiet">{t("nc.settings")}</Link>
+        <button type="button" className="btn btn-quiet" onClick={() => void markAll()} disabled={!unreadCount}>{t("alerts.markAll")}</button>
       </div>
-      {!first.data ? <LoadState error={first.error} /> : alerts.length === 0 ? (
-        <EmptyState title={t("alerts.emptyTitle")}>{t("alerts.emptyBody")}</EmptyState>
+      {!first.data ? <LoadState error={first.error} /> : !shown.length && !notices.length ? (
+        <EmptyState title={filter === "unread" ? t("nc.empty") : t("alerts.emptyTitle")}>{filter === "unread" ? null : t("alerts.emptyBody")}</EmptyState>
       ) : (
-        <ul className="card divide-y divide-line" data-testid="alerts-list">
-          {alerts.map((a) => (
-            <li key={a.id} className={`px-4 py-3 flex flex-wrap justify-between gap-2 text-sm ${a.read ? "" : "bg-paper"}`}>
-              <span>
-                <span aria-hidden>{a.kind === "screen.offline" ? "🔴 " : "🟢 "}</span>
-                <strong>{a.kind === "screen.offline" ? t("alerts.offline") : t("alerts.back")}</strong> · {alertText(a, t, locale)}
-                {a.read ? null : <span className="badge badge-warn ml-2">{t("alerts.new")}</span>}
-              </span>
-              <span className="text-muted">{when(a.at, locale)}</span>
-            </li>
-          ))}
+        <ul className="card nc-list" data-testid="alerts-list">
+          {notices.map((n) => <NoticeRow key={n.key} notice={n} onOpen={openNotice} />)}
+          <DayGroups groups={shown} onOpen={openGroup} />
         </ul>
       )}
-      {cursor ? <button type="button" className="btn btn-quiet mt-3" onClick={loadMore}>{t("alerts.older")}</button> : null}
+      {cursor ? <button type="button" className="btn btn-quiet mt-3" onClick={() => void loadMore()}>{t("alerts.older")}</button> : null}
     </section>
   );
 }

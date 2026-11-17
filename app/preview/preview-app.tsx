@@ -24,6 +24,9 @@ import { UploadProgress, type UploadJob } from "@/components/uploads";
 import { useToast } from "@/components/toast";
 import { UPLOAD_SUCCESS_TOAST_MS } from "@/lib/upload-notice";
 import type { ScreenLibrary } from "@/components/screen-actions";
+import { AlertsScreen } from "@/components/alerts";
+import type { AlertItem } from "@/lib/api";
+import type { NotificationsFixture } from "@/components/notifications";
 
 const lunch = poster("Lunch menu", "#1c3d32");
 const dinner = poster("Dinner menu", "#3d2a1c");
@@ -128,6 +131,7 @@ function previewPath(screen: string) {
   if (screen === "brand-kit") return "/dashboard/account/brand-kit";
   if (screen === "screens") return "/dashboard/screens";
   if (screen === "account") return "/dashboard/account";
+  if (screen === "notifications") return "/dashboard/notifications";
   return `/dashboard/${screen}`;
 }
 
@@ -146,6 +150,27 @@ const contentFixture = {
   ],
 };
 
+/** Notification center fixture: one screen offline now, one recovery, a flapping screen, a burst, and a billing notice. */
+function previewAlerts(): AlertItem[] {
+  const now = Date.now();
+  const at = (min: number) => new Date(now - min * 60_000).toISOString();
+  let i = 0;
+  const a = (kind: AlertItem["kind"], screenId: string, screenName: string, since: number, when: number, read = false, offlineSeconds: number | null = null): AlertItem =>
+    ({ id: `alert-${++i}`, kind, screenId, screenName, offlineSince: at(since), at: at(when), offlineSeconds, read, email: "off" } as AlertItem);
+  const burst = [["screen-front", "Front counter", 3], ["screen-kitchen", "Kitchen", 1], ["screen-lounge", "Lounge", 4], ["screen-office", "Office", 2]] as const;
+  return [
+    a("screen.recovered", "screen-kitchen", "Kitchen", 200, 188, false, 720),
+    a("screen.offline", "screen-kitchen", "Kitchen", 200, 195),
+    ...[300, 420, 600].flatMap((m) => [a("screen.recovered", "screen-lounge", "Lounge", m, m - 6, true, 360), a("screen.offline", "screen-lounge", "Lounge", m, m - 3, true)]),
+    ...burst.flatMap(([id, name, d]) => [a("screen.recovered", id, name, 3 * 1440 + d, 3 * 1440 - 15, true, 900), a("screen.offline", id, name, 3 * 1440 + d, 3 * 1440 - 2, true)]),
+    a("screen.offline", "screen-bar", "Bar TV", 16 * 1440, 16 * 1440 - 10),
+  ];
+}
+const previewNotifications = (): NotificationsFixture => ({
+  alerts: previewAlerts(),
+  entitlements: { warning: { message: "Your last payment didn't go through. Update your card to keep 6 screens playing.", action: null }, rollout_notice: null },
+});
+
 export function PreviewApp() {
   const params = useSearchParams();
   const screen = params.get("screen") || "overview";
@@ -163,7 +188,8 @@ export function PreviewApp() {
     ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
     : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
   return (
-    <DashboardShell preview pathOverride={path}>
+    <DashboardShell preview pathOverride={path} notifications={params.get("nc") === "0" ? undefined : previewNotifications()}>
+      {screen === "notifications" ? <AlertsScreen fixture={previewAlerts()} /> : null}
       {screen === "media" ? <MediaLibrary fixture={media} pathOverride="/dashboard/media" /> : null}
       {screen === "presentations" ? <MediaLibrary fixture={media} pathOverride="/dashboard/media?kind=presentation" /> : null}
       {screen === "playlists" ? <Playlists fixture={playlists} pathOverride="/dashboard/playlists" /> : null}
