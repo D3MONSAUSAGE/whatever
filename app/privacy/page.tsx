@@ -33,7 +33,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       </ul>
 
       <h2 className="font-semibold text-lg">Why it is used</h2>
-      <p>To sign you in, store and deliver your content to your screens, show screen status, send account and screen alerts, run billing when a paid plan is started, measure which ads and channels bring new sign-ups, produce internal statistics about how the Service is used, support customers, limit abuse, and troubleshoot the Service. You keep ownership of your content. We do not sell personal information. There is no sale to opt out of, and this policy is not a claim of compliance with any particular privacy statute.</p>
+      <p>To sign you in, store and deliver your content to your screens, show screen status, send account and screen alerts, run billing when a paid plan is started, measure which ads and channels bring new sign-ups, count visits to the public website, produce internal statistics about how the Service is used, support customers, limit abuse, and troubleshoot the Service. You keep ownership of your content. We do not sell personal information. There is no sale to opt out of, and this policy is not a claim of compliance with any particular privacy statute.</p>
 
       <h2 className="font-semibold text-lg" id="staff-access">Who at Pekko can see your account details</h2>
       <p>
@@ -44,7 +44,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       </p>
 
       <h2 className="font-semibold text-lg">What is measured, and what is not</h2>
-      <p>The records above are first-party records of the account&apos;s own screens and changes. This application does not include an advertising network or a third-party website-analytics script. The dashboard sign-in client stores the session in the browser and calls Pekko&apos;s API with a bearer token.</p>
+      <p>The records above are first-party records of the account&apos;s own screens and changes. This application does not include an advertising network or a third-party website-analytics script. The public website pages use Pekko&apos;s own cookieless visit counter, described below. The dashboard sign-in client stores the session in the browser and calls Pekko&apos;s API with a bearer token.</p>
       <p>Transactional email goes through Resend as plain text. The send request does not turn on open or click tracking, and the verified pekkotv.com sending domain reports open and click tracking off. That describes this application and that domain setting. It is not a promise that a provider never logs or measures its own systems.</p>
 
       <h2 className="font-semibold text-lg">Ad and campaign attribution</h2>
@@ -53,6 +53,18 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
         If you create an account in that time, we copy this first-visit information to your account once, at sign-up, and we do not overwrite it later.
         We use it only to measure which ads and channels bring new sign-ups, and authorized Pekko staff can see an account&apos;s first-visit source on the internal page described above. We don&apos;t sell it or share it with advertisers or ad networks, and we don&apos;t use advertising pixels or third-party analytics scripts.
         The copy on your account is deleted when your account is deleted.
+      </p>
+
+      <h2 className="font-semibold text-lg" id="website-statistics">Website visit statistics</h2>
+      <p>
+        On the public pages of pekkotv.com (the home, features, pricing, FAQ, support and contact pages, in English and Spanish), Pekko counts visits with its own first-party counter. It sets no cookie and stores no IP address, browser fingerprint or persistent identifier.
+        When one of these pages loads, your browser sends Pekko the page address without its query string. For the first page of a visit it also sends the address of the site that sent you, of which only the site name is kept, and any campaign tags in the link (source, medium and campaign).
+        To count unique visitors, Pekko&apos;s server combines your IP address and your browser&apos;s user-agent string with a random value that changes every day, and turns them into a one-way code. The IP address and user-agent string are not saved.
+        That code is kept only for the day it is made and is then replaced by a daily total. Each daily random value is deleted after two days, so visits can&apos;t be linked across days or traced back to you.
+        What is kept is daily totals per page and traffic source, which authorized Pekko staff see on the internal page described above. These totals are deleted after 400 days.
+        A per-tab flag in your browser&apos;s session storage, which is never sent to Pekko, tells the first page of a visit apart from later pages.
+        Visits are not counted while you are signed in to Pekko, or when your browser sends a Global Privacy Control or Do Not Track signal. Dashboards, sign-in pages, the TV player and these legal pages are not counted.
+        These statistics are not linked to any account and are not shared with advertisers or ad networks.
       </p>
 
       <h2 className="font-semibold text-lg">Service providers</h2>
