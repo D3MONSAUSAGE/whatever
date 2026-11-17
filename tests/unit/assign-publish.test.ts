@@ -32,6 +32,8 @@ describe("assign playlist publish busy state", () => {
     expect(portal).toBeGreaterThan(dataTestId);
     const sheet = readFileSync("components/displays-screen.tsx", "utf8");
     const assignSheet = sheet.slice(sheet.indexOf("function AssignPlaylist"));
-    expect(assignSheet).toMatch(/fixed inset-0 z-50/);
+    // Redesign phase 2: the assign sheet is the shared Dialog (layer 60), still below the confirm dialog (80).
+    expect(assignSheet).toContain("<Dialog onClose={onClose} label={t(\"disp.assignPlaylist\")}");
+    expect(readFileSync("app/globals.css", "utf8")).toMatch(/\.ps-dialog-backdrop \{ position: fixed; inset: 0; z-index: 60;/);
   });
 });

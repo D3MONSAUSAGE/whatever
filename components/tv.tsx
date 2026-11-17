@@ -1,4 +1,6 @@
 "use client";
+import { IconTvOff } from "@/components/icons";
+import Link from "next/link";
 import { useEffect } from "react";
 import { timeAgo, type DisplayItem } from "@/lib/api";
 import { ONLINE_MS } from "@/lib/server/limits";
@@ -122,8 +124,8 @@ export function offlineScreens(displays: DisplayItem[]) {
   return displays.filter((d) => d.connected && !d.online);
 }
 
-/** Shows which screens are offline, and puts the count in the browser tab title. */
-export function OfflineAlert({ displays, linkToDisplays = false }: { displays: DisplayItem[]; linkToDisplays?: boolean }) {
+/** Puts "(N offline)" in front of the browser tab title while screens are offline (both languages). */
+export function useOfflineTitle(displays: DisplayItem[]) {
   const t = useT();
   const offline = offlineScreens(displays);
   const titleTag = (n: number) => t("tv.titleOffline", { n });
@@ -140,6 +142,42 @@ export function OfflineAlert({ displays, linkToDisplays = false }: { displays: D
     return () => { observer.disconnect(); document.title = stripOfflineTag(document.title); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- titleTag only changes with the language, which re-renders anyway
   }, [offline.length, t]);
+}
+
+/**
+ * Overview's "Needs attention" entries for offline screens (design system, phase 2): one callout per screen
+ * with a link to it, instead of a strip across the page. Also keeps the "(N offline)" tab title.
+ */
+export function OfflineAttention({ displays }: { displays: DisplayItem[] }) {
+  const t = useT();
+  useOfflineTitle(displays);
+  const offline = offlineScreens(displays);
+  if (offline.length === 0) return null;
+  const shown = offline.slice(0, 4);
+  return (
+    <ul className="grid gap-2" data-testid="offline-attention">
+      {shown.map((d) => (
+        <li key={d.id} className="ps-callout is-bad">
+          <IconTvOff />
+          <p className="min-w-0">
+            <strong>{t("nc.offlineTitle", { name: d.name })}</strong>
+            {d.lastSeenAt ? t("tv.noHeartbeatFor", { dur: offlineFor(d.lastSeenAt, t) }) : t("tv.neverHeartbeat")}. {t("tv.checkTv")}
+          </p>
+          <Link href={`/dashboard/screens/${d.id}`} className="btn btn-quiet min-h-10 shrink-0">{t("screens.openScreen")}</Link>
+        </li>
+      ))}
+      {offline.length > shown.length ? (
+        <li><Link href="/dashboard/screens" className="text-sm font-semibold text-primary underline underline-offset-4">{t("tv.andMore", { n: offline.length - shown.length })}</Link></li>
+      ) : null}
+    </ul>
+  );
+}
+
+/** Shows which screens are offline, and puts the count in the browser tab title. Used on /dashboard/displays. */
+export function OfflineAlert({ displays, linkToDisplays = false }: { displays: DisplayItem[]; linkToDisplays?: boolean }) {
+  const t = useT();
+  const offline = offlineScreens(displays);
+  useOfflineTitle(displays);
   if (offline.length === 0) return null;
   const names = offline.slice(0, 4);
   const snippets = names.map((d) => {

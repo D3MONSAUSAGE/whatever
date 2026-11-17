@@ -1,43 +1,24 @@
 "use client";
-import { LogoMark, WaveBackdrop } from "@/components/brand";
 import { useLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
 
 /**
- * Page heading used at the top of every dashboard page, below any persistent
- * navigation: dark ink panel, eyebrow, title (h1), a short description, and
- * one optional primary action. Secondary actions belong in the page body.
+ * Page heading used at the top of every dashboard page (design system, phase 2): the page title in the display
+ * face, one line of description, and the page's actions on the right (one primary, any others secondary).
+ * It replaces the dark banner header; only Overview keeps a hero. `eyebrow` and `icon` are accepted for older
+ * callers and no longer shown, since the sidebar already names the section.
  */
-export function PageHeader({ title, eyebrow, lede, icon, action, children, compact }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; compact?: boolean }) {
-  if (compact) {
-    return (
-      <div className="mb-4" data-testid="page-header-compact">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words min-w-0">{title}</h1>
-          {action ? <div className="shrink-0">{action}</div> : null}
-        </div>
-        {lede ? <div className="text-muted mt-1 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
-        {children ? <div className="mt-3 flex flex-wrap gap-2">{children}</div> : null}
-      </div>
-    );
-  }
+export function PageHeader({ title, lede, action, children, compact }: { title: string; eyebrow?: string; lede?: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; compact?: boolean }) {
   return (
-    <div className="mb-6">
-      <div className="banner-dark hero-gradient px-5 py-5 md:px-8 md:py-6">
-        <WaveBackdrop tone="dark" className="h-[85%]" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="min-w-0 flex items-start gap-3">
-            {icon ? <span className="icon-tile icon-tile-hero size-11 rounded-2xl">{icon}</span> : null}
-            <div className="min-w-0">
-              {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">{eyebrow}</p> : null}
-              <h1 className="text-2xl md:text-[1.75rem] font-semibold tracking-tight break-words">{title}</h1>
-              {lede ? <div className="text-white/85 mt-1.5 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
-            </div>
-          </div>
-          {action ? <div className="page-header-action shrink-0 self-start sm:self-center">{action}</div> : <LogoMark className="hidden sm:block size-14 md:size-16 shrink-0" />}
+    <div className="mb-6" data-testid={compact ? "page-header-compact" : "page-header"}>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 max-w-3xl">
+          <h1 className="ps-h1 break-words">{title}</h1>
+          {lede ? <div className="text-muted mt-1.5 text-sm md:text-[15px] max-w-2xl leading-relaxed">{lede}</div> : null}
         </div>
+        {action ? <div className="page-header-action flex flex-wrap gap-2 shrink-0">{action}</div> : null}
       </div>
-      {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
+      {children ? <div className="mt-3 flex flex-wrap gap-2">{children}</div> : null}
     </div>
   );
 }

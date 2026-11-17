@@ -1,4 +1,5 @@
 "use client";
+import { Dialog } from "@/components/dialog";
 import { useT } from "@/lib/i18n/client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -391,15 +392,13 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
       </div>
 
       {previewing && (
-        <div className="fixed inset-0 z-50 bg-ink/80 flex items-center justify-center p-4" onClick={() => setPreviewing(false)}>
-          <div role="dialog" aria-label={t("pe.fullAria")} className="bg-paper w-full max-w-4xl rounded-2xl p-4 md:p-5" onClick={(event) => event.stopPropagation()}>
+        <Dialog onClose={() => setPreviewing(false)} label={t("pe.fullAria")} variant="center" tone="dark" className="bg-paper w-full max-w-4xl rounded-2xl p-4 md:p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold">{t("pe.fullPreview")}</h2>
               <button type="button" className="btn btn-quiet" onClick={() => setPreviewing(false)}>{t("pe.close")}</button>
             </div>
             <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label={t("pe.fullAria")} large />
-          </div>
-        </div>
+          </Dialog>
       )}
 
       {adding && (
@@ -518,9 +517,7 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
     setDeckSlides((current) => ({ ...current, [id]: detail.slides }));
   }
   return (
-    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label={t("pe.addImages")} className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-        onClick={(event) => event.stopPropagation()}>
+    <Dialog onClose={onClose} label={t("pe.addImages")} className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">{t("pe.addImages")}</h2>
           <button type="button" className="btn btn-quiet px-3" onClick={onClose}>{t("pe.close")}</button>
@@ -605,7 +602,6 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
           }));
         }}>{picks.length ? t("pe.addN", { n: picks.length }) : t("pe.addSelected")}</button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 }

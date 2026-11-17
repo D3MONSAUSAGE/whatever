@@ -1,4 +1,5 @@
 "use client";
+import { Dialog } from "@/components/dialog";
 import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -405,8 +406,7 @@ function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: ()
     }
   }
   return (
-    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={presentation ? t("ml.renamePres") : t("ml.renameFile")} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+    <Dialog onClose={onClose} label={presentation ? t("ml.renamePres") : t("ml.renameFile")} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5">
         <h2 className="text-lg font-semibold mb-3">{presentation ? t("ml.renamePres") : t("ml.renameFile")}</h2>
         <input className="field" aria-label={presentation ? t("ml.presName") : t("ml.fileName")} value={name} maxLength={200} autoFocus
           onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void save(); if (event.key === "Escape") onClose(); }} />
@@ -416,8 +416,7 @@ function RenameDialog({ item, onClose, onSaved }: { item: MediaItem; onClose: ()
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void save()}>{busy ? t("ed.saving") : t("ml.save")}</button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>{t("ed.cancel")}</button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 }
 
@@ -441,8 +440,7 @@ function AddToPlaylist({ item, onClose, onAdded }: { item: MediaItem; onClose: (
     }
   }
   return (
-    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label={t("ml.addPresAria")} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5" onClick={(event) => event.stopPropagation()}>
+    <Dialog onClose={onClose} label={t("ml.addPresAria")} className="bg-paper w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5">
         <h2 className="text-lg font-semibold mb-3">{t("ml.addToPlaylist")}</h2>
         <p className="text-sm text-muted mb-3">{t("ml.presentationOneItem")}</p>
         <select className="field" aria-label={t("ml.playlist")} value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
@@ -454,8 +452,7 @@ function AddToPlaylist({ item, onClose, onAdded }: { item: MediaItem; onClose: (
           <button type="button" className="btn btn-primary" onClick={() => void add()}>{t("ml.add")}</button>
           <button type="button" className="btn btn-quiet" onClick={onClose}>{t("ed.cancel")}</button>
         </div>
-      </div>
-    </div>
+      </Dialog>
   );
 }
 

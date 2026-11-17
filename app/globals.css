@@ -173,17 +173,9 @@ body {
   outline-offset: -2px;
 }
 
-/* Primary action on the dark page header: high-contrast on the ink banner. */
-.page-header-action .btn-primary {
-  background: #fff;
-  color: var(--color-ink);
-}
-.page-header-action .btn-primary:hover {
-  background: #eef3fa;
-}
-.page-header-action .btn-primary:focus-visible {
-  outline-color: #fff;
-}
+/* Page titles (design system, phase 2): the marketing display face. */
+.ps-h1 { font-family: var(--font-display); font-weight: 800; font-size: 1.625rem; line-height: 1.15; letter-spacing: -0.015em; color: var(--color-ink); }
+@media (min-width: 768px) { .ps-h1 { font-size: 1.875rem; } }
 
 
 /* Shell, notification center, toasts and shared controls sit in the components layer so Tailwind utilities
@@ -249,6 +241,11 @@ body:has(.studio-app) .ps-topbar { position: static; }
 .ps-menu-item[aria-current="page"] svg { color: var(--color-primary); }
 .ps-menu-radio { padding-left: 38px; position: relative; }
 .ps-menu-radio[aria-checked="true"]::before { content: ""; position: absolute; left: 16px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 999px; background: var(--color-primary); }
+.ps-menu-item.is-danger, .ps-menu-item.is-danger svg { color: var(--color-danger); }
+.ps-more-btn { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; color: var(--color-muted); }
+.ps-more-btn svg { width: 20px; height: 20px; }
+.ps-more-btn:hover, .ps-more-btn[aria-expanded="true"] { background: #e6ebf4; color: var(--color-ink); }
+.ps-more-btn:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
 .ps-menu-sep { height: 1px; margin: 6px 4px; background: #e6ebf4; }
 
 .ps-mtabs { position: fixed; inset: auto 0 0 0; z-index: 40; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #fff; border-top: 1px solid var(--color-line); box-shadow: 0 -6px 20px rgb(11 18 32 / 0.06); padding-bottom: env(safe-area-inset-bottom); }
@@ -315,6 +312,27 @@ body:has(.studio-app) .ps-topbar { position: static; }
 .ps-toast button:focus-visible, .ps-toast a:focus-visible { outline: 2px solid #8fd8ff; outline-offset: 2px; }
 @media (prefers-reduced-motion: no-preference) { .ps-toast { animation: ps-rise 0.22s ease-out; } }
 @keyframes ps-rise { from { transform: translateY(8px); opacity: 0; } }
+
+/* ===================== Callouts and stat links (design system, phase 2) ===================== */
+.ps-callout { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid; font-size: 14px; line-height: 1.45; }
+.ps-callout > svg { width: 20px; height: 20px; flex: none; }
+.ps-callout > p { flex: 1; }
+.ps-callout strong { margin-right: 4px; }
+.ps-callout.is-bad { background: #fdecea; border-color: #f3c7c3; color: #8f2a22; }
+.ps-callout.is-warn { background: var(--color-warn-bg); border-color: #f2d58a; color: #6b4a00; }
+.ps-callout.is-info { background: #eef3ff; border-color: #c9d8ff; color: #123a9c; }
+@media (max-width: 639px) { .ps-callout { flex-wrap: wrap; } .ps-callout > p { flex-basis: calc(100% - 32px); } }
+a.ps-stat-link { display: block; border-radius: 16px; }
+a.ps-stat-link:hover > .card { border-color: #8a97ad; box-shadow: 0 10px 26px rgb(11 18 32 / 0.08); }
+a.ps-stat-link:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+
+/* ===================== Dialogs (design system, phase 2) ===================== */
+.ps-dialog-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgb(11 18 32 / 0.5); }
+@media (min-width: 768px) { .ps-dialog-backdrop { align-items: center; padding: 1.5rem; } }
+.ps-dialog-backdrop.is-center { align-items: center; padding: 1rem; }
+.ps-dialog-backdrop.is-dark { background: rgb(4 9 22 / 0.82); }
+.ps-dialog { outline: none; box-shadow: 0 30px 70px rgb(4 9 22 / 0.35); }
+@media (prefers-reduced-motion: no-preference) { .ps-dialog { animation: ps-pop 0.18s ease-out; } }
 
 /* ===================== Shared controls (design system) ===================== */
 /* Segmented control: switches a view inside a page (tabs switch pages). */

@@ -1,9 +1,11 @@
 "use client";
 
+import { IconCalendar, IconList, IconTv } from "@/components/icons";
+import { OverflowMenu } from "@/components/menu";
 import Link from "next/link";
 import { useState } from "react";
 import { api, useApi, type DisplayItem, type ScreenGroupItem } from "@/lib/api";
-import { contentLabel, hasNoContent, heartbeatText, OfflineAlert, Status } from "@/components/tv";
+import { contentLabel, hasNoContent, heartbeatText, Status, useOfflineTitle } from "@/components/tv";
 import { useT } from "@/lib/i18n/client";
 import { onlineNow, syncLine } from "@/lib/sync-line";
 import { clockLabel, nowPlaying } from "@/lib/now-playing";
@@ -47,7 +49,8 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
         ) : null}
         <Link href="/dashboard/screens/groups" className="font-semibold text-primary underline underline-offset-4">{t("screens.groupsLink")}</Link>
       </p>
-      {displays.data ? <div className="hidden sm:block"><OfflineAlert displays={displays.data} /></div> : null}
+      {/* Redesign phase 2: offline state lives on each card (pill + note) and in the notification center. */}
+      <OfflineTitle displays={displays.data ?? []} />
       {!displays.data ? <LoadState error={displays.error} label={t("screens.loading")} /> : displays.data.length === 0 ? (
         <EmptyState title={t("screens.emptyTitle")}>
           {t("screens.emptyBody")} <Link href="/dashboard/screens/add#add-screen" className="underline font-semibold">{t("screens.add")}</Link>.
@@ -71,10 +74,15 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
                 {display.connected && !display.online ? (
                   <p className="text-sm mt-2">{t("screens.offlineCard")}</p>
                 ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
+                {/* Redesign phase 2: one primary action; Schedule, Edit playlist and the screen page sit in the ⋯ menu. */}
+                <div className="mt-3 flex items-center gap-2">
                   <Link className="btn btn-primary min-h-11" href={`/dashboard/screens/${display.id}?panel=change`}>{t("sa.change")}</Link>
-                  <Link className="btn btn-quiet min-h-11" href={`/dashboard/screens/${display.id}?panel=schedule`}>{t("sa.schedule")}</Link>
-                  <Link className="btn btn-quiet min-h-11" href={`/dashboard/screens/${display.id}?panel=playlist`}>{t("sa.playlist")}</Link>
+                  <span className="flex-1" />
+                  <OverflowMenu label={t("screens.moreFor", { name: display.name })} testId="screen-card-menu" items={[
+                    { href: `/dashboard/screens/${display.id}?panel=schedule`, label: t("sa.schedule"), icon: <IconCalendar /> },
+                    { href: `/dashboard/screens/${display.id}?panel=playlist`, label: t("sa.playlist"), icon: <IconList /> },
+                    { href: `/dashboard/screens/${display.id}`, label: t("screens.openScreen"), icon: <IconTv /> },
+                  ]} />
                 </div>
               </article>
             </li>
@@ -325,4 +333,10 @@ export function GroupWorkspace({ id }: { id: string }) {
       </ul>
     </section>
   );
+}
+
+/** Keeps "(N offline)" in the browser tab title on My Screens. */
+function OfflineTitle({ displays }: { displays: DisplayItem[] }) {
+  useOfflineTitle(displays);
+  return null;
 }

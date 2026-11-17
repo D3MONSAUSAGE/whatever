@@ -147,6 +147,11 @@ export function NotificationsProvider({ children, preview = false, fixture }: { 
   );
 }
 
+/** For pages that may render outside the shell (tests, harness): null when there is no provider. */
+export function useOptionalNotifications(): Ctx | null {
+  return useContext(NotificationsContext);
+}
+
 export function useNotifications(): Ctx {
   const ctx = useContext(NotificationsContext);
   if (!ctx) throw new Error("useNotifications needs NotificationsProvider");

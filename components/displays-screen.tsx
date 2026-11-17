@@ -1,4 +1,5 @@
 "use client";
+import { Dialog } from "@/components/dialog";
 import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { OfflineAlert, ScreenCard, onlineHint } from "@/components/tv";
@@ -310,10 +311,8 @@ function Picker({ display, onClose, onPublished, onError }: {
   }
   const images = (media.data ?? []).filter((item) => item.kind !== "video");
   return (
-    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label={t("disp.chooseImageFor", { name: display.name })}
-        className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-        onClick={(event) => event.stopPropagation()}>
+    <Dialog onClose={onClose} label={t("disp.chooseImageFor", { name: display.name })}
+        className="bg-paper w-full md:max-w-2xl max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-semibold">{t("disp.publishTo", { name: display.name })}</h2>
           <button type="button" className="btn btn-quiet px-3" onClick={onClose} aria-label={t("disp.close")}>{t("disp.close")}</button>
@@ -345,8 +344,7 @@ function Picker({ display, onClose, onPublished, onError }: {
         {display.media ? (
           <button type="button" className="btn btn-quiet w-full mt-5" disabled={busy} onClick={() => publish(null)}>{t("disp.clearScreen")}</button>
         ) : null}
-      </div>
-    </div>
+      </Dialog>
   );
 }
 
@@ -436,9 +434,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
   const selected = playlists.data?.find((playlist) => playlist.id === playlistId);
   return (
     <>
-    <div className="fixed inset-0 z-50 bg-ink/50 flex items-end md:items-center justify-center" onClick={onClose}>
-      <div role="dialog" aria-label={t("disp.assignPlaylist")} className="bg-paper w-full md:max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-        onClick={(event) => event.stopPropagation()}>
+    <Dialog onClose={onClose} label={t("disp.assignPlaylist")} className="bg-paper w-full md:max-w-lg max-h-[85dvh] overflow-y-auto rounded-t-2xl md:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-semibold">{t("disp.assignPlaylist")}</h2>
           <button type="button" className="btn btn-quiet px-3" onClick={onClose}>{t("disp.close")}</button>
@@ -480,8 +476,7 @@ function AssignPlaylist({ displays, initialIds, onClose, onDone, onError }: {
             </button>
           </>
         )}
-      </div>
-    </div>
+      </Dialog>
     {confirm.node}
     </>
   );
