@@ -114,11 +114,15 @@ describe("t244u fix 3: selected media controls under the board", () => {
 
   it("Layout Studio renders the selected-area editor once: under the board, or in the left slot", () => {
     const src = readFileSync("components/layout-studio.tsx", "utf8");
-    expect(src).toContain('{editorPlacement === "left" ? <div className="studio-editor-slot">{zoneEditor}</div> : null}');
+    // Classic layout: under the board or in the left slot. Opt-in layout (redesign phase 3): the properties
+    // column only. The three places are mutually exclusive, so the editor still renders once.
+    expect(src).toContain('{editorPlacement === "left" && !v2 ? <div className="studio-editor-slot">{zoneEditor}</div> : null}');
+    expect(src).toContain('{studioBp !== "phone" && !v2 ? (');
     expect(src).toMatch(/className="studio-canvas-tools"[\s\S]{0,200}editorPlacement === "canvas"\s*\?\s*zoneEditor/);
-    expect([...src.matchAll(/\{zoneEditor\}|\? zoneEditor/g)]).toHaveLength(2);
+    expect(src).toMatch(/\{v2 \? \(\s*<aside className="studio-props"[\s\S]{0,200}\{zone \? zoneEditor :/);
+    expect([...src.matchAll(/\{zoneEditor\}|\? zoneEditor/g)]).toHaveLength(3);
     // Switching areas remounts the under-board editor so it always matches the selected area.
-    expect(src).toContain('key={editorPlacement === "canvas" ? `canvas-${zone}` : "left"}');
+    expect(src).toContain('key={v2 ? "props" : editorPlacement === "canvas" ? `canvas-${zone}` : "left"}');
     // The under-board region is a named, keyboard-focusable scroll area.
     expect(src).toContain('role="region" aria-label={t("ls.areaControls")} tabIndex={0}');
     expect(en["ls.areaControls"]).toBe("Selected area controls");

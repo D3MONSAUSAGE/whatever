@@ -3,9 +3,10 @@ import { onlineNow } from "@/lib/sync-line";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useApi, type OnboardingState, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
-import { LogoMark, WaveBackdrop } from "@/components/brand";
-import { IconCalendar, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
-import { OfflineAlert, offlineScreens, onlineHint } from "@/components/tv";
+import { WaveBackdrop } from "@/components/brand";
+import { IconCalendar, IconCard, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
+import { OfflineAttention, offlineScreens, onlineHint } from "@/components/tv";
+import { useOptionalNotifications } from "@/components/notifications";
 import { useT } from "@/lib/i18n/client";
 import type { T } from "@/lib/i18n";
 import { LoadState, Stat } from "@/components/ui";
@@ -41,15 +42,19 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
 
   return (
     <section>
-      <div className="banner-dark px-5 py-6 md:px-8 md:py-8 mb-6">
+      <div className="banner-dark hero-gradient px-5 py-6 md:px-8 md:py-8 mb-6">
         <WaveBackdrop tone="dark" className="h-[85%]" />
-        <div className="relative flex items-center justify-between gap-6">
+        <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">
             <h1 className="text-xs font-semibold uppercase tracking-[0.18em] text-white/80">{t("ov.eyebrow")}</h1>
             <h2 className="mt-2 text-2xl md:text-[1.85rem] font-semibold tracking-tight">{t("ov.welcome")}</h2>
             <p className="mt-1.5 text-sm md:text-[15px] text-white/80 max-w-xl">{t("ov.lede")}</p>
           </div>
-          <LogoMark className="hidden sm:block size-16 md:size-20 shrink-0" />
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto">
+            <Link href="/dashboard/media" className="btn btn-quiet min-h-11">{t("ov.upload")}</Link>
+            <Link href="/dashboard/media/menus?new=1" className="btn btn-quiet min-h-11">{t("mb.new")}</Link>
+            <Link href="/dashboard/screens/add#add-screen" className="btn btn-primary min-h-11">{t("screens.add")}</Link>
+          </div>
         </div>
       </div>
 
@@ -104,14 +109,15 @@ function OverviewBody({
 
   return (
     <>
-      <OfflineAlert displays={displayData} linkToDisplays />
+      <NeedsAttention displays={displayData} />
+      {/* Redesign phase 2: each count opens the page it counts. */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-        <Stat icon={<IconTv />} label={t("ov.screens")} value={displayData.length} />
-        <Stat tone="live" label={t("ov.online")} value={online} hint={hint} />
-        <Stat tone="danger" label={t("ov.offline")} value={offline} hint={hint} />
-        <Stat icon={<IconImage />} label={t("ov.media")} value={mediaCount} />
-        <Stat icon={<IconList />} label={t("ov.playlists")} value={playlistCount === null ? "—" : playlistCount} hint={playlistError ?? undefined} />
-        <Stat icon={<IconCalendar />} label={t("ov.scheduled")} value={scheduleCount === null ? "—" : scheduleCount} hint={scheduleError ?? undefined} />
+        <Link href="/dashboard/screens" className="ps-stat-link"><Stat icon={<IconTv />} label={t("ov.screens")} value={displayData.length} /></Link>
+        <Link href="/dashboard/screens" className="ps-stat-link"><Stat tone="live" label={t("ov.online")} value={online} hint={hint} /></Link>
+        <Link href="/dashboard/screens" className="ps-stat-link"><Stat tone="danger" label={t("ov.offline")} value={offline} hint={hint} /></Link>
+        <Link href="/dashboard/media" className="ps-stat-link"><Stat icon={<IconImage />} label={t("ov.media")} value={mediaCount} /></Link>
+        <Link href="/dashboard/playlists" className="ps-stat-link"><Stat icon={<IconList />} label={t("ov.playlists")} value={playlistCount === null ? "—" : playlistCount} hint={playlistError ?? undefined} /></Link>
+        <Link href="/dashboard/schedule" className="ps-stat-link"><Stat icon={<IconCalendar />} label={t("ov.scheduled")} value={scheduleCount === null ? "—" : scheduleCount} hint={scheduleError ?? undefined} /></Link>
       </div>
       <p className="text-xs text-muted -mt-4 mb-8">{hint} {t("ov.waitingNotOffline")}</p>
 
@@ -146,9 +152,37 @@ function OverviewBody({
               );
             })}
           </ul>
+          <p className="mt-3 text-sm">
+            <Link href="/dashboard/analytics" className="font-semibold text-primary underline underline-offset-4" data-testid="overview-activity-link">{t("ov.activityLink")}</Link>
+          </p>
         </div>
       )}
     </>
+  );
+}
+
+/** "Needs attention": offline screens (live state) and a billing issue, mirroring the bell. */
+function NeedsAttention({ displays }: { displays: DisplayItem[] }) {
+  const t = useT();
+  const nc = useOptionalNotifications();
+  const billing = nc?.billing ?? null;
+  const offline = offlineScreens(displays).length;
+  if (!offline && !billing) return <OfflineAttention displays={displays} />;
+  return (
+    <section className="card p-4 md:p-5 mb-6 grid gap-3" aria-labelledby="ov-attention" data-testid="needs-attention">
+      <div>
+        <h2 id="ov-attention" className="font-semibold">{t("nc.attention")}</h2>
+        <p className="text-sm text-muted">{t("ov.attentionHint")}</p>
+      </div>
+      {billing ? (
+        <div className="ps-callout is-warn">
+          <IconCard />
+          <p className="min-w-0"><strong>{t("nc.billingTitle")}.</strong> {billing.message}</p>
+          <Link href={billing.href ?? "/dashboard/billing"} className="btn btn-quiet min-h-10 shrink-0">{t("ov.review")}</Link>
+        </div>
+      ) : null}
+      <OfflineAttention displays={displays} />
+    </section>
   );
 }
 

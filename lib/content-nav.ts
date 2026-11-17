@@ -1,10 +1,9 @@
 import type { MessageKey } from "@/lib/i18n/index";
-export type ContentTabId = "media" | "promotions" | "playlists" | "presentations";
+export type ContentTabId = "media" | "promotions" | "presentations";
 
 export const CONTENT_TABS: { id: ContentTabId; href: string; label: string }[] = [
   { id: "media", href: "/dashboard/media", label: "Media" },
   { id: "promotions", href: "/dashboard/media/promos", label: "Promotions" },
-  { id: "playlists", href: "/dashboard/playlists", label: "Playlists" },
   { id: "presentations", href: "/dashboard/media?kind=presentation", label: "Presentations" },
 ];
 
@@ -35,12 +34,12 @@ export function activeContentTab(path: string, kind: string | null): ContentTabI
   if (isMenuBoardsPath(clean)) return null;
   if (clean.startsWith("/dashboard/media/promos")) return "promotions";
   if (clean.startsWith("/dashboard/media/presentations")) return "presentations";
-  if (clean.startsWith("/dashboard/playlists")) return "playlists";
   if (clean === "/dashboard/media") return kind === "presentation" ? "presentations" : "media";
   return null;
 }
 
-/** Pages that show the shared Content navigation in the dashboard shell. Menu Boards has its own nav entry. */
+/** Pages that show the shared Content navigation in the dashboard shell. Menu Boards and Playlists (redesign
+ *  decision D1) have their own main-nav entries, so they are not Content tabs. */
 export function isContentPath(path: string): boolean {
   const clean = cleanPath(path);
   if (isMenuBoardsPath(clean)) return false;
@@ -48,9 +47,7 @@ export function isContentPath(path: string): boolean {
     clean === "/dashboard/content" ||
     clean.startsWith("/dashboard/content/") ||
     clean === "/dashboard/media" ||
-    clean.startsWith("/dashboard/media/") ||
-    clean === "/dashboard/playlists" ||
-    clean.startsWith("/dashboard/playlists/")
+    clean.startsWith("/dashboard/media/")
   );
 }
 

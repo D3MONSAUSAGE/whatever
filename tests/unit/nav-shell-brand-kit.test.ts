@@ -31,9 +31,9 @@ const loaded: BrandFields = {
 };
 
 describe("content navigation mapping", () => {
-  it("names the four library destinations (Menu Boards is its own main-nav section)", () => {
+  it("names the three library destinations (Menu Boards and Playlists are main-nav sections, decision D1)", () => {
     expect(CONTENT_TABS.map((tab) => tab.label)).toEqual([
-      "Media", "Promotions", "Playlists", "Presentations",
+      "Media", "Promotions", "Presentations",
     ]);
   });
 
@@ -49,7 +49,7 @@ describe("content navigation mapping", () => {
     expect(activeContentTab("/dashboard/media/promos", null)).toBe("promotions");
     expect(activeContentTab("/dashboard/media/layout-studio", null)).toBeNull();
     expect(activeContentTab("/dashboard/media/layout-studio?screen=abc", null)).toBeNull();
-    expect(activeContentTab("/dashboard/playlists/pl-1", null)).toBe("playlists");
+    expect(activeContentTab("/dashboard/playlists/pl-1", null)).toBeNull();
     expect(activeContentTab("/dashboard/media/presentations/deck-1", null)).toBe("presentations");
     expect(activeContentTab("/dashboard/screens", null)).toBeNull();
     expect(activeContentTab("/dashboard/account", null)).toBeNull();
@@ -60,7 +60,7 @@ describe("content navigation mapping", () => {
     expect(isContentPath("/dashboard/media")).toBe(true);
     expect(isContentPath("/dashboard/media/menus")).toBe(false);
     expect(isContentPath("/dashboard/media/layout-studio")).toBe(false);
-    expect(isContentPath("/dashboard/playlists/pl-1")).toBe(true);
+    expect(isContentPath("/dashboard/playlists/pl-1")).toBe(false);
     expect(isContentPath("/dashboard/media?kind=presentation")).toBe(true);
     expect(isContentPath("/dashboard/screens")).toBe(false);
     expect(isContentPath("/dashboard/account")).toBe(false);

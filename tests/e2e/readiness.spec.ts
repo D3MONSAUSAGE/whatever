@@ -3,21 +3,23 @@ import { expect, test } from "@playwright/test";
 const shots = process.env.SHOT_DIR;
 
 test("offline screens are called out on Overview and Displays", async ({ page }) => {
-  for (const [screen, width] of [["overview", 1440], ["displays", 1440], ["overview", 390]] as const) {
+  // Redesign phase 2: Overview lists each offline screen under Needs attention; Displays keeps its summary.
+  for (const [screen, width] of [["overview", 1440], ["overview", 390]] as const) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`/preview?screen=${screen}`);
-    const alert = page.getByTestId("offline-alert");
-    await expect(alert).toBeVisible();
-    const summary = alert.locator("summary");
-    await expect(summary).toContainText("1 screen offline:");
-    await expect(summary).toContainText("12 min");
-    await expect(summary).toContainText("View");
-    await summary.click();
-    await expect(summary).toContainText("Hide");
-    await expect(alert).toContainText("no heartbeat for 12 min");
+    const attention = page.getByTestId("offline-attention");
+    await expect(attention).toBeVisible();
+    await expect(attention).toContainText("Bar TV is offline");
+    await expect(attention).toContainText("no heartbeat for");
+    await expect(attention.getByRole("link", { name: "Open screen" })).toHaveAttribute("href", /\/dashboard\/screens\//);
     await expect(page).toHaveTitle(/^\(1 offline\) /);
     if (shots) await page.screenshot({ path: `${shots}/offline-${screen}-${width}.png`, fullPage: true });
   }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/preview?screen=displays");
+  const alert = page.getByTestId("offline-alert");
+  await expect(alert.locator("summary")).toContainText("1 screen offline:");
+  await expect(page).toHaveTitle(/^\(1 offline\) /);
 });
 
 test("published legal pages, friendly 404, and health check", async ({ page, request }) => {

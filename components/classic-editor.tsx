@@ -1,5 +1,6 @@
 "use client";
 
+import { useEditorV2 } from "@/lib/editor-layout";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { api, authToken, type DisplayItem, type MediaItem } from "@/lib/api";
@@ -99,7 +100,10 @@ export function ClassicEditor({
   const counts = menuCounts(c.sections);
   const hasPhoto = Boolean(c.photoMediaId);
   const hits = classicPreviewHits(hasPhoto);
-  const saveLabel = busy ? (draft.id ? t("ed.saving") : t("ed.creating")) : draft.id ? t("ed.saveChanges") : t("ed.createBoard");
+  // Redesign phase 3 (opt-in, decision D3): saving an existing classic board already updates its screens, so the
+  // new layout names the button for what it does. Same save() call, same request.
+  const [editorV2] = useEditorV2();
+  const saveLabel = busy ? (draft.id ? t("ed.saving") : t("ed.creating")) : draft.id ? (editorV2 ? t("ls.publish") : t("ed.saveChanges")) : t("ed.createBoard");
 
   useEffect(() => {
     if (readOnly) {

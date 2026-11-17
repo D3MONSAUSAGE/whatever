@@ -26,9 +26,9 @@ const entries = buildScreenPickerEntries({
 });
 
 describe("content navigation", () => {
-  it("names the four library destinations (Menu Boards is its own main-nav section)", () => {
+  it("names the three library destinations (Menu Boards and Playlists are main-nav sections, decision D1)", () => {
     expect(CONTENT_TABS.map((tab) => tab.label)).toEqual([
-      "Media", "Promotions", "Playlists", "Presentations",
+      "Media", "Promotions", "Presentations",
     ]);
   });
 
@@ -39,7 +39,7 @@ describe("content navigation", () => {
     expect(activeContentTab("/dashboard/media/menus", null)).toBeNull();
     expect(activeContentTab("/dashboard/media/promos", null)).toBe("promotions");
     expect(activeContentTab("/dashboard/media/layout-studio", null)).toBeNull();
-    expect(activeContentTab("/dashboard/playlists/pl-1", null)).toBe("playlists");
+    expect(activeContentTab("/dashboard/playlists/pl-1", null)).toBeNull();
     expect(activeContentTab("/dashboard/media/presentations/deck-1", null)).toBe("presentations");
   });
 });
