@@ -213,22 +213,48 @@ ${SHOW_ON_SCREENS_STYLES}
           .studio-preview { display: none !important; }
           .studio-canvas { display: flex; flex-direction: column; gap: 8px; }
         }
-        /* Redesign phase 3 (opt-in, tablets and desktops): tools · TV canvas · properties of the selected area. */
+        /* Redesign phase 3 (default layout): tools · TV canvas · properties of the selected area. */
         .studio-props { display: none; }
         .studio-status-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
         .studio-status-pill.is-dirty { background: #fff4d6; color: #8a5b00; }
         .studio-status-pill.is-saved { background: #eef3ff; color: #134be0; }
-        .studio-layout-toggle { border: 0; background: transparent; color: #1a5cff; font: inherit; font-size: 13px; font-weight: 650; min-height: 44px; padding: 0 6px; cursor: pointer; border-radius: 8px; }
-        .studio-layout-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
-        .studio-layout-toggle:focus-visible { outline: 3px solid #1a5cff; outline-offset: 2px; }
-        @media (min-width: 861px) {
-          .studio-v2 .studio-grid { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) minmax(260px, 320px); grid-template-areas: "controls canvas props"; gap: 16px; }
+        .studio-select-hint { margin: 0; padding: 8px 12px; border-radius: 10px; background: #eef3ff; color: #123a9c; font-size: 13px; font-weight: 600; line-height: 1.4; }
+        /* Desktops: three columns, every column sticky beside the board. */
+        @media (min-width: 1180px) {
+          .studio-v2 .studio-grid { grid-template-columns: 300px minmax(0, 1fr) 360px; grid-template-areas: "controls canvas props"; gap: 16px; }
           .studio-v2 .studio-props { grid-area: props; display: flex; flex-direction: column; gap: 12px; min-width: 0; max-height: calc(100dvh - 8.5rem); overflow-y: auto; overscroll-behavior: contain; position: sticky; top: 4.25rem; padding-right: 2px; }
-          .studio-v2 .studio-props .studio-selected-editor { box-shadow: 0 1px 2px rgba(11,18,32,.04); }
           .studio-v2 .studio-canvas > .studio-canvas-stage { width: min(100%, calc((100dvh - 14rem) * 16 / 9 + 24px)); }
         }
-        @media (min-width: 1180px) {
-          .studio-v2 .studio-grid { grid-template-columns: 300px minmax(0, 1fr) 360px; }
+        /* Tablets and small laptops: the board spans the full width on top; tools and properties sit side by side
+           under it, so the preview stays large. */
+        @media (min-width: 861px) and (max-width: 1179px) {
+          .studio-v2 .studio-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "canvas canvas" "controls props"; gap: 16px; }
+          .studio-v2 .studio-canvas { position: static; max-height: none; }
+          .studio-v2 .studio-canvas > .studio-canvas-stage { width: min(100%, 760px); }
+          .studio-v2 .studio-left { position: static; max-height: none; overflow: visible; }
+          .studio-v2 .studio-props { grid-area: props; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+        }
+        /* Phones: the board on top, then the active tab (Content, Style or Layout); Save draft and Publish stay at the bottom. */
+        .studio-mtabs { display: none; }
+        @media (max-width: 860px) {
+          .studio-v2m .studio-canvas { display: flex; flex-direction: column; gap: 6px; order: 1; padding: 0 16px 10px; width: 100%; max-width: 100%; }
+          .studio-v2m .studio-pane { display: none !important; }
+          .studio-v2m[data-mtab="content"] .studio-pane[data-step="template"],
+          .studio-v2m[data-mtab="content"] .studio-pane[data-step="section"],
+          .studio-v2m[data-mtab="content"] .studio-pane[data-step="content"],
+          .studio-v2m[data-mtab="style"] .studio-pane[data-step="style"],
+          .studio-v2m[data-mtab="layout"] .studio-pane[data-step="template"],
+          .studio-v2m[data-mtab="layout"] .studio-pane[data-step="publish"],
+          .studio-v2m[data-mtab="content"] .studio-pane[data-step="photo"],
+          .studio-v2m.studio-classic[data-mtab="style"] .studio-pane[data-step="publish"] { display: block !important; padding: 0 16px 16px; }
+          .studio-v2m[data-mtab="content"] .studio-panel-layout { display: none; }
+          .studio-v2m[data-mtab="layout"] .studio-panel-content { display: none; }
+          .studio-v2m:not([data-mtab="content"]) .studio-editor-slot { display: none; }
+          .studio-v2m .studio-mobile-hint { display: none; }
+          .studio-v2m .studio-mtabs { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: #e6ebf4; }
+          .studio-v2m .studio-mtabs button { flex: 1 1 0; min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: #3d4c63; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+          .studio-v2m .studio-mtabs button[aria-pressed="true"] { background: #fff; color: #0b1220; box-shadow: 0 1px 3px rgba(11,18,32,.12); }
+          .studio-v2m .studio-mtabs button:focus-visible { outline: 2px solid #1a5cff; outline-offset: 1px; }
         }
         ${fontFaceCss()}
         figure svg { width: 100%; height: 100%; display: block; }

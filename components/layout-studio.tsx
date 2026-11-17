@@ -101,8 +101,11 @@ export function LayoutStudio({
   const [renaming, setRenaming] = useState(false);
   const studioBp = useStudioBreakpoint();
   // Redesign phase 3 (opt-in): tools · TV · properties on tablets and desktops. Phones keep the stacked editor.
-  const [editorV2, setEditorV2] = useEditorV2();
+  const [editorV2] = useEditorV2();
   const v2 = editorV2 && studioBp !== "phone";
+  // Phones in the new layout: the board stays on top and Content / Style / Layout tabs replace the six steps.
+  const v2m = editorV2 && studioBp === "phone";
+  const [mtab, setMtab] = useState<"content" | "style" | "layout">("content");
   const phonePreview = studioBp === "phone";
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [note, setNote] = useState(accountMode || fixture ? "" : t("ls.browserCopy"));
@@ -636,6 +639,7 @@ export function LayoutStudio({
 
   function openZone(next: string) {
     setZone(keepDraftOnZoneChange(draft, zone, next) ? next : next);
+    setMtab("content");
     if (next.startsWith("column-")) {
       const index = Number(next.slice("column-".length));
       setSectionIndex(Number.isFinite(index) ? index : 0);
@@ -854,7 +858,7 @@ export function LayoutStudio({
   }
 
   return (
-    <main className={`${zone && step !== "template" ? "studio-app zone-open" : "studio-app"}${v2 ? " studio-v2" : ""}`} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#f4f7fb", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
+    <main className={`${zone && step !== "template" ? "studio-app zone-open" : "studio-app"}${v2 ? " studio-v2" : ""}${v2m ? " studio-v2m" : ""}`} data-mtab={v2m ? mtab : undefined} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#f4f7fb", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
           {onClose ? <button type="button" className="studio-back" disabled={saving !== null} onClick={() => requestLeave(onClose)}>{t("ls.back")}</button> : null}
@@ -882,18 +886,13 @@ export function LayoutStudio({
           ) : null}
         </div>
         <div className="studio-toolbar-actions">
-          {v2 && accountMode ? (
+          {(v2 || v2m) && accountMode ? (
             <span className={`studio-status-pill ${studioIsDirty() ? "is-dirty" : "is-saved"}`} role="status" data-testid="studio-status-pill">
               {saving === "publish" ? t("ls.publishing") : saving === "draft" ? t("ed.saving") : studioIsDirty() ? t("ed2.unpublished") : t("ed2.upToDate")}
             </span>
           ) : null}
-          {accountMode && studioBp !== "phone" ? (
-            <button type="button" className="studio-layout-toggle" onClick={() => setEditorV2(!editorV2)} data-testid="editor-layout-toggle">
-              {editorV2 ? t("ed2.useClassic") : t("ed2.tryNew")}
-            </button>
-          ) : null}
           {renderSaveDraft()}
-          {renderPreviewButton()}
+          {accountMode ? null : renderPreviewButton()}
           {renderPublish()}
         </div>
         {progress || note ? <p className="studio-toolbar-note" role="status">{progress || note}</p> : null}
@@ -908,22 +907,19 @@ export function LayoutStudio({
           {screenId ? <p style={{ fontSize: 14 }}>{t("ls.oneScreen")}</p> : null}
 
           <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
-            <details className="studio-panel" open={!v2}>
+            <details className="studio-panel studio-panel-layout" open={!v2}>
               <summary className="studio-panel-summary">{t("ls.layout")}</summary>
               <TemplatePicker template={template} onChoose={choose} />
             </details>
-            <details className="studio-panel" open>
+            <details className="studio-panel studio-panel-content" open>
               <summary className="studio-panel-summary">{t("ls.sections")}</summary>
               <ZonePicker template={template} frame={frame} zone={zone} onSelect={openZone} />
             </details>
-            <details className="studio-panel" open>
+            <details className="studio-panel studio-panel-content" open>
               <summary className="studio-panel-summary">{t("ls.contentText")}</summary>
               <BoardText draft={draft} update={update} />
             </details>
-            <details className="studio-panel">
-              <summary className="studio-panel-summary">{t("ls.imagesVideo")}</summary>
-              <p className="zone-help">{t("ls.selectMediaBoard")}</p>
-            </details>
+            {/* Images and video are edited by selecting their area on the board (instruction above the preview). */}
           </div>
 
           <div className={step === "section" ? "studio-pane on" : "studio-pane"} data-step="section">
@@ -1023,16 +1019,18 @@ export function LayoutStudio({
         </div>
 
         <section
-          className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
+          className={step === "preview" || v2m ? "studio-canvas on" : "studio-canvas"}
           id="studio-tv-preview"
           data-testid="studio-tv-preview"
           aria-label={t("ls.canvas")}
         >
-          <p className="studio-kicker">{t("ls.kicker")}</p>
+          {editorV2 ? (
+            <p className="studio-select-hint" data-testid="studio-select-hint">{t("ed2.selectHint")}</p>
+          ) : <p className="studio-kicker">{t("ls.kicker")}</p>}
           <div className="studio-canvas-stage">
-            {studioBp !== "phone" || step === "preview" ? renderStage(true) : null}
+            {studioBp !== "phone" || step === "preview" || v2m ? renderStage(true) : null}
           </div>
-          {(studioBp !== "phone" || step === "preview") && clipped.length ? (
+          {(studioBp !== "phone" || step === "preview" || v2m) && clipped.length ? (
             <p className="note-warn text-sm" role="status" data-testid="clipped-names" style={{ marginTop: 8 }}>
               {t("ls.clippedNames", { names: clipped.map((name) => `“${name}”`).join(", ") })}
             </p>
@@ -1053,6 +1051,13 @@ export function LayoutStudio({
       </div>
       <div className="studio-savebar">
         {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
+        {v2m ? (
+          <div className="studio-mtabs" role="group" aria-label={t("ls.steps")} data-testid="studio-mtabs">
+            {(["content", "style", "layout"] as const).map((id) => (
+              <button key={id} type="button" aria-pressed={mtab === id} onClick={() => setMtab(id)}>{t(`ed2.tab.${id}`)}</button>
+            ))}
+          </div>
+        ) : (
         <nav className="studio-tabs" role="tablist" aria-label={t("ls.steps")}>
           {(["preview", "template", "section", "content", "style", "publish"] as const).map((id) => (
             <button key={id} type="button" role="tab" aria-selected={step === id} style={{ ...chip(step === id), flex: "1 1 0", padding: "6px 2px", fontSize: 12, minHeight: 44 }} onClick={() => {
@@ -1061,6 +1066,7 @@ export function LayoutStudio({
             }}>{stepLabel(id, t)}</button>
           ))}
         </nav>
+        )}
         <div className="studio-save-actions">
           {renderSaveDraft()}
           {renderPublish()}
