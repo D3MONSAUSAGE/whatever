@@ -9,6 +9,8 @@ import { UploadProgress, UploadsProvider } from "@/components/uploads";
 import { LogoMark, PRODUCT_NAME } from "@/components/brand";
 import { isRecoveryUrl } from "@/components/auth-frame";
 import { ContentNav } from "@/components/content-nav";
+import { AccountNav } from "@/components/account-nav";
+import { isAccountPath } from "@/lib/account-nav";
 import { BillingChip, NotificationBell, NotificationsProvider, type NotificationsFixture } from "@/components/notifications";
 import { clearSlideSrcCache, onDashboardAuthChange } from "@/lib/slide-src-cache";
 import { clearLayoutStudioDraftsOnSignOut, shouldClearStudioDraftsOnAuthEvent } from "@/lib/layout-studio-draft";
@@ -119,6 +121,7 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
 
   const studio = path.startsWith("/dashboard/media/layout-studio") || path.startsWith("/layout-studio");
   const showContentNav = isContentPath(path);
+  const showAccountNav = isAccountPath(path);
   const brandKit = path.startsWith("/dashboard/account/brand-kit");
   const activeItem = [OVERVIEW, ...NAV].find((item) => isActive(item.href, path));
   const current = brandKit ? t("dash.nav.brandKit") : isNotifications(path) ? t("dash.nav.notifications") : activeItem ? t(activeItem.labelKey) : PRODUCT_NAME;
@@ -161,6 +164,7 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
         <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : "w-full max-w-[1360px] mx-auto px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
           <UploadProgress />
           {showContentNav ? <ContentNav pathOverride={pathOverride} /> : null}
+          {showAccountNav ? <AccountNav path={path} /> : null}
           {children}
         </main>
       </div>

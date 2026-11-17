@@ -1269,6 +1269,8 @@ export const es: Record<MessageKey, string> = {
   "hub.recent": "{kind} recientes",
   "hub.none": "Todavía no hay nada. Para empezar: {action}.",
   "cnav.aria": "Archivos",
+  "anav.aria": "Secciones de la cuenta",
+  "anav.overview": "Resumen",
 
   // I18N-3: content picker (file names never translated)
   "cp.search": "Buscar",
@@ -1837,6 +1839,7 @@ export const es: Record<MessageKey, string> = {
   "ss.groupAdded": "Grupo agregado",
   "ss.groupSaved": "Grupo guardado",
   "ss.groupDeleted": "Grupo eliminado",
+  "ss.dayPartsAdded": "Franjas horarias agregadas: {n}",
   "ss.publishedUpdated": "Diapositivas publicadas actualizadas",
   "ss.schedAdded": "Horario agregado",
   "ss.schedDeleted": "Horario eliminado",

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { IconGear } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
 import { LanguageSelect } from "@/components/i18n/language-select";
@@ -20,27 +19,27 @@ export default function AccountHub() {
   const developer = useDeveloperAccess();
   return (
     <section className="min-w-0 pb-28 lg:pb-0">
-      <PageHeader title={t("acct.title")} eyebrow="Pekko" lede={t("acct.lede")} icon={<IconGear />} />
+      <PageHeader title={t("acct.title")} lede={t("acct.lede")} />
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
         {CARDS.map((card) => (
-          <li key={card.id} className="card flex flex-col p-5 min-h-[13.5rem]">
-            <h2 className="font-semibold">{t(`acct.${card.id}.title`)}</h2>
+          <li key={card.id} className="card ps-hub-card flex flex-col p-5">
+            <h2 className="font-display font-bold text-ink">{t(`acct.${card.id}.title`)}</h2>
             <p className="text-sm text-muted mt-1 flex-1">{t(`acct.${card.id}.body`)}</p>
-            <Link href={card.href} className="btn btn-primary min-h-11 mt-auto w-full">{t(`acct.${card.id}.action`)}</Link>
+            <Link href={card.href} className="btn btn-quiet min-h-11 mt-4 w-full">{t(`acct.${card.id}.action`)}</Link>
           </li>
         ))}
         {/* Saved to the account by AccountLocaleSync. */}
-        <li className="card flex flex-col p-5 min-h-[13.5rem]" data-testid="language-card">
-          <h2 className="font-semibold">{t("lang.accountTitle")}</h2>
+        <li className="card ps-hub-card flex flex-col p-5" data-testid="language-card">
+          <h2 className="font-display font-bold text-ink">{t("lang.accountTitle")}</h2>
           <p className="text-sm text-muted mt-1 flex-1">{t("lang.accountBody")}</p>
           <LanguageSelect refresh={false} className="mt-auto" />
         </li>
         {/* Developer-only (developer_users, checked on the server). Phones only: desktop has it in the sidebar. */}
         {developer ? (
-          <li className="card flex flex-col p-5 min-h-[13.5rem] md:hidden" data-testid="developer-card">
-            <h2 className="font-semibold">{t("acct.developer.title")}</h2>
+          <li className="card ps-hub-card flex flex-col p-5 md:hidden" data-testid="developer-card">
+            <h2 className="font-display font-bold text-ink">{t("acct.developer.title")}</h2>
             <p className="text-sm text-muted mt-1 flex-1">{t("acct.developer.body")}</p>
-            <Link href="/developer/analytics" className="btn btn-primary min-h-11 mt-auto w-full">{t("acct.developer.action")}</Link>
+            <Link href="/developer/analytics" className="btn btn-quiet min-h-11 mt-4 w-full">{t("acct.developer.action")}</Link>
           </li>
         ) : null}
       </ul>

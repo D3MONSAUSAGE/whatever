@@ -1281,6 +1281,8 @@ export const en = {
   "hub.recent": "Recent {kind}",
   "hub.none": "None yet. {action} to start.",
   "cnav.aria": "Content",
+  "anav.aria": "Account sections",
+  "anav.overview": "Overview",
 
   // I18N-3: content picker (file names never translated)
   "cp.search": "Search",
@@ -1849,6 +1851,7 @@ export const en = {
   "ss.groupAdded": "Group added",
   "ss.groupSaved": "Group saved",
   "ss.groupDeleted": "Group deleted",
+  "ss.dayPartsAdded": "Times of day added: {n}",
   "ss.publishedUpdated": "Published slides updated",
   "ss.schedAdded": "Schedule added",
   "ss.schedDeleted": "Schedule deleted",
