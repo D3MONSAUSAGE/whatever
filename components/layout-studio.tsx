@@ -29,6 +29,7 @@ import { publishSavedCopy } from "@/lib/screen-actions-ui";
 import { ShowOnScreens } from "@/components/show-on-screens";
 import { studioTemplateThumbnailSrc } from "@/lib/layout-thumbnails";
 import { StudioStyles, useStudioBreakpoint } from "@/components/studio-chrome";
+import { useEditorV2 } from "@/lib/editor-layout";
 import { StudioGuardedLink, useConfirmDiscard, useRegisterStudioLeave } from "@/components/studio-leave";
 import type { Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
@@ -99,6 +100,9 @@ export function LayoutStudio({
   const [boardName, setBoardName] = useState("");
   const [renaming, setRenaming] = useState(false);
   const studioBp = useStudioBreakpoint();
+  // Redesign phase 3 (opt-in): tools · TV · properties on tablets and desktops. Phones keep the stacked editor.
+  const [editorV2, setEditorV2] = useEditorV2();
+  const v2 = editorV2 && studioBp !== "phone";
   const phonePreview = studioBp === "phone";
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [note, setNote] = useState(accountMode || fixture ? "" : t("ls.browserCopy"));
@@ -800,7 +804,7 @@ export function LayoutStudio({
   const editorPlacement = zoneEditorPlacement(zone, studioBp);
   const zoneEditor = (
     <SelectedZoneEditor
-      key={editorPlacement === "canvas" ? `canvas-${zone}` : "left"}
+      key={v2 ? "props" : editorPlacement === "canvas" ? `canvas-${zone}` : "left"}
       zone={zone}
       template={template}
       draft={draft}
@@ -850,7 +854,7 @@ export function LayoutStudio({
   }
 
   return (
-    <main className={zone && step !== "template" ? "studio-app zone-open" : "studio-app"} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#f4f7fb", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
+    <main className={`${zone && step !== "template" ? "studio-app zone-open" : "studio-app"}${v2 ? " studio-v2" : ""}`} style={{ minHeight: embedded ? undefined : "100vh", background: embedded ? "transparent" : "#f4f7fb", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} data-embedded={embedded ? "true" : undefined} data-step={step}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
           {onClose ? <button type="button" className="studio-back" disabled={saving !== null} onClick={() => requestLeave(onClose)}>{t("ls.back")}</button> : null}
@@ -878,6 +882,16 @@ export function LayoutStudio({
           ) : null}
         </div>
         <div className="studio-toolbar-actions">
+          {v2 && accountMode ? (
+            <span className={`studio-status-pill ${studioIsDirty() ? "is-dirty" : "is-saved"}`} role="status" data-testid="studio-status-pill">
+              {saving === "publish" ? t("ls.publishing") : saving === "draft" ? t("ed.saving") : studioIsDirty() ? t("ed2.unpublished") : t("ed2.upToDate")}
+            </span>
+          ) : null}
+          {accountMode && studioBp !== "phone" ? (
+            <button type="button" className="studio-layout-toggle" onClick={() => setEditorV2(!editorV2)} data-testid="editor-layout-toggle">
+              {editorV2 ? t("ed2.useClassic") : t("ed2.tryNew")}
+            </button>
+          ) : null}
           {renderSaveDraft()}
           {renderPreviewButton()}
           {renderPublish()}
@@ -894,7 +908,7 @@ export function LayoutStudio({
           {screenId ? <p style={{ fontSize: 14 }}>{t("ls.oneScreen")}</p> : null}
 
           <div className={step === "template" ? "studio-pane on" : "studio-pane"} data-step="template">
-            <details className="studio-panel" open>
+            <details className="studio-panel" open={!v2}>
               <summary className="studio-panel-summary">{t("ls.layout")}</summary>
               <TemplatePicker template={template} onChoose={choose} />
             </details>
@@ -921,7 +935,7 @@ export function LayoutStudio({
           </div>
 
         </section>
-        {editorPlacement === "left" ? <div className="studio-editor-slot">{zoneEditor}</div> : null}
+        {editorPlacement === "left" && !v2 ? <div className="studio-editor-slot">{zoneEditor}</div> : null}
         <section className="studio-controls studio-controls-end" data-testid="studio-tools-style">
           <div className={step === "style" ? "studio-pane on" : "studio-pane"} data-step="style">
             <details className="studio-panel">
@@ -1023,7 +1037,7 @@ export function LayoutStudio({
               {t("ls.clippedNames", { names: clipped.map((name) => `“${name}”`).join(", ") })}
             </p>
           ) : null}
-          {studioBp !== "phone" ? (
+          {studioBp !== "phone" && !v2 ? (
             <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label={t("ls.areaControls")} tabIndex={0}>
               {editorPlacement === "canvas"
                 ? zoneEditor
@@ -1031,6 +1045,11 @@ export function LayoutStudio({
             </div>
           ) : null}
         </section>
+        {v2 ? (
+          <aside className="studio-props" id="studio-canvas-tools" aria-label={t("ed2.properties")} data-testid="studio-props">
+            {zone ? zoneEditor : <p className="studio-zone-hint">{t("ls.selectArea")}</p>}
+          </aside>
+        ) : null}
       </div>
       <div className="studio-savebar">
         {progress || note ? <p className="studio-status" role="status">{progress || note}</p> : null}
