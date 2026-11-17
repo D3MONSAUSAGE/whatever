@@ -160,7 +160,8 @@ describe("I18N-2: Spanish for API errors Android can show (codes unchanged)", ()
     expect(apiMessageEs(found[1])).toBeNull();
   });
   it("customer routes are wrapped so errors come back in the caller's language; player, cron, billing and webhooks are not", () => {
-    const skip = /app\/api\/(admin|billing|cron|config|health|player|webhooks)\//;
+    // traffic: the public, cookieless page-view beacon (always 204, no user-facing text), like player and health.
+    const skip = /app\/api\/(admin|billing|cron|config|health|player|traffic|webhooks)\//;
     for (const f of walk("app/api").filter((p) => p.endsWith("route.ts"))) {
       const src = readFileSync(f, "utf8");
       if (f === "app/api/brand/apply/route.ts") continue; // byte-identical by design (brand-identity test)

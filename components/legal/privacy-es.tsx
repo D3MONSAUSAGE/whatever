@@ -28,7 +28,7 @@ export function PrivacyEs() {
       </ul>
 
       <h2 className="font-semibold text-lg">Para qué se usa</h2>
-      <p>Para iniciar su sesión, almacenar y entregar su contenido a sus pantallas, mostrar el estado de las pantallas, enviar alertas de la cuenta y de las pantallas, gestionar la facturación cuando se inicia un plan de pago, medir qué anuncios y canales traen nuevos registros, elaborar estadísticas internas sobre el uso del Servicio, dar soporte a los clientes, limitar el abuso y solucionar problemas del Servicio. Usted conserva la propiedad de su contenido. No vendemos información personal. No hay ninguna venta de la cual excluirse, y esta política no es una declaración de cumplimiento de ninguna ley de privacidad en particular.</p>
+      <p>Para iniciar su sesión, almacenar y entregar su contenido a sus pantallas, mostrar el estado de las pantallas, enviar alertas de la cuenta y de las pantallas, gestionar la facturación cuando se inicia un plan de pago, medir qué anuncios y canales traen nuevos registros, contar las visitas al sitio web público, elaborar estadísticas internas sobre el uso del Servicio, dar soporte a los clientes, limitar el abuso y solucionar problemas del Servicio. Usted conserva la propiedad de su contenido. No vendemos información personal. No hay ninguna venta de la cual excluirse, y esta política no es una declaración de cumplimiento de ninguna ley de privacidad en particular.</p>
 
       <h2 className="font-semibold text-lg" id="staff-access">Quién en Pekko puede ver los datos de su cuenta</h2>
       <p>
@@ -39,7 +39,7 @@ export function PrivacyEs() {
       </p>
 
       <h2 className="font-semibold text-lg">Qué se mide y qué no</h2>
-      <p>Los registros anteriores son registros propios de las pantallas y los cambios de la propia cuenta. Esta aplicación no incluye una red publicitaria ni un script de analítica web de terceros. El cliente de inicio de sesión del panel almacena la sesión en el navegador y llama a la API de Pekko con un token de portador (bearer token).</p>
+      <p>Los registros anteriores son registros propios de las pantallas y los cambios de la propia cuenta. Esta aplicación no incluye una red publicitaria ni un script de analítica web de terceros. Las páginas públicas del sitio usan el contador de visitas propio de Pekko, sin cookies, que se describe más abajo. El cliente de inicio de sesión del panel almacena la sesión en el navegador y llama a la API de Pekko con un token de portador (bearer token).</p>
       <p>El correo transaccional se envía a través de Resend como texto plano. La solicitud de envío no activa el seguimiento de aperturas ni de clics, y el dominio de envío verificado pekkotv.com reporta el seguimiento de aperturas y de clics desactivado. Esto describe esta aplicación y esa configuración del dominio. No es una promesa de que un proveedor nunca registre ni mida sus propios sistemas.</p>
 
       <h2 className="font-semibold text-lg">Atribución de anuncios y campañas</h2>
@@ -48,6 +48,18 @@ export function PrivacyEs() {
         Si crea una cuenta en ese tiempo, copiamos esta información de la primera visita a su cuenta una sola vez, al registrarse, y no la sobrescribimos después.
         La usamos solo para medir qué anuncios y canales traen nuevos registros, y el personal autorizado de Pekko puede ver el origen de la primera visita de una cuenta en la página interna descrita arriba. No la vendemos ni la compartimos con anunciantes ni redes publicitarias, y no usamos píxeles publicitarios ni scripts de analítica de terceros.
         La copia en su cuenta se elimina cuando se elimina su cuenta.
+      </p>
+
+      <h2 className="font-semibold text-lg" id="website-statistics">Estadísticas de visitas al sitio web</h2>
+      <p>
+        En las páginas públicas de pekkotv.com (inicio, funciones, precios, preguntas frecuentes, soporte y contacto, en inglés y en español), Pekko cuenta las visitas con su propio contador. No crea ninguna cookie ni guarda direcciones IP, huellas del navegador ni identificadores persistentes.
+        Cuando se carga una de estas páginas, su navegador envía a Pekko la dirección de la página sin sus parámetros de consulta. En la primera página de una visita también envía la dirección del sitio que lo envió, de la que solo se guarda el nombre del sitio, y las etiquetas de campaña del enlace (fuente, medio y campaña).
+        Para contar visitantes únicos, el servidor de Pekko combina su dirección IP y la cadena de agente de usuario de su navegador con un valor aleatorio que cambia cada día, y los convierte en un código de un solo sentido. La dirección IP y la cadena de agente de usuario no se guardan.
+        Ese código se conserva solo durante el día en que se crea y luego se sustituye por un total diario. Cada valor aleatorio diario se elimina a los dos días, así que las visitas no se pueden vincular entre días ni rastrear hasta usted.
+        Lo que se conserva son totales diarios por página y fuente de tráfico, que el personal autorizado de Pekko ve en la página interna descrita arriba. Estos totales se eliminan a los 400 días.
+        Un indicador por pestaña en el almacenamiento de sesión de su navegador, que nunca se envía a Pekko, distingue la primera página de una visita de las siguientes.
+        No se cuentan las visitas mientras usted haya iniciado sesión en Pekko, ni cuando su navegador envía una señal de Global Privacy Control o Do Not Track. No se cuentan los paneles, las páginas de inicio de sesión, el reproductor de TV ni estas páginas legales.
+        Estas estadísticas no se vinculan con ninguna cuenta y no se comparten con anunciantes ni redes publicitarias.
       </p>
 
       <h2 className="font-semibold text-lg">Proveedores de servicios</h2>

@@ -5,6 +5,7 @@ import { LoadState } from "@/components/ui";
 import { LogoMark } from "@/components/brand";
 import { LanguageSelect } from "@/components/i18n/language-select";
 import { AccountsView } from "@/components/developer/accounts-view";
+import { TrafficView } from "@/components/developer/traffic-view";
 import { BarRows, ColumnChart, Legend, LineChart, Meter, ORDINAL_BLUE, NEUTRAL, SegmentedBar, SERIES, TableView } from "@/components/developer/charts";
 import { currentLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
@@ -25,9 +26,11 @@ type Load = { state: "loading" } | { state: "notFound" } | { state: "error"; mes
 const SECTIONS = ["overview", "activation", "revenue", "screens", "health"] as const;
 type SectionId = (typeof SECTIONS)[number];
 
-type View = "analytics" | "accounts";
+type View = "analytics" | "accounts" | "traffic";
 /** ?view=accounts opens the Customer Accounts tab (the old /developer/accounts URL redirects here). */
 const ACCOUNTS_VIEW_URL = "/developer/analytics?view=accounts";
+/** ?view=traffic opens the Website traffic tab. */
+const TRAFFIC_VIEW_URL = "/developer/analytics?view=traffic";
 
 export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) {
   const t = useT();
@@ -42,11 +45,12 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("view") === "accounts") setViewState("accounts");
+    const v = new URLSearchParams(location.search).get("view");
+    if (v === "accounts" || v === "traffic") setViewState(v);
   }, []);
   const setView = useCallback((next: View, section?: SectionId) => {
     setViewState(next);
-    history.replaceState(null, "", next === "accounts" ? ACCOUNTS_VIEW_URL : `/developer/analytics${section ? `#dev-sec-${section}` : ""}`);
+    history.replaceState(null, "", next === "accounts" ? ACCOUNTS_VIEW_URL : next === "traffic" ? TRAFFIC_VIEW_URL : `/developer/analytics${section ? `#dev-sec-${section}` : ""}`);
     if (section) requestAnimationFrame(() => document.getElementById(`dev-sec-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
     else window.scrollTo({ top: 0 });
   }, []);
@@ -87,6 +91,7 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
       <main id="main" className="mx-auto max-w-6xl px-5 py-8">
         <LoadState error={load.state === "error" ? load.message : null} />
         {view === "accounts" ? <div hidden><AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} /></div> : null}
+        {view === "traffic" ? <div hidden><TrafficView onConfirmed={onConfirmed} onNotFound={onDenied} /></div> : null}
       </main>
     );
   }
@@ -101,7 +106,7 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
       <ConsoleHeader view={view} setView={setView} />
       <SectionTabs view={view} setView={setView} />
       <main id="main" className="dc-main">
-        {view === "accounts" ? <AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} /> : (
+        {view === "accounts" ? <AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} /> : view === "traffic" ? <TrafficView onConfirmed={onConfirmed} onNotFound={onDenied} /> : (
           <>
             <div className="dc-intro">
               <div>
@@ -157,6 +162,7 @@ function ConsoleHeader({ view, setView }: ViewProps) {
         </Link>
         <nav className="dc-top-nav" aria-label={t("dc.console")}>
           <button type="button" className={view === "analytics" ? "is-on" : ""} aria-current={view === "analytics" ? "page" : undefined} onClick={() => setView("analytics")}>{t("dacct.toAnalytics")}</button>
+          <button type="button" className={view === "traffic" ? "is-on" : ""} aria-current={view === "traffic" ? "page" : undefined} onClick={() => setView("traffic")}>{t("tr.title")}</button>
           <button type="button" className={view === "accounts" ? "is-on" : ""} aria-current={view === "accounts" ? "page" : undefined} onClick={() => setView("accounts")}>{t("dacct.toAccounts")}</button>
           <Link href="/dashboard">{t("dc.backToApp")}</Link>
         </nav>
@@ -188,7 +194,9 @@ function SectionTabs({ view, setView }: ViewProps) {
               onClick={(e) => { if (view !== "analytics") { e.preventDefault(); setView("analytics", id); } }}>{t(`dc.tab.${id}` as MessageKey)}</a>
           );
         })}
-        <a href={ACCOUNTS_VIEW_URL} className={`dc-tab-accounts ${view === "accounts" ? "is-on" : ""}`} aria-current={view === "accounts" ? "page" : undefined}
+        <a href={TRAFFIC_VIEW_URL} className={`dc-tab-accounts ${view === "traffic" ? "is-on" : ""}`} aria-current={view === "traffic" ? "page" : undefined}
+          data-testid="tab-traffic" onClick={(e) => { e.preventDefault(); setView("traffic"); }}>{t("tr.title")}</a>
+        <a href={ACCOUNTS_VIEW_URL} className={view === "accounts" ? "is-on" : ""} aria-current={view === "accounts" ? "page" : undefined}
           data-testid="tab-accounts" onClick={(e) => { e.preventDefault(); setView("accounts"); }}>{t("dacct.toAccounts")}</a>
       </div>
     </nav>
