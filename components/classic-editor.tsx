@@ -103,6 +103,10 @@ export function ClassicEditor({
   // Redesign phase 3 (opt-in, decision D3): saving an existing classic board already updates its screens, so the
   // new layout names the button for what it does. Same save() call, same request.
   const [editorV2] = useEditorV2();
+  // Redesign phase 3: three columns on tablets and desktops (photo controls on the right), board-on-top tabs on phones.
+  const v2 = editorV2 && studioBp !== "phone";
+  const v2m = editorV2 && studioBp === "phone";
+  const [mtab, setMtab] = useState<"content" | "style">("content");
   const saveLabel = busy ? (draft.id ? t("ed.saving") : t("ed.creating")) : draft.id ? (editorV2 ? t("ls.publish") : t("ed.saveChanges")) : t("ed.createBoard");
 
   useEffect(() => {
@@ -215,10 +219,6 @@ export function ClassicEditor({
     confirmDiscard(isDirty(), () => setDraft(null));
   }
 
-  function goPreview() {
-    setStep("preview");
-    document.getElementById("studio-tv-preview")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
 
   async function save() {
     if (readOnly) return;
@@ -441,14 +441,18 @@ export function ClassicEditor({
   );
 
   return (
-    <div className="studio-app" data-testid="menu-editor" data-embedded="true" style={{ background: "transparent", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
+    <div className={`studio-app studio-classic${v2 ? " studio-v2" : ""}${v2m ? " studio-v2m" : ""}`} data-mtab={v2m ? mtab : undefined} data-testid="menu-editor" data-embedded="true" style={{ background: "transparent", color: "#0b1220", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
       <header className="studio-toolbar">
         <div className="studio-toolbar-lead">
           <button type="button" className="studio-back" disabled={busy} onClick={requestClose}>{t("ed.back")}</button>
           <h1 className="studio-heading" style={{ margin: 0, fontSize: 18, fontWeight: 750 }}>{draft.id ? draft.name || t("ed.editBoard") : t("ed.newBoard")}</h1>
         </div>
         <div className="studio-toolbar-actions">
-          <button type="button" className="btn btn-quiet min-h-11" onClick={goPreview}>{t("ed.preview")}</button>
+          {(v2 || v2m) && !readOnly ? (
+            <span className={`studio-status-pill ${isDirty() ? "is-dirty" : "is-saved"}`} role="status" data-testid="studio-status-pill">
+              {busy ? t("ed.saving") : isDirty() ? t("ed2.unpublished") : t("ed2.upToDate")}
+            </span>
+          ) : null}
           <button type="button" className="btn btn-primary min-h-11" disabled={busy || readOnly} onClick={() => { void save(); }}>{saveLabel}</button>
         </div>
       </header>
@@ -477,24 +481,38 @@ export function ClassicEditor({
         </div>
 
         <section
-          className={step === "preview" ? "studio-canvas on" : "studio-canvas"}
+          className={step === "preview" || v2m ? "studio-canvas on" : "studio-canvas"}
           id="studio-tv-preview"
           data-testid="studio-tv-preview"
           aria-label={t("ed.canvasAria")}
         >
-          <p className="studio-kicker">{t("ed.kicker")}</p>
-          <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" ? renderStage(true, "menu-preview") : null}</div>
+          {editorV2 ? (
+            <p className="studio-select-hint" data-testid="studio-select-hint">{t("ed2.selectHint")}</p>
+          ) : <p className="studio-kicker">{t("ed.kicker")}</p>}
+          <div className="studio-canvas-stage">{studioBp !== "phone" || step === "preview" || v2m ? renderStage(true, "menu-preview") : null}</div>
           {previewError ? <p className="text-sm text-danger" role="alert">{previewError}</p> : null}
-          {studioBp !== "phone" ? (
+          {studioBp !== "phone" && !v2 ? (
             <div className="studio-canvas-tools" id="studio-canvas-tools" data-testid="studio-canvas-tools" role="region" aria-label={t("ce.photoControls")} tabIndex={0}>
               {photoPanel}
             </div>
           ) : null}
         </section>
+        {v2 ? (
+          <aside className="studio-props" id="studio-canvas-tools" aria-label={t("ce.photoControls")} data-testid="studio-props">
+            {photoPanel}
+          </aside>
+        ) : null}
       </div>
 
       <div className="studio-savebar">
         {previewError ? <p className="studio-status" role="status">{previewError}</p> : null}
+        {v2m ? (
+          <div className="studio-mtabs" role="group" aria-label={t("ed.stepsAria")} data-testid="studio-mtabs">
+            {(["content", "style"] as const).map((id) => (
+              <button key={id} type="button" aria-pressed={mtab === id} onClick={() => { setMtab(id); if (id === "content") setRegion("menu"); }}>{t(`ed2.tab.${id}`)}</button>
+            ))}
+          </div>
+        ) : (
         <nav className="studio-tabs" role="tablist" aria-label={t("ed.stepsAria")}>
           {(["preview", "content", "photo", "style", "publish"] as const).map((id) => (
             <button
@@ -512,6 +530,7 @@ export function ClassicEditor({
             >{t(STEP_KEY[id])}</button>
           ))}
         </nav>
+        )}
         <div className="studio-save-actions">
           <button type="button" className="btn btn-primary min-h-11" disabled={busy || readOnly} onClick={() => { void save(); }}>{saveLabel}</button>
         </div>

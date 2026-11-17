@@ -138,9 +138,12 @@ describe("t244u fix 3: selected media controls under the board", () => {
 
   it("the classic editor shows its Photo controls under the board, and in the stacked column only on phones", () => {
     const src = readFileSync("components/classic-editor.tsx", "utf8");
-    expect([...src.matchAll(/\{photoPanel\}/g)]).toHaveLength(2);
+    // Three mutually exclusive places: the stacked column on phones, under the board (classic layout), or the
+    // properties column (redesign phase 3 layout on tablets and desktops).
+    expect([...src.matchAll(/\{photoPanel\}/g)]).toHaveLength(3);
     expect(src).toMatch(/studioBp === "phone" \? \([\s\S]{0,160}\{photoPanel\}/);
-    expect(src).toMatch(/studioBp !== "phone" \? \([\s\S]{0,160}studio-canvas-tools[\s\S]{0,220}\{photoPanel\}/);
+    expect(src).toMatch(/studioBp !== "phone" && !v2 \? \([\s\S]{0,160}studio-canvas-tools[\s\S]{0,220}\{photoPanel\}/);
+    expect(src).toMatch(/\{v2 \? \(\s*<aside className="studio-props"[\s\S]{0,200}\{photoPanel\}/);
     expect(src).toContain('role="region" aria-label={t("ce.photoControls")} tabIndex={0}');
     expect(en["ce.photoControls"]).toBe("Photo controls");
   });
