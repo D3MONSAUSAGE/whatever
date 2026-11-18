@@ -12,6 +12,7 @@
 1. CI is green on the PR head; merge (squash, `expectedHeadSha`).
 2. Wait for the `Vercel` status on the **merge commit** to be `success`.
 3. **Verify the live domains, not the status.** Fetch `https://pekkotv.com/<page>` and `https://pantalla-chi.vercel.app/<page>`, download every `/_next/static/**.js` the HTML references, and check for strings that only the new commit contains (and that the previous commit's strings are still there). Both domains must serve the same page chunk hashes. A `success` status alone is not proof: on 2026-11-18 the merge of PR #151 (`57deac3`) reported success while both domains kept serving PR #150's build.
+   For server-only changes, `https://pekkotv.com/api/health` returns `commit` (the short id the live deployment was built from); it must equal the merge commit.
 4. Check the feature itself where access allows (signed-out pages, API status codes, flags), and that nothing else regressed.
 5. Only then move the working branch to `main` (`git checkout -B <branch> origin/main` + `--force-with-lease`). **Never push the working branch to the merge commit before production is verified** (see the incident below).
 
