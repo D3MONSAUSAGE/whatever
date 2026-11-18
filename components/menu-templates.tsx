@@ -21,7 +21,7 @@ import {
   MENU_DESIGNS, designById, designDocument, designHasMedia, filterDesigns, isPhotoDesign, scratchDocument, stockPhotoPath, switchDesign,
   type DesignBusiness, type DesignStyle, type MenuDesign,
 } from "@/lib/menu-designs";
-import { designColors, designSvgWithReport, itemPhotosShown } from "@/lib/menu-design-svg";
+import { designColors, designSvgWithReport, hasOwnerItemPhoto, itemPhotosShown } from "@/lib/menu-design-svg";
 import type { Brand } from "@/lib/brand-kit";
 import { moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 
@@ -74,7 +74,9 @@ const STYLES = `${FONT_CSS}
 .tpl-item { display: grid; grid-template-columns: 64px minmax(0, 1fr) 92px auto; gap: 6px; padding: 8px; border-bottom: 1px solid #edf1f7; }
 .tpl-item:last-child { border-bottom: 0; }
 .tpl-item .tpl-photo { grid-row: 1 / 3; grid-column: 1; width: 64px; height: 64px; align-self: start; border-radius: 10px; border: 1px dashed #9aa8bf; background: #f6f8fc; overflow: hidden; padding: 0; font-size: 11px; font-weight: 700; color: #33415a; line-height: 1.2; }
+.tpl-item .tpl-photo { position: relative; }
 .tpl-item .tpl-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpl-item .tpl-hidden { position: absolute; inset: auto 0 0 0; background: rgb(11 18 32 / .78); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 0; text-align: center; }
 .tpl-item .tpl-photo:has(img) { border-style: solid; border-color: var(--color-line); }
 .tpl-item .desc { grid-column: 2 / 4; }
 .tpl-item .acts { grid-row: 1 / 3; grid-column: 4; display: flex; flex-direction: column; gap: 3px; }
@@ -206,7 +208,12 @@ export function TemplateEditor({
   const design = designById(doc.design) ?? designById("coffee-shop")!;
 
   async function reloadLibrary() {
-    if (preview) return [];
+    if (preview) {
+      // UI preview only (no account): two bundled sample photos stand in for the owner's media.
+      const sample: AccountLibraryFile[] = ["salad", "bowl"].map((n) => ({ id: `00000000-0000-4000-8000-00000000f00${n === "salad" ? 1 : 2}`, name: `${n}.jpg`, kind: "image", mime: "image/jpeg", url: `/menu-templates/${n}.jpg` }));
+      setLibrary(sample);
+      return sample;
+    }
     const body = readAccountStudio(await api("/api/layout-studio"));
     const next = body?.library ?? [];
     setLibrary(next);
@@ -220,7 +227,11 @@ export function TemplateEditor({
   const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(doc.logoMediaId), itemImages };
   const report = useMemo(() => designSvgWithReport(doc, art).report, [doc, art.imageHref, art.logoHref]); // eslint-disable-line react-hooks/exhaustive-deps
   const [photoFor, setPhotoFor] = useState<{ si: number; ii: number } | null>(null);
-  function setItemPhoto(si: number, ii: number, imageMediaId: string | null) { update({ ...doc, sections: withItemPhoto(doc.sections, si, ii, imageMediaId) }); }
+  function setItemPhoto(si: number, ii: number, imageMediaId: string | null) {
+    update({ ...doc, sections: withItemPhoto(doc.sections, si, ii, imageMediaId) });
+    // Say exactly what happens to the photo: it shows on the board unless the owner chose to hide item photos.
+    if (imageMediaId) toast.show(doc.photoStyle === "text" && design.composition !== "cards" && design.composition !== "featured" ? t("tpl.photoSavedHidden") : t("tpl.photoAdded"));
+  }
   function moveItemAt(si: number, ii: number, dir: -1 | 1) { update({ ...doc, sections: moveItem(doc.sections, si, ii, dir) }); }
   /** Move the items that don't fit (the last ones in reading order) to a new board with the same template. */
   function splitOverflow() {
@@ -306,6 +317,9 @@ export function TemplateEditor({
   }
 
   const n = itemCount(doc);
+  const photosShown = itemPhotosShown(doc, design);
+  const ownerPhotos = hasOwnerItemPhoto(doc);
+  const photosHidden = ownerPhotos && !photosShown;
   const photoTemplate = isPhotoDesign(design) || itemPhotosShown(doc, design);
   // A roomier template that still shows item photos when this one does: three-column thumbnails hold all 24 items.
   const roomierId = photoTemplate ? "taqueria-specials" : "diner-classics";
@@ -378,6 +392,14 @@ export function TemplateEditor({
           {step === 1 ? (
             <div className="grid gap-3">
               <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: MENU_LIMITS.sections })}</span></div>
+              {photosHidden ? (
+                <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-hidden">
+                  <p>{t("tpl.photosHiddenNote")}</p>
+                  <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => patch({ photoStyle: "thumbs" })} data-testid="tpl-show-photos">{t("tpl.showItemPhotos")}</button>
+                </div>
+              ) : ownerPhotos && !isPhotoDesign(design) ? (
+                <p className="text-sm text-live-ink" role="status" data-testid="tpl-photos-shown">✓ {t("tpl.photosShownNote")}</p>
+              ) : <p className="text-xs text-muted">{t("tpl.photoTip")}</p>}
               {doc.sections.map((section, si) => (
                 <div className="tpl-sec" key={si}>
                   <div className="tpl-sec-h">
@@ -390,7 +412,8 @@ export function TemplateEditor({
                   {section.items.map((item, ii) => (
                     <div className="tpl-item" key={ii}>
                       <button type="button" className="tpl-photo" onClick={() => setPhotoFor({ si, ii })} data-testid={`tpl-photo-${si}-${ii}`}
-                        aria-label={item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}>
+                        aria-label={`${item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}${item.imageMediaId && photosHidden ? ` (${t("tpl.hiddenOnBoard")})` : ""}`}>
+                        {item.imageMediaId && photosHidden ? <span className="tpl-hidden" aria-hidden>{t("tpl.hidden")}</span> : null}
                         {item.imageMediaId && urlFor(item.imageMediaId) ? <img src={urlFor(item.imageMediaId)!} alt="" />
                           : item.stockPhoto ? <img src={stockPhotoPath(item.stockPhoto)} alt="" />
                             : <span aria-hidden>＋<br />{t("tpl.photo")}</span>}
@@ -576,7 +599,12 @@ export function TemplateEditor({
                     onClick={() => { setItemPhoto(photoFor.si, photoFor.ii, f.id); setPhotoFor(null); }}>{f.url ? <img src={f.url} alt="" /> : null}</button>
                 ))}</div>
               ) : <p className="text-sm text-muted">{t("tpl.noMedia")}</p>}
-              {!itemPhotosShown(doc, design) ? <p className="text-xs text-muted">{t("tpl.photoHiddenHint")}</p> : null}
+              {doc.photoStyle === "text" && design.composition !== "cards" && design.composition !== "featured" ? (
+                <div className="note-warn text-sm grid gap-2" data-testid="tpl-dialog-hidden">
+                  <p>{t("tpl.photoHiddenHint")}</p>
+                  <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.showItemPhotos")}</button>
+                </div>
+              ) : <p className="text-xs text-muted" data-testid="tpl-dialog-where">{isPhotoDesign(design) ? t("tpl.photoWhereCards") : t("tpl.photoWhereThumbs", { name: label })}</p>}
               <div className="flex justify-end"><button type="button" className="btn btn-quiet" onClick={() => setPhotoFor(null)}>{t("tpl.done")}</button></div>
             </div>
           </Dialog>

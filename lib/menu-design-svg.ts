@@ -7,7 +7,7 @@
  */
 import { FONT_METRICS } from "@/lib/board-font-metrics";
 import { boardFont, type BoardFontId } from "@/lib/board-fonts";
-import { designById, designVariant, type MenuDesign } from "@/lib/menu-designs";
+import { designById, designVariant, isPhotoDesign, type MenuDesign } from "@/lib/menu-designs";
 import type { LayoutDocument, LayoutItem, LayoutSection, ZoneBox } from "@/lib/layout-studio";
 
 const W = 1920;
@@ -166,6 +166,8 @@ type Style = {
   leader: boolean; rule: boolean; tags: boolean;
   /** Item photo size (0 = text-only, the original layout). */
   thumb: number;
+  /** Draw a tinted initial tile for items without a photo (photo templates); text templates leave the space clean. */
+  placeholders?: boolean;
 };
 type PlacedItem = { lines: string[]; desc: string[]; price: string; priceW: number; h: number; photo?: string | null; initial?: string };
 type PlacedSection = { name: string; items: PlacedItem[]; headH: number; h: number; thumbs?: boolean };
@@ -411,7 +413,7 @@ function photoTile(parts: string[], href: string | null, x: number, y: number, w
 }
 function paintThumbItem(parts: string[], item: PlacedItem, x: number, y: number, colW: number, st: Style, c: DesignColors) {
   const t = st.thumb; const gap = t * 0.22; const tx = x + t + gap; const textW = colW - t - gap;
-  photoTile(parts, item.photo ?? null, x, y, t, t, t * 0.16, c, item.initial ?? "", c.paper);
+  if (item.photo || st.placeholders) photoTile(parts, item.photo ?? null, x, y, t, t, t * 0.16, c, item.initial ?? "", c.paper);
   const lineH = st.name.size * 1.17;
   const tagH = st.tags && item.price ? st.price.size * 1.25 : 0;
   const textH = Math.max(item.lines.length * lineH, tagH) + (item.desc.length ? st.desc.size * 0.32 + item.desc.length * st.desc.size * 1.32 : 0);
@@ -481,7 +483,15 @@ function photoHref(doc: LayoutDocument, art?: DesignArt) {
 /** Item photos show on card templates always, and on other templates when the owner (or the design) picks thumbnails. */
 export function itemPhotosShown(doc: LayoutDocument, design: MenuDesign): boolean {
   if (design.composition === "cards" || design.composition === "featured") return true;
-  return (doc.photoStyle ?? design.photoStyle ?? "text") === "thumbs";
+  // An explicit choice on the board wins (Look → Show as thumbnails / Hide).
+  if (doc.photoStyle) return doc.photoStyle === "thumbs";
+  if (design.photoStyle) return design.photoStyle === "thumbs";
+  // Text-focused templates: as soon as the owner adds a photo to an item, show item photos as thumbnails, so an
+  // uploaded photo never silently disappears. Boards without owner photos look exactly as before.
+  return hasOwnerItemPhoto(doc);
+}
+export function hasOwnerItemPhoto(doc: LayoutDocument): boolean {
+  return doc.sections.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
 }
 export function itemPhotoResolver(art?: DesignArt): ItemPhotoResolver {
   return (item) => {
@@ -505,7 +515,7 @@ function baseStyle(design: MenuDesign, f: { head: string; body: string }, sizes:
   };
 }
 /** Same style with the thumbnail column switched on when this board shows item photos. */
-function withThumbs(st: Style, on: boolean): Style { return on ? { ...st, thumb: Math.round(st.name.size * 2.3) } : st; }
+function withThumbs(st: Style, on: boolean, placeholders = true): Style { return on ? { ...st, thumb: Math.round(st.name.size * 2.3), placeholders } : st; }
 
 /** Where a muted video may play on a design board (null when the design has no media area). */
 export function designVideoBox(doc: LayoutDocument): ZoneBox | null {
@@ -550,7 +560,7 @@ function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   const footerH = doc.footer ? 52 : 0;
   const colH = H - 70 - footerH - menuTop;
   const shown = itemPhotosShown(doc, design);
-  const base = withThumbs(baseStyle(design, f, { name: 38, price: 38, desc: 25, section: 30, itemGap: 22, sectionGap: 44, headGap: 24 }), shown);
+  const base = withThumbs(baseStyle(design, f, { name: 38, price: 38, desc: 25, section: 30, itemGap: 22, sectionGap: 44, headGap: 24 }), shown, isPhotoDesign(design));
   const avail = L - x0 - 90;
   const result = fit(doc.sections, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 64) / 2 }], colH, 1.25, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 64) / 2, 64, c);
@@ -593,7 +603,7 @@ function columns(parts: string[], doc: LayoutDocument, design: MenuDesign, c: De
   const colH = H - 64 - footerH - menuTop;
   const avail = L - x0 - 84; const colW = (avail - 80) / 2;
   const shown = itemPhotosShown(doc, design);
-  const base = withThumbs(baseStyle(design, f, { name: 36, price: 36, desc: 24, section: 30, itemGap: 20, sectionGap: 46, headGap: 22 }), shown);
+  const base = withThumbs(baseStyle(design, f, { name: 36, price: 36, desc: 24, section: 30, itemGap: 20, sectionGap: 46, headGap: 22 }), shown, isPhotoDesign(design));
   const result = fit(doc.sections, base, [{ cols: 2, colW }], colH, 1.3, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, 80, c);
   if (doc.footer) {
@@ -645,7 +655,7 @@ function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   const colH = H - 56 - footerH - menuTop;
   const avail = L - x0 - 80; const colW = (avail - 64) / 2;
   const shown = itemPhotosShown(doc, design);
-  const base = withThumbs(baseStyle(design, f, { name: 38, price: 42, desc: 25, section: 62, itemGap: 22, sectionGap: 40, headGap: 18 }), shown);
+  const base = withThumbs(baseStyle(design, f, { name: 38, price: 42, desc: 25, section: 62, itemGap: 22, sectionGap: 40, headGap: 18 }), shown, isPhotoDesign(design));
   const result = fit(doc.sections, base, [{ cols: 2, colW }], colH, 1.25, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, 64, c);
   if (doc.footer) parts.push(text(x0, H - 56, ellipsize(doc.footer.toUpperCase(), 22, f.body, 700, avail, 0.06), { size: 22, family: f.body, weight: 700, fill: c.muted, tracking: 0.06 }));
@@ -690,7 +700,7 @@ function list(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desig
   const colH = H - 56 - footerH - menuTop;
   const avail = W - x0 * 2; const gap = 72; const colW = (avail - gap * 2) / 3;
   const shown = itemPhotosShown(doc, design);
-  const base = withThumbs(baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), shown);
+  const base = withThumbs(baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), shown, isPhotoDesign(design));
   const result = fit(doc.sections, base, [{ cols: 3, colW }], colH, 1.5, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, gap, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));

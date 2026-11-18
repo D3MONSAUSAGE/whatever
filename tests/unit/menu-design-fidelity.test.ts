@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import { BOARD_FONTS } from "@/lib/board-fonts";
 import { layoutSvg } from "@/lib/layout-studio";
 import { MENU_DESIGNS, designDocument } from "@/lib/menu-designs";
-import { renderLayoutPng, stockPhotoDataUri } from "@/lib/server/layout-render";
+import { withItemPhoto } from "@/lib/menu-item-photos";
+import { prepareBoardPhoto, renderLayoutPng, stockPhotoDataUri } from "@/lib/server/layout-render";
+import type { LayoutDocument } from "@/lib/layout-studio";
 
 /**
  * The critical requirement: the editor preview and the TV image must be the same picture. The preview is this SVG
@@ -36,11 +38,20 @@ describe("template boards: browser preview vs server PNG", () => {
       `@font-face{font-family:"${font.family}";src:url(data:font/ttf;base64,${readFileSync(resolve("assets/fonts", face.file)).toString("base64")});font-weight:${font.files.length === 1 ? "100 900" : face.weight}}`)).join("");
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     const results: Record<string, { mean: number; changed: number }> = {};
-    for (const design of MENU_DESIGNS) {
-      const doc = designDocument(design);
-      const server = renderLayoutPng(doc);
+    // Every template as shipped, plus text templates carrying an owner's item photo (the Burrata regression).
+    const OWNER = "00000000-0000-4000-8000-000000000101";
+    const photo = await prepareBoardPhoto(readFileSync(resolve("assets/menu-templates/salad.jpg")), "image/jpeg", 900);
+    const cases: Array<{ id: string; doc: LayoutDocument; owner: boolean }> = MENU_DESIGNS.map((design) => ({ id: design.id, doc: designDocument(design), owner: false }));
+    for (const id of ["modern-restaurant", "chalkboard-bistro"]) {
+      const doc = designDocument(MENU_DESIGNS.find((d) => d.id === id)!);
+      cases.push({ id: `${id}+item-photo`, doc: { ...doc, sections: withItemPhoto(doc.sections, 0, 0, OWNER) }, owner: true });
+    }
+    for (const { id, doc, owner } of cases) {
+      const design = { id };
+      const server = renderLayoutPng(doc, null, owner ? { itemImages: { [OWNER]: photo } } : {});
       const stockHrefs = Object.fromEntries(doc.sections.flatMap((sec) => sec.items).filter((item) => item.stockPhoto).map((item) => [item.stockPhoto!, stockPhotoDataUri(item.stockPhoto) ?? ""]));
-      const svg = layoutSvg(doc, { stockHref: stockPhotoDataUri(doc.stockPhoto), stockHrefs });
+      const itemImages = owner ? { [OWNER]: `data:${photo.mime};base64,${photo.bytes.toString("base64")}` } : undefined;
+      const svg = layoutSvg(doc, { stockHref: stockPhotoDataUri(doc.stockPhoto), stockHrefs, itemImages });
       await page.setContent(`<!doctype html><style>${faces}body{margin:0}</style>${svg}`);
       await page.evaluate(async () => {
         await Promise.all(["Inter", "Noto Serif", "Montserrat", "Oswald", "Bebas Neue", "Lobster"].map((f) => document.fonts.load(`40px "${f}"`)));

@@ -51,10 +51,12 @@ Set `MENU_TEMPLATES=off` and redeploy. If a full code rollback is needed, redepl
   No table or migration is involved. Items without these keys parse and render exactly as before.
 - **Photos travel with items.** Editing, reordering, moving an item between sections (↑/↓ at a section edge) and switching templates all move whole item objects (`lib/menu-item-photos.ts`).
 - **Presentation** (shared renderer, `lib/menu-design-svg.ts`; the editor preview and the TV PNG are the same SVG):
-  - *Compact thumbnails:* small rounded photos beside items. This is the default on Taquería Specials, and any other template can turn it on (`photoStyle: "thumbs"`) in Look.
+  - *Compact thumbnails:* small rounded photos beside items. This is the default on Taquería Specials.
   - *Food photo cards:* Photo Menu Grid and Café Favorites. Up to 15 cards per screen.
   - *Featured dishes:* Featured Dishes. Items with photos (up to 3) are shown large beside the full list.
-  - *Text-focused:* the original 18 templates by default. Photos are hidden but stay on their items, and show again on a photo template or with thumbnails turned on.
+  - *Text-focused:* the original 18 templates. With no owner photos they render exactly as before. **As soon as an item has an owner photo, item photos show automatically as compact thumbnails** beside the items that have one (no placeholder tiles for the others; the template's layout, fonts and colours are unchanged).
+  - *Hiding is an explicit choice:* Look → "Hide (keep on items)" stores `photoStyle: "text"`. The photos stay on their items. The editor then shows a notice in the Menu step and in the photo dialog, a "Hidden" badge on the item's photo, and a one-tap **Show item photos** button. Card and featured templates always show photos.
+  - *History:* until this fix, text-focused templates hid item photos unless thumbnails were turned on in Look, so a photo added to an item (e.g. Burrata on Modern Restaurant) appeared in the editor's item list but not on the TV. `tests/unit/menu-item-photos.test.ts` ("regression: … Burrata …") and the fidelity test (`modern-restaurant+item-photo`) cover it.
 - **Images:**
   - Photos are always cropped to fill their box (`slice`), never stretched, and clipped to a rounded rectangle or circle.
   - Items without a photo show a tinted tile with the item's initial.

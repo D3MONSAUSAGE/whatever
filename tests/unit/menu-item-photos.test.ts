@@ -98,20 +98,21 @@ describe("photos travel with their items", () => {
     expect(moveItem(full, 0, 0, 1)).toBe(full);
   });
 
-  it("switching photo → text → photo templates keeps all photos and shows them again", () => {
+  it("switching photo → text → photo templates keeps all photos, and they stay visible", () => {
     const doc = photoBoard("photo-menu-grid");
     const ids = itemPhotoIds(doc.sections);
     const textOnly = switchDesign(doc, designById("chalkboard-bistro")!);
-    expect(itemPhotosShown(textOnly, designById("chalkboard-bistro")!)).toBe(false);
     expect(itemPhotoIds(textOnly.sections)).toEqual(ids);
-    const textSvg = layoutSvg(textOnly, { itemImages: { [P1]: href, [P2]: href } });
-    expect(textSvg).not.toContain(href); // hidden on a text template
-    const back = switchDesign(textOnly, designById("cafe-favorites")!);
+    // A text-focused template shows the owner's photos as thumbnails instead of silently dropping them.
+    expect(itemPhotosShown(textOnly, designById("chalkboard-bistro")!)).toBe(true);
+    expect(layoutSvg(textOnly, { itemImages: { [P1]: href, [P2]: href } })).toContain(href);
+    // Hiding them is an explicit owner choice, and the photos stay on their items.
+    const hidden = { ...textOnly, photoStyle: "text" as const };
+    expect(layoutSvg(hidden, { itemImages: { [P1]: href, [P2]: href } })).not.toContain(href);
+    expect(itemPhotoIds(hidden.sections)).toEqual(ids);
+    const back = switchDesign(hidden, designById("cafe-favorites")!);
     expect(itemPhotoIds(back.sections)).toEqual(ids);
-    expect(layoutSvg(back, { itemImages: { [P1]: href, [P2]: href } })).toContain(href); // shown again
-    // Thumbnails can be turned on for a text template without changing the template.
-    const thumbs = { ...textOnly, photoStyle: "thumbs" as const };
-    expect(layoutSvg(thumbs, { itemImages: { [P1]: href, [P2]: href } })).toContain(href);
+    expect(layoutSvg(back, { itemImages: { [P1]: href, [P2]: href } })).toContain(href); // cards always show photos
   });
 
   it("splits a too-long menu into two boards without losing an item or a photo", () => {
@@ -124,6 +125,72 @@ describe("photos travel with their items", () => {
     expect(count(kept) + count(moved)).toBe(20);
     expect(itemPhotoIds(moved)).toEqual([P1]);
     expect(designSvgWithReport({ ...many, sections: kept }).report.dropped).toBe(0);
+  });
+});
+
+describe("regression: a photo on Modern Restaurant's Burrata appears on the TV", () => {
+  const design = designById("modern-restaurant")!;
+  const burrata = () => {
+    const doc = designDocument(design);
+    expect(doc.sections[0].items[0].name).toBe("Burrata");
+    return { ...doc, sections: withItemPhoto(doc.sections, 0, 0, P1) };
+  };
+
+  it("the photo is drawn in the preview SVG with the template unchanged otherwise", () => {
+    const doc = burrata();
+    expect(doc.photoStyle).toBeUndefined();
+    expect(itemPhotosShown(doc, design)).toBe(true);
+    const svg = layoutSvg(doc, { itemImages: { [P1]: href } });
+    expect(svg).toContain(href);
+    expect(svg).toContain("Burrata");
+    for (const s of doc.sections) for (const i of s.items) expect(svg, i.name).toContain(i.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
+    expect(designSvgWithReport(doc, { itemImages: { [P1]: href } }).report.dropped).toBe(0);
+  });
+
+  it("no initial-letter placeholder tiles on a text template", () => {
+    const doc = burrata();
+    const svg = layoutSvg(doc, { itemImages: { [P1]: href } });
+    // "C" (Charred octopus) and "B" (Beef tartare) placeholders must not appear as centred single letters.
+    expect(svg).not.toMatch(/text-anchor="middle">C</);
+    expect(svg).not.toMatch(/text-anchor="middle">B</);
+  });
+
+  it("survives save and reopen (stored JSON round trip)", () => {
+    const parsed = parseLayout(JSON.parse(JSON.stringify(burrata())));
+    if (!parsed.ok) throw new Error(parsed.error);
+    const reopened = parsed.value;
+    expect(reopened.sections[0].items[0].imageMediaId).toBe(P1);
+    expect(layoutSvg(reopened, { itemImages: { [P1]: href } })).toContain(href);
+  });
+
+  it("the server's 1920×1080 PNG draws it", () => {
+    const bytes = Buffer.from(PNG, "base64");
+    const doc = burrata();
+    const withPhoto = renderLayoutPng(doc, null, { itemImages: { [P1]: { bytes, mime: "image/png" } } });
+    const hidden = renderLayoutPng({ ...doc, photoStyle: "text" }, null, { itemImages: { [P1]: { bytes, mime: "image/png" } } });
+    expect(withPhoto.readUInt32BE(16)).toBe(1920);
+    expect(withPhoto.readUInt32BE(20)).toBe(1080);
+    expect(sha(withPhoto)).not.toBe(sha(hidden));
+  }, 30_000);
+
+  it("an explicit Hide is respected and explained", () => {
+    const doc = { ...burrata(), photoStyle: "text" as const };
+    expect(itemPhotosShown(doc, design)).toBe(false);
+    expect(layoutSvg(doc, { itemImages: { [P1]: href } })).not.toContain(href);
+    for (const k of ["tpl.photosHiddenNote", "tpl.showItemPhotos", "tpl.photoSavedHidden", "tpl.photoAdded", "tpl.photosShownNote", "tpl.photoWhereThumbs"] as const) {
+      expect(en[k], k).toBeTruthy();
+      expect(es[k], k).toBeTruthy();
+      expect(es[k], k).not.toBe(en[k]);
+    }
+  });
+
+  it("every one of the 22 templates shows an owner photo unless hidden", () => {
+    for (const d of MENU_DESIGNS) {
+      const doc = designDocument(d);
+      const withPhoto = { ...doc, sections: withItemPhoto(doc.sections, 0, 0, P1) };
+      expect(layoutSvg(withPhoto, { itemImages: { [P1]: href } }), d.id).toContain(href);
+      expect(designSvgWithReport(withPhoto, { itemImages: { [P1]: href } }).report.dropped, d.id).toBe(0);
+    }
   });
 });
 
