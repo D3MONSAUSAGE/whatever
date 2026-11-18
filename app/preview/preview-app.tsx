@@ -27,6 +27,32 @@ import type { ScreenLibrary } from "@/components/screen-actions";
 import { AlertsScreen } from "@/components/alerts";
 import type { AlertItem } from "@/lib/api";
 import type { NotificationsFixture } from "@/components/notifications";
+import { AnalyticsScreen, type AnalyticsFixture } from "@/components/analytics-screen";
+
+// Fixed timestamps so server and client render the same text.
+const analyticsFixture: AnalyticsFixture = {
+  summary: {
+    screens: { total: 3, online: 2, offline: 1, neverConnected: 0 },
+    uptime: { pct7: 97.4, pct30: 98.1, coverageFrom: "2026-09-01T15:00:00Z" },
+    playback: { confirmed: 2, unconfirmed: 0, nothingAssigned: 1 },
+    playlists: { total: 4, published: 3, publishes30d: 12 },
+    schedules: { total: 5, enabled: 4, changes30d: 6 },
+    media: { count: 38, images: 31, videos: 7, bytes: 412_000_000, inPlaylists: 24, unused: 14 },
+    bandwidth: null,
+  },
+  uptime: {
+    days: 7, coverageFrom: "2026-09-01T15:00:00Z", overall: { uptimePct: 97.4 },
+    screens: [
+      { id: "s1", name: "Front counter", online: true, lastSeenAt: "2026-11-17T18:00:00Z", uptimePct: 99.6, onlineSeconds: 0, windowSeconds: 0, daily: [100, 100, 99, 100, 100, 98, 100].map((v, i) => ({ date: `2026-11-1${i}`, uptimePct: v })) },
+      { id: "s2", name: "Drive-thru", online: false, lastSeenAt: "2026-11-17T14:20:00Z", uptimePct: 88.2, onlineSeconds: 0, windowSeconds: 0, daily: [100, 92, 40, 100, 100, 95, 70].map((v, i) => ({ date: `2026-11-1${i}`, uptimePct: v })) },
+    ],
+  },
+  activity: [
+    { at: "2026-11-17T17:10:00Z", kind: "playlist.published", subjectId: null, subjectName: "Lunch specials", detail: {} },
+    { at: "2026-11-17T16:00:00Z", kind: "schedule.updated", subjectId: null, subjectName: "Weekday lunch", detail: {} },
+    { at: "2026-11-16T20:30:00Z", kind: "media.uploaded", subjectId: null, subjectName: "burger.jpg", detail: {} },
+  ],
+};
 
 const lunch = poster("Lunch menu", "#1c3d32");
 const dinner = poster("Dinner menu", "#3d2a1c");
@@ -196,6 +222,7 @@ export function PreviewApp() {
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
+      {screen === "analytics" ? <AnalyticsScreen fixture={analyticsFixture} /> : null}
       {screen === "workspace" ? <ScreenWorkspace id={workspaceId} fixture={workspaceDisplay} library={workspaceLibrary} initialPanel={panel} /> : null}
       {screen === "studio" ? <MenuBoards fixture={{ ...menuFixture, startBoardId: "board-lunch", startLayout: "menu-promo-67" }} /> : null}
       {screen === "content" ? <ContentHub pathOverride="/dashboard/content" fixture={contentFixture} /> : null}
