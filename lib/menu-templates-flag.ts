@@ -31,3 +31,22 @@ export function menuTemplatesEnabledFor(
   const account = who.accountId.trim().toLowerCase();
   return setting.entries.some((entry) => entry === email || entry === account);
 }
+
+/**
+ * Rollout switch for the unified menu designer (one editor for templates, original layouts and classic boards,
+ * item photos everywhere). Set as UNIFIED_MENU_EDITOR with the same values as MENU_TEMPLATES:
+ *   unset → developer accounts only; "off" → nobody; "all" → everyone; a list → developers plus these accounts.
+ * It needs the template gallery to be on for the account as well. When it is off, the previous editors are used.
+ */
+export function unifiedEditorSetting(env: Record<string, string | undefined> = process.env): MenuTemplatesSetting {
+  return menuTemplatesSetting({ MENU_TEMPLATES: env.UNIFIED_MENU_EDITOR });
+}
+
+export function unifiedEditorEnabledFor(
+  who: { email: string; accountId: string; developer: boolean },
+  templates: MenuTemplatesSetting,
+  unified: MenuTemplatesSetting,
+  layoutStudioOn: boolean,
+): boolean {
+  return menuTemplatesEnabledFor(who, templates, layoutStudioOn) && menuTemplatesEnabledFor(who, unified, layoutStudioOn);
+}

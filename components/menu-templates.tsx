@@ -15,8 +15,19 @@ import { Dialog } from "@/components/dialog";
 import { useToast } from "@/components/toast";
 import { useRegisterStudioLeave } from "@/components/studio-leave";
 import { fontFaceCss } from "@/lib/board-fonts";
-import { MENU_LIMITS, parseLayout, type LayoutDocument } from "@/lib/layout-studio";
-import { accountSaveBody, readAccountStudio, type AccountLibraryFile } from "@/lib/layout-account";
+import { MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, templateSpec, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
+import { accountSaveBody, findSameVideo, placeZoneMedia, readAccountStudio, type AccountLibraryFile } from "@/lib/layout-account";
+import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
+import { ColorField } from "@/components/color-field";
+import { menuSvg } from "@/lib/menu-classic-svg";
+import { parseMenuContent, sampleMenu } from "@/lib/menu-templates";
+import { seedClassicMenu } from "@/lib/brand-kit";
+import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
+import {
+  ORIGINAL_LAYOUTS, classicSaveContent, engineOf, filterGallery, fixedColumns, fromClassic, galleryEntries, layoutMedia, layoutReport,
+  mergeExtraSections, newLayoutDocument, switchToLayout, toClassic,
+  type ClassicSettings, type Engine, type GalleryEntry, type Structure,
+} from "@/lib/menu-designer";
 import {
   MENU_DESIGNS, designById, designDocument, designHasMedia, filterDesigns, isPhotoDesign, scratchDocument, stockPhotoPath, switchDesign,
   type DesignBusiness, type DesignStyle, type MenuDesign,
@@ -26,6 +37,27 @@ import type { Brand } from "@/lib/brand-kit";
 import { moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 
 const FONT_CSS = fontFaceCss();
+
+/**
+ * Unified menu designer flag for this account (server-checked, UNIFIED_MENU_EDITOR). Null while loading.
+ * `?unified=off` opts this browser out (back to the previous editors), `?unified=on` opts back in.
+ */
+export function useUnifiedEditorFlag(skip = false): boolean | null {
+  const flag = useApi<{ enabled: boolean; unified?: boolean }>(skip ? null : "/api/menu-templates");
+  const [optOut, setOptOut] = useState(false);
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("unified");
+      if (q === "off") localStorage.setItem("pekko_unified_optout", "1");
+      if (q === "on") localStorage.removeItem("pekko_unified_optout");
+      setOptOut(localStorage.getItem("pekko_unified_optout") === "1");
+    } catch { /* private window */ }
+  }, []);
+  if (skip) return false;
+  if (flag.error) return false;
+  if (!flag.data) return null;
+  return Boolean(flag.data.unified) && flag.data.enabled && !optOut;
+}
 
 /** Rollout flag for this account (server-checked). Null while loading. `?templates=off` opts this browser out. */
 export function useMenuTemplatesFlag(skip = false): boolean | null {
@@ -83,6 +115,9 @@ const STYLES = `${FONT_CSS}
 @media (max-width: 420px) { .tpl-item { grid-template-columns: 52px minmax(0, 1fr) 76px auto; } .tpl-item .tpl-photo { width: 52px; height: 52px; } }
 .tpl-ib { width: 32px; height: 30px; border: 1px solid var(--color-line); background: #fff; border-radius: 7px; display: grid; place-items: center; font-size: 13px; padding: 0; }
 .tpl-ib:disabled { opacity: .35; }
+.tpl-ib { flex: none; }
+.tpl-sec-h { flex-wrap: wrap; }
+.tpl-sec-h > .field { flex: 1 1 8rem; min-width: 0; }
 .tpl-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
 .tpl-lib button { border: 2px solid transparent; padding: 0; border-radius: 9px; overflow: hidden; aspect-ratio: 1; background: #ddd; }
 .tpl-lib button[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(26 92 255 / .25); }
@@ -97,6 +132,12 @@ const STYLES = `${FONT_CSS}
 @media (min-width: 1100px) { .tpl-grid { grid-template-columns: minmax(360px, 420px) minmax(0, 1fr); align-items: start; } .tpl-preview { position: sticky; top: 72px; grid-column: 2; grid-row: 1; } .tpl-form { grid-column: 1; grid-row: 1; } }
 @media (max-width: 1099px) { .tpl-preview { position: sticky; top: 56px; z-index: 5; background: var(--color-paper, #f1f4fa); padding-bottom: 10px; } }
 @media (prefers-reduced-motion: reduce) { .tpl-card { transition: none; } .tpl-card:hover { transform: none; } }
+.tpl-board > svg { font-family: Inter, sans-serif; }
+.tpl-col { flex: none; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #0a5c3e; background: #e6f6ee; border-radius: 6px; padding: 3px 7px; }
+.tpl-col.off { color: #7a4a00; background: #fff6e5; }
+.tpl-sec-off { opacity: .72; }
+.tpl-adv { border: 1px solid var(--color-line); border-radius: 12px; padding: 10px 12px; background: #fff; }
+.tpl-adv > summary { cursor: pointer; font-weight: 700; font-size: 14px; min-height: 28px; display: flex; align-items: center; }
 `;
 
 const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets"];
@@ -174,8 +215,41 @@ type Step = 0 | 1 | 2 | 3;
 const blankItem = () => ({ name: "", price: "", description: "" });
 function itemCount(doc: LayoutDocument) { return doc.sections.reduce((a, s) => a + s.items.length, 0); }
 
+/** What the board can't show, in one shape for every engine. */
+type Fit = { dropped: number; scale: number; hiddenSections: number; clipped: string[] };
+
+/** Classic boards draw with the classic renderer; the browser gets the same SVG the server rasterises. */
+function classicArt(classic: ClassicSettings, brand: Brand | null, art: Art) {
+  const kit = classic.useBrand && brand?.custom ? brand : null;
+  return {
+    brand: kit ? { primaryColor: kit.primaryColor, accentColor: kit.accentColor } : null,
+    logo: kit?.logoMediaId ? art.logoHref : null,
+    photo: art.imageHref,
+    itemImages: art.itemImages,
+  };
+}
+
+/** The board exactly as the TV shows it, for any engine. */
+export function BoardView({ engine, doc, classic, art, brand, label, className = "" }: {
+  engine: Engine; doc: LayoutDocument; classic: ClassicSettings | null; art: Art; brand: Brand | null; label?: string; className?: string;
+}) {
+  const svg = useMemo(() => {
+    if (engine === "classic" && classic) {
+      const { template, content } = toClassic(doc, classic);
+      return menuSvg(template, content, classicArt(classic, brand, art));
+    }
+    if (engine === "layout") return layoutSvg(doc, { imageHref: art.imageHref, itemImages: art.itemImages });
+    return designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages }).svg;
+  }, [engine, doc, classic, art.imageHref, art.logoHref, art.itemImages, brand]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className={`tpl-board ${className}`} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}
+      dangerouslySetInnerHTML={{ __html: svg }} />
+  );
+}
+
 export function TemplateEditor({
   menuId: initialMenuId, name: initialName, document: initialDoc, displays, brand, preview = false, onClose, onAdvanced, onSaved, onSplit,
+  unified = false, classic: initialClassic = null, onNewBoard,
 }: {
   menuId: string | null;
   name: string;
@@ -186,18 +260,26 @@ export function TemplateEditor({
   onClose: () => void;
   onAdvanced: (menuId: string) => void;
   onSaved?: () => void;
-  /** Open a new board with the items that didn't fit (same template). */
-  onSplit?: (document: LayoutDocument, name: string) => void;
+  /** Open a new board with the items that didn't fit (same design). */
+  onSplit?: (document: LayoutDocument, name: string, classic?: ClassicSettings | null) => void;
+  /** Unified menu designer (UNIFIED_MENU_EDITOR): every board type, Advanced options, no second editor. */
+  unified?: boolean;
+  /** Set when this is a classic full-screen board. */
+  classic?: ClassicSettings | null;
+  /** Start a NEW board with this content in another design (classic boards can't change storage type in place). */
+  onNewBoard?: (document: LayoutDocument, name: string) => void;
 }) {
   const { locale, t } = useLocale();
   const L = locale === "es" ? "es" : "en";
   const toast = useToast();
   const [doc, setDoc] = useState<LayoutDocument>(initialDoc);
+  const [classic, setClassic] = useState<ClassicSettings | null>(initialClassic);
   const [name, setName] = useState(initialName || initialDoc.title || t("tpl.untitled"));
   const [menuId, setMenuId] = useState<string | null>(initialMenuId);
   const [step, setStep] = useState<Step>(0);
   const [dirty, setDirty] = useState(!initialMenuId);
   const [busy, setBusy] = useState<null | "draft" | "publish" | "upload">(null);
+  const [progress, setProgress] = useState<string | null>(null);
   const [library, setLibrary] = useState<AccountLibraryFile[]>([]);
   const [publishOpen, setPublishOpen] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -205,6 +287,8 @@ export function TemplateEditor({
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   useRegisterStudioLeave(() => dirtyRef.current);
+  const engine: Engine = engineOf(doc, classic);
+  const isDesign = engine === "design";
   const design = designById(doc.design) ?? designById("coffee-shop")!;
 
   async function reloadLibrary() {
@@ -224,31 +308,53 @@ export function TemplateEditor({
   const urlFor = (id: string | null | undefined) => (id ? library.find((f) => f.id === id)?.url ?? null : null);
   // Item photos in the preview use the same signed library URLs the photo picker shows.
   const itemImages = useMemo(() => Object.fromEntries(library.filter((f) => f.kind === "image" && f.url).map((f) => [f.id, f.url as string])), [library]);
-  const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(doc.logoMediaId), itemImages };
-  const report = useMemo(() => designSvgWithReport(doc, art).report, [doc, art.imageHref, art.logoHref]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Classic boards show the Brand Kit logo (when "Use my Brand Kit" is on); templates show the board's own logo.
+  const logoId = engine === "classic" ? brand?.logoMediaId : doc.logoMediaId;
+  const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(logoId), itemImages };
+  const fit: Fit = useMemo(() => {
+    if (engine === "design") { const r = designSvgWithReport(doc, art).report; return { dropped: r.dropped, scale: r.scale, hiddenSections: 0, clipped: [] }; }
+    if (engine === "layout") { const r = layoutReport(doc, art); return { dropped: r.hiddenItems, scale: 1, hiddenSections: r.hiddenSections, clipped: r.clipped }; }
+    return { dropped: 0, scale: 1, hiddenSections: 0, clipped: [] };
+  }, [engine, doc, art.imageHref, art.logoHref, itemImages]); // eslint-disable-line react-hooks/exhaustive-deps
   const [photoFor, setPhotoFor] = useState<{ si: number; ii: number } | null>(null);
+  /** Card and featured templates always show item photos; every other style can hide them. */
+  const photosAlways = isDesign && (design.composition === "cards" || design.composition === "featured");
   function setItemPhoto(si: number, ii: number, imageMediaId: string | null) {
     update({ ...doc, sections: withItemPhoto(doc.sections, si, ii, imageMediaId) });
     // Say exactly what happens to the photo: it shows on the board unless the owner chose to hide item photos.
-    if (imageMediaId) toast.show(doc.photoStyle === "text" && design.composition !== "cards" && design.composition !== "featured" ? t("tpl.photoSavedHidden") : t("tpl.photoAdded"));
+    if (imageMediaId) toast.show(doc.photoStyle === "text" && !photosAlways ? t("tpl.photoSavedHidden") : t("tpl.photoAdded"));
   }
   function moveItemAt(si: number, ii: number, dir: -1 | 1) { update({ ...doc, sections: moveItem(doc.sections, si, ii, dir) }); }
-  /** Move the items that don't fit (the last ones in reading order) to a new board with the same template. */
+  /** Move the items that don't fit (the last ones in reading order) to a new board with the same design. */
   function splitOverflow() {
-    const split = splitLastItems(doc.sections, report.dropped);
+    const split = splitLastItems(doc.sections, fit.dropped);
     const kept = { ...doc, sections: split.kept };
     update(kept);
     // Keep this board safe first (as a draft), then open the new board with the moved items.
     void (async () => {
       const saved = preview ? "preview" : await save("draft", kept);
-      if (saved) onSplit?.({ ...doc, sections: split.moved }, `${name} (2)`);
+      if (saved) onSplit?.({ ...doc, sections: split.moved }, `${name} (2)`, classic);
     })();
   }
   const colors = useMemo(() => designColors(doc, design), [doc, design]);
 
   function update(next: LayoutDocument) { setDoc(next); setDirty(true); }
   function patch(p: Partial<LayoutDocument>) { update({ ...doc, ...p }); }
+  function patchClassic(p: Partial<ClassicSettings>) { if (classic) { setClassic({ ...classic, ...p }); setDirty(true); } }
   function setSections(fn: (s: LayoutDocument["sections"]) => LayoutDocument["sections"]) { update({ ...doc, sections: fn(doc.sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }))) }); }
+
+  const media = engine === "layout" ? layoutMedia(doc.template) : null;
+  /** A board photo or video in a promo/side area replaces the other (one file per area), as before. */
+  function setBoardPhoto(id: string | null) {
+    if (media?.exclusive) update(placeZoneMedia(doc, "photo", id, Boolean(id)));
+    else patch({ imageMediaId: id });
+    if (id && media?.exclusive && doc.videoMediaId) toast.show(t("ls.imageReplacesVideo"));
+  }
+  function setBoardVideo(id: string | null) {
+    if (media?.exclusive) update(placeZoneMedia(doc, "video", id, Boolean(id)));
+    else patch({ videoMediaId: id });
+    if (id && media?.exclusive && doc.imageMediaId) toast.show(t("ls.videoReplaces"));
+  }
 
   async function upload(file: File | undefined, role: "photo" | "logo" | "item", target?: { si: number; ii: number }) {
     if (!file || preview) return;
@@ -259,7 +365,8 @@ export function TemplateEditor({
       const body = await authToken().then((token) => uploadForm("/api/media", form, token, () => {})) as { id?: string };
       await reloadLibrary();
       if (body.id && role === "item" && target) setItemPhoto(target.si, target.ii, body.id);
-      else if (body.id) patch(role === "photo" ? { imageMediaId: body.id } : { logoMediaId: body.id });
+      else if (body.id && role === "photo") setBoardPhoto(body.id);
+      else if (body.id) patch({ logoMediaId: body.id });
       toast.show(t("tpl.uploaded"));
     } catch (err) {
       toast.show((err as Error).message || t("tpl.uploadFailed"), true);
@@ -268,8 +375,37 @@ export function TemplateEditor({
     }
   }
 
-  async function save(mode: "draft" | "publish", override?: LayoutDocument) {
+  /** Same signed upload as the previous layout editor: prepare, upload straight to storage, then register. */
+  async function uploadVideo(file: File | undefined) {
+    if (!file || preview) return;
+    if (file.type && file.type !== "video/mp4" && !/\.mp4$/i.test(file.name)) { toast.show(t("tpl.videoType"), true); return; }
+    const existing = findSameVideo(library, file);
+    if (existing) { setBoardVideo(existing.id); toast.show(t("ls.videoInLibrary")); return; }
+    setBusy("upload");
+    setProgress(t("ed.uploading"));
+    try {
+      const prepared = await prepareVideo(file);
+      const signed = await api<{ mediaId: string; signedUrl: string; token: string }>("/api/media/upload", { method: "POST", body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }) });
+      await uploadToSignedUrl(signed.signedUrl, file, (percent) => setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading")), file.name, signed.token);
+      setProgress(t("ls.processing"));
+      await api("/api/media/upload/complete", {
+        method: "POST",
+        body: JSON.stringify({ mediaId: signed.mediaId, fileName: file.name, durationMs: prepared.durationMs, width: prepared.width, height: prepared.height, thumbnailBase64: await blobToBase64(prepared.thumbnail) }),
+      });
+      await reloadLibrary();
+      setBoardVideo(signed.mediaId);
+      toast.show(t("ls.uploadComplete"));
+    } catch (err) {
+      toast.show((err as Error).message || t("tpl.uploadFailed"), true);
+    } finally {
+      setBusy(null);
+      setProgress(null);
+    }
+  }
+
+  async function save(mode: "draft" | "publish", override?: LayoutDocument, displayIds: string[] = []) {
     if (preview) { toast.show(t("tpl.previewOnly")); return null; }
+    if (engine === "classic" && classic) return saveClassic(override ?? doc, displayIds);
     const parsed = parseLayout(override ?? doc);
     if (!parsed.ok) { toast.show(parsed.error, true); return null; }
     setBusy(mode);
@@ -287,10 +423,44 @@ export function TemplateEditor({
     }
   }
 
+  /** Classic boards keep their own save: it renders and updates the screens already showing the board. */
+  async function saveClassic(working: LayoutDocument, displayIds: string[]) {
+    if (!classic) return null;
+    const { template, content } = toClassic(working, classic);
+    const parsed = parseMenuContent(content);
+    if (!parsed.ok) { toast.show(parsed.error, true); return null; }
+    setBusy("publish");
+    try {
+      const body = JSON.stringify({ name, template, content: classicSaveContent(parsed.value), ...(displayIds.length ? { displayIds } : {}) });
+      const res = menuId
+        ? await api<{ id?: string }>(`/api/menus/${menuId}`, { method: "PATCH", body })
+        : await api<{ id?: string }>("/api/menus", { method: "POST", body });
+      const id = res.id ?? menuId;
+      setMenuId(id);
+      setDirty(false);
+      onSaved?.();
+      return id;
+    } catch (err) {
+      toast.show((err as Error).message, true);
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function publishTo() {
+    const ids = Object.keys(picked).filter((k) => picked[k]);
+    if (engine === "classic") {
+      // One request: save, re-render and put the board on the ticked screens.
+      const id = await save("publish", undefined, ids);
+      if (!id) return;
+      setPublishOpen(false);
+      setPublished(true);
+      toast.show(ids.length ? t("tpl.publishedOn", { n: ids.length }) : t("tpl.classicSaved"));
+      return;
+    }
     const id = await save("publish");
     if (!id) return;
-    const ids = Object.keys(picked).filter((k) => picked[k]);
     const failed: string[] = [];
     for (const displayId of ids) {
       try { await api("/api/layout-studio/assign", { method: "POST", body: JSON.stringify({ menuId: id, displayId }) }); }
@@ -309,60 +479,73 @@ export function TemplateEditor({
       ...doc,
       primaryColor: brand.primaryColor || null,
       accentColor: brand.accentColor || null,
-      ...(brand.logoMediaId ? { logoMediaId: brand.logoMediaId } : {}),
+      ...(brand.logoMediaId && isDesign ? { logoMediaId: brand.logoMediaId } : {}),
     });
   }
   function restoreTemplate() {
+    if (!isDesign) { update({ ...doc, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null }); return; }
     update({ ...doc, primaryColor: null, accentColor: null, textColor: null, backgroundColor: null, font: design.look.head, ...(design.look.body !== design.look.head ? { bodyFont: design.look.body } : {}) });
   }
 
   const n = itemCount(doc);
-  const photosShown = itemPhotosShown(doc, design);
   const ownerPhotos = hasOwnerItemPhoto(doc);
+  const photosShown = isDesign ? itemPhotosShown(doc, design) : ownerPhotos && doc.photoStyle !== "text";
   const photosHidden = ownerPhotos && !photosShown;
-  const photoTemplate = isPhotoDesign(design) || itemPhotosShown(doc, design);
+  const photoTemplate = isDesign && (isPhotoDesign(design) || itemPhotosShown(doc, design));
   // A roomier template that still shows item photos when this one does: three-column thumbnails hold all 24 items.
   const roomierId = photoTemplate ? "taqueria-specials" : "diner-classics";
-  const roomier = report.dropped > 0 && design.id !== roomierId ? designById(roomierId) : null;
-  const canHidePhotos = report.dropped > 0 && design.composition !== "cards" && design.composition !== "featured" && itemPhotosShown(doc, design);
+  const roomier = isDesign && fit.dropped > 0 && design.id !== roomierId ? designById(roomierId) : null;
+  const canHidePhotos = isDesign && fit.dropped > 0 && !photosAlways && itemPhotosShown(doc, design);
+  const merged = engine === "layout" && fit.hiddenSections > 0 ? mergeExtraSections(doc) : null;
+  const columns = engine === "layout" ? fixedColumns(doc.template) : null;
   const images = library.filter((f) => f.kind === "image");
   const videos = library.filter((f) => f.kind === "video");
   const stepNames = [t("tpl.step.business"), t("tpl.step.menu"), t("tpl.step.photos"), t("tpl.step.look")];
+  const styleName = engine === "classic" ? t("tpl.classicName") : engine === "layout" ? layoutName(doc.template, t) : design.name[L];
 
   return (
-    <section data-testid="template-editor" aria-labelledby="tpl-editor-title">
+    <section data-testid="template-editor" data-engine={engine} aria-labelledby="tpl-editor-title">
       <style>{STYLES}</style>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <button type="button" className="btn btn-quiet" onClick={onClose}>← {t("tpl.back")}</button>
         <label className="sr-only" htmlFor="tpl-name">{t("tpl.boardName")}</label>
         <input id="tpl-name" className="field font-display font-bold text-lg max-w-xs" value={name} maxLength={80} onChange={(e) => { setName(e.target.value); setDirty(true); }} />
         <span className={`badge ${published ? "badge-live" : ""}`} data-testid="tpl-status">{published ? t("tpl.statusLive") : dirty ? t("tpl.statusUnsaved") : t("tpl.statusSaved")}</span>
+        {unified ? <span className="text-xs text-muted" data-testid="tpl-design-name">{styleName}</span> : null}
         <span className="flex-1" />
-        <button type="button" className="btn btn-quiet" disabled={busy !== null} onClick={async () => {
-          const id = menuId ?? (await save("draft"));
-          if (id) onAdvanced(id);
-        }}>{t("tpl.advanced")}</button>
-        <button type="button" className="btn btn-quiet" disabled={busy !== null} data-testid="tpl-save-draft"
-          onClick={async () => { if (await save("draft")) toast.show(t("tpl.draftSaved")); }}>{busy === "draft" ? t("tpl.saving") : t("ls.saveDraft")}</button>
-        <button type="button" className="btn btn-primary" disabled={busy !== null} data-testid="tpl-publish" onClick={() => setPublishOpen(true)}>{t("ls.publish")}</button>
+        {unified ? null : (
+          <button type="button" className="btn btn-quiet" disabled={busy !== null} onClick={async () => {
+            const id = menuId ?? (await save("draft"));
+            if (id) onAdvanced(id);
+          }}>{t("tpl.advanced")}</button>
+        )}
+        {engine === "classic" ? null : (
+          <button type="button" className="btn btn-quiet" disabled={busy !== null} data-testid="tpl-save-draft"
+            onClick={async () => { if (await save("draft")) toast.show(t("tpl.draftSaved")); }}>{busy === "draft" ? t("tpl.saving") : t("ls.saveDraft")}</button>
+        )}
+        <button type="button" className="btn btn-primary" disabled={busy !== null} data-testid="tpl-publish" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")}</button>
       </div>
+      {engine === "classic" ? <p className="text-xs text-muted -mt-2 mb-3" data-testid="tpl-classic-note">{t("tpl.classicNote")}</p> : null}
+      {progress ? <p className="text-sm text-muted mb-2" role="status">{progress}</p> : null}
       <h2 id="tpl-editor-title" className="sr-only">{t("tpl.editorTitle")}</h2>
       <div className="tpl-grid">
         <div className="tpl-preview">
           <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{t("tpl.previewCap")}</span><span>1920 × 1080</span></p>
-          <DesignBoard doc={doc} art={art} className="tpl-tv" label={t("tpl.previewAria", { name })} />
-          {report.dropped > 0 ? (
+          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} />
+          {fit.dropped > 0 ? (
             <div className="note-warn text-sm mt-3 grid gap-2" role="status" data-testid="tpl-dropped">
-              <p>{t(photoTemplate ? "tpl.droppedPhotos" : "tpl.dropped", { n: report.dropped })}</p>
+              <p>{engine === "layout" ? t("tpl.columnsHidden", { n: fit.dropped, cols: columns ?? 0 }) : t(photoTemplate ? "tpl.droppedPhotos" : "tpl.dropped", { n: fit.dropped })}</p>
               <div className="flex flex-wrap gap-2">
+                {merged ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(merged)} data-testid="tpl-merge">{t("tpl.mergeColumns", { n: columns ?? 0 })}</button> : null}
                 {roomier ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
                 {canHidePhotos ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => patch({ photoStyle: "text" })} data-testid="tpl-hide-photos">{t("tpl.itemPhotosHidden")}</button> : null}
-                {onSplit ? <button type="button" className="btn btn-quiet min-h-9" onClick={splitOverflow} data-testid="tpl-split">{t("tpl.splitBoard", { n: report.dropped })}</button> : null}
+                {onSplit ? <button type="button" className="btn btn-quiet min-h-9" onClick={splitOverflow} data-testid="tpl-split">{t("tpl.splitBoard", { n: fit.dropped })}</button> : null}
               </div>
             </div>
           )
-            : report.scale < 0.72 ? <p className="text-sm mt-3 text-[#7a4a00]" role="status">{t("tpl.tight")}</p>
+            : fit.scale < 0.72 ? <p className="text-sm mt-3 text-[#7a4a00]" role="status">{t("tpl.tight")}</p>
               : <p className="text-sm mt-3 text-live-ink" role="status">✓ {t("tpl.fits")}</p>}
+          {fit.clipped.length ? <p className="note-warn text-sm mt-2" role="status" data-testid="tpl-clipped">{t("ls.clippedNames", { names: fit.clipped.map((x) => `“${x}”`).join(", ") })}</p> : null}
         </div>
         <div className="tpl-form card p-4 grid gap-4 min-w-0">
           <nav className="tpl-steps" aria-label={t("tpl.stepsAria")}>
@@ -379,30 +562,40 @@ export function TemplateEditor({
               <label className="form-label grid gap-1">{t("tpl.footer")}<input className="field" maxLength={80} value={doc.footer} onChange={(e) => patch({ footer: e.target.value })} /></label>
               <div className="grid gap-2">
                 <p className="form-label">{t("tpl.logo")}</p>
-                <div className="flex flex-wrap gap-2">
-                  {brand?.logoMediaId ? <button type="button" className="btn btn-quiet" onClick={() => patch({ logoMediaId: brand.logoMediaId })}>{t("tpl.logoFromKit")}</button> : null}
-                  <label className="btn btn-quiet cursor-pointer">{t("tpl.uploadLogo")}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void upload(e.target.files?.[0], "logo")} /></label>
-                  {doc.logoMediaId ? <button type="button" className="btn btn-quiet text-danger" onClick={() => patch({ logoMediaId: null })}>{t("tpl.removeLogo")}</button> : null}
-                </div>
-                <p className="text-xs text-muted">{doc.logoMediaId ? t("tpl.logoOn") : t("tpl.logoOff")}</p>
+                {engine === "design" ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {brand?.logoMediaId ? <button type="button" className="btn btn-quiet" onClick={() => patch({ logoMediaId: brand.logoMediaId })}>{t("tpl.logoFromKit")}</button> : null}
+                      <label className="btn btn-quiet cursor-pointer">{t("tpl.uploadLogo")}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void upload(e.target.files?.[0], "logo")} /></label>
+                      {doc.logoMediaId ? <button type="button" className="btn btn-quiet text-danger" onClick={() => patch({ logoMediaId: null })}>{t("tpl.removeLogo")}</button> : null}
+                    </div>
+                    <p className="text-xs text-muted">{doc.logoMediaId ? t("tpl.logoOn") : t("tpl.logoOff")}</p>
+                  </>
+                ) : engine === "classic" ? (
+                  <p className="text-sm text-muted" data-testid="tpl-logo-classic">{classic?.useBrand && brand?.logoMediaId ? t("tpl.logoClassicOn") : t("tpl.logoClassicOff")}</p>
+                ) : (
+                  <p className="text-sm text-muted" data-testid="tpl-logo-layout">{t("tpl.logoLayout")}</p>
+                )}
               </div>
             </div>
           ) : null}
 
           {step === 1 ? (
             <div className="grid gap-3">
-              <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: MENU_LIMITS.sections })}</span></div>
+              <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
+              {columns ? <p className="text-sm text-muted" data-testid="tpl-columns-note">{t("tpl.columnsNote", { n: columns })}</p> : null}
               {photosHidden ? (
                 <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-hidden">
                   <p>{t("tpl.photosHiddenNote")}</p>
                   <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => patch({ photoStyle: "thumbs" })} data-testid="tpl-show-photos">{t("tpl.showItemPhotos")}</button>
                 </div>
-              ) : ownerPhotos && !isPhotoDesign(design) ? (
+              ) : ownerPhotos && !(isDesign && isPhotoDesign(design)) ? (
                 <p className="text-sm text-live-ink" role="status" data-testid="tpl-photos-shown">✓ {t("tpl.photosShownNote")}</p>
               ) : <p className="text-xs text-muted">{t("tpl.photoTip")}</p>}
               {doc.sections.map((section, si) => (
-                <div className="tpl-sec" key={si}>
+                <div className={`tpl-sec ${columns && si >= columns ? "tpl-sec-off" : ""}`} key={si} data-testid={`tpl-section-${si}`}>
                   <div className="tpl-sec-h">
+                    {columns ? <span className={`tpl-col ${si >= columns ? "off" : ""}`}>{si < columns ? t("tpl.columnN", { n: si + 1 }) : t("tpl.notShown")}</span> : null}
                     <input className="field font-bold" aria-label={t("tpl.sectionN", { n: si + 1 })} placeholder={t("tpl.section")} maxLength={30} value={section.name}
                       onChange={(e) => setSections((s) => { s[si].name = e.target.value; return s; })} />
                     <button type="button" className="tpl-ib" aria-label={t("tpl.moveSectionUp", { n: si + 1 })} disabled={si === 0} onClick={() => setSections((s) => { [s[si - 1], s[si]] = [s[si], s[si - 1]]; return s; })}>↑</button>
@@ -415,7 +608,7 @@ export function TemplateEditor({
                         aria-label={`${item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}${item.imageMediaId && photosHidden ? ` (${t("tpl.hiddenOnBoard")})` : ""}`}>
                         {item.imageMediaId && photosHidden ? <span className="tpl-hidden" aria-hidden>{t("tpl.hidden")}</span> : null}
                         {item.imageMediaId && urlFor(item.imageMediaId) ? <img src={urlFor(item.imageMediaId)!} alt="" />
-                          : item.stockPhoto ? <img src={stockPhotoPath(item.stockPhoto)} alt="" />
+                          : item.stockPhoto && isDesign ? <img src={stockPhotoPath(item.stockPhoto)} alt="" />
                             : <span aria-hidden>＋<br />{t("tpl.photo")}</span>}
                       </button>
                       <input className="field" aria-label={t("tpl.itemName", { n: ii + 1 })} placeholder={t("tpl.item")} maxLength={MENU_LIMITS.itemName} value={item.name}
@@ -437,40 +630,66 @@ export function TemplateEditor({
                   </div>
                 </div>
               ))}
-              <button type="button" className="btn btn-quiet justify-self-start" disabled={doc.sections.length >= MENU_LIMITS.sections}
-                onClick={() => setSections((s) => [...s, { name: "", items: [blankItem()] }])}>＋ {t("tpl.addSection")}</button>
+              <button type="button" className="btn btn-quiet justify-self-start" disabled={doc.sections.length >= (columns ?? MENU_LIMITS.sections)}
+                onClick={() => setSections((s) => [...s, { name: "", items: [blankItem()] }])}>＋ {columns ? t("tpl.addColumn") : t("tpl.addSection")}</button>
             </div>
           ) : null}
 
           {step === 2 ? (
             <div className="grid gap-3">
               <h3 className="font-display font-bold text-lg">{t("tpl.photosTitle")}</h3>
-              {!designHasMedia(design) ? <p className="text-sm text-muted">{t("tpl.noPhotoArea")}</p> : (
+              {unified ? <p className="text-sm text-muted" data-testid="tpl-photos-items">{t("tpl.itemPhotosWhere")}</p> : null}
+              {engine === "design" && !designHasMedia(design) ? <p className="text-sm text-muted">{t("tpl.noPhotoArea")}</p> : (
                 <>
-                  <p className="text-sm text-muted">{t("tpl.photosLede")}</p>
+                  <p className="text-sm text-muted" data-testid="tpl-photo-area">{engine === "classic" ? t("tpl.classicPhotoArea") : media?.photo === "background" ? t("tpl.backgroundPhotoArea") : engine === "layout" ? t("tpl.layoutPhotoArea") : t("tpl.photosLede")}</p>
                   <div className="flex flex-wrap gap-2">
-                    <label className="btn btn-quiet cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void upload(e.target.files?.[0], "photo")} /></label>
-                    {design.stock ? <button type="button" className="btn btn-quiet" onClick={() => patch({ imageMediaId: null, stockPhoto: design.stock ?? undefined })}>{t("tpl.useSample")}</button> : null}
-                    <button type="button" className="btn btn-quiet" onClick={() => patch({ imageMediaId: null, stockPhoto: undefined })}>{t("tpl.noPhoto")}</button>
+                    <label className="btn btn-quiet cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" data-testid="tpl-board-upload" onChange={(e) => void upload(e.target.files?.[0], "photo")} /></label>
+                    {isDesign && design.stock ? <button type="button" className="btn btn-quiet" onClick={() => patch({ imageMediaId: null, stockPhoto: design.stock ?? undefined })}>{t("tpl.useSample")}</button> : null}
+                    <button type="button" className="btn btn-quiet" data-testid="tpl-board-none" onClick={() => (isDesign ? patch({ imageMediaId: null, stockPhoto: undefined }) : setBoardPhoto(null))}>{t("tpl.noPhoto")}</button>
                   </div>
                   <p className="form-label">{t("tpl.fromMedia")}</p>
                   {images.length ? (
                     <div className="tpl-lib">{images.map((f) => (
-                      <button key={f.id} type="button" aria-pressed={doc.imageMediaId === f.id} aria-label={f.name} onClick={() => patch({ imageMediaId: f.id })}>{f.url ? <img src={f.url} alt="" /> : null}</button>
+                      <button key={f.id} type="button" aria-pressed={doc.imageMediaId === f.id} aria-label={f.name} onClick={() => setBoardPhoto(f.id)}>{f.url ? <img src={f.url} alt="" /> : null}</button>
                     ))}</div>
                   ) : <p className="text-sm text-muted">{t("tpl.noMedia")}</p>}
-                  {videos.length ? (
-                    <label className="form-label grid gap-1">{t("tpl.video")}
-                      <select className="field" value={doc.videoMediaId ?? ""} onChange={(e) => patch({ videoMediaId: e.target.value || null })}>
-                        <option value="">{t("tpl.noVideo")}</option>
-                        {videos.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                      </select>
-                      <span className="text-xs text-muted font-normal">{t("tpl.videoNote")}</span>
-                    </label>
+                  {engine === "classic" ? <p className="text-xs text-muted">{t("tpl.classicNoVideo")}</p>
+                    : engine === "layout" && !media?.video ? <p className="text-xs text-muted">{t("tpl.layoutNoVideo")}</p> : (
+                      <div className="grid gap-1">
+                        <label className="form-label grid gap-1">{t("tpl.video")}
+                          <select className="field" value={doc.videoMediaId ?? ""} onChange={(e) => setBoardVideo(e.target.value || null)} data-testid="tpl-video">
+                            <option value="">{t("tpl.noVideo")}</option>
+                            {videos.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                          </select>
+                        </label>
+                        {unified ? <label className="btn btn-quiet cursor-pointer justify-self-start">{t("tpl.uploadVideo")}<input type="file" accept="video/mp4,.mp4" className="sr-only" data-testid="tpl-video-upload" onChange={(e) => void uploadVideo(e.target.files?.[0])} /></label> : null}
+                        <span className="text-xs text-muted font-normal">{media?.exclusive ? t("tpl.videoOrPhoto") : t("tpl.videoNote")}</span>
+                      </div>
+                    )}
+                  {engine === "classic" || (engine === "layout" && !media?.featureText) ? null : (
+                    <>
+                      <h4 className="font-semibold mt-1">{t("tpl.featureTitle")}</h4>
+                      <label className="form-label grid gap-1">{t("tpl.featureHead")}<input className="field" maxLength={40} value={doc.featureTitle} onChange={(e) => patch({ featureTitle: e.target.value })} /></label>
+                      <label className="form-label grid gap-1">{t("tpl.featureDetail")}<input className="field" maxLength={80} value={doc.featureDetail} onChange={(e) => patch({ featureDetail: e.target.value })} /></label>
+                    </>
+                  )}
+                  {unified && engine !== "classic" && doc.imageMediaId ? (
+                    <details className="tpl-adv" data-testid="tpl-photo-advanced">
+                      <summary>{t("tpl.advancedOptions")}</summary>
+                      <div className="grid gap-2 pt-2">
+                        <div className="seg" role="group" aria-label={t("ls.howFits")}>
+                          <button type="button" aria-pressed={doc.imageFit !== "contain"} onClick={() => patch({ imageFit: "cover" })}>{t("ls.fill")}</button>
+                          <button type="button" aria-pressed={doc.imageFit === "contain"} onClick={() => patch({ imageFit: "contain" })}>{t("ls.fit")}</button>
+                        </div>
+                        <p className="text-xs text-muted">{t("ls.fillFitNote")}</p>
+                        <label className="form-label grid gap-1">{t("ls.position")}
+                          <select className="field" aria-label={t("ls.photoPosition")} value={doc.imageAnchor} onChange={(e) => patch({ imageAnchor: e.target.value as LayoutDocument["imageAnchor"] })}>
+                            {(["center", "top", "bottom", "left", "right"] as const).map((a) => <option key={a} value={a}>{t(`ls.${a}` as MessageKey)}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                    </details>
                   ) : null}
-                  <h4 className="font-semibold mt-1">{t("tpl.featureTitle")}</h4>
-                  <label className="form-label grid gap-1">{t("tpl.featureHead")}<input className="field" maxLength={40} value={doc.featureTitle} onChange={(e) => patch({ featureTitle: e.target.value })} /></label>
-                  <label className="form-label grid gap-1">{t("tpl.featureDetail")}<input className="field" maxLength={80} value={doc.featureDetail} onChange={(e) => patch({ featureDetail: e.target.value })} /></label>
                 </>
               )}
             </div>
@@ -479,69 +698,104 @@ export function TemplateEditor({
           {step === 3 ? (
             <div className="grid gap-4">
               <h3 className="font-display font-bold text-lg">{t("tpl.lookTitle")}</h3>
-              <div className="grid gap-2">
-                <p className="form-label">{t("tpl.colourStyle")}</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {design.variants.map((v) => (
-                    <button key={v.id} type="button" className="tpl-var" aria-pressed={(doc.variant ?? design.variants[0].id) === v.id} onClick={() => patch({ variant: v.id })}>
-                      <span className="tpl-sw" aria-hidden><span style={{ background: v.paper }} /><span style={{ background: v.accent }} /><span style={{ background: v.panel }} /></span>{v.name[L]}
-                    </button>
-                  ))}
+              {engine === "design" ? (
+                <div className="grid gap-2">
+                  <p className="form-label">{t("tpl.colourStyle")}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {design.variants.map((v) => (
+                      <button key={v.id} type="button" className="tpl-var" aria-pressed={(doc.variant ?? design.variants[0].id) === v.id} onClick={() => patch({ variant: v.id })}>
+                        <span className="tpl-sw" aria-hidden><span style={{ background: v.paper }} /><span style={{ background: v.accent }} /><span style={{ background: v.panel }} /></span>{v.name[L]}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="grid gap-2">
-                <p className="form-label">{t("tpl.switchTitle")}</p>
-                <p className="text-xs text-muted">{t("tpl.switchBody")}</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[420px] overflow-y-auto pr-1" role="group" aria-label={t("tpl.switchTitle")}>
-                  {MENU_DESIGNS.map((d) => (
-                    <SwitchCard key={d.id} design={d} current={doc} art={art} label={d.name[L]} onPick={() => update(switchDesign(doc, d))} />
-                  ))}
+              ) : (
+                <div className="grid gap-2" data-testid="tpl-palette">
+                  <p className="form-label">{t("tpl.colourStyle")}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {CLASSIC_THEMES.map((theme) => {
+                      const on = engine === "classic" ? classic?.theme === theme.id : doc.palette === theme.id;
+                      return (
+                        <button key={theme.id} type="button" className="tpl-var" aria-pressed={on} onClick={() => (engine === "classic" ? patchClassic({ theme: theme.id }) : patch({ palette: theme.id }))}>
+                          <span className="tpl-sw" aria-hidden>{theme.swatch.map((c) => <span key={c} style={{ background: c }} />)}</span>{t(`tpl.theme.${theme.id}` as MessageKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
+              {engine === "classic" ? (
+                <div className="grid gap-2" data-testid="tpl-classic-switch">
+                  <p className="form-label">{t("tpl.switchTitle")}</p>
+                  <p className="text-xs text-muted">{t("tpl.classicSwitchBody")}</p>
+                  {onNewBoard ? <button type="button" className="btn btn-quiet justify-self-start" onClick={() => onNewBoard(doc, `${name} (2)`)} data-testid="tpl-new-from-classic">{t("tpl.classicSwitch")}</button> : null}
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <p className="form-label">{t("tpl.switchTitle")}</p>
+                  <p className="text-xs text-muted">{t("tpl.switchBody")}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[420px] overflow-y-auto pr-1" role="group" aria-label={t("tpl.switchTitle")}>
+                    {MENU_DESIGNS.map((d) => (
+                      <SwitchCard key={d.id} design={d} current={doc} art={art} label={d.name[L]} onPick={() => update(switchDesign(doc, d))} />
+                    ))}
+                    {unified ? ORIGINAL_LAYOUTS.map((layout) => (
+                      <LayoutSwitchCard key={layout.id} template={layout.template} current={doc} art={art} label={layoutName(layout.template, t)} onPick={() => update(switchToLayout(doc, layout.template))} />
+                    )) : null}
+                  </div>
+                </div>
+              )}
               <div className="grid gap-2" data-testid="tpl-photo-style">
                 <p className="form-label">{t("tpl.itemPhotosTitle")}</p>
-                {design.composition === "cards" || design.composition === "featured" ? <p className="text-sm text-muted">{t("tpl.itemPhotosAlways")}</p> : (
+                {photosAlways ? <p className="text-sm text-muted">{t("tpl.itemPhotosAlways")}</p> : (
                   <div className="seg" role="group" aria-label={t("tpl.itemPhotosTitle")}>
-                    <button type="button" aria-pressed={itemPhotosShown(doc, design)} onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.itemPhotosThumbs")}</button>
-                    <button type="button" aria-pressed={!itemPhotosShown(doc, design)} onClick={() => patch({ photoStyle: "text" })}>{t("tpl.itemPhotosHidden")}</button>
+                    <button type="button" aria-pressed={isDesign ? itemPhotosShown(doc, design) : doc.photoStyle !== "text"} onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.itemPhotosThumbs")}</button>
+                    <button type="button" aria-pressed={isDesign ? !itemPhotosShown(doc, design) : doc.photoStyle === "text"} onClick={() => patch({ photoStyle: "text" })}>{t("tpl.itemPhotosHidden")}</button>
                   </div>
                 )}
                 <p className="text-xs text-muted">{t("tpl.itemPhotosNote")}</p>
               </div>
               <div className="grid gap-2">
                 <p className="form-label">{t("tpl.kitTitle")}</p>
-                {brand && brand.custom ? (
+                {engine === "classic" ? (
+                  <label className="flex items-center gap-3 p-3 rounded-xl border border-line min-h-11" data-testid="tpl-classic-kit">
+                    <input type="checkbox" className="size-5" checked={Boolean(classic?.useBrand)} onChange={(e) => patchClassic({ useBrand: e.target.checked })} />
+                    <span className="text-sm flex-1">{brand?.custom ? t("tpl.classicKit") : t("tpl.noKit")}</span>
+                  </label>
+                ) : brand && brand.custom ? (
                   <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-line">
                     <span className="size-6 rounded-md" style={{ background: brand.primaryColor }} aria-hidden />
                     <span className="size-6 rounded-md" style={{ background: brand.accentColor }} aria-hidden />
                     <span className="text-sm flex-1 min-w-[8rem]">{kitApplied ? t("tpl.kitOn") : t("tpl.kitOff")}</span>
-                    {kitApplied ? <button type="button" className="btn btn-quiet" onClick={restoreTemplate} data-testid="tpl-restore">{t("tpl.restore")}</button>
+                    {kitApplied ? <button type="button" className="btn btn-quiet" onClick={restoreTemplate} data-testid="tpl-restore">{isDesign ? t("tpl.restore") : t("ls.builtIn")}</button>
                       : <button type="button" className="btn btn-primary" onClick={applyKit} data-testid="tpl-apply-kit">{t("tpl.applyKit")}</button>}
                   </div>
                 ) : <p className="text-sm text-muted">{t("tpl.noKit")}</p>}
-                {!kitApplied && (doc.primaryColor || doc.accentColor || doc.textColor || doc.backgroundColor) ? (
-                  <button type="button" className="btn btn-quiet justify-self-start" onClick={restoreTemplate}>{t("tpl.restore")}</button>
+                {engine !== "classic" && !kitApplied && (doc.primaryColor || doc.accentColor || doc.textColor || doc.backgroundColor) ? (
+                  <button type="button" className="btn btn-quiet justify-self-start" onClick={restoreTemplate}>{isDesign ? t("tpl.restore") : t("ls.builtIn")}</button>
                 ) : null}
-                <p className="text-xs text-muted">{t("tpl.kitNote")}</p>
+                {engine !== "classic" ? <p className="text-xs text-muted">{t("tpl.kitNote")}</p> : null}
               </div>
-              <div className="grid gap-2">
-                <p className="form-label">{t("tpl.checks")}</p>
-                <ul className="grid gap-1.5" data-testid="tpl-checks">
-                  {colors.checks.map((c) => (
-                    <li key={c.key} className={`tpl-ck ${c.adjusted ? "adj" : ""}`}>
-                      <span>{t(`tpl.check.${c.key}` as MessageKey)}</span>
-                      <span>{c.ratio.toFixed(1)}:1 · {c.adjusted ? t("tpl.adjusted") : `✓ ${t("tpl.ok")}`}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {isDesign ? (
+                <div className="grid gap-2">
+                  <p className="form-label">{t("tpl.checks")}</p>
+                  <ul className="grid gap-1.5" data-testid="tpl-checks">
+                    {colors.checks.map((c) => (
+                      <li key={c.key} className={`tpl-ck ${c.adjusted ? "adj" : ""}`}>
+                        <span>{t(`tpl.check.${c.key}` as MessageKey)}</span>
+                        <span>{c.ratio.toFixed(1)}:1 · {c.adjusted ? t("tpl.adjusted") : `✓ ${t("tpl.ok")}`}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {unified ? <AdvancedLook engine={engine} doc={doc} patch={patch} /> : null}
             </div>
           ) : null}
 
           <div className="flex justify-between gap-2 pt-2 border-t border-line">
             <button type="button" className="btn btn-quiet" disabled={step === 0} onClick={() => setStep((step - 1) as Step)}>← {step > 0 ? stepNames[step - 1] : ""}</button>
             {step < 3 ? <button type="button" className="btn btn-primary" onClick={() => setStep((step + 1) as Step)}>{stepNames[step + 1]} →</button>
-              : <button type="button" className="btn btn-primary" onClick={() => setPublishOpen(true)}>{t("ls.publish")} →</button>}
+              : <button type="button" className="btn btn-primary" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")} →</button>}
           </div>
         </div>
       </div>
@@ -550,8 +804,8 @@ export function TemplateEditor({
         <Dialog label={t("tpl.publishTitle")} onClose={() => setPublishOpen(false)} className="bg-paper w-full max-w-lg rounded-2xl p-5" variant="center">
           <div className="grid gap-3" data-testid="tpl-publish-dialog">
             <h3 className="font-display font-bold text-lg">{t("tpl.publishTitle")}</h3>
-            {report.dropped > 0 ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-blocked">{t("tpl.publishBlocked", { n: report.dropped })}</p> : null}
-            <p className="text-sm text-muted">{t("tpl.publishBody")}</p>
+            {fit.dropped > 0 ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-blocked">{t("tpl.publishBlocked", { n: fit.dropped })}</p> : null}
+            <p className="text-sm text-muted">{engine === "classic" ? t("tpl.classicPublishBody") : t("tpl.publishBody")}</p>
             {displays === null ? <p className="text-sm text-muted">{t("common.loading")}</p> : displays.length === 0 ? <p className="text-sm text-muted">{t("tpl.noScreens")}</p> : (
               <ul className="grid gap-2">
                 {displays.map((d) => (
@@ -568,8 +822,8 @@ export function TemplateEditor({
             <p className="text-xs text-muted">{t("tpl.publishNote")}</p>
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className="btn btn-quiet" onClick={() => setPublishOpen(false)}>{t("tpl.cancel")}</button>
-              <button type="button" className="btn btn-primary" disabled={busy !== null || report.dropped > 0} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
-                {busy === "publish" ? t("tpl.publishing") : t("tpl.publishN", { n: Object.values(picked).filter(Boolean).length })}
+              <button type="button" className="btn btn-primary" disabled={busy !== null || fit.dropped > 0} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
+                {busy === "publish" ? t("tpl.publishing") : engine === "classic" && !Object.values(picked).some(Boolean) ? t("tpl.classicSave") : t("tpl.publishN", { n: Object.values(picked).filter(Boolean).length })}
               </button>
             </div>
           </div>
@@ -580,13 +834,15 @@ export function TemplateEditor({
         const item = doc.sections[photoFor.si].items[photoFor.ii];
         const label = item.name || t("tpl.item");
         const images = library.filter((f) => f.kind === "image");
+        const current = item.imageMediaId ? urlFor(item.imageMediaId) : item.stockPhoto && isDesign ? stockPhotoPath(item.stockPhoto) : null;
         return (
           <Dialog label={t("tpl.photoFor", { name: label })} onClose={() => setPhotoFor(null)} className="bg-paper w-full max-w-xl rounded-2xl p-5 max-h-[85dvh] overflow-y-auto" variant="center">
             <div className="grid gap-3" data-testid="tpl-item-photo-dialog">
               <h3 className="font-display font-bold text-lg break-words">{t("tpl.photoFor", { name: label })}</h3>
+              {unified && current ? <img src={current} alt={t("tpl.currentPhoto", { name: label })} className="w-28 h-28 rounded-xl object-cover border border-line" data-testid="tpl-item-current" /> : null}
               <p className="text-sm text-muted">{t("tpl.photoForBody")}</p>
               <div className="flex flex-wrap gap-2">
-                <label className="btn btn-primary cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}
+                <label className="btn btn-primary cursor-pointer">{busy === "upload" ? t("tpl.uploading") : unified && current ? t("tpl.replacePhoto") : t("tpl.uploadPhoto")}
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" data-testid="tpl-item-upload"
                     onChange={(e) => { const target = photoFor; void upload(e.target.files?.[0], "item", target).then(() => setPhotoFor(null)); }} />
                 </label>
@@ -599,12 +855,12 @@ export function TemplateEditor({
                     onClick={() => { setItemPhoto(photoFor.si, photoFor.ii, f.id); setPhotoFor(null); }}>{f.url ? <img src={f.url} alt="" /> : null}</button>
                 ))}</div>
               ) : <p className="text-sm text-muted">{t("tpl.noMedia")}</p>}
-              {doc.photoStyle === "text" && design.composition !== "cards" && design.composition !== "featured" ? (
+              {doc.photoStyle === "text" && !photosAlways ? (
                 <div className="note-warn text-sm grid gap-2" data-testid="tpl-dialog-hidden">
                   <p>{t("tpl.photoHiddenHint")}</p>
                   <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.showItemPhotos")}</button>
                 </div>
-              ) : <p className="text-xs text-muted" data-testid="tpl-dialog-where">{isPhotoDesign(design) ? t("tpl.photoWhereCards") : t("tpl.photoWhereThumbs", { name: label })}</p>}
+              ) : <p className="text-xs text-muted" data-testid="tpl-dialog-where">{isDesign && isPhotoDesign(design) ? t("tpl.photoWhereCards") : t("tpl.photoWhereThumbs", { name: label })}</p>}
               <div className="flex justify-end"><button type="button" className="btn btn-quiet" onClick={() => setPhotoFor(null)}>{t("tpl.done")}</button></div>
             </div>
           </Dialog>
@@ -612,6 +868,105 @@ export function TemplateEditor({
       })() : null}
     </section>
   );
+}
+
+const CLASSIC_THEMES: { id: "classic" | "fresh" | "bold"; swatch: string[] }[] = [
+  { id: "classic", swatch: ["#0b1220", "#4d94ff", "#13203a"] },
+  { id: "fresh", swatch: ["#f6f9fe", "#0066ff", "#ffffff"] },
+  { id: "bold", swatch: ["#0066ff", "#ffd34d", "#0047b3"] },
+];
+
+function layoutName(template: LayoutTemplate, t: ReturnType<typeof useLocale>["t"]) {
+  const id = ORIGINAL_LAYOUTS.find((layout) => layout.template === template)?.id ?? "menu-promo";
+  return t(`lo.${id}.name` as MessageKey);
+}
+
+/** Everything the previous layout editor could set that isn't a first-step choice, behind one disclosure. */
+function AdvancedLook({ engine, doc, patch }: { engine: Engine; doc: LayoutDocument; patch: (p: Partial<LayoutDocument>) => void }) {
+  const { t } = useLocale();
+  const spec = templateSpec(doc.template);
+  const proportion = engine === "layout" && (doc.template === "menu-promo-67" || doc.template === "split-50" || doc.template === "menu-banner" || doc.template === "signature");
+  const columnWidths = engine === "layout" && (doc.template === "triple-column" || doc.template === "two-menu-promo");
+  const widths: [number, number, number] = doc.columnWidths ?? (doc.template === "two-menu-promo" ? [0.35, 0.35, 0.3] : [doc.split, (1 - doc.split) / 2, (1 - doc.split) / 2]);
+  function setWidth(index: number, value: number) {
+    const next: [number, number, number] = [...widths];
+    next[index] = Math.min(0.6, Math.max(0.2, value));
+    const others = [0, 1, 2].filter((i) => i !== index);
+    const remain = 1 - next[index];
+    const sum = next[others[0]] + next[others[1]] || 1;
+    next[others[0]] = Math.min(0.6, Math.max(0.2, (remain * next[others[0]]) / sum));
+    next[others[1]] = remain - next[others[0]];
+    if (next[others[1]] < 0.2 || next[others[1]] > 0.6) return;
+    patch({ columnWidths: next });
+  }
+  return (
+    <details className="tpl-adv" data-testid="tpl-advanced">
+      <summary>{t("tpl.advancedOptions")}</summary>
+      <div className="grid gap-3 pt-3">
+        <p className="text-xs text-muted">{t("tpl.advancedNote")}</p>
+        {engine !== "classic" ? (
+          <div className="grid grid-cols-2 gap-2">
+            <ColorField label={t("ls.textColor")} ariaLabel={t("ls.textColor")} value={doc.textColor} fallback="#0b1220" onChange={(next) => patch({ textColor: next })} />
+            <ColorField label={t("ls.menuBg")} ariaLabel={t("ls.menuBg")} value={doc.backgroundColor} fallback="#f6f9fe" onChange={(next) => patch({ backgroundColor: next })} />
+            <ColorField label={t("ls.featureColor")} ariaLabel={t("ls.primaryColor")} value={doc.primaryColor} fallback="#0066ff" onChange={(next) => patch({ primaryColor: next })} />
+            <ColorField label={t("ls.accentColor")} ariaLabel={t("ls.accentColor")} value={doc.accentColor} fallback="#ffd34d" onChange={(next) => patch({ accentColor: next })} />
+          </div>
+        ) : null}
+        <label className="form-label grid gap-1">{t("ls.font")}
+          <select className="field" value={doc.font} data-testid="tpl-font" onChange={(e) => {
+            const next = e.target.value;
+            if (!isBoardFont(next)) return;
+            const { bodyFont, ...rest } = doc;
+            patch(bodyFont && bodyFont !== next ? { ...rest, font: next, bodyFont } : { ...rest, font: next, bodyFont: undefined });
+          }}>
+            {BOARD_FONTS.map((font) => <option key={font.id} value={font.id}>{font.label} · {t(`font.${font.id}.hint` as MessageKey)}</option>)}
+          </select>
+        </label>
+        <label className="form-label grid gap-1">{t("studio.bodyFont")}
+          <select className="field" value={doc.bodyFont ?? ""} data-testid="tpl-body-font" onChange={(e) => {
+            const next = e.target.value;
+            patch({ bodyFont: isBoardFont(next) && next !== doc.font ? next : undefined });
+          }}>
+            <option value="">{t("studio.bodyFontSame")}</option>
+            {BOARD_FONTS.filter((font) => font.id !== doc.font).map((font) => <option key={font.id} value={font.id}>{font.label} · {t(`font.${font.id}.hint` as MessageKey)}</option>)}
+          </select>
+        </label>
+        {engine === "layout" ? (
+          <div className="grid gap-1">
+            <p className="form-label">{t("ls.typeSize")}</p>
+            <div className="seg" role="group" aria-label={t("ls.typeSize")}>
+              <button type="button" aria-pressed={doc.typeScale === "room"} onClick={() => patch({ typeScale: "room" })}>{t("ls.room")}</button>
+              <button type="button" aria-pressed={doc.typeScale === "counter"} onClick={() => patch({ typeScale: "counter" })}>{t("ls.counter")}</button>
+            </div>
+            <p className="text-xs text-muted">{t("ls.roomNote")}</p>
+          </div>
+        ) : null}
+        {proportion ? (
+          <label className="form-label grid gap-1">{proportionLabel(doc.template, t)} {Math.round(doc.split * 100)}%
+            <input type="range" min={spec.min} max={spec.max} step={0.01} value={doc.split} data-testid="tpl-split-range" onChange={(e) => patch({ split: Number(e.target.value) })} />
+          </label>
+        ) : null}
+        {columnWidths ? (
+          <fieldset className="grid gap-1 border border-line rounded-xl p-3" data-testid="tpl-column-widths">
+            <legend className="form-label px-1">{t("ls.columnWidths")}</legend>
+            {widths.map((w, i) => (
+              <label key={i} className="text-sm grid gap-1">{t("ls.columnN", { n: i + 1 })} {Math.round(w * 100)}%
+                <input aria-label={t("ls.columnWidthN", { n: i + 1 })} type="range" min={0.2} max={0.6} step={0.01} value={w} onChange={(e) => setWidth(i, Number(e.target.value))} />
+              </label>
+            ))}
+            <p className="text-xs text-muted">{t("ls.columnsNote")}</p>
+          </fieldset>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function proportionLabel(template: LayoutTemplate, t: ReturnType<typeof useLocale>["t"]) {
+  if (template === "menu-banner") return t("ls.bannerHeight");
+  if (template === "signature") return t("ls.cardWidth");
+  if (template === "split-50") return t("ls.leftSide");
+  return t("ls.menuWidth");
 }
 
 function SwitchCard({ design, current, art, label, onPick }: { design: MenuDesign; current: LayoutDocument; art: Art; label: string; onPick: () => void }) {
@@ -622,6 +977,114 @@ function SwitchCard({ design, current, art, label, onPick }: { design: MenuDesig
       <DesignBoard doc={doc} art={{ imageHref: art.imageHref, logoHref: art.logoHref }} className="rounded-md" />
       {label}
     </button>
+  );
+}
+
+function LayoutSwitchCard({ template, current, art, label, onPick }: { template: LayoutTemplate; current: LayoutDocument; art: Art; label: string; onPick: () => void }) {
+  const doc = useMemo(() => switchToLayout(current, template), [current, template]);
+  const active = !current.design && current.template === template;
+  return (
+    <button type="button" className="tpl-var" aria-pressed={active} onClick={onPick} data-testid={`tpl-switch-layout-${template}`}>
+      <BoardView engine="layout" doc={doc} classic={null} art={{ imageHref: art.imageHref, logoHref: null, itemImages: art.itemImages }} brand={null} className="rounded-md" />
+      {label}
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ one gallery ------------------------------------------------------------------ */
+
+const STRUCTURES: (Structure | "all")[] = ["all", "single", "columns", "media", "cards"];
+
+/**
+ * The unified design gallery (UNIFIED_MENU_EDITOR): premium templates, the original layouts and the classic
+ * full-screen menu in one place. Every choice opens the same menu designer.
+ */
+export function DesignGallery({ onPick, onCancel, brand }: {
+  onPick: (pick: { document: LayoutDocument; name: string; classic: ClassicSettings | null }) => void;
+  onCancel: () => void;
+  brand: Brand | null;
+}) {
+  const { locale, t } = useLocale();
+  const L = locale === "es" ? "es" : "en";
+  const [business, setBusiness] = useState<DesignBusiness | "all">("all");
+  const [style, setStyle] = useState<DesignStyle | "all">("all");
+  const [structure, setStructure] = useState<Structure | "all">("all");
+  const [photos, setPhotos] = useState(false);
+  const entries = useMemo(() => galleryEntries(), []);
+  const shown = filterGallery(entries, { business, style, photos, structure });
+  const noArt: Art = { imageHref: null, logoHref: null };
+  const classicSample = useMemo(() => fromClassic("classic", sampleMenu()), []);
+
+  function pick(entry: GalleryEntry) {
+    if (entry.kind === "design") { onPick({ document: designDocument(entry.design), name: entry.design.name[L], classic: null }); return; }
+    if (entry.kind === "layout") { onPick({ document: newLayoutDocument(entry.template, brand), name: t(`lo.${entry.id}.name` as MessageKey), classic: null }); return; }
+    const seeded = fromClassic("classic", seedClassicMenu(sampleMenu(), brand));
+    onPick({ document: seeded.doc, name: t("lo.full-screen.name"), classic: seeded.classic });
+  }
+  const nameOf = (entry: GalleryEntry) => (entry.kind === "design" ? entry.design.name[L] : t(`lo.${entry.id}.name` as MessageKey));
+  const blurbOf = (entry: GalleryEntry) => (entry.kind === "design" ? entry.design.blurb[L] : t(`lo.${entry.id}.blurb` as MessageKey));
+
+  return (
+    <section className="mb-6" data-testid="design-gallery" aria-labelledby="tpl-gallery-title">
+      <style>{STYLES}</style>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="tpl-gallery-title" className="font-display text-2xl font-bold">{t("tpl.unifiedTitle")}</h2>
+          <p className="text-sm text-muted mt-1">{t("tpl.unifiedLede")}</p>
+        </div>
+        <button type="button" className="btn btn-quiet" onClick={onCancel}>{t("tpl.cancel")}</button>
+      </div>
+      <div className="grid gap-2 mt-4">
+        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterBusiness")}>
+          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterBusiness")}</span>
+          {BUSINESSES.map((id) => (
+            <button key={id} type="button" className="tpl-chip" aria-pressed={business === id} onClick={() => setBusiness(id)}>{t(`tpl.business.${id}` as MessageKey)}</button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterStyle")}>
+          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterStyle")}</span>
+          {STYLE_IDS.map((id) => (
+            <button key={id} type="button" className="tpl-chip" aria-pressed={style === id} onClick={() => setStyle(id)}>{t(`tpl.style.${id}` as MessageKey)}</button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterStructure")}>
+          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterStructure")}</span>
+          {STRUCTURES.map((id) => (
+            <button key={id} type="button" className="tpl-chip" aria-pressed={structure === id} onClick={() => setStructure(id)} data-testid={`filter-structure-${id}`}>{t(`tpl.structure.${id}` as MessageKey)}</button>
+          ))}
+          <button type="button" className="tpl-chip" aria-pressed={photos} onClick={() => setPhotos(!photos)} data-testid="filter-photos">📷 {t("tpl.filterPhotos")}</button>
+        </div>
+      </div>
+      <p className="sr-only" role="status">{t("tpl.count", { n: shown.length })}</p>
+      <ul className="grid gap-4 mt-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("tpl.galleryTitle")}>
+        {shown.map((entry) => (
+          <li key={`${entry.kind}-${entry.id}`} className="min-w-0 flex">
+            <button type="button" className="tpl-card w-full" data-testid={entry.kind === "design" ? `template-${entry.id}` : `layout-${entry.id}`} onClick={() => pick(entry)}>
+              {entry.kind === "design" ? <DesignBoard doc={designDocument(entry.design)} art={noArt} />
+                : entry.kind === "layout" ? <BoardView engine="layout" doc={sampleLayout(entry.template)} classic={null} art={noArt} brand={null} />
+                  : <BoardView engine="classic" doc={classicSample.doc} classic={classicSample.classic} art={noArt} brand={null} />}
+              <span className="font-display font-bold text-[15px]">{nameOf(entry)}</span>
+              <span className="text-sm text-muted">{blurbOf(entry)}</span>
+              <span className="flex flex-wrap gap-1.5 mt-auto">
+                <span className="tpl-tag">{entry.business === "any" ? t("tpl.business.any") : t(`tpl.business.${entry.business}` as MessageKey)}</span>
+                <span className="tpl-tag">{t(`tpl.structure.${entry.structure}` as MessageKey)}</span>
+                {entry.kind === "design" ? <span className="tpl-tag">{t("tpl.colourStyles", { n: entry.design.variants.length })}</span> : <span className="tpl-tag">{t("tpl.colourStyles", { n: 3 })}</span>}
+                {entry.photos ? <span className="tpl-tag">{t("tpl.itemPhotosTag")}</span> : <span className="tpl-tag">{t("tpl.itemThumbsTag")}</span>}
+                {entry.original ? <span className="tpl-tag">{t("tpl.originalTag")}</span> : null}
+              </span>
+              <span className="btn btn-primary min-h-10 self-start" aria-hidden>{t("tpl.use")}</span>
+            </button>
+          </li>
+        ))}
+        {shown.length === 0 ? <li className="text-sm text-muted">{t("tpl.noMatch")}</li> : null}
+        <li className="min-w-0 sm:col-span-2 xl:col-span-3">
+          <button type="button" className="tpl-card w-full sm:flex-row sm:items-center" data-testid="template-scratch" onClick={() => onPick({ document: scratchDocument(), name: "", classic: null })}>
+            <span className="grid place-items-center rounded-lg border-2 border-dashed border-line text-muted font-bold sm:w-44 aspect-video" aria-hidden>＋</span>
+            <span className="grid gap-1"><span className="font-display font-bold">{t("tpl.scratch")}</span><span className="text-sm text-muted">{t("tpl.scratchBody")}</span></span>
+          </button>
+        </li>
+      </ul>
+    </section>
   );
 }
 

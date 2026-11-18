@@ -186,17 +186,38 @@ export async function imageDataUri(accountId: string, mediaId: string | null | u
   return `data:${file.mime};base64,${file.bytes.toString("base64")}`;
 }
 
-export async function artFor(accountId: string, content: Pick<MenuContent, "useBrand" | "photoMediaId">): Promise<MenuArt> {
+export async function artFor(accountId: string, content: Pick<MenuContent, "useBrand" | "photoMediaId"> & { sections?: MenuContent["sections"]; itemPhotos?: boolean }): Promise<MenuArt> {
   const useBrand = content.useBrand !== false;
   const brand = useBrand ? await getBrand(accountId) : null;
   const custom = brand && brand !== "error" && brand.custom ? brand : null;
-  const [logo, photo] = await Promise.all([
+  const [logo, photo, itemImages] = await Promise.all([
     custom ? imageDataUri(accountId, custom.logoMediaId) : Promise.resolve(null),
     imageDataUri(accountId, content.photoMediaId),
+    classicItemImages(accountId, content),
   ]);
   return {
     brand: custom ? { primaryColor: custom.primaryColor, accentColor: custom.accentColor } : null,
     logo,
     photo,
+    ...(itemImages ? { itemImages } : {}),
   };
+}
+
+/**
+ * Item photos for a classic board: only this account's own images (imageBytes checks the account), each reduced
+ * before drawing. Nothing is loaded for boards without item photos or with item photos hidden.
+ */
+async function classicItemImages(accountId: string, content: { sections?: MenuContent["sections"]; itemPhotos?: boolean }): Promise<Record<string, string> | null> {
+  if (content.itemPhotos === false || !content.sections) return null;
+  const ids = [...new Set(content.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
+  if (!ids.length) return null;
+  const { prepareBoardPhoto } = await import("@/lib/server/layout-render");
+  const out: Record<string, string> = {};
+  await Promise.all(ids.map(async (id) => {
+    const raw = await imageBytes(accountId, id);
+    if (!raw || !raw.bytes.length) return;
+    const fitted = await prepareBoardPhoto(raw.bytes, raw.mime, 600);
+    out[id] = `data:${fitted.mime};base64,${fitted.bytes.toString("base64")}`;
+  }));
+  return out;
 }

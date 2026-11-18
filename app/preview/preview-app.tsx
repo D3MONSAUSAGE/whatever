@@ -8,7 +8,7 @@ import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
 import { MyScreens, ScreenGroups, ScreenWorkspace } from "@/components/my-screens";
 import type { AccountStudio } from "@/lib/layout-account";
-import { sampleLayout } from "@/lib/layout-studio";
+import { sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 import { ShowOnScreens } from "@/components/show-on-screens";
@@ -230,6 +230,12 @@ export function PreviewApp() {
       {screen === "templates" ? <MenuBoards fixture={{ ...menuFixture, templates: true, startTemplate: "gallery" }} /> : null}
       {screen === "templates-edit" ? <MenuBoards fixture={{ ...menuFixture, templates: true, startTemplate: params.get("design") || "coffee-shop" }} /> : null}
       {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startMenuId: "menu-dinner" }} /> : null}
+      {/* Unified menu designer (UNIFIED_MENU_EDITOR) */}
+      {screen === "unified" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true }} /> : null}
+      {screen === "unified-gallery" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startTemplate: "gallery" }} /> : null}
+      {screen === "unified-edit" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startTemplate: params.get("design") || "modern-restaurant" }} /> : null}
+      {screen === "unified-layout" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startLayout: (params.get("layout") as LayoutTemplate) || "two-column", startBoardId: null }} /> : null}
+      {screen === "unified-board" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startMenuId: params.get("menu") || "menu-dinner" }} /> : null}
       {screen === "unify-list" ? <MenuBoards fixture={menuFixture} /> : null}
       {screen === "unify-picker" ? <MenuBoards fixture={{ ...menuFixture, startView: "pick-layout" }} /> : null}
       {screen === "unify-full-screen" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}

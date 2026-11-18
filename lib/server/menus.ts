@@ -118,6 +118,29 @@ export async function menuView(accountId: string, rows: MenuRow[]) {
 export { isMissingSchema };
 
 /** Validate the optional photo before rendering. */
+/**
+ * Item photos must be this account's own images. A reference that isn't (deleted, another account's, not an
+ * image) is dropped from the stored board, and the item keeps its text. Boards without item photos are untouched.
+ */
+export async function keepOwnItemPhotos(accountId: string, content: MenuContent): Promise<MenuContent> {
+  const ids = [...new Set(content.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
+  if (!ids.length) return content;
+  const rows = await db().from("media").select("id, mime_type").eq("account_id", accountId).in("id", ids);
+  const own = new Set(rows.error ? [] : (rows.data ?? []).filter((row) => /^image\/(jpeg|png|webp)$/.test(String(row.mime_type))).map((row) => String(row.id)));
+  return {
+    ...content,
+    sections: content.sections.map((section) => ({
+      ...section,
+      items: section.items.map((item) => {
+        if (!item.imageMediaId || own.has(item.imageMediaId)) return item;
+        const { imageMediaId: _drop, ...rest } = item;
+        void _drop;
+        return rest;
+      }),
+    })),
+  };
+}
+
 export async function checkMenuPhoto(accountId: string, content: MenuContent | undefined) {
   if (!content?.photoMediaId) return null;
   return checkArtMedia(accountId, content.photoMediaId, "photo");
