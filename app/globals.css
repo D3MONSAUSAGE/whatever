@@ -343,6 +343,11 @@ a.ps-stat-link:focus-visible { outline: 3px solid var(--color-primary); outline-
 /* Phase 4: one heading voice on every standard signed-in page (the editors keep their compact panel type). */
 main.shell-main:not(.studio-shell) h2 { font-family: var(--font-display); letter-spacing: -0.005em; color: var(--color-ink); }
 @media (max-width: 639px) { .seg.seg-lg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .seg.seg-lg > button { padding: 0 8px; } }
+/* Playlist preview countdown: a small live pill under the slideshow. */
+.slide-countdown { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 2px 10px; border-radius: 999px; background: #e6ebf4; color: var(--color-ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.slide-countdown::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--color-primary); animation: slide-countdown-pulse 1s ease-in-out infinite; }
+@keyframes slide-countdown-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .slide-countdown::before { animation: none; } }
 .ps-sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 12px; }
 .ps-sec-head h2 { font-family: var(--font-display); font-size: 1.125rem; font-weight: 700; color: var(--color-ink); }
 .ps-sec-count { font-size: 12px; font-weight: 600; color: var(--color-muted); background: #e6ebf4; border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: 2px; }
