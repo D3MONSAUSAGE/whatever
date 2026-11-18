@@ -1,0 +1,313 @@
+<title>Pekko Option A</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: problem → transformation. A torn paper menu against the live board, then a short, plain-spoken path to a trial. */
+:root {
+  --paper: #fbfcfe;      /* page ground, slightly blue-biased white */
+  --ink: #0d1b33;        /* Pekko navy, body text */
+  --ink-2: #4a5a74;      /* secondary text */
+  --line: #dde4ef;
+  --blue: #1a5cff;       /* Pekko primary */
+  --blue-ink: #0c3db8;
+  --marker: #ffe36b;     /* price-change highlighter, used sparingly */
+  --stop: #c8341f;       /* crossed-out old price */
+  --sheet: #f3efe4;      /* the printed menu */
+  --card: #ffffff;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--body); }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.proto { background: var(--ink); color: #fff; font: 600 12px/1.4 var(--body); text-align: center; padding: 6px 16px; letter-spacing: .02em; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+h1 { font-weight: 900; font-size: clamp(2.3rem, 8.2vw, 4.4rem); line-height: .98; }
+h2 { font-weight: 800; font-size: clamp(1.7rem, 5vw, 2.6rem); line-height: 1.05; }
+h3 { font-weight: 800; font-size: 1.15rem; line-height: 1.2; }
+p { margin: 0; }
+.eyebrow { font: 700 12px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--blue-ink); }
+.lede { font-size: 1.08rem; color: var(--ink-2); max-width: 36rem; }
+.mark { background: linear-gradient(transparent 58%, var(--marker) 58%); padding: 0 .06em; }
+
+/* nav */
+header.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--paper); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; font: 800 19px/1 var(--display); text-decoration: none; }
+.brand b { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #2aa8ff, var(--blue)); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.nav-links { display: none; gap: 22px; font-weight: 600; font-size: 14px; }
+.nav-links a { text-decoration: none; color: var(--ink-2); }
+@media (min-width: 860px) { .nav-links { display: flex; } }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 12px; font: 700 16px/1 var(--body); text-decoration: none; border: 2px solid transparent; cursor: pointer; }
+.btn:focus-visible { outline: 3px solid var(--marker); outline-offset: 2px; }
+.btn-primary { background: var(--blue); color: #fff; box-shadow: 0 6px 18px rgb(26 92 255 / .28); }
+.btn-primary:hover { background: var(--blue-ink); }
+.btn-ghost { border-color: var(--ink); color: var(--ink); background: transparent; }
+.btn-sm { min-height: 40px; padding: 0 14px; font-size: 14px; border-radius: 10px; }
+
+/* hero */
+.hero { padding-block: 28px 40px; }
+.hero-grid { display: grid; gap: 28px; }
+.hero-grid > * { min-width: 0; }
+@media (min-width: 960px) { .hero-grid { grid-template-columns: 1.02fr 1fr; align-items: center; gap: 48px; } .hero { padding-block: 56px 72px; } }
+.hero .lede { margin-top: 16px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.reassure { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; font-size: 14px; color: var(--ink-2); padding: 0; list-style: none; }
+.reassure li::before { content: "✓ "; color: var(--blue); font-weight: 800; }
+
+/* before / after */
+.ba { position: relative; }
+.ba-tabs { display: inline-flex; background: #e8edf6; border-radius: 999px; padding: 4px; gap: 4px; margin-bottom: 12px; }
+.ba-tabs button { border: 0; background: transparent; font: 700 13px/1 var(--body); padding: 9px 14px; border-radius: 999px; color: var(--ink-2); cursor: pointer; min-height: 36px; }
+.ba-tabs button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgb(13 27 51 / .15); }
+.stage { position: relative; aspect-ratio: 16 / 10.5; max-width: 100%; }
+.sheet { position: absolute; inset: 4% 8% 2% 4%; background: var(--sheet); border-radius: 4px; padding: 6% 7%; transform: rotate(-2.2deg); box-shadow: 0 18px 40px rgb(13 27 51 / .18), inset 0 0 0 1px rgb(0 0 0 / .04); font-family: "Courier New", ui-monospace, monospace; color: #2c2a24; transition: opacity .35s, transform .35s; }
+.sheet::before, .sheet::after { content: ""; position: absolute; top: -10px; width: 70px; height: 22px; background: rgb(255 255 255 / .6); box-shadow: 0 1px 2px rgb(0 0 0 / .1); }
+.sheet::before { left: 12%; transform: rotate(-6deg); } .sheet::after { right: 10%; transform: rotate(5deg); }
+.sheet h4 { margin: 0 0 6%; font: 700 clamp(14px, 2.6vw, 20px)/1 "Courier New", monospace; letter-spacing: .08em; }
+.sheet .row { display: flex; justify-content: space-between; gap: 10px; font-size: clamp(11px, 1.9vw, 15px); padding: 3% 0; border-bottom: 1px dashed rgb(0 0 0 / .18); }
+.old { position: relative; color: var(--stop); }
+.old s { text-decoration-thickness: 2px; }
+.old i { font-style: normal; font-family: "Comic Sans MS", "Marker Felt", cursive; color: var(--stop); margin-left: 6px; transform: rotate(-6deg); display: inline-block; }
+.sheet .note { margin-top: 6%; font-size: clamp(10px, 1.6vw, 13px); color: #8a8270; }
+.tv { position: absolute; inset: 6% 0 auto 0; aspect-ratio: 16 / 9; border-radius: 14px; background: #0b0f17; padding: 2.2%; box-shadow: 0 22px 50px rgb(13 27 51 / .28); opacity: 0; transform: scale(.97); transition: opacity .35s, transform .35s; }
+.tv img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+.tv .live { position: absolute; left: 4%; bottom: -14px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: 700 12px/1 var(--body); color: var(--ink); display: flex; gap: 6px; align-items: center; box-shadow: 0 4px 12px rgb(13 27 51 / .12); }
+.tv .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
+.stage[data-show="after"] .tv { opacity: 1; transform: none; }
+.stage[data-show="after"] .sheet { opacity: 0; transform: rotate(-4deg) translateY(10px); }
+.caption { margin-top: 26px; font-size: 13px; color: var(--ink-2); }
+
+/* problems */
+section { padding-block: 56px; }
+.band { background: var(--ink); color: #eaf0fb; }
+.band .eyebrow { color: #8fb4ff; }
+.band .lede { color: #b9c6dc; }
+.problems { display: grid; gap: 14px; margin-top: 28px; }
+@media (min-width: 720px) { .problems { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .problems { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.prob { background: #15284a; border: 1px solid #22385f; border-radius: 16px; padding: 20px; display: grid; gap: 10px; align-content: start; }
+.prob .pain { font: 800 1.08rem/1.25 var(--display); color: #fff; }
+.prob .fix { font-size: 14.5px; color: #c9d6ec; border-top: 1px solid #22385f; padding-top: 10px; }
+.prob .fix b { color: var(--marker); font-weight: 700; }
+
+/* how */
+.how { display: grid; gap: 16px; margin-top: 28px; counter-reset: step; }
+@media (min-width: 860px) { .how { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.step { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 10px; align-content: start; }
+.step .n { counter-increment: step; width: 34px; height: 34px; border-radius: 10px; background: var(--blue); color: #fff; display: grid; place-items: center; font: 900 16px/1 var(--display); }
+.step .n::before { content: counter(step); }
+.step .time { font: 700 12px/1 var(--body); color: var(--blue-ink); letter-spacing: .06em; text-transform: uppercase; }
+.step p { color: var(--ink-2); font-size: 15px; }
+.step .shot { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #eef2f8; }
+.code { display: flex; gap: 6px; justify-content: center; padding: 18px 8px; background: #0b0f17; }
+.code span { width: 32px; height: 42px; border-radius: 6px; background: #1b2436; color: #fff; font: 800 22px/42px var(--display); text-align: center; }
+
+/* templates */
+.tpl-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; }
+.strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 72%); gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; margin-top: 22px; }
+@media (min-width: 860px) { .strip { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; } }
+.strip figure { margin: 0; scroll-snap-align: start; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.strip figcaption { padding: 10px 12px; font-size: 13px; color: var(--ink-2); display: flex; justify-content: space-between; gap: 8px; }
+.strip figcaption b { color: var(--ink); }
+
+/* objections */
+.qa { display: grid; gap: 12px; margin-top: 24px; }
+@media (min-width: 860px) { .qa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.qa details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.qa summary { font: 800 1.02rem/1.3 var(--display); cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; min-height: 28px; align-items: center; }
+.qa summary::after { content: "+"; font-size: 22px; color: var(--blue); }
+.qa details[open] summary::after { content: "−"; }
+.qa p { margin-top: 10px; color: var(--ink-2); font-size: 15px; }
+.check { margin-top: 22px; background: #eaf1ff; border: 1px solid #c8d8ff; border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+@media (min-width: 760px) { .check { grid-template-columns: 1fr auto; align-items: center; } }
+.check code { font: 700 15px/1 ui-monospace, Menlo, monospace; background: #fff; border: 1px solid #c8d8ff; padding: 4px 8px; border-radius: 6px; }
+
+/* pricing */
+.plans { display: grid; gap: 12px; margin-top: 24px; }
+@media (min-width: 760px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.plan { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 6px; }
+.plan.pop { border: 2px solid var(--blue); }
+.price { font: 900 2.2rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.price small { font: 500 14px var(--body); color: var(--ink-2); }
+.trialnote { margin-top: 16px; font-size: 14.5px; color: var(--ink-2); }
+
+/* final */
+.final { text-align: left; }
+.final .box { background: var(--blue); color: #fff; border-radius: 22px; padding: 28px 22px; display: grid; gap: 16px; }
+@media (min-width: 860px) { .final .box { grid-template-columns: 1.3fr auto; align-items: center; padding: 40px; } }
+.final .btn-primary { background: #fff; color: var(--blue-ink); box-shadow: none; }
+.final p { color: #dce6ff; }
+footer { padding-block: 26px 40px; color: var(--ink-2); font-size: 13px; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 13px; z-index: 40; max-width: calc(100% - 32px); }
+.sticky-cta { position: fixed; inset: auto 0 0 0; z-index: 25; background: var(--card); border-top: 1px solid var(--line); padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 10px; align-items: center; justify-content: space-between; transform: translateY(110%); transition: transform .25s; }
+.sticky-cta.on { transform: none; }
+.sticky-cta span { font-size: 13px; color: var(--ink-2); }
+@media (min-width: 860px) { .sticky-cta { display: none; } }
+</style>
+
+<div class="proto">Prototype · Option A (problem-first) · not live · buttons are inert</div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><b>P</b>Pekko</a>
+    <nav class="nav-links" aria-label="Page"><a href="#problems">Why switch</a><a href="#how">How it works</a><a href="#tv">Your TV</a><a href="#pricing">Pricing</a></nav>
+    <a class="btn btn-primary btn-sm cta" href="#trial" data-dest="/signup">Start free trial</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">For restaurants, cafés and food trucks</p>
+        <h1 style="margin-top:12px">Your prices changed.<br><span class="mark">Your menu didn’t.</span></h1>
+        <p class="lede">Pekko puts a professional digital menu on the TV you already have. Change a price from your phone and the screen updates. No designer, no reprinting, no extra box on compatible smart TVs.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary cta" href="#trial" data-dest="/signup">Start my 14-day free trial</a>
+          <a class="btn btn-ghost cta" href="#tv" data-dest="#tv">Will it work on my TV?</a>
+        </div>
+        <ul class="reassure"><li>No credit card</li><li>Every feature, up to 5 screens</li><li>Cancel by not choosing a plan</li></ul>
+      </div>
+      <div class="ba">
+        <div class="ba-tabs" role="group" aria-label="Compare">
+          <button type="button" id="ba-before" aria-pressed="false">Today</button>
+          <button type="button" id="ba-after" aria-pressed="true">With Pekko</button>
+        </div>
+        <div class="stage" id="stage" data-show="after">
+          <div class="sheet" aria-hidden="true">
+            <h4>DINNER MENU</h4>
+            <div class="row"><span>Burrata</span><span class="old"><s>$14</s><i>$16</i></span></div>
+            <div class="row"><span>Charred octopus</span><span>$19</span></div>
+            <div class="row"><span>Ribeye 14 oz</span><span class="old"><s>$42</s><i>$46</i></span></div>
+            <div class="row"><span>Half chicken</span><span>$29</span></div>
+            <div class="row"><span>Fish of the day</span><span class="old"><i>ask server</i></span></div>
+            <p class="note">printed in March · specials on the board by the door</p>
+          </div>
+          <div class="tv" role="img" aria-label="The Modern Restaurant template on a TV, with up-to-date prices">
+            <img src="assets/modern-restaurant.jpg" alt="" width="1280" height="720">
+            <span class="live">Updated from a phone · live on Dining room TV</span>
+          </div>
+        </div>
+        <p class="caption">Right: the real “Modern Restaurant” template, rendered by Pekko exactly as the TV shows it. Left: a sketch of the problem.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="problems">
+    <div class="wrap">
+      <p class="eyebrow">Sound familiar?</p>
+      <h2 style="margin-top:10px">Four things that shouldn’t take a week</h2>
+      <p class="lede" style="margin-top:12px">These are the jobs Pekko was built to make small.</p>
+      <div class="problems">
+        <article class="prob"><p class="pain">“The price on the board is wrong again.”</p><p class="fix"><b>Change it from your phone.</b> Every screen showing that menu updates. No reprint, no marker.</p></article>
+        <article class="prob"><p class="pain">“I’m not a designer and can’t keep paying one.”</p><p class="fix"><b>Pick one of 22 ready-made templates.</b> Type your items; Pekko sizes the text and checks it’s readable from across the room.</p></article>
+        <article class="prob"><p class="pain">“Signage companies want a box, a contract and an installer.”</p><p class="fix"><b>Use the TV you have.</b> On tested smart TVs it runs in the TV’s web browser. Otherwise any TV stick or computer with a browser works.</p></article>
+        <article class="prob"><p class="pain">“Breakfast is over and the TV still says pancakes.”</p><p class="fix"><b>Schedule it once.</b> Breakfast, lunch and dinner boards switch on their own at the times you set.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <p class="eyebrow">How it works</p>
+      <h2 style="margin-top:10px">From a blank TV to your menu, in three steps</h2>
+      <div class="how">
+        <article class="step"><span class="n" aria-hidden="true"></span><p class="time">On your phone</p><h3>Pick a template and type your menu</h3><p>Add items, prices and a food photo for any dish. The preview is exactly what the TV will show.</p><div class="shot"><img src="assets/ui-phone-editor.jpg" alt="The Pekko menu editor on a phone, with a live TV preview of a taquería menu" width="468" height="853" loading="lazy" style="max-height:300px;object-fit:cover;object-position:top;width:100%"></div></article>
+        <article class="step"><span class="n" aria-hidden="true"></span><p class="time">On your TV</p><h3>Open pekkotv.com/pair</h3><p>A six-digit code appears. Type it in Pekko to connect that screen to your account.</p><div class="shot"><div class="code" aria-label="Example pairing code 482910"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>0</span></div></div></article>
+        <article class="step"><span class="n" aria-hidden="true"></span><p class="time">Anywhere</p><h3>Publish, then change it any time</h3><p>Your menu goes live on that screen. Edit a price later and it updates there, no ladder required.</p><div class="shot"><img src="assets/taqueria-specials.jpg" alt="The Taquería Specials template with dish photos" width="1280" height="720" loading="lazy"></div></article>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="tpl-head">
+        <div><p class="eyebrow">22 templates · 7 layouts</p><h2 style="margin-top:10px">Looks designed. Took minutes.</h2></div>
+        <a class="btn btn-ghost btn-sm cta" href="#trial" data-dest="/signup">Try them free</a>
+      </div>
+      <div class="strip">
+        <figure><img src="assets/photo-menu-grid.jpg" alt="Photo Menu Grid template" width="1280" height="720" loading="lazy"><figcaption><b>Photo Menu Grid</b><span>food photo cards</span></figcaption></figure>
+        <figure><img src="assets/coffee-shop.jpg" alt="Coffee Shop template" width="1280" height="720" loading="lazy"><figcaption><b>Coffee Shop</b><span>two columns + photo</span></figcaption></figure>
+        <figure><img src="assets/smokehouse-bbq.jpg" alt="Smokehouse BBQ template" width="1280" height="720" loading="lazy"><figcaption><b>Smokehouse BBQ</b><span>bold, price tags</span></figcaption></figure>
+      </div>
+      <p class="caption">Real Pekko templates with their sample content. Your name, logo, colours and photos replace it.</p>
+    </div>
+  </section>
+
+  <section id="tv" style="padding-top:8px">
+    <div class="wrap">
+      <p class="eyebrow">Before you sign up</p>
+      <h2 style="margin-top:10px">The honest answers</h2>
+      <div class="check">
+        <p><b>Check your TV in 30 seconds, no account needed.</b> Open <code>pekkotv.com/pair</code> in your TV’s web browser. If a six-digit code appears, Pekko works on that TV.</p>
+        <a class="btn btn-primary cta" href="#trial" data-dest="/signup">It worked, start my trial</a>
+      </div>
+      <div class="qa">
+        <details open><summary>Do I need to buy any hardware?</summary><p>Not on smart TVs where the player has been tested, including LG, Samsung, Vizio and Insignia. Some TVs aren’t compatible; for those, a TV stick or any computer with a web browser connected to the screen works.</p></details>
+        <details><summary>What happens when the trial ends?</summary><p>Your screens keep playing for 3 more days. If you don’t choose a plan they pause. Nothing you made is deleted, and choosing a plan turns them back on.</p></details>
+        <details><summary>I already have a menu from Canva or a printer.</summary><p>Upload it. Images (JPG, PNG, WebP), MP4 video, PowerPoint and PDF all show full screen, and you can mix them with Pekko menus in a playlist.</p></details>
+        <details><summary>Can I manage it in Spanish, from my phone?</summary><p>Yes. Pekko’s dashboard is in English and Spanish, and it works in any phone or computer browser. Several locations and screens can be managed from one account.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" style="padding-top:8px">
+    <div class="wrap">
+      <p class="eyebrow">Pricing</p>
+      <h2 style="margin-top:10px">One flat price per month, by number of screens</h2>
+      <div class="plans">
+        <div class="plan"><h3>Starter</h3><p class="price">$19 <small>/ month</small></p><p>1 screen</p></div>
+        <div class="plan pop"><h3>Business</h3><p class="price">$39 <small>/ month</small></p><p>Up to 3 screens</p></div>
+        <div class="plan"><h3>Multi-screen</h3><p class="price">$59 <small>/ month</small></p><p>Up to 5 screens</p></div>
+      </div>
+      <p class="trialnote">Every plan includes templates, item photos, schedules, playlists and screen alerts. Start with 14 days free on up to 5 screens; no card needed. Prices in USD, billed monthly; taxes may apply.</p>
+    </div>
+  </section>
+
+  <section class="final" id="trial">
+    <div class="wrap">
+      <div class="box">
+        <div><h2>Fix tonight’s prices before the dinner rush.</h2><p style="margin-top:10px">Create your account with an email, pick a template, and see your menu in the TV preview right away.</p></div>
+        <a class="btn btn-primary cta" href="#trial" data-dest="/signup">Start my 14-day free trial</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">Pekko · Prototype for review. Copy uses only features available in the product today. Templates shown with Pekko’s own sample content.</div></footer>
+
+<div class="sticky-cta" id="sticky"><span>14 days free · no card</span><a class="btn btn-primary btn-sm cta" href="#trial" data-dest="/signup">Start free trial</a></div>
+
+<script>
+(() => {
+  const stage = document.getElementById("stage");
+  const before = document.getElementById("ba-before"), after = document.getElementById("ba-after");
+  function show(which) { stage.dataset.show = which; before.setAttribute("aria-pressed", String(which === "before")); after.setAttribute("aria-pressed", String(which === "after")); }
+  before.addEventListener("click", () => show("before"));
+  after.addEventListener("click", () => show("after"));
+  // Open on "Today" for a moment, then reveal the board: the transformation is the point of this direction.
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) { show("before"); setTimeout(() => show("after"), 1400); }
+  let toastTimer;
+  document.querySelectorAll(".cta").forEach((a) => a.addEventListener("click", (e) => {
+    const dest = a.dataset.dest || "";
+    if (dest.startsWith("#")) return;
+    e.preventDefault();
+    let t = document.querySelector(".toast");
+    if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = "Prototype: on the live page this opens pekkotv.com" + dest;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2600);
+  }));
+  const sticky = document.getElementById("sticky");
+  const hero = document.querySelector(".hero");
+  new IntersectionObserver(([e]) => sticky.classList.toggle("on", !e.isIntersecting)).observe(hero);
+})();
+</script>
