@@ -261,10 +261,12 @@ describe("server-rendered TV image", () => {
 
 describe("rollout flag", () => {
   const who = { email: "Owner@Example.com", accountId: UUID, developer: false };
-  it("defaults to developer accounts only", () => {
+  it("is released to every customer by default; \"developers\" limits it to developer accounts", () => {
     const s = menuTemplatesSetting({});
-    expect(menuTemplatesEnabledFor(who, s, true)).toBe(false);
-    expect(menuTemplatesEnabledFor({ ...who, developer: true }, s, true)).toBe(true);
+    expect(menuTemplatesEnabledFor(who, s, true)).toBe(true);
+    const dev = menuTemplatesSetting({ MENU_TEMPLATES: "developers" });
+    expect(menuTemplatesEnabledFor(who, dev, true)).toBe(false);
+    expect(menuTemplatesEnabledFor({ ...who, developer: true }, dev, true)).toBe(true);
   });
   it("supports an allowlist of emails or account ids, all, and a kill switch", () => {
     expect(menuTemplatesEnabledFor(who, menuTemplatesSetting({ MENU_TEMPLATES: "owner@example.com, someone@x.co" }), true)).toBe(true);
