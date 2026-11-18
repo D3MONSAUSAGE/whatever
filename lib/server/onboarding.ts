@@ -1,7 +1,7 @@
 import { db } from "./supabase";
 import { isMissingSchema } from "./schema";
 import { stripControls } from "./validate";
-import { expectedFor, isErr, isOnline, loadDisplays, playbackStatus } from "./analytics";
+import { expectedFor, isErr, isOnline, loadDisplays, playbackStatus, type DisplayRow } from "./analytics";
 
 /** Accounts created before this (M8 release) with screens and content are treated as set up. */
 export const ONBOARDING_SHIPPED_AT = Date.parse("2026-10-30T12:00:00Z");
@@ -22,6 +22,28 @@ export type OnboardingState = {
 /** The name ensure_account gives a new account (same rule as lib/server/auth.ts). */
 export function defaultAccountName(email: string) {
   return stripControls(email.split("@")[0] || "My business").trim().slice(0, 80) || "My business";
+}
+
+/**
+ * Step 8 ("Check it's playing") as a milestone, not a live reading.
+ *
+ * It used to be done only while a screen was online at the moment the tracker loaded (heartbeat in the last
+ * 90 seconds). Turning the TVs off, or checking from a phone away from the store, put the account back to 7/8
+ * and showed the tracker again. The TV's own confirmation is stored per screen (displays.confirmed_at, written
+ * by report_playing only after the player painted real content), so once a TV has confirmed content that is
+ * still published, the step stays done on every device.
+ */
+export function playingStep(input: {
+  livePlaying: boolean;
+  liveConfirmed: boolean;
+  publish: boolean;
+  screens: Pick<DisplayRow, "confirmed_at" | "confirmed_version">[];
+}): { playing: boolean; confirmed: boolean } {
+  const everConfirmed = input.publish && input.screens.some((d) => !!d.confirmed_at && d.confirmed_version != null);
+  return {
+    playing: input.livePlaying || everConfirmed,
+    confirmed: input.liveConfirmed || everConfirmed,
+  };
 }
 
 /** Progress is derived from the account's real data every time; only "dismissed" and "business confirmed" are stored. */
@@ -62,14 +84,15 @@ export async function onboardingState(accountId: string, email: string): Promise
   const publish = screens.some((d) => d.assigned_media_id || (d.assigned_playlist_id && publishedIds.has(d.assigned_playlist_id)))
     || (screen && scheduleCount > 0);
 
-  // Playing: an online screen with content. Confirmed when the TV itself reported the expected content.
-  let playing = false, confirmed = false;
+  // Playing: an online screen with content now, or a TV that has already confirmed painting the account's content.
+  let livePlaying = false, liveConfirmed = false;
   for (const d of screens.filter((x) => isOnline(x.last_seen_at)).slice(0, 10)) {
     const e = await expectedFor(d);
     if (isErr(e) || e.source === "none") continue;
-    playing = true;
-    if (playbackStatus(d, e) === "confirmed") { confirmed = true; break; }
+    livePlaying = true;
+    if (playbackStatus(d, e) === "confirmed") { liveConfirmed = true; break; }
   }
+  const { playing, confirmed } = playingStep({ livePlaying, liveConfirmed, publish, screens });
 
   const steps: OnboardingState["steps"] = [
     { id: "account", done: true },

@@ -76,17 +76,18 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
           {t("screens.emptyBody")} <Link href="/dashboard/screens/add#add-screen" className="underline font-semibold">{t("screens.add")}</Link>.
         </EmptyState>
       ) : (
-        <ul className="grid gap-3 xl:grid-cols-2">
+        <ul className="grid gap-3 xl:grid-cols-2 items-stretch" data-testid="screen-cards">
           {shown.map((display) => (
-            <li key={display.id} className="min-w-0">
-              <article className="card p-4 min-w-0">
+            <li key={display.id} className="min-w-0 flex" data-testid="screen-card">
+              {/* Cards in a row share the tallest card's height; the action row sits at the bottom of each. */}
+              <article className="card p-4 min-w-0 w-full flex flex-col">
                 <div className="flex items-start gap-3">
                   <Link href={`/dashboard/screens/${display.id}`} className="block min-h-11 min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
-                      <h2 className="font-semibold truncate">{display.name}</h2>
+                      <h2 className="font-semibold break-words min-w-0">{display.name}</h2>
                       <Status display={display} />
                     </div>
-                    <p className="text-sm mt-2 truncate">{contentLabel(display, t)}</p>
+                    <p className="text-sm mt-2 break-words">{contentLabel(display, t)}</p>
                     <p className="text-xs text-muted mt-1">{display.location?.name ?? t("screens.noLocation")} · {heartbeatText(display, t)}</p>
                   </Link>
                   <AssignedThumb display={display} />
@@ -95,7 +96,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
                   <p className="text-sm mt-2">{t("screens.offlineCard")}</p>
                 ) : null}
                 {/* Redesign phase 2: one primary action; Schedule, Edit playlist and the screen page sit in the ⋯ menu. */}
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-auto pt-3 flex items-center gap-2" data-testid="screen-card-actions">
                   <Link className="btn btn-primary min-h-11" href={`/dashboard/screens/${display.id}?panel=change`}>{t("sa.change")}</Link>
                   <span className="flex-1" />
                   <OverflowMenu label={t("screens.moreFor", { name: display.name })} testId="screen-card-menu" items={[

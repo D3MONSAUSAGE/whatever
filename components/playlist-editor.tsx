@@ -9,6 +9,7 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { LimitNote, PageHeader, atLimit } from "@/components/ui";
 import { togglePicks } from "@/lib/pick-order";
+import { secondsLeft, startSlideTimer, videoSecondsLeft } from "@/lib/slide-timer";
 
 /** Same as PLAYLIST_MAX_ITEMS on the server. */
 const MAX_SLIDES = 40;
@@ -439,14 +440,25 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
   const t = useT();
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [slides, playbackMode]);
+  // Seconds until the next slide. Images: one timer drives the countdown and the switch (lib/slide-timer).
+  // Videos: their own clock, and they move on when they end, as before.
+  const [secondsToNext, setSecondsToNext] = useState<number | null>(null);
+  const timed = playbackMode !== "manual" && slides.length > 1;
   useEffect(() => {
-    if (playbackMode === "manual") return;
-    if (slides.length < 2) return;
-    if (slides[index]?.kind === "video") return;
-    const ms = Math.max(1000, slides[index]?.durationMs || 10000);
-    const timer = window.setTimeout(() => setIndex((current) => (current + 1) % slides.length), ms);
-    return () => window.clearTimeout(timer);
-  }, [slides, index, playbackMode]);
+    setSecondsToNext(null);
+    if (!timed) return;
+    const slide = slides[index];
+    if (!slide) return;
+    if (slide.kind === "video") {
+      setSecondsToNext(secondsLeft(slide.durationMs));
+      return;
+    }
+    const timer = startSlideTimer(slide.durationMs, {
+      onTick: setSecondsToNext,
+      onDone: () => setIndex((current) => (current + 1) % slides.length),
+    });
+    return () => timer.stop();
+  }, [slides, index, timed]);
   useEffect(() => {
     if (playbackMode !== "manual") return;
     function onKey(event: KeyboardEvent) {
@@ -470,6 +482,11 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
         ) : slides.map((slide, i) => slide.kind === "video" ? (
           <video key={`${slide.url}-${i}`} src={i === index ? slide.url : undefined} poster={slide.thumbnailUrl || undefined}
             muted playsInline autoPlay={i === index} preload={i === index ? "auto" : "none"}
+            onTimeUpdate={(event) => {
+              if (i !== index || !timed) return;
+              const left = videoSecondsLeft(event.currentTarget.duration, event.currentTarget.currentTime);
+              if (left !== null && left > 0) setSecondsToNext(left);
+            }}
             onEnded={(event) => {
               if (playbackMode === "manual") return;
               if (slides.length < 2) {
@@ -491,7 +508,21 @@ function Preview({ slides, transition, playbackMode, label, large = false }: {
           </div>
         ) : null}
       </div>
-      {current && <p className="text-sm text-muted mt-2 truncate">{index + 1} / {slides.length} · {current.fileName}{playbackMode === "manual" ? " · Manual" : ""}</p>}
+      {current ? (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+          <p className="text-muted truncate min-w-0">{index + 1} / {slides.length} · {current.fileName}</p>
+          {/* role=timer is polite-off by default: readable on demand, not announced every second. */}
+          <p className="slide-countdown" role="timer" data-testid="slide-countdown">
+            {playbackMode === "manual"
+              ? t("pe.manualMode")
+              : slides.length < 2
+                ? t("pe.oneSlide")
+                : secondsToNext === null
+                  ? t("pe.playing")
+                  : t("pe.nextIn", { n: secondsToNext })}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
