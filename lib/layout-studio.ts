@@ -3,6 +3,8 @@
 import { boardFont, FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type BoardFontId } from "@/lib/board-fonts";
 import { MENU_LIMITS } from "@/lib/menu-templates";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
+import { isDesignId, isStockPhoto, type StockPhotoId } from "@/lib/menu-designs";
+import { designSvg, designSvgWithReport, designVideoBox, type DesignArt } from "@/lib/menu-design-svg";
 
 export { MENU_LIMITS };
 
@@ -56,6 +58,17 @@ export type LayoutDocument = {
   /** How an assigned photo fills its box. Cover matches the previous boards. */
   imageFit: "cover" | "contain";
   imageAnchor: "center" | "top" | "bottom" | "left" | "right";
+  /**
+   * Premium template (lib/menu-designs.ts). Absent on every board made before templates, which keep the original
+   * renderer unchanged. Present: lib/menu-design-svg.ts draws the board (same SVG in the editor and the PNG).
+   */
+  design?: string;
+  /** Colour style id inside the design. */
+  variant?: string;
+  /** A bundled stock photo used until the owner picks their own (imageMediaId wins). */
+  stockPhoto?: StockPhotoId;
+  /** Same-account logo (from the Brand Kit or uploaded) drawn in a design board's header. */
+  logoMediaId?: string | null;
 };
 
 export type LayoutFrame = {
@@ -217,6 +230,7 @@ export function promoBandHeight(doc: { template: LayoutTemplate; featureTitle?: 
 
 /** The rectangle the video and its fallback photo share. The promo band stays below it. */
 export function mediaVideoBox(doc: LayoutDocument): ZoneBox | null {
+  if (doc.design && isDesignId(doc.design)) return designVideoBox(doc);
   const frame = frameFor(doc.template, doc.split, doc.columnWidths);
   if (!frame.video) return null;
   const band = promoBandHeight(doc);
@@ -324,8 +338,19 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       textColor, backgroundColor,
       featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
       columnWidths, imageFit, imageAnchor,
+      ...designFields(raw),
     },
   };
+}
+
+/** Premium template fields. Only added when present and valid, so older documents parse exactly as before. */
+function designFields(raw: Record<string, unknown>): Partial<LayoutDocument> {
+  if (!isDesignId(raw.design)) return {};
+  const out: Partial<LayoutDocument> = { design: raw.design as string };
+  if (typeof raw.variant === "string" && /^[a-z0-9-]{1,32}$/.test(raw.variant)) out.variant = raw.variant;
+  if (isStockPhoto(raw.stockPhoto)) out.stockPhoto = raw.stockPhoto;
+  if (typeof raw.logoMediaId === "string" && UUID.test(raw.logoMediaId)) out.logoMediaId = raw.logoMediaId.toLowerCase();
+  return out;
 }
 
 function readColumnWidths(value: unknown): [number, number, number] | null {
@@ -817,11 +842,12 @@ export function longMenuColumns(sections: LayoutSection[], width: number): Layou
   return [sections.slice(0, best), sections.slice(best)];
 }
 
-export type LayoutArt = { imageHref?: string | null };
+export type LayoutArt = { imageHref?: string | null } & DesignArt;
 
 /** Complete board. Menu text stays out of the video box. The still does not say a video is playing. */
 /** The same SVG as layoutSvg, plus the item names the board shortens with "…" (as the TV does). */
 export function layoutSvgWithClips(doc: LayoutDocument, art?: LayoutArt): { svg: string; clipped: string[] } {
+  if (doc.design && isDesignId(doc.design)) return { svg: designSvgWithReport(doc, art).svg, clipped: [] };
   const sink: string[] = [];
   clippedItemNames = sink;
   try {
@@ -833,6 +859,7 @@ export function layoutSvgWithClips(doc: LayoutDocument, art?: LayoutArt): { svg:
 }
 
 export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
+  if (doc.design && isDesignId(doc.design)) return designSvg(doc, art);
   const frame = frameFor(doc.template, doc.split, doc.columnWidths);
   const colors = colorsFor(doc);
   const family = fontFamily(doc.font);

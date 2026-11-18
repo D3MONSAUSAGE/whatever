@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { Resvg } from "@resvg/resvg-js";
@@ -43,11 +44,26 @@ export function fontsFor(font: LayoutDocument["font"], bodyFont?: LayoutDocument
 }
 
 /** Whole-board PNG. The selected bundled face and the assigned photo are drawn into this file. */
-export function renderLayoutPng(doc: LayoutDocument, image?: { bytes: Uint8Array; mime: "image/png" | "image/jpeg" | "image/webp" } | null): Buffer {
-  const href = image && image.bytes.length
-    ? `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`
-    : null;
-  const resvg = new Resvg(layoutSvg(doc, { imageHref: href }), {
+type BoardImage = { bytes: Uint8Array; mime: "image/png" | "image/jpeg" | "image/webp" };
+const dataUri = (image: BoardImage | null | undefined) => (image && image.bytes.length ? `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}` : null);
+
+/** A template's bundled stock photo (assets/menu-templates), as a data URI for resvg. */
+export function stockPhotoDataUri(id: string | undefined): string | null {
+  if (!id || !/^[a-z]+$/.test(id)) return null;
+  try {
+    return `data:image/jpeg;base64,${readFileSync(join(process.cwd(), "assets", "menu-templates", `${id}.jpg`)).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, extras?: { logo?: BoardImage | null }): Buffer {
+  const href = dataUri(image);
+  // Template boards (doc.design) may show a bundled stock photo and a logo. Older boards never set these fields.
+  const art = doc.design
+    ? { imageHref: href, stockHref: href ? null : stockPhotoDataUri(doc.stockPhoto), logoHref: dataUri(extras?.logo) }
+    : { imageHref: href };
+  const resvg = new Resvg(layoutSvg(doc, art), {
     font: { fontFiles: fontsFor(doc.font, doc.bodyFont), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
     fitTo: { mode: "original" },
   });

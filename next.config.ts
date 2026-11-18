@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@resvg/resvg-js", "pptx-glimpse", "pdfjs-dist", "@napi-rs/canvas"],
   outputFileTracingIncludes: {
     "/api/menus": ["./assets/fonts/**"],
+    // Template boards draw bundled stock photos (assets/menu-templates) into the published PNG.
+    "/api/layout-studio": ["./assets/fonts/**", "./assets/menu-templates/**"],
+    "/api/layout-studio/boards": ["./assets/fonts/**", "./assets/menu-templates/**"],
     "/api/menus/[id]": ["./assets/fonts/**"],
     "/api/menus/preview": ["./assets/fonts/**"],
     "/api/health": ["./assets/fonts/**"],

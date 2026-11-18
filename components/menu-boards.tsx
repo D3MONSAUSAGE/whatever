@@ -15,8 +15,10 @@ import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { LayoutStudio } from "@/components/layout-studio";
 import { ClassicEditor, type ClassicDraft } from "@/components/classic-editor";
 import { LayoutGallery } from "@/components/layout-gallery";
+import { TemplateEditor, TemplateGallery, useMenuTemplatesFlag } from "@/components/menu-templates";
+import { designById, designDocument } from "@/lib/menu-designs";
 import type { AccountStudio } from "@/lib/layout-account";
-import { type LayoutTemplate } from "@/lib/layout-studio";
+import { parseLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
 import {
   LAYOUT_OPTIONS,
   classifyBoardContent,
@@ -46,7 +48,10 @@ type View =
   | { mode: "list" }
   | { mode: "pick-layout"; screenId: string | null }
   | { mode: "classic"; draft: ClassicDraft; screenId: string | null }
-  | { mode: "layout"; boardId: string | null; template: LayoutTemplate; screenId: string | null; zone?: string };
+  | { mode: "layout"; boardId: string | null; template: LayoutTemplate; screenId: string | null; zone?: string }
+  // Premium templates (MENU_TEMPLATES flag): gallery, then the guided editor.
+  | { mode: "template-gallery"; screenId: string | null }
+  | { mode: "template"; menuId: string | null; name: string; document: LayoutDocument };
 
 export type MenuFixture = {
   menus: MenuBoard[];
@@ -62,6 +67,9 @@ export type MenuFixture = {
   startBoardId?: string | null;
   previewSrc?: string;
   studio?: AccountStudio;
+  /** Preview harness: show the premium template experience without the server flag. */
+  templates?: boolean;
+  startTemplate?: string;
 };
 
 const EN: T = makeT("en");
@@ -98,6 +106,11 @@ function initialView(fixture?: MenuFixture, search?: Record<string, string | str
     };
   }
   if (fixture?.startView === "pick-layout") return { view: { mode: "pick-layout", screenId: null }, pendingBoardId: null };
+  if (fixture?.startTemplate === "gallery") return { view: { mode: "template-gallery", screenId: null }, pendingBoardId: null };
+  if (fixture?.startTemplate) {
+    const design = designById(fixture.startTemplate);
+    if (design) return { view: { mode: "template", menuId: null, name: design.name.en, document: designDocument(design) }, pendingBoardId: null };
+  }
   const parsed = parseUnifiedSearch(search ?? {});
   const screenId = parsed.screenId;
   if (parsed.boardId) {
@@ -138,18 +151,29 @@ export function MenuBoards({
   // E2b: "Show on which screen?" after saving a classic board that isn't on any screen yet.
   const [pickClassic, setPickClassic] = useState<{ id: string; name: string; playlistId: string } | null>(null);
   const confirm = useConfirm();
-  const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout";
+  const templatesOn = useMenuTemplatesFlag(Boolean(fixture)) || Boolean(fixture?.templates);
+  const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout" || view.mode === "template-gallery" || view.mode === "template";
+
+  /** A template board opens in the guided editor when templates are on; otherwise the existing editor. */
+  function templateView(menu: MenuBoard): View | null {
+    if (!templatesOn) return null;
+    const parsed = parseLayout(menu.content);
+    if (!parsed.ok || !parsed.value.design) return null;
+    return { mode: "template", menuId: menu.id, name: menu.name, document: parsed.value };
+  }
 
   useEffect(() => {
     if (!pendingBoardId || !menus.data?.menus) return;
     const menu = menus.data.menus.find((item) => item.id === pendingBoardId);
     if (!menu) return;
-    const next = openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
+    if (templatesOn === null && !fixture) return; // wait for the flag so a template board opens in the right editor
+    const next = templateView(menu) ?? openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
     if (next) setView(next);
     setPendingBoardId(null);
-  }, [menus.data, pendingBoardId, initialSearch]);
+  }, [menus.data, pendingBoardId, initialSearch, templatesOn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startNew() {
+    if (studioEnabled && templatesOn) { setView({ mode: "template-gallery", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); return; }
     if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
     else setView({ mode: "classic", draft: newClassicDraft([], kit, t), screenId: null });
   }
@@ -165,7 +189,7 @@ export function MenuBoards({
   }
 
   function editMenu(menu: MenuBoard) {
-    const next = openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
+    const next = templateView(menu) ?? openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
     if (next) setView(next);
     else toast.show(t("mb.cantOpen"), true);
   }
@@ -209,6 +233,33 @@ export function MenuBoards({
       )}
 
       {!draftOpen && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
+
+      {view.mode === "template-gallery" ? (
+        <TemplateGallery
+          onCancel={() => setView({ mode: "list" })}
+          onAdvanced={() => { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: view.screenId }); }}
+          onPick={(document, name) => {
+            // The owner's business name from the Brand Kit replaces the sample name; nothing else is changed.
+            const title = kit?.displayName ? kit.displayName.slice(0, 40) : document.title;
+            setView({ mode: "template", menuId: null, name: kit?.displayName || name, document: { ...document, title } });
+          }}
+        />
+      ) : null}
+
+      {view.mode === "template" ? (
+        <TemplateEditor
+          key={view.menuId ?? `new-${view.document.design}`}
+          menuId={view.menuId}
+          name={view.name}
+          document={view.document}
+          displays={displays.data ? displays.data.filter((d) => d.connected) : null}
+          brand={kit}
+          preview={Boolean(fixture)}
+          onClose={() => { setView({ mode: "list" }); void menus.reload(); }}
+          onSaved={() => { void menus.reload(); }}
+          onAdvanced={(menuId) => setView({ mode: "layout", boardId: menuId, template: view.document.template, screenId: null })}
+        />
+      ) : null}
 
       {view.mode === "pick-layout" ? (
         <LayoutGallery
