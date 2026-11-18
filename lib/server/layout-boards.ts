@@ -126,7 +126,10 @@ export async function saveLayoutForAccount(accountId: string, body: {
       const raw = document.imageMediaId ? await imageBytes(accountId, document.imageMediaId) : null;
       const { prepareBoardPhoto, renderLayoutPng } = await import("@/lib/server/layout-render");
       const fitted = raw && raw.bytes.length ? await prepareBoardPhoto(raw.bytes, raw.mime) : null;
-      const png = renderLayoutPng(document, fitted);
+      // Template boards may carry a logo; imageBytes only returns this account's own JPEG/PNG.
+      const logoRaw = document.design && document.logoMediaId ? await imageBytes(accountId, document.logoMediaId) : null;
+      const logo = logoRaw && logoRaw.bytes.length ? await prepareBoardPhoto(logoRaw.bytes, logoRaw.mime) : null;
+      const png = renderLayoutPng(document, fitted, { logo });
       const { storeRenderedImage } = await import("@/lib/server/menus");
       const id = await storeRenderedImage(accountId, boardRenderFileName(body.name, document.title), png);
       if (!id) throw new Error("Couldn't store the board.");

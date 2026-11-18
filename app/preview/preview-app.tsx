@@ -152,7 +152,7 @@ function previewPath(screen: string) {
   if (screen === "media" || screen === "upload" || screen === "upload-error") return "/dashboard/media";
   if (screen === "playlists") return "/dashboard/playlists";
   if (screen === "overview") return "/dashboard";
-  if (screen === "menus" || screen === "menu-edit" || screen.startsWith("unify-")) return "/dashboard/media/menus";
+  if (screen === "menus" || screen === "menu-edit" || screen.startsWith("unify-") || screen.startsWith("templates")) return "/dashboard/media/menus";
   if (screen === "promos" || screen === "promo-edit") return "/dashboard/media/promos";
   if (screen === "brand-kit") return "/dashboard/account/brand-kit";
   if (screen === "screens") return "/dashboard/screens";
@@ -227,6 +227,8 @@ export function PreviewApp() {
       {screen === "studio" ? <MenuBoards fixture={{ ...menuFixture, startBoardId: "board-lunch", startLayout: "menu-promo-67" }} /> : null}
       {screen === "content" ? <ContentHub pathOverride="/dashboard/content" fixture={contentFixture} /> : null}
       {screen === "menus" ? <MenuBoards fixture={menuFixture} /> : null}
+      {screen === "templates" ? <MenuBoards fixture={{ ...menuFixture, templates: true, startTemplate: "gallery" }} /> : null}
+      {screen === "templates-edit" ? <MenuBoards fixture={{ ...menuFixture, templates: true, startTemplate: params.get("design") || "coffee-shop" }} /> : null}
       {screen === "menu-edit" ? <MenuBoards fixture={{ ...menuFixture, startMenuId: "menu-dinner" }} /> : null}
       {screen === "unify-list" ? <MenuBoards fixture={menuFixture} /> : null}
       {screen === "unify-picker" ? <MenuBoards fixture={{ ...menuFixture, startView: "pick-layout" }} /> : null}
