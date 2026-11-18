@@ -43,3 +43,33 @@ describe("redesign phase 5: accessibility fixes", () => {
     expect(chrome).toContain(".studio-back { border: 0; background: transparent; color: #134be0;");
   });
 });
+
+describe("redesign phase 5: screen search and status filter (feature map #49)", async () => {
+  const { filterScreens, SCREEN_FILTER_MIN } = await import("@/lib/screen-filter");
+  const list = [
+    { id: "a", name: "Front counter", connected: true, online: true, location: { name: "Kitchen" } },
+    { id: "b", name: "Drive-thru", connected: true, online: false, location: null },
+    { id: "c", name: "Bar TV", connected: false, online: false, location: { name: "Patio" } },
+  ];
+
+  it("filters by name, location and status without changing the list", () => {
+    expect(filterScreens(list, "", "all").map((d) => d.id)).toEqual(["a", "b", "c"]);
+    expect(filterScreens(list, "drive", "all").map((d) => d.id)).toEqual(["b"]);
+    expect(filterScreens(list, "patio", "all").map((d) => d.id)).toEqual(["c"]);
+    expect(filterScreens(list, "", "online").map((d) => d.id)).toEqual(["a"]);
+    expect(filterScreens(list, "", "offline").map((d) => d.id)).toEqual(["b", "c"]);
+    expect(filterScreens(list, "front", "offline")).toEqual([]);
+    expect(list).toHaveLength(3);
+  });
+
+  it("only shows the bar on longer lists, with labels in both languages", () => {
+    expect(SCREEN_FILTER_MIN).toBe(4);
+    const src = readFileSync("components/my-screens.tsx", "utf8");
+    expect(src).toContain("const showFilters = list.length >= SCREEN_FILTER_MIN;");
+    expect(src).toContain("{shown.map((display) => (");
+    for (const k of ["screens.search", "screens.statusFilter", "screens.filterAll", "screens.filterOffline", "screens.noMatch"] as const) {
+      expect(es[k], k).toBeTruthy();
+      expect(es[k], k).not.toBe(en[k]);
+    }
+  });
+});

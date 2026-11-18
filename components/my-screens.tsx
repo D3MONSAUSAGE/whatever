@@ -17,6 +17,7 @@ import { ReconnectTv } from "@/components/reconnect-tv";
 import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
+import { filterScreens, SCREEN_FILTER_MIN, type ScreenStatusFilter } from "@/lib/screen-filter";
 
 export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; groups?: ScreenGroupItem[] } } = {}) {
   const t = useT();
@@ -27,6 +28,10 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   const list = displays.data ?? [];
   const onlineCount = list.filter(onlineNow).length;
   const offlineCount = list.filter((display) => display.connected && !display.online).length;
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<ScreenStatusFilter>("all");
+  const showFilters = list.length >= SCREEN_FILTER_MIN;
+  const shown = showFilters ? filterScreens(list, query, status) : list;
   return (
     <section className="min-w-0 overflow-x-hidden">
       <PageHeader compact title={t("screens.title")} lede={t("screens.lede")}
@@ -51,13 +56,28 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
       </p>
       {/* Redesign phase 2: offline state lives on each card (pill + note) and in the notification center. */}
       <OfflineTitle displays={displays.data ?? []} />
+      {showFilters ? (
+        <div className="flex flex-wrap items-center gap-2 mb-3" data-testid="screen-filters">
+          <input type="search" className="field flex-1 min-w-[12rem] max-w-sm" placeholder={t("screens.search")} aria-label={t("screens.search")} value={query} onChange={(event) => setQuery(event.target.value)} />
+          <div className="seg" role="group" aria-label={t("screens.statusFilter")}>
+            {(["all", "online", "offline"] as const).map((id) => (
+              <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)}>
+                {id === "all" ? t("screens.filterAll", { n: list.length }) : id === "online" ? t("screens.nOnline", { n: onlineCount }) : t("screens.filterOffline", { n: list.length - onlineCount })}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {showFilters && displays.data && displays.data.length > 0 && shown.length === 0 ? (
+        <p className="text-sm text-muted mb-3" role="status" data-testid="screen-filter-empty">{t("screens.noMatch")}</p>
+      ) : null}
       {!displays.data ? <LoadState error={displays.error} label={t("screens.loading")} /> : displays.data.length === 0 ? (
         <EmptyState title={t("screens.emptyTitle")}>
           {t("screens.emptyBody")} <Link href="/dashboard/screens/add#add-screen" className="underline font-semibold">{t("screens.add")}</Link>.
         </EmptyState>
       ) : (
         <ul className="grid gap-3 xl:grid-cols-2">
-          {displays.data.map((display) => (
+          {shown.map((display) => (
             <li key={display.id} className="min-w-0">
               <article className="card p-4 min-w-0">
                 <div className="flex items-start gap-3">
