@@ -1,5 +1,5 @@
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
-import { applyLayoutSave, type LibraryFile } from "@/lib/layout-publish";
+import { applyLayoutSave, extraImageIds, type LibraryFile } from "@/lib/layout-publish";
 import { imageBytes } from "@/lib/server/brand";
 import { BUCKET, db } from "@/lib/server/supabase";
 function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
@@ -72,7 +72,10 @@ export async function saveLayoutForAccount(accountId: string, body: {
   if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
   if (body.mode !== "draft" && body.mode !== "publish") return { status: 400 as const, error: "Choose draft or publish." };
   const doc = body.document && typeof body.document === "object" ? body.document as { imageMediaId?: string; videoMediaId?: string } : {};
-  const ids = [doc.imageMediaId, doc.videoMediaId].filter((id): id is string => typeof id === "string" && id.length > 0);
+  // Every file the board draws is checked against this account: main photo, video, item photos and logo.
+  const parsedForIds = parseLayout(body.document);
+  const extra = parsedForIds.ok ? extraImageIds(parsedForIds.value) : [];
+  const ids = [...new Set([doc.imageMediaId, doc.videoMediaId, ...extra].filter((id): id is string => typeof id === "string" && id.length > 0))].slice(0, 60);
   const found = ids.length
     ? await db().from("media").select("id, account_id, mime_type, kind").eq("account_id", accountId).in("id", ids)
     : { data: [], error: null };
@@ -129,7 +132,16 @@ export async function saveLayoutForAccount(accountId: string, body: {
       // Template boards may carry a logo; imageBytes only returns this account's own JPEG/PNG.
       const logoRaw = document.design && document.logoMediaId ? await imageBytes(accountId, document.logoMediaId) : null;
       const logo = logoRaw && logoRaw.bytes.length ? await prepareBoardPhoto(logoRaw.bytes, logoRaw.mime) : null;
-      const png = renderLayoutPng(document, fitted, { logo });
+      // Item photos: only this account's own images (imageBytes checks the account), each reduced for the board.
+      const itemImages: Record<string, { bytes: Buffer; mime: "image/png" | "image/jpeg" | "image/webp" }> = {};
+      if (document.design) {
+        const ids = [...new Set(document.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
+        await Promise.all(ids.map(async (id) => {
+          const raw = await imageBytes(accountId, id);
+          if (raw && raw.bytes.length) itemImages[id] = await prepareBoardPhoto(raw.bytes, raw.mime, 900);
+        }));
+      }
+      const png = renderLayoutPng(document, fitted, { logo, itemImages });
       const { storeRenderedImage } = await import("@/lib/server/menus");
       const id = await storeRenderedImage(accountId, boardRenderFileName(body.name, document.title), png);
       if (!id) throw new Error("Couldn't store the board.");

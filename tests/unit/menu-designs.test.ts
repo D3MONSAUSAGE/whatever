@@ -52,9 +52,8 @@ describe("existing boards are untouched", () => {
 });
 
 describe("template library", () => {
-  it("has 15–20 templates across business types and styles, including the three approved designs", () => {
-    expect(MENU_DESIGNS.length).toBeGreaterThanOrEqual(15);
-    expect(MENU_DESIGNS.length).toBeLessThanOrEqual(20);
+  it("has 22 templates (18 + 4 photo templates) across business types and styles, including the three approved designs", () => {
+    expect(MENU_DESIGNS.length).toBe(22);
     expect(new Set(MENU_DESIGNS.map((d) => d.id)).size).toBe(MENU_DESIGNS.length);
     for (const id of ["modern-restaurant", "coffee-shop", "bold-fast-casual"]) expect(designById(id), id).not.toBeNull();
     for (const business of ["restaurant", "cafe", "fast", "bar", "sweets"] as const) expect(filterDesigns(business, "all").length, business).toBeGreaterThanOrEqual(2);
@@ -252,7 +251,7 @@ describe("server-rendered TV image", () => {
       if (!designHasMedia(design)) { expect(comp).toBeNull(); continue; }
       expect(comp?.video?.box, design.id).toBeTruthy();
       const box = comp!.video!.box;
-      const menuRight = { showcase: 1140, columns: 1344, promo: 1260, list: 1920 }[design.composition];
+      const menuRight = { showcase: 1140, columns: 1344, promo: 1260, list: 1920, cards: 1920, featured: 1920 }[design.composition];
       expect(box.x, design.id).toBeGreaterThanOrEqual(menuRight);
       expect(box.x + box.w).toBeLessThanOrEqual(1920);
       expect(box.y + box.h).toBeLessThanOrEqual(1080);

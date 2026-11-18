@@ -4,6 +4,7 @@ import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { keepStoredFonts } from "@/lib/menu-templates";
+import { parseLayout } from "@/lib/layout-studio";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
 import { withLocalizedErrors } from "@/lib/server/locale";
@@ -44,6 +45,26 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
   const found = await load(admin.accountId, id);
   if (found.error) return found.error;
   const row = found.row;
+  // Layout Studio and template boards (layoutVersion 1) are edited on the web. The classic editor path would
+  // re-render them as a classic menu and overwrite the layout, item photos included, so older clients may only
+  // rename them or put them on screens here.
+  if (parseLayout(row.content).ok) {
+    if (parsed.value.content !== undefined || parsed.value.template !== undefined) {
+      return fail("This menu board was made in the web editor. Edit it at pekkotv.com.", 409);
+    }
+    if (parsed.value.name !== undefined) {
+      const renamed = await db().from("menus").update({ name: parsed.value.name, updated_at: new Date().toISOString() }).eq("id", row.id).eq("account_id", admin.accountId);
+      if (renamed.error) return fail("Couldn't update the menu.", 500);
+    }
+    let kept: boolean | undefined;
+    if (parsed.value.displayIds?.length && row.playlist_id) {
+      const pubLimited = await enforceLimit(`publish:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
+      if (pubLimited) return pubLimited;
+      const pub = await db().rpc("publish_playlist", { p_account_id: admin.accountId, p_playlist_id: row.playlist_id, p_display_ids: parsed.value.displayIds });
+      kept = !pub.error && Boolean(pub.data);
+    }
+    return json({ id, mediaId: row.media_id, playlistId: row.playlist_id, published: kept });
+  }
   // E6: clients that don't know about fonts (Android +13) must not strip them on edit.
   if (parsed.value.content) parsed.value.content = keepStoredFonts(body.content, parsed.value.content, row.content);
 

@@ -11,15 +11,15 @@ const BOARD_EDGE = 1920;
  * Shrink a library photo to the board before Resvg sees it.
  * A full camera file inside the SVG is decoded on the request thread and holds the player polls.
  */
-export async function prepareBoardPhoto(bytes: Uint8Array, mime: string): Promise<{ bytes: Buffer; mime: "image/png" | "image/jpeg" | "image/webp" }> {
+export async function prepareBoardPhoto(bytes: Uint8Array, mime: string, maxEdge = BOARD_EDGE): Promise<{ bytes: Buffer; mime: "image/png" | "image/jpeg" | "image/webp" }> {
   const labeled = mime === "image/png" || mime === "image/webp" ? mime : "image/jpeg";
   try {
     const image = await loadImage(Buffer.from(bytes));
     const edge = Math.max(image.width, image.height);
-    if (edge <= BOARD_EDGE && bytes.byteLength <= 700_000 && labeled !== "image/webp") {
+    if (edge <= maxEdge && bytes.byteLength <= 700_000 && labeled !== "image/webp") {
       return { bytes: Buffer.from(bytes), mime: labeled };
     }
-    const scale = Math.min(1, BOARD_EDGE / Math.max(edge, 1));
+    const scale = Math.min(1, maxEdge / Math.max(edge, 1));
     const width = Math.max(1, Math.round(image.width * scale));
     const height = Math.max(1, Math.round(image.height * scale));
     const canvas = createCanvas(width, height);
@@ -57,12 +57,22 @@ export function stockPhotoDataUri(id: string | undefined): string | null {
   }
 }
 
-export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, extras?: { logo?: BoardImage | null }): Buffer {
+export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, extras?: { logo?: BoardImage | null; itemImages?: Record<string, BoardImage> }): Buffer {
   const href = dataUri(image);
-  // Template boards (doc.design) may show a bundled stock photo and a logo. Older boards never set these fields.
-  const art = doc.design
-    ? { imageHref: href, stockHref: href ? null : stockPhotoDataUri(doc.stockPhoto), logoHref: dataUri(extras?.logo) }
-    : { imageHref: href };
+  // Template boards (doc.design) may show a bundled stock photo, a logo and item photos. Older boards never set these.
+  let art: Parameters<typeof layoutSvg>[1] = { imageHref: href };
+  if (doc.design) {
+    const stockHrefs: Record<string, string> = {};
+    const itemImages: Record<string, string> = {};
+    for (const section of doc.sections) {
+      for (const item of section.items) {
+        if (item.stockPhoto && !stockHrefs[item.stockPhoto]) stockHrefs[item.stockPhoto] = stockPhotoDataUri(item.stockPhoto) ?? "";
+        const own = item.imageMediaId ? extras?.itemImages?.[item.imageMediaId] : null;
+        if (item.imageMediaId && own) itemImages[item.imageMediaId] = dataUri(own) ?? "";
+      }
+    }
+    art = { imageHref: href, stockHref: href ? null : stockPhotoDataUri(doc.stockPhoto), logoHref: dataUri(extras?.logo), stockHrefs, itemImages };
+  }
   const resvg = new Resvg(layoutSvg(doc, art), {
     font: { fontFiles: fontsFor(doc.font, doc.bodyFont), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
     fitTo: { mode: "original" },

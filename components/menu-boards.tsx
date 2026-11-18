@@ -258,6 +258,7 @@ export function MenuBoards({
           onClose={() => { setView({ mode: "list" }); void menus.reload(); }}
           onSaved={() => { void menus.reload(); }}
           onAdvanced={(menuId) => setView({ mode: "layout", boardId: menuId, template: view.document.template, screenId: null })}
+          onSplit={(document, name) => { toast.show(t("tpl.splitDone")); setView({ mode: "template", menuId: null, name, document }); }}
         />
       ) : null}
 

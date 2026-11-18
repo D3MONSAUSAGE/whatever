@@ -1,4 +1,7 @@
 import { parseLayout, type LayoutDocument } from "@/lib/layout-studio";
+import { isDesignId } from "@/lib/menu-designs";
+import { itemPhotoIds } from "@/lib/menu-item-photos";
+import { designSvgWithReport } from "@/lib/menu-design-svg";
 
 export type LibraryFile = {
   id: string;
@@ -39,6 +42,13 @@ export type LayoutSaveDeps = {
  * Draft writes the board only. Publish renders a PNG and swaps it through the existing menu function.
  * The flag must already be on. This does not open a database by itself.
  */
+/** Media ids a board draws besides its main photo and video: item photos and a template logo. */
+export function extraImageIds(doc: Pick<LayoutDocument, "sections" | "logoMediaId">): string[] {
+  const ids = new Set<string>(itemPhotoIds(doc.sections));
+  if (doc.logoMediaId) ids.add(doc.logoMediaId);
+  return [...ids];
+}
+
 export async function applyLayoutSave(input: {
   enabled: boolean;
   accountId: string;
@@ -50,15 +60,37 @@ export async function applyLayoutSave(input: {
   if (!input.enabled) return { ok: false, error: "Layout Studio is not on." };
   const parsed = parseLayout(input.document);
   if (!parsed.ok) return parsed;
-  const doc = parsed.value;
+  const raw = parsed.value;
   const byId = new Map(input.files.map((file) => [file.id, file]));
-  if (doc.imageMediaId) {
-    const error = libraryError(input.accountId, byId.get(doc.imageMediaId) ?? null, "photo");
+  if (raw.imageMediaId) {
+    const error = libraryError(input.accountId, byId.get(raw.imageMediaId) ?? null, "photo");
     if (error) return { ok: false, error };
   }
-  if (doc.videoMediaId) {
-    const error = libraryError(input.accountId, byId.get(doc.videoMediaId) ?? null, "video");
+  if (raw.videoMediaId) {
+    const error = libraryError(input.accountId, byId.get(raw.videoMediaId) ?? null, "video");
     if (error) return { ok: false, error };
+  }
+  // Item photos and a template board's logo must be this account's own images. A reference that isn't (deleted
+  // since, another account's, or not a photo) is dropped before anything is stored or drawn; the item keeps its
+  // text and shows the template's placeholder instead.
+  const usable = (id: string) => !libraryError(input.accountId, byId.get(id) ?? null, "photo");
+  const doc: LayoutDocument = {
+    ...raw,
+    sections: raw.sections.map((section) => ({
+      ...section,
+      items: section.items.map((item) => {
+        if (!item.imageMediaId || usable(item.imageMediaId)) return item;
+        const { imageMediaId: _drop, ...rest } = item;
+        return rest;
+      }),
+    })),
+  };
+  if (raw.logoMediaId && !usable(raw.logoMediaId)) doc.logoMediaId = null;
+  // A template board is never published with items left off the screen: drafts can be saved, publishing waits
+  // until everything fits (fewer items, a roomier template, or a second board).
+  if (input.mode === "publish" && doc.design && isDesignId(doc.design)) {
+    const { dropped } = designSvgWithReport(doc).report;
+    if (dropped > 0) return { ok: false, error: dropped === 1 ? "1 item doesn't fit on the screen. Remove an item or choose a roomier template, then publish." : `${dropped} items don't fit on the screen. Remove some items or choose a roomier template, then publish.` };
   }
   const effect = boardSaveEffect(input.mode);
   // Write the menu row first. A new board has no id until this returns, and the
