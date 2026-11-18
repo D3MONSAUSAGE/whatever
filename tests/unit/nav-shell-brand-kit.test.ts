@@ -219,7 +219,7 @@ describe("web Brand Kit and Account hub (no bulk apply)", () => {
     expect(account).not.toContain("Open support");
     expect(account).not.toContain("ContactBlock");
     expect(account).not.toContain("ManageBilling");
-    expect(account).toContain("btn btn-primary min-h-11 mt-auto");
+    expect(account).toContain("btn btn-quiet min-h-11 mt-4 w-full"); // phase 4: secondary buttons, one primary action per page
     expect(account).toContain("t(`acct.${card.id}.action`)");
     expect(["settings", "brand", "billing", "support"].map((id) => en[`acct.${id}.action` as keyof typeof en])).toEqual(["Open settings", "Open Brand Kit", "Open billing", "Contact support"]);
   });

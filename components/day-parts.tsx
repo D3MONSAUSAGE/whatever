@@ -72,7 +72,7 @@ export function DayPartSetup({ displays, groups, playlists, schedules = [], ask,
     <div id="day-parts" className="card p-4 md:p-6 mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">{t("dp.title")}</h2>
+          <h2 className="font-display text-lg font-bold">{t("dp.title")}</h2>
           <p className="text-sm text-muted max-w-xl">{t("dp.lede")}</p>
         </div>
         {!open ? <button className="btn btn-primary" onClick={() => setOpen(true)}>{t("dp.open")}</button> : null}

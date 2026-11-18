@@ -110,6 +110,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
       {blocked ? <p className="text-danger mb-4" role="alert">{blocked}</p> : null}
 
       <ScheduleViews schedules={schedules.data} displays={displays.data}>
+      <div className="grid gap-x-8 xl:grid-cols-2" data-testid="schedule-setup">
       <Locations
         locations={locations.data}
         error={locations.error}
@@ -170,6 +171,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
           toast.show(t("ss.groupDeleted"));
         })}
       />
+      </div>
 
       <DayPartSetup
         displays={(displays.data ?? []).filter((d) => d.connected)}
@@ -183,7 +185,7 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
           await run(async () => {
             const res = await api<{ ids: string[] }>("/api/schedules/day-parts", { method: "POST", body: JSON.stringify(body) });
             await schedules.reload();
-            toast.show(`${res.ids.length} times of day added`);
+            toast.show(t("ss.dayPartsAdded", { n: res.ids.length }));
             ok = true;
           });
           return ok;
@@ -237,6 +239,14 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
   );
 }
 
+function SectionHead({ title, count }: { title: string; count?: number }) {
+  return (
+    <div className="ps-sec-head">
+      <h2>{title}{typeof count === "number" ? <span className="ps-sec-count">{count}</span> : null}</h2>
+    </div>
+  );
+}
+
 function Locations({
   locations, error, onCreate, onSave, onDelete,
 }: {
@@ -252,8 +262,8 @@ function Locations({
   const [timezone, setTimezone] = useState("America/Los_Angeles");
   return (
     <div className="mb-10">
-      <h2 className="text-lg font-semibold mb-3">{t("ss.locations")}</h2>
-      <form className="card p-4 grid gap-3 mb-3" onSubmit={(event) => { event.preventDefault(); onCreate(name, timezone); setName(""); }}>
+      <SectionHead title={t("ss.locations")} count={locations?.length} />
+      <form className="ps-form-card" aria-label={t("ss.addLocation")} onSubmit={(event) => { event.preventDefault(); onCreate(name, timezone); setName(""); }}>
         <label className="text-sm font-semibold">{t("ss.locationName")}
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required {...requiredMsg} maxLength={80} />
         </label>
@@ -284,10 +294,12 @@ function LocationRow({ location, onSave, onDelete }: { location: LocationItem; o
         <p className="font-semibold">{location.name}</p>
         <span className="badge">{t(location.displayCount === 1 ? "ss.screenCount" : "ss.screenCountMany", { n: location.displayCount })}</span>
       </div>
-      <label className="text-sm font-semibold">{t("ss.nameFor", { name: location.name })}
-        <input className="field mt-1" aria-label={t("ss.nameFor", { name: location.name })} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
-      </label>
-      <TimezoneField label={t("ss.timezoneFor", { name: location.name })} value={timezone} onChange={setTimezone} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-semibold">{t("ss.nameFor", { name: location.name })}
+          <input className="field mt-1" aria-label={t("ss.nameFor", { name: location.name })} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
+        </label>
+        <TimezoneField label={t("ss.timezoneFor", { name: location.name })} value={timezone} onChange={setTimezone} />
+      </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn btn-primary" onClick={() => onSave(location.id, name, timezone)}>{t("ss.saveName", { name: location.name })}</button>
         <button type="button" className="btn btn-quiet text-danger" onClick={() => onDelete(location)}>{t("ss.deleteName", { name: location.name })}</button>
@@ -327,8 +339,8 @@ function Groups({
   const [picked, setPicked] = useState<string[]>([]);
   return (
     <div className="mb-10">
-      <h2 className="text-lg font-semibold mb-3">{t("ss.groups")}</h2>
-      <form className="card p-4 grid gap-3 mb-3" onSubmit={(event) => { event.preventDefault(); onCreate(name, picked); setName(""); setPicked([]); }}>
+      <SectionHead title={t("ss.groups")} count={groups?.length} />
+      <form className="ps-form-card" aria-label={t("ss.createGroup")} onSubmit={(event) => { event.preventDefault(); onCreate(name, picked); setName(""); setPicked([]); }}>
         <label className="text-sm font-semibold">{t("ss.groupName")}
           <input className="field mt-1" value={name} onChange={(event) => setName(event.target.value)} required {...requiredMsg} maxLength={80} />
         </label>
@@ -440,9 +452,10 @@ function Rules({
 
   return (
     <div className="mb-10">
-      <h2 className="text-lg font-semibold mb-3">{t("ss.schedules")}</h2>
+      <SectionHead title={t("ss.schedules")} count={schedules?.length} />
       <form
-        className="card p-4 grid gap-3 mb-3"
+        className="ps-form-card"
+        aria-label={t("ss.addSchedule")}
         onSubmit={async (event) => {
           event.preventDefault();
           // QA B2-02 / B2-04: an overnight window or a range that already ended needs an explicit OK.
@@ -600,7 +613,7 @@ function Preview({ displays, fixture }: { displays: DisplayItem[]; fixture: Sche
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-3">{t("ss.next7")}</h2>
+      <div className="ps-sec-head"><h2>{t("ss.next7")}</h2></div>
       <label className="text-sm font-semibold block mb-3">{t("ss.previewScreen")}
         <select className="field mt-1" aria-label={t("ss.previewScreen")} value={displayId} onChange={(event) => setDisplayId(event.target.value)}>
           <option value="">{t("ss.chooseScreen")}</option>

@@ -42,14 +42,14 @@ export function ScheduleViews({ schedules, displays, children }: { schedules: Sc
   const [tab, setTab] = useState<"upcoming" | "recurring" | "calendar" | "rules">("rules");
   return (
     <div>
-      <div role="tablist" aria-label={t("sv.tabsAria")} className="flex flex-wrap gap-2 mb-4">
+      <div role="tablist" aria-label={t("sv.tabsAria")} className="seg seg-lg mb-6" data-testid="schedule-tabs">
         {([
           ["upcoming", "sv.upcoming"],
           ["recurring", "sv.recurring"],
           ["calendar", "sv.calendar"],
           ["rules", "sv.rules"],
         ] as const).map(([id, label]) => (
-          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`btn min-h-11 ${tab === id ? "btn-primary" : ""}`} onClick={() => setTab(id)}>{t(label)}</button>
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{t(label)}</button>
         ))}
       </div>
       {tab === "upcoming" ? <Upcoming /> : null}
