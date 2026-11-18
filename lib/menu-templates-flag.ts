@@ -1,7 +1,8 @@
 /**
  * Rollout switch for premium menu templates (gallery + guided editor). Server-side, set in the deployment
  * environment as MENU_TEMPLATES:
- *   unset       → developer accounts only (public.developer_users), so the team can test on real accounts;
+ *   unset       → every customer (the feature is released; the flag stays as a rollout safeguard);
+ *   "developers" → developer accounts only (public.developer_users), for testing or a soft rollback;
  *   "off"       → nobody (kill switch, also for developers);
  *   "all"       → every customer;
  *   a list     → developers plus these accounts, comma-separated emails or account ids
@@ -13,8 +14,9 @@ export type MenuTemplatesSetting = { mode: "off" | "all" | "list"; entries: stri
 
 export function menuTemplatesSetting(env: Record<string, string | undefined> = process.env): MenuTemplatesSetting {
   const raw = (env.MENU_TEMPLATES ?? "").trim();
-  if (!raw) return { mode: "list", entries: [] };
+  if (!raw) return { mode: "all", entries: [] };
   const lower = raw.toLowerCase();
+  if (lower === "developers" || lower === "dev" || lower === "developer") return { mode: "list", entries: [] };
   if (lower === "off" || lower === "0" || lower === "false") return { mode: "off", entries: [] };
   if (lower === "all" || lower === "on" || lower === "1") return { mode: "all", entries: [] };
   return { mode: "list", entries: lower.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean) };
@@ -35,7 +37,8 @@ export function menuTemplatesEnabledFor(
 /**
  * Rollout switch for the unified menu designer (one editor for templates, original layouts and classic boards,
  * item photos everywhere). Set as UNIFIED_MENU_EDITOR with the same values as MENU_TEMPLATES:
- *   unset → developer accounts only; "off" → nobody; "all" → everyone; a list → developers plus these accounts.
+ *   unset → everyone (released); "developers" → developer accounts only; "off" → nobody; "all" → everyone;
+ *   a list → developers plus these accounts.
  * It needs the template gallery to be on for the account as well. When it is off, the previous editors are used.
  */
 export function unifiedEditorSetting(env: Record<string, string | undefined> = process.env): MenuTemplatesSetting {

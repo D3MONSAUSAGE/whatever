@@ -100,10 +100,10 @@ Status: ☑ done · ◐ partly · ☐ not done. Evidence is in the tests named.
 
 ## 4. Testing on your account
 
-1. In Vercel → Project → Settings → Environment Variables, leave `UNIFIED_MENU_EDITOR` **unset** (developer accounts only) or set it to your email; redeploy if you changed it. `MENU_TEMPLATES` and `LAYOUT_STUDIO=1` must also be on.
+1. Released to every customer (both `MENU_TEMPLATES` and `UNIFIED_MENU_EDITOR` unset = everyone; `LAYOUT_STUDIO=1` must be on). `developers` limits it to developer accounts, `off` turns it off.
 2. Open Menu Boards → **New menu board**: one gallery with templates and original layouts. Try a template, an original layout (e.g. Two-column menu) and Full-screen menu.
 3. In each: Business → Menu (tap a photo square to add a food photo) → Photos → Look (Advanced options at the bottom). Save draft / Publish (classic: Save and update screens).
 4. Open an existing board of each type with **Edit**; it opens in the same editor and looks the same.
 5. To compare with the previous editors in one browser, add `?unified=off` to the Menu Boards URL (`?unified=on` to return).
 
-Rollback: set `UNIFIED_MENU_EDITOR=off` and redeploy. Boards edited in the unified editor stay valid for the previous editors: item photos on original layouts and classic boards are optional fields those editors keep (classic) or ignore when drawing.
+Rollback: set `UNIFIED_MENU_EDITOR=developers` (or `off`) and redeploy, or revert the release commit; one browser can opt out with `?unified=off`. Boards edited in the unified editor stay valid for the previous editors: item photos on original layouts and classic boards are optional fields those editors keep (classic) or ignore when drawing.

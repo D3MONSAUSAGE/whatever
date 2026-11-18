@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { renderMenuPng } from "@/lib/server/menu-render";
+import { deployedCommit } from "@/lib/deploy-info";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     }
   }
   return Response.json(
-    { ok: database === "ok", database, ...(render ? { render } : {}), ms: Date.now() - started, time: new Date().toISOString() },
+    { ok: database === "ok", database, ...(render ? { render } : {}), commit: deployedCommit(), ms: Date.now() - started, time: new Date().toISOString() },
     { status: database === "ok" ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
 }

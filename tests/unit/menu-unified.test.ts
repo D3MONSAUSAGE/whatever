@@ -260,9 +260,12 @@ describe("rollout flag: UNIFIED_MENU_EDITOR", () => {
   const owner = { email: "owner@example.com", accountId: "a2", developer: false };
   const on = (env: Record<string, string | undefined>, who: typeof dev) =>
     unifiedEditorEnabledFor(who, menuTemplatesSetting(env), unifiedEditorSetting(env), true);
-  it("unset means developers only; a list adds accounts; all means everyone; off stops it", () => {
+  it("unset means released to everyone; \"developers\" limits it; a list adds accounts; off stops it", () => {
     expect(on({}, dev)).toBe(true);
-    expect(on({}, owner)).toBe(false);
+    expect(on({}, owner)).toBe(true);
+    expect(on({ UNIFIED_MENU_EDITOR: "developers" }, owner)).toBe(false);
+    expect(on({ UNIFIED_MENU_EDITOR: "developers" }, dev)).toBe(true);
+    expect(on({ UNIFIED_MENU_EDITOR: "owner@example.com" }, owner)).toBe(true);
     expect(on({ UNIFIED_MENU_EDITOR: "owner@example.com" , MENU_TEMPLATES: "owner@example.com" }, owner)).toBe(true);
     expect(on({ UNIFIED_MENU_EDITOR: "all", MENU_TEMPLATES: "all" }, owner)).toBe(true);
     expect(on({ UNIFIED_MENU_EDITOR: "off" }, dev)).toBe(false);
@@ -270,7 +273,8 @@ describe("rollout flag: UNIFIED_MENU_EDITOR", () => {
   it("needs the template gallery too, and Layout Studio", () => {
     expect(on({ MENU_TEMPLATES: "off" }, dev)).toBe(false);
     expect(unifiedEditorEnabledFor(dev, menuTemplatesSetting({}), unifiedEditorSetting({}), false)).toBe(false);
-    // Templates on for everyone does not turn the unified designer on for customers.
-    expect(on({ MENU_TEMPLATES: "all" }, owner)).toBe(false);
+    // Each switch can hold back the other: templates for developers only keeps the designer from customers too.
+    expect(on({ MENU_TEMPLATES: "developers" }, owner)).toBe(false);
+    expect(on({ UNIFIED_MENU_EDITOR: "off", MENU_TEMPLATES: "all" }, owner)).toBe(false);
   });
 });
