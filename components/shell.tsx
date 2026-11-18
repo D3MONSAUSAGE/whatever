@@ -124,7 +124,8 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
   const showAccountNav = isAccountPath(path);
   const brandKit = path.startsWith("/dashboard/account/brand-kit");
   const activeItem = [OVERVIEW, ...NAV].find((item) => isActive(item.href, path));
-  const current = brandKit ? t("dash.nav.brandKit") : isNotifications(path) ? t("dash.nav.notifications") : activeItem ? t(activeItem.labelKey) : PRODUCT_NAME;
+  const analytics = cleanPath(path).startsWith("/dashboard/analytics");
+  const current = brandKit ? t("dash.nav.brandKit") : isNotifications(path) ? t("dash.nav.notifications") : analytics ? t("an.title") : activeItem ? t(activeItem.labelKey) : PRODUCT_NAME;
   const sideLink = (item: { href: string; labelKey: MessageKey; icon: () => React.ReactElement }, testId?: string) => (
     <StudioGuardedLink key={item.href} href={item.href} aria-current={isActive(item.href, path) ? "page" : undefined} aria-label={t(item.labelKey)} title={t(item.labelKey)} className="ps-nav-link" data-testid={testId}>
       <item.icon />

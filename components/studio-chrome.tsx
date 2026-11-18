@@ -43,7 +43,7 @@ export function StudioStyles() {
         .studio-toolbar-lead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; flex: 1 1 240px; }
         .studio-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
         .studio-toolbar-note { flex: 1 1 100%; margin: 0; font-size: 13px; color: #5c6474; }
-        .studio-back { border: 0; background: transparent; color: #0066ff; font: inherit; font-size: 13px; font-weight: 650; min-height: 44px; padding: 0 2px; cursor: pointer; }
+        .studio-back { border: 0; background: transparent; color: #134be0; font: inherit; font-size: 13px; font-weight: 650; min-height: 44px; padding: 0 2px; cursor: pointer; }
         .studio-back:hover { text-decoration: underline; text-underline-offset: 3px; }
         .studio-back:focus-visible { outline: 3px solid #0066ff; outline-offset: 2px; border-radius: 6px; }
         .studio-back:disabled { opacity: 0.45; cursor: not-allowed; text-decoration: none; }

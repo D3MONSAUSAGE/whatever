@@ -334,7 +334,7 @@ function Thumb({ item }: { item: MediaItem }) {
     );
   }
   return (
-    <a href={item.url ?? undefined} target="_blank" rel="noreferrer" className="block aspect-video bg-black overflow-hidden">
+    <a href={item.url ?? undefined} target="_blank" rel="noreferrer" aria-label={t("ml.openNewTab", { name: item.fileName })} className="block aspect-video bg-black overflow-hidden">
       {item.url ? <img src={item.url} alt="" className="size-full object-contain" loading="lazy" /> : null}
     </a>
   );
