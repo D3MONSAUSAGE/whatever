@@ -2,7 +2,11 @@
 import { FONT_CHOICE_ERROR, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
 
 export type MenuTemplate = "classic" | "fresh" | "bold";
-export type MenuItem = { name: string; price: string; description: string };
+export type MenuItem = {
+  name: string; price: string; description: string;
+  /** Optional food photo (same-account image). Absent on every board made before item photos. */
+  imageMediaId?: string;
+};
 export type MenuSection = { name: string; items: MenuItem[] };
 export type MenuContent = {
   title: string; subtitle: string; footer: string; sections: MenuSection[]; photoMediaId?: string | null; useBrand?: boolean;
@@ -11,6 +15,8 @@ export type MenuContent = {
    * so later Brand Kit changes leave existing boards alone). Absent = Inter, exactly as before.
    */
   headingFont?: BoardFontId; bodyFont?: BoardFontId;
+  /** Item photos show as thumbnails beside their items unless this is false (hidden; the photos stay on the items). */
+  itemPhotos?: boolean;
 };
 
 export const MENU_TEMPLATES: { id: MenuTemplate; name: string; blurb: string; swatch: [string, string] }[] = [
@@ -82,7 +88,9 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
       if (price == null) return { ok: false, error: `Keep prices under ${MENU_LIMITS.price} characters.` };
       if (description == null) return { ok: false, error: `Keep descriptions under ${MENU_LIMITS.description} characters.` };
       if (!itemName) continue; // blank rows are ignored
-      items.push({ name: itemName, price: price!, description: description! });
+      // Item photos are optional and only kept when valid, so items without them parse exactly as before.
+      const photo = typeof it.imageMediaId === "string" && UUID.test(it.imageMediaId) ? { imageMediaId: it.imageMediaId.toLowerCase() } : {};
+      items.push({ name: itemName, price: price!, description: description!, ...photo });
     }
     if (items.length > MENU_LIMITS.itemsPerSection) return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     total += items.length;
@@ -106,7 +114,9 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
     if (!isBoardFont(value)) return { ok: false, error: FONT_CHOICE_ERROR };
     fonts[key] = value;
   }
-  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand, ...fonts } };
+  if (raw.itemPhotos != null && typeof raw.itemPhotos !== "boolean") return { ok: false, error: "Item photos has to be true or false." };
+  const itemPhotos = raw.itemPhotos === false ? { itemPhotos: false } : {};
+  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand, ...fonts, ...itemPhotos } };
 }
 
 /**
@@ -122,6 +132,54 @@ export function keepStoredFonts(incoming: unknown, parsed: MenuContent, stored: 
     const value = old[key];
     if (isBoardFont(value)) next[key] = value;
   }
+  return next;
+}
+
+/**
+ * PATCH merge for item photos (protects Android and other older clients, which don't know about them).
+ * An item that arrives without an `imageMediaId` key keeps the photo stored on the item with the same name in the
+ * same section (first match, case-insensitive); an explicit null or "" removes it. The hide setting is kept the same way.
+ */
+export function keepStoredItemPhotos(incoming: unknown, parsed: MenuContent, stored: unknown): MenuContent {
+  const raw = incoming && typeof incoming === "object" ? (incoming as Record<string, unknown>) : {};
+  const old = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
+  const oldSections = Array.isArray(old.sections) ? (old.sections as unknown[]) : [];
+  const rawSections = Array.isArray(raw.sections) ? (raw.sections as unknown[]) : [];
+  const key = (value: unknown) => (typeof value === "string" ? value.trim().toLowerCase() : "");
+  const storedPhotos = (sectionName: string, index: number): Map<string, string> => {
+    // Same section by name first, then by position (a renamed section still keeps its photos).
+    const byName = oldSections.find((s) => s && typeof s === "object" && key((s as Record<string, unknown>).name) === key(sectionName));
+    const section = (byName ?? oldSections[index]) as Record<string, unknown> | undefined;
+    const map = new Map<string, string>();
+    for (const item of Array.isArray(section?.items) ? (section!.items as unknown[]) : []) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.imageMediaId === "string" && UUID.test(row.imageMediaId) && !map.has(key(row.name))) map.set(key(row.name), row.imageMediaId.toLowerCase());
+    }
+    return map;
+  };
+  // Incoming items that still carry the key (the web editor sends it on every item) are taken as sent.
+  const rawItemsFor = (section: MenuSection) => {
+    const match = rawSections.find((s) => s && typeof s === "object" && key((s as Record<string, unknown>).name) === key(section.name));
+    const items = match && Array.isArray((match as Record<string, unknown>).items) ? ((match as Record<string, unknown>).items as unknown[]) : [];
+    return items.filter((i): i is Record<string, unknown> => Boolean(i && typeof i === "object"));
+  };
+  const sections = parsed.sections.map((section, si) => {
+    const photos = storedPhotos(section.name, si);
+    if (!photos.size) return section;
+    const sent = rawItemsFor(section);
+    return {
+      ...section,
+      items: section.items.map((item) => {
+        const original = sent.find((row) => key(row.name) === key(item.name));
+        if (original && Object.prototype.hasOwnProperty.call(original, "imageMediaId")) return item;
+        const kept = photos.get(key(item.name));
+        return kept && !item.imageMediaId ? { ...item, imageMediaId: kept } : item;
+      }),
+    };
+  });
+  const next: MenuContent = { ...parsed, sections };
+  if (!Object.prototype.hasOwnProperty.call(raw, "itemPhotos") && old.itemPhotos === false) next.itemPhotos = false;
   return next;
 }
 

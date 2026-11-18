@@ -7,7 +7,10 @@ import { layoutSvg } from "@/lib/layout-studio";
 import { MENU_DESIGNS, designDocument } from "@/lib/menu-designs";
 import { withItemPhoto } from "@/lib/menu-item-photos";
 import { prepareBoardPhoto, renderLayoutPng, stockPhotoDataUri } from "@/lib/server/layout-render";
-import type { LayoutDocument } from "@/lib/layout-studio";
+import { sampleLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
+import { menuSvg } from "@/lib/menu-classic-svg";
+import { renderMenuPng } from "@/lib/server/menu-render";
+import { sampleMenu, type MenuTemplate } from "@/lib/menu-templates";
 
 /**
  * The critical requirement: the editor preview and the TV image must be the same picture. The preview is this SVG
@@ -41,18 +44,34 @@ describe("template boards: browser preview vs server PNG", () => {
     // Every template as shipped, plus text templates carrying an owner's item photo (the Burrata regression).
     const OWNER = "00000000-0000-4000-8000-000000000101";
     const photo = await prepareBoardPhoto(readFileSync(resolve("assets/menu-templates/salad.jpg")), "image/jpeg", 900);
-    const cases: Array<{ id: string; doc: LayoutDocument; owner: boolean }> = MENU_DESIGNS.map((design) => ({ id: design.id, doc: designDocument(design), owner: false }));
+    type Case = { id: string; doc: LayoutDocument; owner: boolean; classic?: MenuTemplate };
+    const cases: Case[] = MENU_DESIGNS.map((design) => ({ id: design.id, doc: designDocument(design), owner: false }));
+    // Original layouts and classic boards with an item photo (unified menu designer).
+    for (const t of ["two-column", "triple-column", "menu-promo-67", "split-50", "menu-banner", "signature", "two-menu-promo"] as LayoutTemplate[]) {
+      const doc = sampleLayout(t);
+      cases.push({ id: `layout-${t}+item-photo`, doc: { ...doc, sections: withItemPhoto(doc.sections, 0, 0, OWNER) }, owner: true });
+    }
+    for (const theme of ["classic", "fresh", "bold"] as MenuTemplate[]) cases.push({ id: `classic-${theme}+item-photo`, doc: sampleLayout("menu-promo-67"), owner: true, classic: theme });
     for (const id of ["modern-restaurant", "chalkboard-bistro"]) {
       const doc = designDocument(MENU_DESIGNS.find((d) => d.id === id)!);
       cases.push({ id: `${id}+item-photo`, doc: { ...doc, sections: withItemPhoto(doc.sections, 0, 0, OWNER) }, owner: true });
     }
-    for (const { id, doc, owner } of cases) {
+    for (const { id, doc, owner, classic } of cases) {
       const design = { id };
-      const server = renderLayoutPng(doc, null, owner ? { itemImages: { [OWNER]: photo } } : {});
-      const stockHrefs = Object.fromEntries(doc.sections.flatMap((sec) => sec.items).filter((item) => item.stockPhoto).map((item) => [item.stockPhoto!, stockPhotoDataUri(item.stockPhoto) ?? ""]));
       const itemImages = owner ? { [OWNER]: `data:${photo.mime};base64,${photo.bytes.toString("base64")}` } : undefined;
-      const svg = layoutSvg(doc, { stockHref: stockPhotoDataUri(doc.stockPhoto), stockHrefs, itemImages });
-      await page.setContent(`<!doctype html><style>${faces}body{margin:0}</style>${svg}`);
+      let server: Buffer;
+      let svg: string;
+      if (classic) {
+        const menu = sampleMenu();
+        const content = { ...menu, sections: menu.sections.map((sec, i) => (i === 0 ? { ...sec, items: sec.items.map((it, j) => (j === 0 ? { ...it, imageMediaId: OWNER } : it)) } : sec)) };
+        server = Buffer.from(renderMenuPng(classic, content, { itemImages }));
+        svg = menuSvg(classic, content, { itemImages });
+      } else {
+        server = renderLayoutPng(doc, null, owner ? { itemImages: { [OWNER]: photo } } : {});
+        const stockHrefs = Object.fromEntries(doc.sections.flatMap((sec) => sec.items).filter((item) => item.stockPhoto).map((item) => [item.stockPhoto!, stockPhotoDataUri(item.stockPhoto) ?? ""]));
+        svg = layoutSvg(doc, { stockHref: stockPhotoDataUri(doc.stockPhoto), stockHrefs, itemImages });
+      }
+      await page.setContent(`<!doctype html><style>${faces}body{margin:0}svg{font-family:Inter,sans-serif}</style>${svg}`);
       await page.evaluate(async () => {
         await Promise.all(["Inter", "Noto Serif", "Montserrat", "Oswald", "Bebas Neue", "Lobster"].map((f) => document.fonts.load(`40px "${f}"`)));
         await document.fonts.ready;

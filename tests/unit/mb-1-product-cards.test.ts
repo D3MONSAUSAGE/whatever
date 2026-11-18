@@ -81,7 +81,9 @@ describe("MB-1 product cards", () => {
       expect(src).toMatch(/open=\{cards\.isOpen\(si, ii\) \|\| nameInvalid\}/); // a missing name always shows its field
       expect(src).toContain("className=\"item-order product-order\"");
     }
-    expect(readFileSync("lib/menu-templates.ts", "utf8")).toContain("export type MenuItem = { name: string; price: string; description: string };");
+    // Classic items keep the same three fields; the only addition is an optional item photo (unified menu designer).
+    const menuTypes = readFileSync("lib/menu-templates.ts", "utf8");
+    expect(menuTypes).toMatch(/export type MenuItem = \{\s*name: string; price: string; description: string;\s*(\/\*\*[^*]*\*\/\s*)?imageMediaId\?: string;\s*\};/);
   });
 
   it("long text never breaks the card, and narrow panels stack price under the name", async () => {

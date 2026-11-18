@@ -134,7 +134,8 @@ export async function saveLayoutForAccount(accountId: string, body: {
       const logo = logoRaw && logoRaw.bytes.length ? await prepareBoardPhoto(logoRaw.bytes, logoRaw.mime) : null;
       // Item photos: only this account's own images (imageBytes checks the account), each reduced for the board.
       const itemImages: Record<string, { bytes: Buffer; mime: "image/png" | "image/jpeg" | "image/webp" }> = {};
-      if (document.design) {
+      // Every board type can carry item photos (templates and original layouts).
+      {
         const ids = [...new Set(document.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
         await Promise.all(ids.map(async (id) => {
           const raw = await imageBytes(accountId, id);

@@ -34,7 +34,9 @@ Set in the deployment environment (Vercel → Project → Settings → Environme
 | `all` | Every customer |
 | `off` | Nobody, not even developers (kill switch) |
 
-`LAYOUT_STUDIO=1` must also be on. A single browser can opt out with `?templates=off`, and opt back in with `?templates=on`.
+`LAYOUT_STUDIO=1` must also be on.
+
+The unified menu designer (one editor for templates, original layouts and classic boards; see `docs/MENU_EDITOR_UNIFY.md`) has its own switch, `UNIFIED_MENU_EDITOR`, with the same values. It is only on for an account when `MENU_TEMPLATES` is on for it too. A single browser can opt out with `?templates=off`, and opt back in with `?templates=on`.
 
 Boards already made from a template keep rendering and stay editable whatever the flag says. With the flag off they open in the Advanced editor.
 

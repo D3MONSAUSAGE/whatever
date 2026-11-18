@@ -59,8 +59,17 @@ export function stockPhotoDataUri(id: string | undefined): string | null {
 
 export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, extras?: { logo?: BoardImage | null; itemImages?: Record<string, BoardImage> }): Buffer {
   const href = dataUri(image);
-  // Template boards (doc.design) may show a bundled stock photo, a logo and item photos. Older boards never set these.
+  // Template boards (doc.design) may show a bundled stock photo, a logo and item photos. Original layouts may show
+  // item photos (thumbnails). Boards without them render exactly as before.
   let art: Parameters<typeof layoutSvg>[1] = { imageHref: href };
+  if (!doc.design && extras?.itemImages) {
+    const itemImages: Record<string, string> = {};
+    for (const section of doc.sections) for (const item of section.items) {
+      const own = item.imageMediaId ? extras.itemImages[item.imageMediaId] : null;
+      if (item.imageMediaId && own) itemImages[item.imageMediaId] = dataUri(own) ?? "";
+    }
+    if (Object.keys(itemImages).length) art = { imageHref: href, itemImages };
+  }
   if (doc.design) {
     const stockHrefs: Record<string, string> = {};
     const itemImages: Record<string, string> = {};

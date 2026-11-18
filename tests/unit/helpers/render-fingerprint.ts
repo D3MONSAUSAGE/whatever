@@ -7,7 +7,7 @@ import { promoSvg } from "@/lib/server/promo-render";
 import { MENU_TEMPLATES, sampleMenu } from "@/lib/menu-templates";
 import { PROMO_TEMPLATES, samplePromo } from "@/lib/promo-templates";
 
-export const GUARDED_FILES = ["public/player.html", "lib/server/layout-render.ts", "lib/server/menu-render.ts", "lib/server/promo-render.ts"] as const;
+export const GUARDED_FILES = ["public/player.html", "lib/server/layout-render.ts", "lib/server/menu-render.ts", "lib/menu-classic-svg.ts", "lib/server/promo-render.ts"] as const;
 const LAYOUTS: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"];
 const NAMES = [null, "Burrito de carne asada con guacamole XL", "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"];
 

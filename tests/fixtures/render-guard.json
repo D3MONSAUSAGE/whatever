@@ -1,8 +1,9 @@
 {
  "files": {
   "public/player.html": "35a01145306d847b7fd4a5fa3424f432ce3e2bfe8e643de627eda94a33211334",
-  "lib/server/layout-render.ts": "a7d2024280b2173590c1d5c9ec9f9a855d95e1729dc72a7d1ccfc2075b624e90",
-  "lib/server/menu-render.ts": "672decdb030490cdd8f1de0b6354fb7fbf1a5dcdb939f33e951d3e5b70e960a3",
+  "lib/server/layout-render.ts": "37331efc0ecd4a027da010ace84438a82ff8a84470957d404384039d0440199a",
+  "lib/server/menu-render.ts": "ba4459f625229dac648219712f70ed4406334ef6be2d56583e2fc10a191a4a5b",
+  "lib/menu-classic-svg.ts": "da93dd953741bf81b6a334455dde2826c2a3bfb6416c69cfe8b9843c05a68f81",
   "lib/server/promo-render.ts": "b217d94de7cbcb7d765b15cae1c651cae48c7fffe74819211f4030a6daf0a24f"
  },
  "outputs": {

@@ -15,7 +15,8 @@ import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
 import { LayoutStudio } from "@/components/layout-studio";
 import { ClassicEditor, type ClassicDraft } from "@/components/classic-editor";
 import { LayoutGallery } from "@/components/layout-gallery";
-import { TemplateEditor, TemplateGallery, useMenuTemplatesFlag } from "@/components/menu-templates";
+import { DesignGallery, TemplateEditor, TemplateGallery, useMenuTemplatesFlag, useUnifiedEditorFlag } from "@/components/menu-templates";
+import { fromClassic, newLayoutDocument, type ClassicSettings } from "@/lib/menu-designer";
 import { designById, designDocument } from "@/lib/menu-designs";
 import type { AccountStudio } from "@/lib/layout-account";
 import { parseLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
@@ -51,7 +52,9 @@ type View =
   | { mode: "layout"; boardId: string | null; template: LayoutTemplate; screenId: string | null; zone?: string }
   // Premium templates (MENU_TEMPLATES flag): gallery, then the guided editor.
   | { mode: "template-gallery"; screenId: string | null }
-  | { mode: "template"; menuId: string | null; name: string; document: LayoutDocument };
+  | { mode: "template"; menuId: string | null; name: string; document: LayoutDocument; classic?: ClassicSettings | null }
+  // Unified menu designer (UNIFIED_MENU_EDITOR): one gallery for templates and original layouts.
+  | { mode: "design-gallery"; screenId: string | null };
 
 export type MenuFixture = {
   menus: MenuBoard[];
@@ -70,6 +73,8 @@ export type MenuFixture = {
   /** Preview harness: show the premium template experience without the server flag. */
   templates?: boolean;
   startTemplate?: string;
+  /** Preview harness: show the unified menu designer without the server flag. */
+  unified?: boolean;
 };
 
 const EN: T = makeT("en");
@@ -152,10 +157,43 @@ export function MenuBoards({
   const [pickClassic, setPickClassic] = useState<{ id: string; name: string; playlistId: string } | null>(null);
   const confirm = useConfirm();
   const templatesOn = useMenuTemplatesFlag(Boolean(fixture)) || Boolean(fixture?.templates);
-  const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout" || view.mode === "template-gallery" || view.mode === "template";
+  const unifiedFlag = useUnifiedEditorFlag(Boolean(fixture));
+  const unifiedOn = Boolean(fixture?.unified) || unifiedFlag === true;
+  const flagsLoading = !fixture && unifiedFlag === null;
+  const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout" || view.mode === "template-gallery" || view.mode === "template" || view.mode === "design-gallery";
+
+  /**
+   * With the unified designer on, every editor view becomes the same menu designer: the old layout picker and the
+   * template gallery become one gallery, and layout and classic boards open in the designer in their own engine.
+   * Nothing about the board is converted.
+   */
+  function unifiedFor(current: View): View {
+    if (current.mode === "pick-layout" || current.mode === "template-gallery") return { mode: "design-gallery", screenId: current.screenId };
+    if (current.mode === "classic") {
+      const working = fromClassic(current.draft.template, current.draft.content);
+      return { mode: "template", menuId: current.draft.id, name: current.draft.name, document: working.doc, classic: working.classic };
+    }
+    if (current.mode === "layout") {
+      if (!current.boardId) return { mode: "template", menuId: null, name: t("mb.defaultName"), document: newLayoutDocument(current.template, kit) };
+      const menu = menus.data?.menus.find((item) => item.id === current.boardId);
+      const parsed = menu ? parseLayout(menu.content) : null;
+      if (menu && parsed?.ok) return { mode: "template", menuId: menu.id, name: menu.name, document: parsed.value };
+      return current;
+    }
+    return current;
+  }
+  useEffect(() => {
+    if (!unifiedOn) return;
+    const next = unifiedFor(view);
+    if (next !== view) setView(next);
+  }, [unifiedOn, view, menus.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** A template board opens in the guided editor when templates are on; otherwise the existing editor. */
   function templateView(menu: MenuBoard): View | null {
+    if (unifiedOn) {
+      const opened = openClassified(menu, null);
+      return opened ? unifiedFor(opened) : null;
+    }
     if (!templatesOn) return null;
     const parsed = parseLayout(menu.content);
     if (!parsed.ok || !parsed.value.design) return null;
@@ -166,13 +204,14 @@ export function MenuBoards({
     if (!pendingBoardId || !menus.data?.menus) return;
     const menu = menus.data.menus.find((item) => item.id === pendingBoardId);
     if (!menu) return;
-    if (templatesOn === null && !fixture) return; // wait for the flag so a template board opens in the right editor
+    if ((templatesOn === null || unifiedFlag === null) && !fixture) return; // wait for the flags so a board opens in the right editor
     const next = templateView(menu) ?? openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
     if (next) setView(next);
     setPendingBoardId(null);
-  }, [menus.data, pendingBoardId, initialSearch, templatesOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [menus.data, pendingBoardId, initialSearch, templatesOn, unifiedFlag]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startNew() {
+    if (studioEnabled && unifiedOn) { setView({ mode: "design-gallery", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); return; }
     if (studioEnabled && templatesOn) { setView({ mode: "template-gallery", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); return; }
     if (studioEnabled) { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: parseUnifiedSearch(initialSearch ?? {}).screenId }); }
     else setView({ mode: "classic", draft: newClassicDraft([], kit, t), screenId: null });
@@ -234,7 +273,22 @@ export function MenuBoards({
 
       {!draftOpen && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
 
-      {view.mode === "template-gallery" ? (
+      {flagsLoading && draftOpen ? <LoadState error={null} /> : null}
+
+      {view.mode === "design-gallery" ? (
+        <DesignGallery
+          brand={kit}
+          onCancel={() => setView({ mode: "list" })}
+          onPick={({ document, name, classic }) => {
+            // The owner's business name from the Brand Kit replaces the sample name on templates; layouts and the
+            // classic menu are seeded from the Brand Kit already.
+            const title = !classic && document.design && kit?.displayName ? kit.displayName.slice(0, 40) : document.title;
+            setView({ mode: "template", menuId: null, name: kit?.displayName || name, document: { ...document, title }, classic });
+          }}
+        />
+      ) : null}
+
+      {view.mode === "template-gallery" && !unifiedOn && !flagsLoading ? (
         <TemplateGallery
           onCancel={() => setView({ mode: "list" })}
           onAdvanced={() => { setSelectedLayout(null); setView({ mode: "pick-layout", screenId: view.screenId }); }}
@@ -248,21 +302,24 @@ export function MenuBoards({
 
       {view.mode === "template" ? (
         <TemplateEditor
-          key={view.menuId ?? `new-${view.document.design}`}
+          key={view.menuId ?? `new-${view.document.design ?? view.document.template}-${view.classic ? "classic" : "board"}-${view.name}`}
           menuId={view.menuId}
           name={view.name}
           document={view.document}
+          classic={view.classic ?? null}
+          unified={unifiedOn}
+          onNewBoard={(document, name) => { toast.show(t("tpl.newBoardFrom")); setView({ mode: "template", menuId: null, name, document, classic: null }); }}
           displays={displays.data ? displays.data.filter((d) => d.connected) : null}
           brand={kit}
           preview={Boolean(fixture)}
           onClose={() => { setView({ mode: "list" }); void menus.reload(); }}
           onSaved={() => { void menus.reload(); }}
           onAdvanced={(menuId) => setView({ mode: "layout", boardId: menuId, template: view.document.template, screenId: null })}
-          onSplit={(document, name) => { toast.show(t("tpl.splitDone")); setView({ mode: "template", menuId: null, name, document }); }}
+          onSplit={(document, name, classic) => { toast.show(t("tpl.splitDone")); setView({ mode: "template", menuId: null, name, document, classic: classic ?? null }); }}
         />
       ) : null}
 
-      {view.mode === "pick-layout" ? (
+      {view.mode === "pick-layout" && !unifiedOn && !flagsLoading ? (
         <LayoutGallery
           options={pickerOptions}
           selectedId={selectedLayout?.id ?? null}
@@ -272,7 +329,7 @@ export function MenuBoards({
         />
       ) : null}
 
-      {view.mode === "classic" ? (
+      {view.mode === "classic" && !unifiedOn && !flagsLoading ? (
         <ClassicEditor
           images={artImages(media.data)}
           draft={view.draft}
@@ -306,7 +363,7 @@ export function MenuBoards({
         />
       ) : null}
 
-      {view.mode === "layout" ? (
+      {view.mode === "layout" && !unifiedOn && !flagsLoading ? (
         <LayoutStudio
           key={view.boardId ?? `new-${view.template}`}
           mode="account"

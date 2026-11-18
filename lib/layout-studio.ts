@@ -4,7 +4,7 @@ import { boardFont, FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type Bo
 import { MENU_LIMITS } from "@/lib/menu-templates";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
 import { isDesignId, isStockPhoto, type StockPhotoId } from "@/lib/menu-designs";
-import { designSvg, designSvgWithReport, designVideoBox, type DesignArt } from "@/lib/menu-design-svg";
+import { designSvg, designSvgWithReport, designVideoBox, safeDesignHref, type DesignArt } from "@/lib/menu-design-svg";
 
 export { MENU_LIMITS };
 
@@ -352,6 +352,8 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       textColor, backgroundColor,
       featureTitle: featureTitle ?? "", featureDetail: featureDetail ?? "",
       columnWidths, imageFit, imageAnchor,
+      // Item photo display applies to every board (templates and original layouts). Absent = shown when present.
+      ...(raw.photoStyle === "thumbs" || raw.photoStyle === "text" ? { photoStyle: raw.photoStyle } : {}),
       ...designFields(raw),
     },
   };
@@ -364,7 +366,6 @@ function designFields(raw: Record<string, unknown>): Partial<LayoutDocument> {
   if (typeof raw.variant === "string" && /^[a-z0-9-]{1,32}$/.test(raw.variant)) out.variant = raw.variant;
   if (isStockPhoto(raw.stockPhoto)) out.stockPhoto = raw.stockPhoto;
   if (typeof raw.logoMediaId === "string" && UUID.test(raw.logoMediaId)) out.logoMediaId = raw.logoMediaId.toLowerCase();
-  if (raw.photoStyle === "thumbs" || raw.photoStyle === "text") out.photoStyle = raw.photoStyle;
   return out;
 }
 
@@ -656,6 +657,8 @@ export function safeImageHref(value: string | null | undefined): string | null {
   if (!value) return null;
   if (/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=\s]+$/i.test(value)) return value.replace(/\s/g, "");
   if (/^https:\/\/[^\s"'<>]+$/i.test(value)) return value;
+  // Bundled sample photos (public/menu-templates), the same paths template boards accept.
+  if (/^\/menu-templates\/[a-z]+\.jpg$/.test(value)) return value;
   return null;
 }
 
@@ -793,7 +796,18 @@ function itemUnit(sections: LayoutSection[], top: number, bottom: number, scale:
 
 type Families = { heading: string; body: string };
 
-function paintItems(parts: string[], sections: LayoutSection[], x: number, top: number, width: number, bottom: number, colors: BoardColors, scale: TypeScale, families: Families, spread = false, unitOverride?: number, minDescSize = 10) {
+/** Item photos on an original layout: compact thumbnails beside the items that have one. */
+type ItemPhotos = { images: Record<string, string>; fill: string; next: () => string };
+
+/**
+ * Item photos show on original layouts (no `design`) when an item has an owner photo, unless the board hides them
+ * (`photoStyle: "text"`). Boards without item photos draw exactly as before.
+ */
+export function layoutItemPhotosShown(doc: Pick<LayoutDocument, "sections" | "photoStyle">): boolean {
+  return doc.photoStyle !== "text" && doc.sections.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
+}
+
+function paintItems(parts: string[], sections: LayoutSection[], x0: number, top: number, width0: number, bottom: number, colors: BoardColors, scale: TypeScale, families: Families, spread = false, unitOverride?: number, minDescSize = 10, photos?: ItemPhotos | null) {
   const family = families.heading;
   const body = families.body;
   const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
@@ -802,13 +816,34 @@ function paintItems(parts: string[], sections: LayoutSection[], x: number, top: 
   const descSize = Math.max(minDescSize, Math.round(nameSize * 0.55));
   let y = top;
   for (const section of sections) {
+    // Only sections with an item photo make room for thumbnails, so their names stay aligned.
+    const thumbs = Boolean(photos) && section.items.some((item) => Boolean(item.imageMediaId));
+    let x = x0;
+    let width = width0;
     if (section.name) {
       y += unit * 0.72;
-      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(fitWidth(section.name.toUpperCase(), nameSize - 6, width, family))}</text>`);
+      parts.push(`<text x="${x0}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(fitWidth(section.name.toUpperCase(), nameSize - 6, width0, family))}</text>`);
       y += unit * 0.28;
     }
     for (const item of section.items) {
       y += unit * 0.78;
+      if (thumbs && photos) {
+        const boxTop = y - nameSize * 0.85;
+        const size = Math.round((item.description ? y + unit * 0.48 + descSize * 0.25 : y + nameSize * 0.3) - boxTop);
+        // One text indent per section (the tallest thumbnail), so every name in it lines up.
+        const tallest = Math.round(section.items.some((it) => it.description) ? nameSize * 0.85 + unit * 0.48 + descSize * 0.25 : nameSize * 1.15);
+        const shift = tallest + Math.max(12, Math.round(tallest * 0.24));
+        x = x0 + shift;
+        width = width0 - shift;
+        if (item.imageMediaId) {
+          const r = Math.round(size * 0.18);
+          const id = photos.next();
+          const href = safeDesignHref(photos.images[item.imageMediaId]);
+          parts.push(`<clipPath id="${id}"><rect x="${x0}" y="${boxTop.toFixed(1)}" width="${size}" height="${size}" rx="${r}"/></clipPath>`);
+          parts.push(`<rect x="${x0}" y="${boxTop.toFixed(1)}" width="${size}" height="${size}" rx="${r}" fill="${photos.fill}"/>`);
+          if (href) parts.push(`<image href="${esc(href)}" x="${x0}" y="${boxTop.toFixed(1)}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`);
+        }
+      }
       const price = item.price || "";
       const priceW = price ? measure(price, nameSize, body) + (colors.priceBg ? 28 : 0) : 0;
       const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24), body);
@@ -881,6 +916,10 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const bodyFamily = fontFamily(doc.bodyFont ?? doc.font);
   const families: Families = { heading: family, body: bodyFamily };
   const href = safeImageHref(art?.imageHref);
+  let clipN = 0;
+  const photos: ItemPhotos | null = layoutItemPhotosShown(doc)
+    ? { images: art?.itemImages ?? {}, fill: mixHex(colors.paper, colors.ink, 0.12), next: () => `ip${clipN++}` }
+    : null;
   const parts: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${BOARD_W}" height="${BOARD_H}" viewBox="0 0 ${BOARD_W} ${BOARD_H}">`,
     `<rect width="${BOARD_W}" height="${BOARD_H}" fill="${colors.feature}"/>`,
@@ -938,7 +977,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const section = doc.sections[index];
       // Fixed columns keep their place; an empty column draws nothing, not even its heading (QA B1-04).
       if (!section || !sectionShows(section)) return;
-      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared);
+      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared, 10, photos);
     });
   } else if (doc.template === "two-menu-promo") {
     const textBottom = BOARD_H - 64;
@@ -948,7 +987,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const section = doc.sections[index];
       // Fixed columns keep their place; an empty column draws nothing, not even its heading (QA B1-04).
       if (!section || !sectionShows(section)) return;
-      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared);
+      paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared, 10, photos);
     });
   } else {
     const shown = shownSections(doc.sections); // QA B1-04: sections with no items draw nothing
@@ -960,10 +999,10 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       const colW = (menu.w - gap) / 2;
       const unit = Math.min(...columns.map((column) => itemUnit(column, textTop, menu.bottom, doc.typeScale, true)));
       columns.forEach((column, index) => {
-        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, families, true, unit, LONG_MENU_DESC_MIN);
+        paintItems(parts, column, menu.x + index * (colW + gap), textTop, colW, menu.bottom, colors, doc.typeScale, families, true, unit, LONG_MENU_DESC_MIN, photos);
       });
     } else {
-      paintItems(parts, shown, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, families, doc.template === "menu-banner");
+      paintItems(parts, shown, menu.x, textTop, menu.w, menu.bottom, colors, doc.typeScale, families, doc.template === "menu-banner", undefined, 10, photos);
     }
   }
   if (doc.footer && doc.template === "menu-banner") {
