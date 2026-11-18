@@ -39,7 +39,8 @@ describe("template boards: browser preview vs server PNG", () => {
     for (const design of MENU_DESIGNS) {
       const doc = designDocument(design);
       const server = renderLayoutPng(doc);
-      const svg = layoutSvg(doc, { stockHref: stockPhotoDataUri(doc.stockPhoto) });
+      const stockHrefs = Object.fromEntries(doc.sections.flatMap((sec) => sec.items).filter((item) => item.stockPhoto).map((item) => [item.stockPhoto!, stockPhotoDataUri(item.stockPhoto) ?? ""]));
+      const svg = layoutSvg(doc, { stockHref: stockPhotoDataUri(doc.stockPhoto), stockHrefs });
       await page.setContent(`<!doctype html><style>${faces}body{margin:0}</style>${svg}`);
       await page.evaluate(async () => {
         await Promise.all(["Inter", "Noto Serif", "Montserrat", "Oswald", "Bebas Neue", "Lobster"].map((f) => document.fonts.load(`40px "${f}"`)));

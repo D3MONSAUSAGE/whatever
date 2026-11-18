@@ -14,7 +14,13 @@ export const BOARD_H = 1080;
 
 export type LayoutTemplate = "menu-promo-67" | "triple-column" | "split-50" | "menu-banner" | "signature" | "two-menu-promo" | "two-column";
 export type ZoneBox = { x: number; y: number; w: number; h: number };
-export type LayoutItem = { name: string; price: string; description: string };
+export type LayoutItem = {
+  name: string; price: string; description: string;
+  /** Optional food photo for this item (same-account JPEG/PNG/WebP). Travels with the item when it moves. */
+  imageMediaId?: string;
+  /** Sample photo from a photo template, used until the owner adds their own. */
+  stockPhoto?: StockPhotoId;
+};
 export type LayoutSection = { name: string; items: LayoutItem[] };
 
 export type BoardPalette = "classic" | "fresh" | "bold";
@@ -69,6 +75,11 @@ export type LayoutDocument = {
   stockPhoto?: StockPhotoId;
   /** Same-account logo (from the Brand Kit or uploaded) drawn in a design board's header. */
   logoMediaId?: string | null;
+  /**
+   * How item photos show on a design board: "thumbs" (small photos beside items) or "text" (hidden; the photos stay
+   * on the items). Absent = the design's own default. Card templates always show item photos.
+   */
+  photoStyle?: "thumbs" | "text";
 };
 
 export type LayoutFrame = {
@@ -295,7 +306,10 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       if (itemName == null || price == null || description == null) return { ok: false, error: "Check your items." };
       // Blank rows are ignored, same as the existing menu editor. Named items are kept.
       if (!itemName) continue;
-      items.push({ name: itemName, price: price ?? "", description: description ?? "" });
+      // Item photos are optional and only kept when valid, so items without them parse exactly as before.
+      const photo = typeof row.imageMediaId === "string" && UUID.test(row.imageMediaId) ? { imageMediaId: row.imageMediaId.toLowerCase() } : {};
+      const stock = isStockPhoto(row.stockPhoto) ? { stockPhoto: row.stockPhoto } : {};
+      items.push({ name: itemName, price: price ?? "", description: description ?? "", ...photo, ...stock });
     }
     if (items.length > MENU_LIMITS.itemsPerSection) return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     total += items.length;
@@ -350,6 +364,7 @@ function designFields(raw: Record<string, unknown>): Partial<LayoutDocument> {
   if (typeof raw.variant === "string" && /^[a-z0-9-]{1,32}$/.test(raw.variant)) out.variant = raw.variant;
   if (isStockPhoto(raw.stockPhoto)) out.stockPhoto = raw.stockPhoto;
   if (typeof raw.logoMediaId === "string" && UUID.test(raw.logoMediaId)) out.logoMediaId = raw.logoMediaId.toLowerCase();
+  if (raw.photoStyle === "thumbs" || raw.photoStyle === "text") out.photoStyle = raw.photoStyle;
   return out;
 }
 

@@ -8,7 +8,7 @@
 import type { BoardFontId } from "@/lib/board-fonts";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
-export type DesignComposition = "showcase" | "columns" | "promo" | "list";
+export type DesignComposition = "showcase" | "columns" | "promo" | "list" | "cards" | "featured";
 export type DesignStyle = "dark" | "light" | "bold";
 export type DesignBusiness = "restaurant" | "cafe" | "fast" | "bar" | "sweets";
 export type Localized = { en: string; es: string };
@@ -42,9 +42,16 @@ export type DesignLook = {
   tags?: boolean;
   /** Price colour: accent (true) or menu text colour. */
   accentPrices?: boolean;
+  /** Card templates: photo shape. */
+  photoShape?: "rect" | "circle";
 };
 
-export const STOCK_PHOTOS = ["steak", "latte", "burger", "coldbrew", "pizza", "ribs", "pancakes", "interior", "croissant"] as const;
+export const STOCK_PHOTOS = [
+  "steak", "latte", "burger", "coldbrew", "pizza", "ribs", "pancakes", "interior", "croissant",
+  // Item photos for the photo templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
+  "salmon", "pasta", "parfait", "smoothie", "cinnamon", "bowl", "sandwich", "salad", "donuts", "tacos", "carnitas",
+  "streettacos", "wings", "macarons", "cake", "chicken", "muffins", "quesadilla", "burrito",
+] as const;
 export type StockPhotoId = (typeof STOCK_PHOTOS)[number];
 
 export function isStockPhoto(value: unknown): value is StockPhotoId {
@@ -68,6 +75,8 @@ export type MenuDesign = {
   variants: DesignVariant[];
   stock: StockPhotoId | null;
   sample: Sample;
+  /** Item photos on non-card templates: "thumbs" shows them by default. Absent = text-focused. */
+  photoStyle?: "thumbs" | "text";
 };
 
 /** Layout Studio geometry each composition is drawn on. Keeps the frame and the video box contract intact. */
@@ -76,9 +85,12 @@ export const COMPOSITION_LAYOUT: Record<DesignComposition, { template: LayoutTem
   columns: { template: "two-menu-promo", split: 0.35, columnWidths: [0.35, 0.35, 0.3] },
   promo: { template: "menu-promo-67", split: 0.65625, columnWidths: null },
   list: { template: "triple-column", split: 1 / 3, columnWidths: null },
+  // Photo templates fill the whole board with menu content; there is no single feature photo or video area.
+  cards: { template: "triple-column", split: 1 / 3, columnWidths: null },
+  featured: { template: "triple-column", split: 1 / 3, columnWidths: null },
 };
 
-const i = (name: string, price: string, description = "") => ({ name, price, description });
+const i = (name: string, price: string, description = "", stockPhoto?: StockPhotoId) => ({ name, price, description, ...(stockPhoto ? { stockPhoto } : {}) });
 const v = (id: string, en: string, es: string, paper: string, ink: string, muted: string, accent: string, panel: string, tag?: string): DesignVariant =>
   ({ id, name: { en, es }, paper, ink, muted, accent, panel, ...(tag ? { tag } : {}) });
 
@@ -466,6 +478,92 @@ export const MENU_DESIGNS: MenuDesign[] = [
       ],
     },
   },
+  {
+    id: "photo-menu-grid", composition: "cards", business: "fast", style: "bold",
+    name: { en: "Photo Menu Grid", es: "Menú con fotos" },
+    blurb: { en: "Modern fast-casual cards: a big food photo, the name and a bright price tag for every item.", es: "Tarjetas modernas: una foto grande, el nombre y una etiqueta de precio llamativa por producto." },
+    look: { head: "bebas-neue", headWeight: 400, body: "inter", sectionInHead: true, sectionWeight: 400, sectionTracking: 0.06, namesUpper: true, tags: true, photoShape: "rect" },
+    variants: [
+      v("charcoal", "Charcoal & lime", "Carbón y lima", "#141414", "#ffffff", "#b5b5b5", "#c6f432", "#1f1f1f", "#c6f432"),
+      v("ketchup", "Ketchup & mustard", "Kétchup y mostaza", "#fff7ed", "#1c1410", "#6b5a4c", "#c81d25", "#c81d25", "#ffb703"),
+      v("ocean", "Ocean", "Océano", "#0b1d33", "#ffffff", "#a9b8cc", "#ffd166", "#12355b", "#ffd166"),
+    ],
+    stock: null,
+    sample: {
+      title: "Fresh Fork Kitchen", subtitle: "Made to order · Ready in 10 minutes", footer: "Add avocado +$2 · Ask about gluten-free options",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Bowls & salads", items: [i("Harvest bowl", "$12.95", "Quinoa, avocado, roasted sweet potato", "bowl"), i("Garden salad", "$10.50", "Greens, feta, citrus vinaigrette", "salad")] },
+        { name: "Handhelds", items: [i("Pressed panini", "$11.25", "Turkey, provolone, pesto", "sandwich"), i("Smash burger", "$12.50", "Double patty, cheddar, house sauce", "burger"), i("Chicken wrap", "$11.75", "Grilled chicken, slaw, chipotle", "burrito")] },
+        { name: "Plates", items: [i("Buffalo wings", "$13.00", "Eight wings, ranch, celery", "wings"), i("Half roast chicken", "$15.50", "Herbs, lemon, pan jus", "chicken"), i("Penne arrabbiata", "$13.25", "Spicy tomato, parmesan", "pasta")] },
+      ],
+    },
+  },
+  {
+    id: "cafe-favorites", composition: "cards", business: "cafe", style: "light",
+    name: { en: "Café Favorites", es: "Favoritos de la cafetería" },
+    blurb: { en: "Round coffee and pastry photos on warm paper, with elegant serif names and prices.", es: "Fotos redondas de café y repostería sobre papel cálido, con nombres y precios elegantes." },
+    look: { head: "noto-serif", headWeight: 700, body: "inter", sectionInHead: true, sectionWeight: 700, sectionTracking: 0.1, accentPrices: true, photoShape: "circle" },
+    variants: [
+      v("mocha", "Cream & mocha", "Crema y moca", "#f6efe6", "#2b1d14", "#6e5a4b", "#8b4a26", "#3b2a20"),
+      v("sage", "Sage", "Salvia", "#eef3ec", "#1f2a22", "#56645a", "#3f6f4f", "#2f5040"),
+      v("blush", "Blush", "Rubor", "#fbf1f0", "#2d1d1f", "#725e60", "#a3425a", "#6d2c3c"),
+    ],
+    stock: null,
+    sample: {
+      title: "Maple & Bean", subtitle: "Coffee · Pastries · Little treats", footer: "Oat and almond milk at no extra charge",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Coffee", items: [i("Caffè latte", "$5.25", "Double shot, steamed milk", "latte"), i("Cold brew", "$4.75", "Steeped 18 hours", "coldbrew"), i("Mango smoothie", "$6.50", "Mango, banana, yogurt", "smoothie")] },
+        { name: "Bakery", items: [i("Butter croissant", "$3.95", "Laminated in house", "croissant"), i("Cinnamon roll", "$4.50", "Brown sugar, cream cheese glaze", "cinnamon"), i("Blueberry muffin", "$3.75", "", "muffins")] },
+        { name: "Sweets", items: [i("French macarons", "$2.50", "Ask for today’s flavors", "macarons"), i("Berry parfait", "$5.75", "Yogurt, granola, strawberries", "parfait")] },
+      ],
+    },
+  },
+  {
+    id: "taqueria-specials", composition: "list", business: "fast", style: "bold",
+    name: { en: "Taquería Specials", es: "Especiales de taquería" },
+    blurb: { en: "Colourful three-column menu with a small food photo beside each dish and big price tags.", es: "Menú colorido de tres columnas con una foto pequeña junto a cada platillo y precios grandes." },
+    look: { head: "bebas-neue", headWeight: 400, body: "inter", sectionInHead: true, sectionWeight: 400, sectionTracking: 0.06, namesUpper: true, tags: true },
+    variants: [
+      v("papel", "Papel picado", "Papel picado", "#fff6e8", "#1d140e", "#625244", "#c2255c", "#0b7a75", "#ffb000"),
+      v("noche", "Noche", "Noche", "#141019", "#ffffff", "#b5adc2", "#ff6b9a", "#5b21b6", "#ffd23f"),
+      v("lima", "Lima", "Lima", "#f2f8ea", "#16220f", "#53604b", "#c2410c", "#2b7a1f", "#ffcf3f"),
+    ],
+    stock: null,
+    photoStyle: "thumbs",
+    sample: {
+      title: "La Esquina Taquería", subtitle: "Handmade tortillas · Grilled to order", footer: "All tacos on corn tortillas · Flour available on request",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Tacos", items: [i("Tacos al pastor", "$3.75", "Pineapple, onion, cilantro", "streettacos"), i("Carnitas", "$3.75", "Slow-cooked pork, salsa verde", "carnitas"), i("Veggie tacos", "$3.25", "Roasted squash, chickpeas, lime", "tacos")] },
+        { name: "Burritos & more", items: [i("Carne asada burrito", "$11.50", "Rice, beans, pico de gallo", "burrito"), i("Quesadilla", "$9.50", "Oaxaca cheese, peppers", "quesadilla"), i("Tostada", "$5.50", "Black beans, crema, queso fresco")] },
+        { name: "Sides", items: [i("Chips & guacamole", "$7"), i("Elote", "$5", "Mayo, cotija, chili"), i("Rice & beans", "$4")] },
+        { name: "Drinks", items: [i("Horchata", "$3.50"), i("Agua de jamaica", "$3.50")] },
+      ],
+    },
+  },
+  {
+    id: "featured-dishes", composition: "featured", business: "restaurant", style: "dark",
+    name: { en: "Featured Dishes", es: "Platillos destacados" },
+    blurb: { en: "Premium restaurant menu with your signature dishes in large photos beside the full list.", es: "Menú de restaurante elegante con sus platillos estrella en fotos grandes junto a la lista completa." },
+    look: { head: "noto-serif", headWeight: 700, body: "inter", sectionInHead: true, sectionWeight: 700, sectionTracking: 0.12, leader: true },
+    variants: [
+      v("onyx", "Onyx & gold", "Ónix y oro", "#121214", "#f3eee5", "#a39b8e", "#d4af6a", "#1c1b1f"),
+      v("bordeaux", "Bordeaux", "Burdeos", "#16100f", "#f5ece6", "#ab9a92", "#e2a86b", "#3a1418"),
+      v("linen", "Linen", "Lino", "#f5f0e8", "#1c1a17", "#67604f", "#8a5a2b", "#24302a"),
+    ],
+    stock: null,
+    sample: {
+      title: "Atelier 21", subtitle: "Seasonal kitchen · Dinner", footer: "Tasting menu available Thursday to Saturday",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "To start", items: [i("Charred octopus", "$19", "Romesco, fingerling potato"), i("Burrata", "$16", "Heirloom tomato, basil oil"), i("Garden salad", "$13", "Shaved vegetables, citrus")] },
+        { name: "Mains", items: [i("Seared salmon", "$32", "Fennel, citrus beurre blanc", "salmon"), i("Dry-aged ribeye", "$46", "Bone marrow butter, frites", "steak"), i("Rigatoni al ragù", "$26", "Slow-cooked beef, parmesan", "pasta"), i("Roast half chicken", "$29", "Salsa verde, charred lemon")] },
+        { name: "Dessert", items: [i("Chocolate torte", "$13", "Sea salt, crème fraîche"), i("Basque cheesecake", "$12", "Seasonal fruit")] },
+      ],
+    },
+  },
 ];
 
 export function designById(id: unknown): MenuDesign | null {
@@ -553,5 +651,9 @@ export function switchDesign(doc: LayoutDocument, design: MenuDesign): LayoutDoc
 
 /** True when this design can show a photo or video. */
 export function designHasMedia(design: MenuDesign) {
-  return design.composition !== "list";
+  return design.composition !== "list" && design.composition !== "cards" && design.composition !== "featured";
+}
+/** Templates whose layout is built around item photos. */
+export function isPhotoDesign(design: MenuDesign) {
+  return design.composition === "cards" || design.composition === "featured" || design.photoStyle === "thumbs";
 }

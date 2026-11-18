@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { parseLayout } from "@/lib/layout-studio";
 import { MENUS_UNAVAILABLE, isMissingSchema, rerenderMenu, type MenuRow } from "@/lib/server/menus";
 import { PROMO_COLUMNS, rerenderPromo, type PromoRow } from "@/lib/server/promos";
 
@@ -47,6 +48,9 @@ export async function POST(req: Request) {
   for (const row of list) {
     const content = row.content as { useBrand?: unknown } | null;
     if (content && content.useBrand === false) { skipped++; continue; }
+    // Layout Studio and template boards keep their own colours and are re-rendered by their editor only;
+    // the classic renderer would overwrite them (item photos included).
+    if (parseLayout(row.content).ok) { skipped++; continue; }
     const r = await rerenderMenu(admin.accountId, row, {});
     if ("ok" in r) updated++; else failed++;
   }

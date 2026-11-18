@@ -20,7 +20,9 @@ import { sampleLayout, seedBrand } from "@/lib/layout-studio";
 import { sampleMenu } from "@/lib/menu-templates";
 import { hasUnsavedEdits } from "@/lib/menu-board-unify";
 
-const APPLY_SHA = "677e466cbf7eb6e3983f0a108c510d35e6a94736a0e0e30db3418777eb16bfc3";
+// Updated intentionally (per-item photos PR): apply-to-all now skips Layout Studio/template boards, which the
+// classic renderer would overwrite. Classic menus and promos are re-rendered exactly as before.
+const APPLY_SHA = "ea543e7fa888252b05a69538dc44b27da74997c5c93d2e58139ec135aa7fe934";
 const PLAYER_SHA = "35a01145306d847b7fd4a5fa3424f432ce3e2bfe8e643de627eda94a33211334"; // E5 changed the player (on-TV unpair)
 
 const stored: BrandRecord = {

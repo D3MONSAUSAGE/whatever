@@ -18,11 +18,12 @@ import { fontFaceCss } from "@/lib/board-fonts";
 import { MENU_LIMITS, parseLayout, type LayoutDocument } from "@/lib/layout-studio";
 import { accountSaveBody, readAccountStudio, type AccountLibraryFile } from "@/lib/layout-account";
 import {
-  MENU_DESIGNS, designById, designDocument, designHasMedia, filterDesigns, scratchDocument, stockPhotoPath, switchDesign,
+  MENU_DESIGNS, designById, designDocument, designHasMedia, filterDesigns, isPhotoDesign, scratchDocument, stockPhotoPath, switchDesign,
   type DesignBusiness, type DesignStyle, type MenuDesign,
 } from "@/lib/menu-designs";
-import { designColors, designSvgWithReport } from "@/lib/menu-design-svg";
+import { designColors, designSvgWithReport, itemPhotosShown } from "@/lib/menu-design-svg";
 import type { Brand } from "@/lib/brand-kit";
+import { moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 
 const FONT_CSS = fontFaceCss();
 
@@ -44,11 +45,11 @@ export function useMenuTemplatesFlag(skip = false): boolean | null {
   return flag.data.enabled && !optOut;
 }
 
-type Art = { imageHref: string | null; logoHref: string | null };
+type Art = { imageHref: string | null; logoHref: string | null; itemImages?: Record<string, string> };
 
 /** The board exactly as the TV will show it. */
 export function DesignBoard({ doc, art, label, className = "" }: { doc: LayoutDocument; art: Art; label?: string; className?: string }) {
-  const svg = useMemo(() => designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref }).svg, [doc, art.imageHref, art.logoHref]);
+  const svg = useMemo(() => designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages }).svg, [doc, art.imageHref, art.logoHref, art.itemImages]);
   return (
     <div className={`tpl-board ${className}`} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}
       dangerouslySetInnerHTML={{ __html: svg }} />
@@ -70,10 +71,14 @@ const STYLES = `${FONT_CSS}
 .tpl-steps button[aria-current="step"] { background: #fff; color: var(--color-ink); box-shadow: 0 1px 3px rgb(11 18 32 / .12); }
 .tpl-sec { border: 1px solid var(--color-line); border-radius: 12px; overflow: hidden; background: #fff; }
 .tpl-sec-h { display: flex; gap: 6px; align-items: center; padding: 8px; background: #f6f8fc; border-bottom: 1px solid var(--color-line); }
-.tpl-item { display: grid; grid-template-columns: minmax(0, 1fr) 92px auto; gap: 6px; padding: 8px; border-bottom: 1px solid #edf1f7; }
+.tpl-item { display: grid; grid-template-columns: 64px minmax(0, 1fr) 92px auto; gap: 6px; padding: 8px; border-bottom: 1px solid #edf1f7; }
 .tpl-item:last-child { border-bottom: 0; }
-.tpl-item .desc { grid-column: 1 / 3; }
-.tpl-item .acts { grid-row: 1 / 3; grid-column: 3; display: flex; flex-direction: column; gap: 3px; }
+.tpl-item .tpl-photo { grid-row: 1 / 3; grid-column: 1; width: 64px; height: 64px; align-self: start; border-radius: 10px; border: 1px dashed #9aa8bf; background: #f6f8fc; overflow: hidden; padding: 0; font-size: 11px; font-weight: 700; color: #33415a; line-height: 1.2; }
+.tpl-item .tpl-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpl-item .tpl-photo:has(img) { border-style: solid; border-color: var(--color-line); }
+.tpl-item .desc { grid-column: 2 / 4; }
+.tpl-item .acts { grid-row: 1 / 3; grid-column: 4; display: flex; flex-direction: column; gap: 3px; }
+@media (max-width: 420px) { .tpl-item { grid-template-columns: 52px minmax(0, 1fr) 76px auto; } .tpl-item .tpl-photo { width: 52px; height: 52px; } }
 .tpl-ib { width: 32px; height: 30px; border: 1px solid var(--color-line); background: #fff; border-radius: 7px; display: grid; place-items: center; font-size: 13px; padding: 0; }
 .tpl-ib:disabled { opacity: .35; }
 .tpl-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
@@ -143,6 +148,7 @@ export function TemplateGallery({ onPick, onCancel, onAdvanced }: { onPick: (doc
                 <span className="tpl-tag">{t(`tpl.business.${design.business}` as MessageKey)}</span>
                 <span className="tpl-tag">{t(`tpl.style.${design.style}` as MessageKey)}</span>
                 <span className="tpl-tag">{t("tpl.colourStyles", { n: design.variants.length })}</span>
+                {isPhotoDesign(design) ? <span className="tpl-tag">{t("tpl.itemPhotosTag")}</span> : null}
               </span>
               <span className="btn btn-primary min-h-10 self-start" aria-hidden>{t("tpl.use")}</span>
             </button>
@@ -167,7 +173,7 @@ const blankItem = () => ({ name: "", price: "", description: "" });
 function itemCount(doc: LayoutDocument) { return doc.sections.reduce((a, s) => a + s.items.length, 0); }
 
 export function TemplateEditor({
-  menuId: initialMenuId, name: initialName, document: initialDoc, displays, brand, preview = false, onClose, onAdvanced, onSaved,
+  menuId: initialMenuId, name: initialName, document: initialDoc, displays, brand, preview = false, onClose, onAdvanced, onSaved, onSplit,
 }: {
   menuId: string | null;
   name: string;
@@ -178,6 +184,8 @@ export function TemplateEditor({
   onClose: () => void;
   onAdvanced: (menuId: string) => void;
   onSaved?: () => void;
+  /** Open a new board with the items that didn't fit (same template). */
+  onSplit?: (document: LayoutDocument, name: string) => void;
 }) {
   const { locale, t } = useLocale();
   const L = locale === "es" ? "es" : "en";
@@ -207,15 +215,31 @@ export function TemplateEditor({
   useEffect(() => { void reloadLibrary().catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const urlFor = (id: string | null | undefined) => (id ? library.find((f) => f.id === id)?.url ?? null : null);
-  const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(doc.logoMediaId) };
+  // Item photos in the preview use the same signed library URLs the photo picker shows.
+  const itemImages = useMemo(() => Object.fromEntries(library.filter((f) => f.kind === "image" && f.url).map((f) => [f.id, f.url as string])), [library]);
+  const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(doc.logoMediaId), itemImages };
   const report = useMemo(() => designSvgWithReport(doc, art).report, [doc, art.imageHref, art.logoHref]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [photoFor, setPhotoFor] = useState<{ si: number; ii: number } | null>(null);
+  function setItemPhoto(si: number, ii: number, imageMediaId: string | null) { update({ ...doc, sections: withItemPhoto(doc.sections, si, ii, imageMediaId) }); }
+  function moveItemAt(si: number, ii: number, dir: -1 | 1) { update({ ...doc, sections: moveItem(doc.sections, si, ii, dir) }); }
+  /** Move the items that don't fit (the last ones in reading order) to a new board with the same template. */
+  function splitOverflow() {
+    const split = splitLastItems(doc.sections, report.dropped);
+    const kept = { ...doc, sections: split.kept };
+    update(kept);
+    // Keep this board safe first (as a draft), then open the new board with the moved items.
+    void (async () => {
+      const saved = preview ? "preview" : await save("draft", kept);
+      if (saved) onSplit?.({ ...doc, sections: split.moved }, `${name} (2)`);
+    })();
+  }
   const colors = useMemo(() => designColors(doc, design), [doc, design]);
 
   function update(next: LayoutDocument) { setDoc(next); setDirty(true); }
   function patch(p: Partial<LayoutDocument>) { update({ ...doc, ...p }); }
   function setSections(fn: (s: LayoutDocument["sections"]) => LayoutDocument["sections"]) { update({ ...doc, sections: fn(doc.sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }))) }); }
 
-  async function upload(file: File | undefined, role: "photo" | "logo") {
+  async function upload(file: File | undefined, role: "photo" | "logo" | "item", target?: { si: number; ii: number }) {
     if (!file || preview) return;
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { toast.show(t("tpl.photoType"), true); return; }
     setBusy("upload");
@@ -223,7 +247,8 @@ export function TemplateEditor({
       const form = new FormData(); form.set("file", file); form.set("name", file.name);
       const body = await authToken().then((token) => uploadForm("/api/media", form, token, () => {})) as { id?: string };
       await reloadLibrary();
-      if (body.id) patch(role === "photo" ? { imageMediaId: body.id } : { logoMediaId: body.id });
+      if (body.id && role === "item" && target) setItemPhoto(target.si, target.ii, body.id);
+      else if (body.id) patch(role === "photo" ? { imageMediaId: body.id } : { logoMediaId: body.id });
       toast.show(t("tpl.uploaded"));
     } catch (err) {
       toast.show((err as Error).message || t("tpl.uploadFailed"), true);
@@ -232,9 +257,9 @@ export function TemplateEditor({
     }
   }
 
-  async function save(mode: "draft" | "publish") {
+  async function save(mode: "draft" | "publish", override?: LayoutDocument) {
     if (preview) { toast.show(t("tpl.previewOnly")); return null; }
-    const parsed = parseLayout(doc);
+    const parsed = parseLayout(override ?? doc);
     if (!parsed.ok) { toast.show(parsed.error, true); return null; }
     setBusy(mode);
     try {
@@ -281,6 +306,11 @@ export function TemplateEditor({
   }
 
   const n = itemCount(doc);
+  const photoTemplate = isPhotoDesign(design) || itemPhotosShown(doc, design);
+  // A roomier template that still shows item photos when this one does: three-column thumbnails hold all 24 items.
+  const roomierId = photoTemplate ? "taqueria-specials" : "diner-classics";
+  const roomier = report.dropped > 0 && design.id !== roomierId ? designById(roomierId) : null;
+  const canHidePhotos = report.dropped > 0 && design.composition !== "cards" && design.composition !== "featured" && itemPhotosShown(doc, design);
   const images = library.filter((f) => f.kind === "image");
   const videos = library.filter((f) => f.kind === "video");
   const stepNames = [t("tpl.step.business"), t("tpl.step.menu"), t("tpl.step.photos"), t("tpl.step.look")];
@@ -307,7 +337,16 @@ export function TemplateEditor({
         <div className="tpl-preview">
           <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{t("tpl.previewCap")}</span><span>1920 × 1080</span></p>
           <DesignBoard doc={doc} art={art} className="tpl-tv" label={t("tpl.previewAria", { name })} />
-          {report.dropped > 0 ? <p className="note-warn text-sm mt-3" role="status" data-testid="tpl-dropped">{t("tpl.dropped", { n: report.dropped })}</p>
+          {report.dropped > 0 ? (
+            <div className="note-warn text-sm mt-3 grid gap-2" role="status" data-testid="tpl-dropped">
+              <p>{t(photoTemplate ? "tpl.droppedPhotos" : "tpl.dropped", { n: report.dropped })}</p>
+              <div className="flex flex-wrap gap-2">
+                {roomier ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
+                {canHidePhotos ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => patch({ photoStyle: "text" })} data-testid="tpl-hide-photos">{t("tpl.itemPhotosHidden")}</button> : null}
+                {onSplit ? <button type="button" className="btn btn-quiet min-h-9" onClick={splitOverflow} data-testid="tpl-split">{t("tpl.splitBoard", { n: report.dropped })}</button> : null}
+              </div>
+            </div>
+          )
             : report.scale < 0.72 ? <p className="text-sm mt-3 text-[#7a4a00]" role="status">{t("tpl.tight")}</p>
               : <p className="text-sm mt-3 text-live-ink" role="status">✓ {t("tpl.fits")}</p>}
         </div>
@@ -350,13 +389,19 @@ export function TemplateEditor({
                   </div>
                   {section.items.map((item, ii) => (
                     <div className="tpl-item" key={ii}>
+                      <button type="button" className="tpl-photo" onClick={() => setPhotoFor({ si, ii })} data-testid={`tpl-photo-${si}-${ii}`}
+                        aria-label={item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}>
+                        {item.imageMediaId && urlFor(item.imageMediaId) ? <img src={urlFor(item.imageMediaId)!} alt="" />
+                          : item.stockPhoto ? <img src={stockPhotoPath(item.stockPhoto)} alt="" />
+                            : <span aria-hidden>＋<br />{t("tpl.photo")}</span>}
+                      </button>
                       <input className="field" aria-label={t("tpl.itemName", { n: ii + 1 })} placeholder={t("tpl.item")} maxLength={MENU_LIMITS.itemName} value={item.name}
                         onChange={(e) => setSections((s) => { s[si].items[ii].name = e.target.value; return s; })} data-testid={`tpl-item-${si}-${ii}`} />
                       <input className="field text-right" aria-label={t("tpl.itemPrice", { n: ii + 1 })} placeholder={t("tpl.price")} maxLength={MENU_LIMITS.price} value={item.price}
                         onChange={(e) => setSections((s) => { s[si].items[ii].price = e.target.value; return s; })} />
                       <div className="acts">
-                        <button type="button" className="tpl-ib" aria-label={t("tpl.moveItemUp", { n: ii + 1 })} disabled={ii === 0} onClick={() => setSections((s) => { const it = s[si].items; [it[ii - 1], it[ii]] = [it[ii], it[ii - 1]]; return s; })}>↑</button>
-                        <button type="button" className="tpl-ib" aria-label={t("tpl.moveItemDown", { n: ii + 1 })} disabled={ii === section.items.length - 1} onClick={() => setSections((s) => { const it = s[si].items; [it[ii + 1], it[ii]] = [it[ii], it[ii + 1]]; return s; })}>↓</button>
+                        <button type="button" className="tpl-ib" aria-label={t("tpl.moveItemUp", { n: ii + 1 })} disabled={ii === 0 && si === 0} onClick={() => moveItemAt(si, ii, -1)}>↑</button>
+                        <button type="button" className="tpl-ib" aria-label={t("tpl.moveItemDown", { n: ii + 1 })} disabled={ii === section.items.length - 1 && si === doc.sections.length - 1} onClick={() => moveItemAt(si, ii, 1)}>↓</button>
                         <button type="button" className="tpl-ib text-danger" aria-label={t("tpl.removeItem", { n: ii + 1 })} onClick={() => setSections((s) => { s[si].items.splice(ii, 1); return s; })}>✕</button>
                       </div>
                       <input className="field desc" aria-label={t("tpl.itemDesc", { n: ii + 1 })} placeholder={t("tpl.desc")} maxLength={MENU_LIMITS.description} value={item.description}
@@ -430,6 +475,16 @@ export function TemplateEditor({
                   ))}
                 </div>
               </div>
+              <div className="grid gap-2" data-testid="tpl-photo-style">
+                <p className="form-label">{t("tpl.itemPhotosTitle")}</p>
+                {design.composition === "cards" || design.composition === "featured" ? <p className="text-sm text-muted">{t("tpl.itemPhotosAlways")}</p> : (
+                  <div className="seg" role="group" aria-label={t("tpl.itemPhotosTitle")}>
+                    <button type="button" aria-pressed={itemPhotosShown(doc, design)} onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.itemPhotosThumbs")}</button>
+                    <button type="button" aria-pressed={!itemPhotosShown(doc, design)} onClick={() => patch({ photoStyle: "text" })}>{t("tpl.itemPhotosHidden")}</button>
+                  </div>
+                )}
+                <p className="text-xs text-muted">{t("tpl.itemPhotosNote")}</p>
+              </div>
               <div className="grid gap-2">
                 <p className="form-label">{t("tpl.kitTitle")}</p>
                 {brand && brand.custom ? (
@@ -472,6 +527,7 @@ export function TemplateEditor({
         <Dialog label={t("tpl.publishTitle")} onClose={() => setPublishOpen(false)} className="bg-paper w-full max-w-lg rounded-2xl p-5" variant="center">
           <div className="grid gap-3" data-testid="tpl-publish-dialog">
             <h3 className="font-display font-bold text-lg">{t("tpl.publishTitle")}</h3>
+            {report.dropped > 0 ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-blocked">{t("tpl.publishBlocked", { n: report.dropped })}</p> : null}
             <p className="text-sm text-muted">{t("tpl.publishBody")}</p>
             {displays === null ? <p className="text-sm text-muted">{t("common.loading")}</p> : displays.length === 0 ? <p className="text-sm text-muted">{t("tpl.noScreens")}</p> : (
               <ul className="grid gap-2">
@@ -489,13 +545,43 @@ export function TemplateEditor({
             <p className="text-xs text-muted">{t("tpl.publishNote")}</p>
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className="btn btn-quiet" onClick={() => setPublishOpen(false)}>{t("tpl.cancel")}</button>
-              <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
+              <button type="button" className="btn btn-primary" disabled={busy !== null || report.dropped > 0} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
                 {busy === "publish" ? t("tpl.publishing") : t("tpl.publishN", { n: Object.values(picked).filter(Boolean).length })}
               </button>
             </div>
           </div>
         </Dialog>
       ) : null}
+
+      {photoFor && doc.sections[photoFor.si]?.items[photoFor.ii] ? (() => {
+        const item = doc.sections[photoFor.si].items[photoFor.ii];
+        const label = item.name || t("tpl.item");
+        const images = library.filter((f) => f.kind === "image");
+        return (
+          <Dialog label={t("tpl.photoFor", { name: label })} onClose={() => setPhotoFor(null)} className="bg-paper w-full max-w-xl rounded-2xl p-5 max-h-[85dvh] overflow-y-auto" variant="center">
+            <div className="grid gap-3" data-testid="tpl-item-photo-dialog">
+              <h3 className="font-display font-bold text-lg break-words">{t("tpl.photoFor", { name: label })}</h3>
+              <p className="text-sm text-muted">{t("tpl.photoForBody")}</p>
+              <div className="flex flex-wrap gap-2">
+                <label className="btn btn-primary cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" data-testid="tpl-item-upload"
+                    onChange={(e) => { const target = photoFor; void upload(e.target.files?.[0], "item", target).then(() => setPhotoFor(null)); }} />
+                </label>
+                {item.imageMediaId || item.stockPhoto ? <button type="button" className="btn btn-quiet text-danger" data-testid="tpl-item-remove" onClick={() => { setItemPhoto(photoFor.si, photoFor.ii, null); setPhotoFor(null); }}>{t("tpl.removePhoto")}</button> : null}
+              </div>
+              <p className="form-label">{t("tpl.fromMedia")}</p>
+              {images.length ? (
+                <div className="tpl-lib">{images.map((f) => (
+                  <button key={f.id} type="button" aria-pressed={item.imageMediaId === f.id} aria-label={f.name}
+                    onClick={() => { setItemPhoto(photoFor.si, photoFor.ii, f.id); setPhotoFor(null); }}>{f.url ? <img src={f.url} alt="" /> : null}</button>
+                ))}</div>
+              ) : <p className="text-sm text-muted">{t("tpl.noMedia")}</p>}
+              {!itemPhotosShown(doc, design) ? <p className="text-xs text-muted">{t("tpl.photoHiddenHint")}</p> : null}
+              <div className="flex justify-end"><button type="button" className="btn btn-quiet" onClick={() => setPhotoFor(null)}>{t("tpl.done")}</button></div>
+            </div>
+          </Dialog>
+        );
+      })() : null}
     </section>
   );
 }
