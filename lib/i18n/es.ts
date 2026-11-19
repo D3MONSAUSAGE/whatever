@@ -1492,6 +1492,7 @@ export const es: Record<MessageKey, string> = {
   "tpl.noMatch": "Ninguna plantilla coincide. Pruebe otro filtro.",
   "tpl.scratch": "Empezar desde cero",
   "tpl.scratchBody": "Un menú limpio y vacío. Agregue sus propias secciones y productos.",
+  "tpl.scratchCta": "Empezar con un menú en blanco",
   "tpl.untitled": "Menú sin nombre",
   "tpl.back": "Menús digitales",
   "tpl.boardName": "Nombre del menú",

@@ -1,11 +1,16 @@
 "use client";
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { StudioGuardedLink } from "@/components/studio-leave";
 import { IconMore } from "@/components/icons";
 
 export type MenuItem =
   | { kind?: "link"; href: string; label: string; icon?: ReactNode; danger?: boolean }
   | { kind: "action"; onSelect: () => void; label: string; icon?: ReactNode; danger?: boolean };
+
+/** True when a menu opened below its button would run past the viewport bottom but fits above the button. */
+export function menuOpensUp(menu: { bottom: number; height: number }, button: { top: number }, viewportHeight: number, margin = 8): boolean {
+  return menu.bottom > viewportHeight - margin && button.top - menu.height - margin >= margin;
+}
 
 /**
  * "⋯" overflow menu (design system, phase 2). A button with aria-haspopup="menu" opens a list of menuitems:
@@ -19,10 +24,19 @@ export function OverflowMenu({ label, items, className = "", testId }: { label: 
   const wrap = useRef<HTMLDivElement>(null);
   const id = useId();
   const close = useCallback((refocus = true) => { setOpen(false); if (refocus) button.current?.focus(); }, []);
+  // Opens below the button; flips above it when there isn't room below in the viewport but there is above.
+  const [up, setUp] = useState(false);
+  useLayoutEffect(() => {
+    if (!open) { setUp(false); return; }
+    const m = menu.current?.getBoundingClientRect();
+    const b = button.current?.getBoundingClientRect();
+    if (!m || !b) return;
+    setUp(menuOpensUp(m, b, window.innerHeight));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+    menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus({ preventScroll: true });
     const onDoc = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) close(false); };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -45,7 +59,7 @@ export function OverflowMenu({ label, items, className = "", testId }: { label: 
         <IconMore />
       </button>
       {open ? (
-        <div id={id} ref={menu} role="menu" aria-label={label} className="ps-menu" onKeyDown={onKeyDown}>
+        <div id={id} ref={menu} role="menu" aria-label={label} className={`ps-menu${up ? " is-up" : ""}`} onKeyDown={onKeyDown}>
           {items.map((item) =>
             item.kind === "action" ? (
               <button key={item.label} type="button" role="menuitem" tabIndex={-1} className={`ps-menu-item${item.danger ? " is-danger" : ""}`} onClick={() => { setOpen(false); item.onSelect(); }}>

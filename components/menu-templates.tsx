@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, authToken, uploadForm, useApi, type DisplayItem } from "@/lib/api";
-import { useLocale } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/en";
 import { Dialog } from "@/components/dialog";
 import { useToast } from "@/components/toast";
@@ -96,6 +96,14 @@ const STYLES = `${FONT_CSS}
 .tpl-card { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 10px; border: 1px solid var(--color-line); border-radius: 14px; background: #fff; transition: border-color .15s, box-shadow .15s, transform .15s; }
 .tpl-card:hover { border-color: var(--color-primary); box-shadow: 0 10px 26px rgb(11 18 32 / .1); transform: translateY(-2px); }
 .tpl-card .tpl-board { border-radius: 9px; }
+.tpl-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+/* Card text: the description reserves two lines so tags start at the same height in a row; the button sits at the
+   bottom of every card (margin-top: auto), so buttons line up across a row however long the text is. */
+.tpl-card-desc { min-height: 2.5rem; }
+.tpl-card-cta { margin-top: auto; align-self: flex-start; }
+.tpl-card.is-scratch { border-style: dashed; background: #fbfcfe; }
+.tpl-card.is-scratch .tpl-blank { aspect-ratio: 16 / 9; border-radius: 9px; border: 2px dashed var(--color-line); display: grid; place-items: center; font-size: 28px; font-weight: 700; color: var(--color-muted); background: #fff; }
+.tpl-card.is-scratch:hover .tpl-blank { border-color: var(--color-primary); color: var(--color-primary); }
 .tpl-tag { font-size: 11px; font-weight: 600; color: #33415a; background: #eef2f8; border-radius: 6px; padding: 2px 7px; }
 .tpl-tv { border-radius: 10px; box-shadow: 0 0 0 6px #0b0f17, 0 0 0 7px #2a3242, 0 16px 40px rgb(8 15 30 / .3); }
 .tpl-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #e9eef6; }
@@ -186,24 +194,19 @@ export function TemplateGallery({ onPick, onCancel, onAdvanced }: { onPick: (doc
               onClick={() => onPick(designDocument(design), design.name[locale === "es" ? "es" : "en"])}>
               <DesignBoard doc={designDocument(design)} art={noArt} />
               <span className="font-display font-bold text-[15px]">{design.name[locale === "es" ? "es" : "en"]}</span>
-              <span className="text-sm text-muted">{design.blurb[locale === "es" ? "es" : "en"]}</span>
-              <span className="flex flex-wrap gap-1.5 mt-auto">
+              <span className="text-sm text-muted tpl-card-desc">{design.blurb[locale === "es" ? "es" : "en"]}</span>
+              <span className="flex flex-wrap gap-1.5">
                 <span className="tpl-tag">{t(`tpl.business.${design.business}` as MessageKey)}</span>
                 <span className="tpl-tag">{t(`tpl.style.${design.style}` as MessageKey)}</span>
                 <span className="tpl-tag">{t("tpl.colourStyles", { n: design.variants.length })}</span>
                 {isPhotoDesign(design) ? <span className="tpl-tag">{t("tpl.itemPhotosTag")}</span> : null}
               </span>
-              <span className="btn btn-primary min-h-10 self-start" aria-hidden>{t("tpl.use")}</span>
+              <span className="btn btn-primary min-h-10 tpl-card-cta" aria-hidden>{t("tpl.use")}</span>
             </button>
           </li>
         ))}
         {shown.length === 0 ? <li className="text-sm text-muted">{t("tpl.noMatch")}</li> : null}
-        <li className="min-w-0 sm:col-span-2 xl:col-span-3">
-          <button type="button" className="tpl-card w-full sm:flex-row sm:items-center" data-testid="template-scratch" onClick={() => onPick(scratchDocument(), "")}>
-            <span className="grid place-items-center rounded-lg border-2 border-dashed border-line text-muted font-bold sm:w-44 aspect-video" aria-hidden>＋</span>
-            <span className="grid gap-1"><span className="font-display font-bold">{t("tpl.scratch")}</span><span className="text-sm text-muted">{t("tpl.scratchBody")}</span></span>
-          </button>
-        </li>
+        <ScratchCard onPick={() => onPick(scratchDocument(), "")} />
       </ul>
     </section>
   );
@@ -999,6 +1002,21 @@ const STRUCTURES: (Structure | "all")[] = ["all", "single", "columns", "media", 
  * The unified design gallery (UNIFIED_MENU_EDITOR): premium templates, the original layouts and the classic
  * full-screen menu in one place. Every choice opens the same menu designer.
  */
+/** "Start from scratch": one card in the gallery grid, same size and structure as a template card, dashed to mark it as blank. */
+function ScratchCard({ onPick }: { onPick: () => void }) {
+  const t = useT();
+  return (
+    <li className="min-w-0 flex">
+      <button type="button" className="tpl-card is-scratch w-full" data-testid="template-scratch" onClick={onPick}>
+        <span className="tpl-blank" aria-hidden>＋</span>
+        <span className="font-display font-bold text-[15px]">{t("tpl.scratch")}</span>
+        <span className="text-sm text-muted tpl-card-desc">{t("tpl.scratchBody")}</span>
+        <span className="btn btn-quiet min-h-10 tpl-card-cta" aria-hidden>{t("tpl.scratchCta")}</span>
+      </button>
+    </li>
+  );
+}
+
 export function DesignGallery({ onPick, onCancel, brand }: {
   onPick: (pick: { document: LayoutDocument; name: string; classic: ClassicSettings | null }) => void;
   onCancel: () => void;
@@ -1064,25 +1082,20 @@ export function DesignGallery({ onPick, onCancel, brand }: {
                 : entry.kind === "layout" ? <BoardView engine="layout" doc={sampleLayout(entry.template)} classic={null} art={noArt} brand={null} />
                   : <BoardView engine="classic" doc={classicSample.doc} classic={classicSample.classic} art={noArt} brand={null} />}
               <span className="font-display font-bold text-[15px]">{nameOf(entry)}</span>
-              <span className="text-sm text-muted">{blurbOf(entry)}</span>
-              <span className="flex flex-wrap gap-1.5 mt-auto">
+              <span className="text-sm text-muted tpl-card-desc">{blurbOf(entry)}</span>
+              <span className="flex flex-wrap gap-1.5">
                 <span className="tpl-tag">{entry.business === "any" ? t("tpl.business.any") : t(`tpl.business.${entry.business}` as MessageKey)}</span>
                 <span className="tpl-tag">{t(`tpl.structure.${entry.structure}` as MessageKey)}</span>
                 {entry.kind === "design" ? <span className="tpl-tag">{t("tpl.colourStyles", { n: entry.design.variants.length })}</span> : <span className="tpl-tag">{t("tpl.colourStyles", { n: 3 })}</span>}
                 {entry.photos ? <span className="tpl-tag">{t("tpl.itemPhotosTag")}</span> : <span className="tpl-tag">{t("tpl.itemThumbsTag")}</span>}
                 {entry.original ? <span className="tpl-tag">{t("tpl.originalTag")}</span> : null}
               </span>
-              <span className="btn btn-primary min-h-10 self-start" aria-hidden>{t("tpl.use")}</span>
+              <span className="btn btn-primary min-h-10 tpl-card-cta" aria-hidden>{t("tpl.use")}</span>
             </button>
           </li>
         ))}
         {shown.length === 0 ? <li className="text-sm text-muted">{t("tpl.noMatch")}</li> : null}
-        <li className="min-w-0 sm:col-span-2 xl:col-span-3">
-          <button type="button" className="tpl-card w-full sm:flex-row sm:items-center" data-testid="template-scratch" onClick={() => onPick({ document: scratchDocument(), name: "", classic: null })}>
-            <span className="grid place-items-center rounded-lg border-2 border-dashed border-line text-muted font-bold sm:w-44 aspect-video" aria-hidden>＋</span>
-            <span className="grid gap-1"><span className="font-display font-bold">{t("tpl.scratch")}</span><span className="text-sm text-muted">{t("tpl.scratchBody")}</span></span>
-          </button>
-        </li>
+        <ScratchCard onPick={() => onPick({ document: scratchDocument(), name: "", classic: null })} />
       </ul>
     </section>
   );

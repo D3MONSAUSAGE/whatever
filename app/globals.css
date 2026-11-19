@@ -230,6 +230,7 @@ body:has(.studio-app) .ps-topbar { position: static; }
 .ps-link:disabled { color: var(--color-muted); opacity: 0.6; text-decoration: none; }
 
 .ps-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 50; min-width: 15rem; max-width: calc(100vw - 2rem); padding: 6px; background: #fff; border: 1px solid var(--color-line); border-radius: 14px; box-shadow: 0 24px 60px rgb(4 9 22 / 0.22); }
+.ps-menu.is-up { top: auto; bottom: calc(100% + 8px); }
 .ps-menu-head { padding: 8px 10px 6px; font-size: 13px; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-menu-label { display: flex; align-items: center; gap: 10px; padding: 8px 10px 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); }
 .ps-menu-label svg { width: 16px; height: 16px; }

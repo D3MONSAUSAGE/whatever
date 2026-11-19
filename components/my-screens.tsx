@@ -33,7 +33,9 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   const showFilters = list.length >= SCREEN_FILTER_MIN;
   const shown = showFilters ? filterScreens(list, query, status) : list;
   return (
-    <section className="min-w-0 overflow-x-hidden">
+    // overflow-x-clip, not overflow-x-hidden: "hidden" on one axis turns the other into "auto", which made this
+    // section its own vertical scroll box that clipped the ⋯ menus and showed an inner scrollbar.
+    <section className="min-w-0 overflow-x-clip">
       <PageHeader compact title={t("screens.title")} lede={t("screens.lede")}
         action={<Link href="/dashboard/screens/add#add-screen" className="btn btn-primary min-h-11">{t("screens.add")}</Link>}
       />
@@ -162,7 +164,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   const preview = display.boardPreviewUrl || display.media?.url || display.playlist?.url;
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
   return (
-    <section className="min-w-0 overflow-x-hidden">
+    <section className="min-w-0 overflow-x-clip">
       <PageHeader compact title={display.name} lede={display.location ? `${display.location.name} · ${display.location.timezone}` : t("screens.noLocationYet")}
         action={<Link href="/dashboard/screens" className="btn btn-primary min-h-11">{t("screens.all")}</Link>}
       />
@@ -170,7 +172,9 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
         <Link href="/dashboard/screens/add#add-screen" className="btn btn-quiet min-h-11">{t("screens.add")}</Link>
         {fixture ? null : <button type="button" className="btn btn-quiet text-danger min-h-11" onClick={() => { void removeScreen(); }}>{t("screens.remove")}</button>}
       </div>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      {/* The management column gets the wider share (it holds the content picker and schedule panels); the preview
+          sizes to its content and stays in view while those panels scroll, instead of a tall, mostly empty card. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start" data-testid="screen-workspace-grid">
         <article className="card p-4 min-w-0">
           <h2 className="font-semibold">{t("screens.whatsPlaying")}</h2>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -193,7 +197,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
         </article>
         {confirm.node}
         {toast.node}
-        <article className="card p-4 min-w-0">
+        <article className="card p-4 min-w-0 lg:sticky lg:top-20" data-testid="screen-preview-card">
           <h2 className="font-semibold">{t("screens.preview")}</h2>
           <p className="text-sm text-muted mt-1">{t("screens.previewNote")}</p>
           <div className="mt-3 aspect-video bg-ink rounded-xl overflow-hidden grid place-items-center">
@@ -245,7 +249,7 @@ export function ScreenGroups({ fixture, startCreating = false }: {
   }
 
   return (
-    <section className="min-w-0 overflow-x-hidden">
+    <section className="min-w-0 overflow-x-clip">
       <PageHeader compact title={t("groups.title")} lede={t("groups.lede")}
         action={<button type="button" className="btn btn-primary min-h-11" onClick={() => { setCreating(true); setError(null); }}>{t("groups.new")}</button>}
       />
@@ -325,7 +329,7 @@ export function GroupWorkspace({ id }: { id: string }) {
   const online = members.filter(onlineNow).length;
   const offline = members.filter((display) => display.connected && !display.online).length;
   return (
-    <section className="min-w-0 overflow-x-hidden">
+    <section className="min-w-0 overflow-x-clip">
       <PageHeader compact title={group.name} lede={t("groups.lede2", { online, offline, n: members.length })}
         action={<Link href="/dashboard/screens/groups" className="btn btn-primary min-h-11">{t("groups.all")}</Link>}
       />
