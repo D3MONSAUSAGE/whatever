@@ -62,3 +62,30 @@ describe("Menu Boards gallery: consistent cards", () => {
     expect(es["tpl.scratchCta"]).toBe("Empezar con un menú en blanco");
   });
 });
+
+describe("Menu Boards gallery: filter rows", () => {
+  for (const locale of ["en", "es"] as const) {
+    it(`labels share one column and every row uses Pekko's segmented control (${locale})`, () => {
+      const html = renderToStaticMarkup(createElement(LocaleProvider, { initial: locale, children: createElement(DesignGallery, { onPick: () => {}, onCancel: () => {}, brand: null }) }));
+      const start = html.indexOf('data-testid="gallery-filters"');
+      const filters = html.slice(start, html.indexOf("<ul", start));
+      const d = locale === "es" ? es : en;
+      // Label, then its controls, three times, all direct children of one grid.
+      for (const [id, key] of [["tpl-f-business", "tpl.filterBusiness"], ["tpl-f-style", "tpl.filterStyle"], ["tpl-f-structure", "tpl.filterStructure"]] as const) {
+        expect(filters).toContain(`<span class="tpl-filter-label" id="${id}">${d[key]}</span><div class="tpl-filter-controls"><div class="seg" role="group" aria-labelledby="${id}">`);
+      }
+      expect(html).not.toContain("tpl-chip");
+      expect(html).not.toContain("📷");
+      expect(html).toMatch(/data-testid="filter-photos"><svg/);
+      expect(filters.match(/aria-pressed="true"/g)?.length).toBe(3); // "All" in each row; photos off
+    });
+  }
+
+  it("rows align by a shared label column and wrap cleanly on phones", () => {
+    const src = readFileSync("components/menu-templates.tsx", "utf8");
+    expect(src).toContain(".tpl-filters { display: grid; grid-template-columns: max-content minmax(0, 1fr);");
+    expect(src).toContain(".tpl-filter-label { display: flex; align-items: center; min-height: 40px;");
+    expect(src).toContain("@media (max-width: 639px) { .tpl-filters { grid-template-columns: minmax(0, 1fr);");
+    expect(readFileSync("app/globals.css", "utf8")).toContain(".seg { display: inline-flex; flex-wrap: wrap;");
+  });
+});
