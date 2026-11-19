@@ -1,0 +1,271 @@
+<title>Pekko Option B</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: the TV is the hero. Try a template in the first screen, then a four-frame storyboard from empty screen to live menu. */
+:root {
+  --night: #070d1c;      /* page ground, Pekko navy-black */
+  --panel: #0f1a33;
+  --panel-2: #142244;
+  --line: #22335a;
+  --text: #eef3ff;
+  --muted: #a9b8d6;
+  --blue: #2f6bff;       /* Pekko primary, lifted for dark ground */
+  --cyan: #3dd6ff;       /* Pekko secondary, gradients and focus */
+  --ok: #3ddc97;
+  --display: "Montserrat", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+body { margin: 0; background: var(--night); color: var(--text); font: 400 16px/1.55 var(--body); }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.proto { background: var(--cyan); color: #04121f; font: 700 12px/1.4 var(--body); text-align: center; padding: 6px 16px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+h1 { font-weight: 900; font-size: clamp(2.1rem, 7.4vw, 4rem); line-height: 1.02; }
+h2 { font-weight: 800; font-size: clamp(1.6rem, 4.6vw, 2.5rem); line-height: 1.08; }
+h3 { font-weight: 800; font-size: 1.1rem; line-height: 1.25; }
+p { margin: 0; }
+.grad { background: linear-gradient(90deg, #8fb4ff, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.eyebrow { font: 700 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); }
+.lede { color: var(--muted); font-size: 1.06rem; max-width: 38rem; }
+
+header.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgb(7 13 28 / .86); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--night); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; font: 800 19px/1 var(--display); text-decoration: none; }
+.brand b { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--cyan), var(--blue)); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.nav-links { display: none; gap: 22px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.nav-links a { text-decoration: none; }
+@media (min-width: 860px) { .nav-links { display: flex; } }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 999px; font: 700 16px/1 var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+.btn:focus-visible, button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.btn-primary { background: var(--blue); color: #fff; box-shadow: 0 8px 26px rgb(47 107 255 / .42); }
+.btn-primary:hover { background: #2259e6; }
+.btn-ghost { border-color: var(--line); background: var(--panel); color: var(--text); }
+.btn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; }
+
+/* hero */
+.hero { padding-block: 26px 36px; background: radial-gradient(900px 420px at 70% 0%, rgb(47 107 255 / .22), transparent 70%); }
+.hero-grid { display: grid; gap: 22px; }
+.hero-grid > * { min-width: 0; }
+@media (min-width: 980px) { .hero-grid { grid-template-columns: .9fr 1.1fr; align-items: center; gap: 44px; } .hero { padding-block: 56px 64px; } }
+.hero .lede { margin-top: 14px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding: 0; list-style: none; }
+.pills li { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; }
+.pills li b { color: var(--text); }
+/* Mobile: the TV comes first so the result is visible in the first screen. */
+.hero-visual { order: -1; }
+@media (min-width: 980px) { .hero-visual { order: 0; } }
+.tv { position: relative; border-radius: 16px; background: #000; padding: 2.4%; box-shadow: 0 0 0 1px #2a3a60, 0 24px 60px rgb(0 0 0 / .5); aspect-ratio: 16 / 9; max-width: 100%; }
+.tv img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; transition: opacity .25s; }
+.tv .badge { position: absolute; right: 3%; top: -12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: 700 12px/1 var(--body); display: flex; gap: 6px; align-items: center; }
+.tv .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.switch { margin-top: 14px; }
+.switch p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.chips button { flex: none; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 8px 14px; font: 600 14px/1 var(--body); min-height: 40px; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: #fff; color: #07101f; border-color: #fff; }
+
+section { padding-block: 56px; }
+/* storyboard */
+.story { display: grid; gap: 14px; margin-top: 26px; }
+@media (min-width: 720px) { .story { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1080px) { .story { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.frame { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+.frame .pic { aspect-ratio: 4 / 3; background: #0b1226; overflow: hidden; display: grid; place-items: center; }
+.frame .pic img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.frame .body { padding: 16px; display: grid; gap: 6px; align-content: start; }
+.frame .t { font: 700 12px/1 var(--body); color: var(--cyan); letter-spacing: .08em; text-transform: uppercase; }
+.frame p { color: var(--muted); font-size: 14.5px; }
+.code { display: flex; gap: 5px; }
+.code span { width: 30px; height: 40px; border-radius: 6px; background: #1b2747; color: #fff; font: 800 21px/40px var(--display); text-align: center; }
+.blank { color: #5a6a8c; font: 600 13px/1.4 var(--body); text-align: center; padding: 10px; }
+
+/* outcomes */
+.outcomes { display: grid; gap: 12px; margin-top: 24px; }
+@media (min-width: 760px) { .outcomes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.out { border-top: 2px solid var(--blue); padding-top: 14px; display: grid; gap: 6px; }
+.out p { color: var(--muted); font-size: 15px; }
+
+/* gallery */
+.gal { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+@media (min-width: 900px) { .gal { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.gal figure { margin: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+.gal figcaption { font-size: 12.5px; color: var(--muted); padding: 8px 10px; }
+.note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+
+/* facts */
+.facts { display: grid; gap: 12px; margin-top: 24px; }
+@media (min-width: 860px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 8px; }
+.fact p { color: var(--muted); font-size: 15px; }
+.fact code { font: 700 14px/1 ui-monospace, Menlo, monospace; color: #fff; background: #1b2747; padding: 3px 7px; border-radius: 6px; }
+
+/* pricing */
+.plans { display: grid; gap: 12px; margin-top: 24px; }
+@media (min-width: 760px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.plan { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 6px; }
+.plan.pop { background: linear-gradient(180deg, #17295a, var(--panel)); border-color: var(--blue); }
+.price { font: 900 2.1rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.price small { font: 500 14px var(--body); color: var(--muted); }
+
+.final .box { border-radius: 24px; padding: 30px 22px; background: radial-gradient(600px 260px at 20% 0%, rgb(61 214 255 / .25), transparent 70%), linear-gradient(135deg, #1d4fe0, #0f2c86); display: grid; gap: 14px; }
+@media (min-width: 860px) { .final .box { grid-template-columns: 1.4fr auto; align-items: center; padding: 42px; } }
+.final .btn-primary { background: #fff; color: #0f2c86; box-shadow: none; }
+.final p { color: #d7e3ff; }
+footer { padding-block: 24px 40px; color: var(--muted); font-size: 13px; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #fff; color: #07101f; padding: 10px 14px; border-radius: 10px; font-size: 13px; z-index: 40; max-width: calc(100% - 32px); }
+</style>
+
+<div class="proto">Prototype · Option B (outcome-first) · not live · buttons are inert</div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><b>P</b>Pekko</a>
+    <nav class="nav-links" aria-label="Page"><a href="#templates">Templates</a><a href="#story">How it works</a><a href="#facts">TV setup</a><a href="#pricing">Pricing</a></nav>
+    <a class="btn btn-primary btn-sm cta" href="#start" data-dest="/signup">Start free</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">Digital menus for restaurants and cafés</p>
+        <h1 style="margin-top:12px">Beautiful digital menus on your TV <span class="grad">in minutes.</span></h1>
+        <p class="lede">Pick one of 22 ready-made templates, type your items and prices, add food photos, and publish to the TV you already have. Change anything later from your phone.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary cta" href="#start" data-dest="/signup">Create my menu free</a>
+          <a class="btn btn-ghost cta" href="#story" data-dest="#story">See it in 4 steps</a>
+        </div>
+        <ul class="pills"><li><b>14 days</b> free</li><li><b>No</b> credit card</li><li>No design skills needed</li></ul>
+      </div>
+      <div class="hero-visual">
+        <div class="tv">
+          <img id="tv-img" src="assets/modern-restaurant.jpg" alt="Modern Restaurant template on a TV" width="1280" height="720">
+          <span class="badge">Exactly what your TV shows</span>
+        </div>
+        <div class="switch">
+          <p id="switch-label">Try a template for your business:</p>
+          <div class="chips" role="group" aria-labelledby="switch-label">
+            <button type="button" aria-pressed="true" data-img="modern-restaurant" data-name="Modern Restaurant">Restaurant</button>
+            <button type="button" aria-pressed="false" data-img="taqueria-specials" data-name="Taquería Specials">Tacos</button>
+            <button type="button" aria-pressed="false" data-img="coffee-shop" data-name="Coffee Shop">Café</button>
+            <button type="button" aria-pressed="false" data-img="photo-menu-grid" data-name="Photo Menu Grid">Fast casual</button>
+            <button type="button" aria-pressed="false" data-img="smokehouse-bbq" data-name="Smokehouse BBQ">BBQ</button>
+            <button type="button" aria-pressed="false" data-img="brunch-house" data-name="Brunch House">Brunch</button>
+            <button type="button" aria-pressed="false" data-img="happy-hour" data-name="Happy Hour">Bar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="story" style="padding-top:28px">
+    <div class="wrap">
+      <p class="eyebrow">From empty screen to live menu</p>
+      <h2 style="margin-top:10px">Four steps. No designer. No extra box on compatible TVs.</h2>
+      <div class="story">
+        <article class="frame"><div class="pic"><img src="assets/ui-desktop-gallery.jpg" alt="Pekko design gallery with templates for restaurants, cafés and bars" width="960" height="400" loading="lazy"></div><div class="body"><p class="t">1 · Pick a design</p><h3>Choose from 22 templates and 7 layouts</h3><p>Filter by business type, style, or photo-friendly designs.</p></div></article>
+        <article class="frame"><div class="pic"><img src="assets/ui-desktop-editor.jpg" alt="Pekko editor with a menu item photo and a live TV preview" width="960" height="400" loading="lazy"></div><div class="body"><p class="t">2 · Add your menu</p><h3>Type items and prices, add a photo to any dish</h3><p>The preview beside you is exactly what the TV will show.</p></div></article>
+        <article class="frame"><div class="pic"><div class="code" aria-label="Example pairing code 482910"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>0</span></div></div><div class="body"><p class="t">3 · Connect your TV</p><h3>Open pekkotv.com/pair on the TV</h3><p>Type the six-digit code from the TV into Pekko on your phone.</p></div></article>
+        <article class="frame"><div class="pic"><img src="assets/taqueria-specials.jpg" alt="A finished taquería menu with dish photos" width="1280" height="720" loading="lazy"></div><div class="body"><p class="t">4 · It’s live</p><h3>Publish, then update from anywhere</h3><p>Change a price on your phone and the screen follows.</p></div></article>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow">What you get</p>
+      <h2 style="margin-top:10px">A menu that looks professional, and stays current</h2>
+      <div class="outcomes">
+        <div class="out"><h3>Look designed, without a designer</h3><p>Templates set the fonts, spacing and sizes, and check text is readable from across the room. Apply your Brand Kit colours and logo in one tap.</p></div>
+        <div class="out"><h3>Show the food</h3><p>Add a photo to any item. Photo templates show them as cards; the others show neat thumbnails beside the dish.</p></div>
+        <div class="out"><h3>Always the right menu</h3><p>Schedule breakfast, lunch and dinner boards, rotate promotions in a playlist, and see which screens are online.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="templates" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow">Real templates</p>
+      <h2 style="margin-top:10px">Start from one of these</h2>
+      <div class="gal">
+        <figure><img src="assets/photo-menu-grid.jpg" alt="Photo Menu Grid" width="1280" height="720" loading="lazy"><figcaption>Photo Menu Grid</figcaption></figure>
+        <figure><img src="assets/cafe-favorites.jpg" alt="Café Favorites" width="1280" height="720" loading="lazy"><figcaption>Café Favorites</figcaption></figure>
+        <figure><img src="assets/featured-dishes.jpg" alt="Featured Dishes" width="1280" height="720" loading="lazy"><figcaption>Featured Dishes</figcaption></figure>
+        <figure><img src="assets/pizza-night.jpg" alt="Pizza Night" width="1280" height="720" loading="lazy"><figcaption>Pizza Night</figcaption></figure>
+      </div>
+      <p class="note">Shown with Pekko’s sample content. Your name, prices, logo and photos replace it.</p>
+    </div>
+  </section>
+
+  <section id="facts" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow">Good to know</p>
+      <h2 style="margin-top:10px">Before you start</h2>
+      <div class="facts">
+        <div class="fact"><h3>Check your TV first, no account needed</h3><p>Open <code>pekkotv.com/pair</code> in your TV’s web browser. If a six-digit code appears, your TV works with Pekko. Tested on LG, Samsung, Vizio and Insignia smart TVs; other screens work with a TV stick or computer.</p></div>
+        <div class="fact"><h3>Already have artwork?</h3><p>Upload designs from Canva, Photoshop or PowerPoint, PDFs and MP4 video, and mix them with Pekko menus.</p></div>
+        <div class="fact"><h3>The trial is the full product</h3><p>14 days, every feature, up to 5 screens, no card. When it ends, screens keep playing 3 more days; nothing you made is deleted.</p></div>
+        <div class="fact"><h3>English and Spanish</h3><p>Manage everything in either language, from a phone or computer.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing" style="padding-top:0">
+    <div class="wrap">
+      <p class="eyebrow">Pricing</p>
+      <h2 style="margin-top:10px">Simple monthly plans</h2>
+      <div class="plans">
+        <div class="plan"><h3>Starter</h3><p class="price">$19 <small>/ month</small></p><p>1 screen</p></div>
+        <div class="plan pop"><h3>Business</h3><p class="price">$39 <small>/ month</small></p><p>Up to 3 screens</p></div>
+        <div class="plan"><h3>Multi-screen</h3><p class="price">$59 <small>/ month</small></p><p>Up to 5 screens</p></div>
+      </div>
+      <p class="note">All templates and features on every plan. USD, billed monthly; taxes may apply.</p>
+    </div>
+  </section>
+
+  <section class="final" id="start">
+    <div class="wrap">
+      <div class="box">
+        <div><h2>See your menu on screen today.</h2><p style="margin-top:10px">Sign up with an email, pick a template, and your menu is in the TV preview before you’ve connected a screen.</p></div>
+        <a class="btn btn-primary cta" href="#start" data-dest="/signup">Create my menu free</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">Pekko · Prototype for review. Copy uses only features available in the product today. Templates shown with Pekko’s own sample content.</div></footer>
+
+<script>
+(() => {
+  const img = document.getElementById("tv-img");
+  const chips = [...document.querySelectorAll(".chips button")];
+  // Preload so switching is instant.
+  chips.forEach((c) => { const i = new Image(); i.src = `assets/${c.dataset.img}.jpg`; });
+  chips.forEach((c) => c.addEventListener("click", () => {
+    chips.forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+    img.style.opacity = "0";
+    setTimeout(() => { img.src = `assets/${c.dataset.img}.jpg`; img.alt = `${c.dataset.name} template on a TV`; img.style.opacity = "1"; }, 160);
+  }));
+  let timer;
+  document.querySelectorAll(".cta").forEach((a) => a.addEventListener("click", (e) => {
+    const dest = a.dataset.dest || "";
+    if (dest.startsWith("#")) return;
+    e.preventDefault();
+    let t = document.querySelector(".toast");
+    if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = "Prototype: on the live page this opens pekkotv.com" + dest;
+    clearTimeout(timer); timer = setTimeout(() => t.remove(), 2600);
+  }));
+})();
+</script>

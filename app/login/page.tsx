@@ -7,8 +7,10 @@ import { AuthFrame, friendlyAuthError, isRecoveryUrl, MIN_PASSWORD } from "@/com
 import { safeDashboardNext } from "@/lib/safe-next";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey, Vars } from "@/lib/i18n/index";
-import { rich } from "@/components/i18n/rich";
 import { useRequiredMessage } from "@/components/ui";
+import { SignupView } from "@/components/auth/signup-view";
+import { trackFunnel } from "@/lib/funnel-client";
+import { signupErrorCode } from "@/lib/funnel";
 
 export default function LoginPage() {
   return (
@@ -43,6 +45,11 @@ function Login() {
   // Screen readers hear one polite message when the wait ends, not a per-second countdown (Gother #104 low 3).
   const [announce, setAnnounce] = useState<MessageKey | null>(null);
   const wasWaiting = useRef(false);
+  // Sign-up: the address the confirmation email went to (shows "Check your inbox").
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  // Funnel: one signup_view per page load (cookieless daily count, lib/funnel.ts).
+  useEffect(() => { if (mode === "up") trackFunnel("signup_view", "", { oncePerPage: true }); }, [mode]);
 
   useEffect(() => {
     if (resendWait <= 0) return;
@@ -63,14 +70,15 @@ function Login() {
     getSupabase().auth.getSession().then(({ data }) => data.session && router.replace(nextPath())).catch(() => {});
   }, [params, router]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(e?: React.FormEvent) {
+    e?.preventDefault();
     setNote(null);
     if (!supabaseConfigured()) {
       setNote({ key: "auth.notConfigured", error: true });
       return;
     }
     setBusy(true);
+    if (mode === "up") trackFunnel("signup_submit");
     try {
       const res = mode === "in"
         ? await getSupabase().auth.signInWithPassword({ email, password })
@@ -78,14 +86,20 @@ function Login() {
       if (res.error) {
         // Gother #104 low 2: an unconfirmed sign-in starts the same 60 s wait as sign-up.
         if (needsConfirmation(res.error)) { setPending(email.trim()); setResendWait(RESEND_COOLDOWN_S); return setNote({ key: "auth.confirmFirst", error: true }); }
+        if (mode === "up") trackFunnel("signup_error", signupErrorCode(res.error.message));
         return setNote({ text: friendlyAuthError(res.error.message, t), error: true });
       }
       if (res.data.session) return router.replace(nextPath());
       setPending(email.trim());
       setResendWait(RESEND_COOLDOWN_S);
-      setNote({ key: "auth.checkEmail" });
-      setMode("in");
+      if (mode === "up") {
+        setSentTo(email.trim());
+        setNote({ key: "auth.up.inboxSent", vars: { email: email.trim() } });
+      } else {
+        setNote({ key: "auth.checkEmail" });
+      }
     } catch (err) {
+      if (mode === "up") trackFunnel("signup_error", signupErrorCode((err as Error).message));
       setNote({ text: friendlyAuthError((err as Error).message, t), error: true });
     } finally {
       setBusy(false);
@@ -107,13 +121,30 @@ function Login() {
     }
   }
 
+  if (mode === "up") {
+    return (
+      <SignupView
+        email={email} password={password} setEmail={setEmail} setPassword={setPassword} minPassword={MIN_PASSWORD}
+        busy={busy} configured={supabaseConfigured()}
+        onSubmit={() => void submit()}
+        onInvalid={(problems) => { for (const code of problems) trackFunnel("signup_error", code); }}
+        onSignIn={() => { setMode("in"); setNote(null); setSentTo(null); }}
+        sentTo={sentTo}
+        onDifferentEmail={() => { setSentTo(null); setPending(null); setResendWait(0); setNote(null); setPassword(""); }}
+        resend={{ onClick: resend, disabled: resending || resendWait > 0, label: resending ? t("auth.sending") : resendWait > 0 ? t("auth.resendWait") : t("auth.resend") }}
+        note={note ? { text: note.key ? t(note.key, note.vars) : note.text ?? "", error: note.error } : null}
+        announce={announce ? t(announce) : ""}
+      />
+    );
+  }
+
   return (
     <AuthFrame
-      title={mode === "in" ? t("auth.signInTitle") : t("auth.signUpTitle")}
+      title={t("auth.signInTitle")}
       footer={
         <button type="button" className="font-semibold text-primary underline underline-offset-4"
-          onClick={() => { setMode(mode === "in" ? "up" : "in"); setNote(null); }}>
-          {mode === "in" ? t("auth.newHere") : t("auth.haveAccount")}
+          onClick={() => { setMode("up"); setNote(null); }}>
+          {t("auth.newHere")}
         </button>
       }
     >
@@ -126,22 +157,12 @@ function Login() {
         <input id="login-email" name="email" className="field" type="email" autoComplete="email" inputMode="email" placeholder={t("common.email")} required {...requiredMsg}
           value={email} onChange={(e) => setEmail(e.target.value)} />
         <label htmlFor="login-password" className="sr-only">{t("common.password")}</label>
-        <input id="login-password" name="password" className="field" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"}
+        <input id="login-password" name="password" className="field" type="password" autoComplete="current-password"
           placeholder={t("common.password")} minLength={MIN_PASSWORD} required {...requiredMsg} value={password} onChange={(e) => setPassword(e.target.value)} />
-        {mode === "in" ? (
-          <div className="text-right">
-            <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">{t("auth.forgot")}</Link>
-          </div>
-        ) : null}
-        {mode === "up" ? (
-          <p className="text-sm text-muted" data-testid="signup-legal">
-            {rich(t("auth.legalConsent"), {
-              terms: (c) => <Link className="underline" href="/terms">{c}</Link>,
-              privacy: (c) => <Link className="underline" href="/privacy">{c}</Link>,
-            })}
-          </p>
-        ) : null}
-        <button className="btn btn-primary w-full" disabled={busy}>{busy ? t("auth.busy") : mode === "in" ? t("auth.signInButton") : t("auth.createButton")}</button>
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-sm font-semibold text-primary underline underline-offset-4">{t("auth.forgot")}</Link>
+        </div>
+        <button className="btn btn-primary w-full" disabled={busy}>{busy ? t("auth.busy") : t("auth.signInButton")}</button>
       </form>
       {note && <p role={note.error ? "alert" : "status"} className={`mt-4 ${note.error ? "note-error" : "note-ok"}`}>{note.key ? t(note.key, note.vars) : note.text}</p>}
       {pending ? (

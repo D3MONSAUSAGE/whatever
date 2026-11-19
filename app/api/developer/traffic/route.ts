@@ -6,7 +6,7 @@ import { developerFromRequest } from "@/lib/server/dev-analytics/authz";
 import { internalDomains } from "@/lib/server/dev-analytics/exclusions";
 import { computeDashboard, type Snapshot } from "@/lib/server/dev-analytics/metrics";
 import { parseRange } from "@/lib/server/dev-analytics/range";
-import { buildTrafficReport, type TrafficSnapshot } from "@/lib/server/traffic-report";
+import { buildTrafficReport, type FunnelSnapshot, type TrafficSnapshot } from "@/lib/server/traffic-report";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,15 +39,18 @@ const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Reques
   if (!range) return fail("Choose a valid date range (up to 366 days, not in the future).", 400, "bad_range");
   const since = new Date(Math.min(range.from.getTime(), now.getTime() - 37 * DAY));
 
-  const [traffic, snap] = await Promise.all([
+  const [traffic, snap, funnel] = await Promise.all([
     db().rpc("dev_traffic_snapshot", { p_actor: userId, p_from: range.fromDay, p_to: range.toDay }),
     db().rpc("dev_analytics_snapshot", { p_actor: userId, p_since: since.toISOString() }),
+    db().rpc("dev_funnel_snapshot", { p_actor: userId, p_from: range.fromDay, p_to: range.toDay }),
   ]);
-  for (const r of [traffic, snap]) {
+  for (const r of [traffic, snap, funnel]) {
     if (r.error && (r.error.code === "42501" || /not_authorized/.test(r.error.message || ""))) return notFound();
   }
   if (snap.error) return fail("Couldn't load analytics.", 500);
   if (traffic.error && !isMissingSchema(traffic.error)) return fail("Couldn't load analytics.", 500);
+  // The funnel panel is optional: until 0032 is applied it reports "not collecting" instead of failing the tab.
+  const funnelData = funnel.error ? null : (funnel.data as FunnelSnapshot);
 
   // Billing isn't part of this tab, so Stripe isn't called; only customer registrations are used.
   const customers = computeDashboard({
@@ -55,6 +58,6 @@ const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Reques
     billing: { available: false, livemode: null, subs: [] },
     range, now, includeInternal: false, domains: internalDomains(),
   });
-  const body = buildTrafficReport({ traffic: traffic.error ? null : (traffic.data as TrafficSnapshot), customers, range, now });
+  const body = buildTrafficReport({ traffic: traffic.error ? null : (traffic.data as TrafficSnapshot), funnel: funnelData, customers, range, now });
   return json(body, 200, { "X-Robots-Tag": "noindex, nofollow" });
 });

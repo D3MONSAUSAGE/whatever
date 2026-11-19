@@ -64,12 +64,15 @@ describe("traffic: what is collected", () => {
 
   it("the beacon sets no cookie, respects GPC/DNT, skips signed-in people and runs on marketing pages only", () => {
     const beacon = readFileSync("components/site/traffic-beacon.tsx", "utf8");
-    expect(beacon).not.toContain("document.cookie");
-    expect(beacon).not.toMatch(/localStorage\.setItem/);
-    expect(beacon).toContain("globalPrivacyControl");
-    expect(beacon).toContain('nav.doNotTrack === "1"');
-    expect(beacon).toContain("signedIn()");
-    expect(beacon).toContain("if (!isTrackedPath(path) || optedOut() || signedIn()) return;");
+    const client = readFileSync("lib/funnel-client.ts", "utf8");
+    for (const src of [beacon, client]) {
+      expect(src).not.toContain("document.cookie");
+      expect(src).not.toMatch(/localStorage\.setItem/);
+    }
+    expect(client).toContain("globalPrivacyControl");
+    expect(client).toContain('nav.doNotTrack === "1"');
+    expect(client).toContain("if (typeof window === \"undefined\" || browserOptedOut() || browserSignedIn()) return;");
+    expect(beacon).toContain("if (!isTrackedPath(path) || browserOptedOut() || browserSignedIn()) return;");
     expect(readFileSync("components/public-page.tsx", "utf8")).toContain("{dark ? <TrafficBeacon /> : null}");
   });
 });

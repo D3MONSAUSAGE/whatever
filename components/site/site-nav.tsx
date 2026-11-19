@@ -7,6 +7,7 @@ import { useLocale } from "@/lib/i18n/client";
 import { marketingBaseOf, marketingHref } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
 import { LanguageSelect } from "@/components/i18n/language-select";
+import { trackFunnel } from "@/lib/funnel-client";
 
 export const NAV_LINKS: readonly { href: string; label: MessageKey }[] = [
   { href: "/", label: "nav.home" },
@@ -50,7 +51,7 @@ export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
         <div className="hidden md:flex items-center gap-2 text-sm font-semibold">
           <LanguageSelect compact />
           <Link href="/login" className={dark ? "rounded-full px-3.5 py-2 text-[#c5d3ee] hover:bg-white/10 hover:text-white" : "rounded-lg px-3 py-2 hover:bg-black/5"} data-testid="nav-login">{t("nav.login")}</Link>
-          <Link href="/signup" className="btn btn-primary" data-testid="nav-trial">{t("nav.startTrial")}</Link>
+          <Link href="/signup" className="btn btn-primary" data-testid="nav-trial" onClick={() => trackFunnel("cta_click", "nav")}>{t("nav.startTrial")}</Link>
         </div>
         <button type="button" className={`md:hidden rounded-lg p-2 ${hover}`} aria-label={open ? t("nav.closeMenu") : t("nav.openMenu")}
           aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen((o) => !o)} data-testid="menu-toggle">
@@ -68,7 +69,7 @@ export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
             <li><Link href="/login" className="block py-3" onClick={() => setOpen(false)}>{t("nav.login")}</Link></li>
           </ul>
           <LanguageSelect className="mt-2" />
-          <Link href="/signup" className="btn btn-primary mt-3 w-full" onClick={() => setOpen(false)}>{t("nav.startTrial")}</Link>
+          <Link href="/signup" className="btn btn-primary mt-3 w-full" onClick={() => { trackFunnel("cta_click", "nav"); setOpen(false); }}>{t("nav.startTrial")}</Link>
         </nav>
       ) : null}
     </header>

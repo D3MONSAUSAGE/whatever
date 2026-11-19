@@ -63,7 +63,8 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
         That code is kept only for the day it is made and is then replaced by a daily total. Each daily random value is deleted after two days, so visits can&apos;t be linked across days or traced back to you.
         What is kept is daily totals per page and traffic source, which authorized Pekko staff see on the internal page described above. These totals are deleted after 400 days.
         A per-tab flag in your browser&apos;s session storage, which is never sent to Pekko, tells the first page of a visit apart from later pages.
-        Visits are not counted while you are signed in to Pekko, or when your browser sends a Global Privacy Control or Do Not Track signal. Dashboards, sign-in pages, the TV player and these legal pages are not counted.
+        Visits are not counted while you are signed in to Pekko, or when your browser sends a Global Privacy Control or Do Not Track signal. Dashboards, sign-in pages, the TV player and these legal pages are not counted as visits.
+        The same counter also keeps daily totals of a few steps toward starting a trial: clicks on a trial button (and where on the page it was), template previews used on the home page, views and submissions of the sign-up form, and the type of sign-up problem (for example, a password that is too short). Only the step and a daily count are kept. Your email address, what you type and any identifier are never sent with these steps.
         These statistics are not linked to any account and are not shared with advertisers or ad networks.
       </p>
 

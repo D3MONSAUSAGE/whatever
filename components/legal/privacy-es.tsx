@@ -58,7 +58,8 @@ export function PrivacyEs() {
         Ese código se conserva solo durante el día en que se crea y luego se sustituye por un total diario. Cada valor aleatorio diario se elimina a los dos días, así que las visitas no se pueden vincular entre días ni rastrear hasta usted.
         Lo que se conserva son totales diarios por página y fuente de tráfico, que el personal autorizado de Pekko ve en la página interna descrita arriba. Estos totales se eliminan a los 400 días.
         Un indicador por pestaña en el almacenamiento de sesión de su navegador, que nunca se envía a Pekko, distingue la primera página de una visita de las siguientes.
-        No se cuentan las visitas mientras usted haya iniciado sesión en Pekko, ni cuando su navegador envía una señal de Global Privacy Control o Do Not Track. No se cuentan los paneles, las páginas de inicio de sesión, el reproductor de TV ni estas páginas legales.
+        No se cuentan las visitas mientras usted haya iniciado sesión en Pekko, ni cuando su navegador envía una señal de Global Privacy Control o Do Not Track. No se cuentan como visitas los paneles, las páginas de inicio de sesión, el reproductor de TV ni estas páginas legales.
+        El mismo contador también guarda totales diarios de algunos pasos para empezar una prueba: los clics en un botón de prueba (y en qué parte de la página estaba), las vistas previas de plantillas usadas en la página de inicio, las vistas y los envíos del formulario de registro, y el tipo de problema al registrarse (por ejemplo, una contraseña demasiado corta). Solo se guardan el paso y un total diario. Su correo, el contenido de los campos del formulario y cualquier identificador nunca se envían con estos pasos.
         Estas estadísticas no se vinculan con ninguna cuenta y no se comparten con anunciantes ni redes publicitarias.
       </p>
 

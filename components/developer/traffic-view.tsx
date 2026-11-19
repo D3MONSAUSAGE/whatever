@@ -175,11 +175,54 @@ export function TrafficReport({ data }: { data: DevTraffic }) {
         </div>
       </div>
 
+      <FunnelPanel funnel={data.funnel} />
+
       <ul className="dc-notes" data-testid="tr-notes">
         {notes.map((n) => (
           <li key={n.key} data-note={n.key}><span className="dc-note-badge">{t("tr.noteBadge")}</span><span>{n.text}</span></li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Signup funnel: browser stages from 0032, then registrations and confirmations from account data. */
+function FunnelPanel({ funnel }: { funnel: DevTraffic["funnel"] }) {
+  const t = useT();
+  const f = useFormat();
+  return (
+    <div className="dc-panel" data-testid="tr-funnel">
+      <h3 className="dc-panel-title">{t("tr.funnel.title")}</h3>
+      <p className="dc-panel-sub">{t("tr.funnel.sub")}</p>
+      {!funnel.collecting ? <p className="dc-empty" data-testid="tr-funnel-off">{t("tr.funnel.notCollecting")}</p> : null}
+      <div className="dc-table-wrap">
+        <table className="dc-table">
+          <thead><tr><th scope="col">{t("tr.funnel.stage")}</th><th scope="col">{t("tr.funnel.count")}</th><th scope="col">{t("tr.funnel.fromPrevious")}</th></tr></thead>
+          <tbody>
+            {funnel.stages.map((s) => (
+              <tr key={s.key} data-stage={s.key}><td>{t(`tr.funnel.${s.key}` as MessageKey)}</td><td>{f.num(s.count)}</td><td>{f.pct(s.fromPrevious)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="dc-table-wrap" style={{ marginTop: 16 }}>
+        <table className="dc-table">
+          <thead><tr><th scope="col">{t("tr.funnel.ctaWhere")}</th><th scope="col">{t("tr.funnel.count")}</th></tr></thead>
+          <tbody>
+            {funnel.ctaByLocation.map((c) => <tr key={c.location}><td>{t(`tr.funnel.cta.${c.location}` as MessageKey)}</td><td>{f.num(c.count)}</td></tr>)}
+            {funnel.templateTries.map((c) => <tr key={`try-${c.spot}`}><td>{t(`tr.funnel.try.${c.spot}` as MessageKey)}</td><td>{f.num(c.count)}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      {funnel.errorsByCode.length ? (
+        <div className="dc-table-wrap" style={{ marginTop: 16 }}>
+          <table className="dc-table">
+            <thead><tr><th scope="col">{t("tr.funnel.errors")}</th><th scope="col">{t("tr.funnel.count")}</th></tr></thead>
+            <tbody>{funnel.errorsByCode.map((e) => <tr key={e.code}><td>{t(`tr.funnel.err.${e.code}` as MessageKey)}</td><td>{f.num(e.count)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      ) : null}
+      <p className="dc-panel-sub" style={{ marginTop: 12 }}>{t("tr.funnel.note")}</p>
     </div>
   );
 }
