@@ -1504,6 +1504,7 @@ export const en = {
   "tpl.noMatch": "No templates match. Try another filter.",
   "tpl.scratch": "Start from scratch",
   "tpl.scratchBody": "A clean, empty board. Add your own sections and items.",
+  "tpl.scratchCta": "Start with a blank board",
   "tpl.untitled": "Untitled board",
   "tpl.back": "Menu Boards",
   "tpl.boardName": "Board name",
