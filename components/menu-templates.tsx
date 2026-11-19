@@ -7,6 +7,7 @@
  * here is what the screen shows. Saving reuses POST /api/layout-studio (draft never moves a screen; publish swaps
  * the image on the screens already showing the board) and POST /api/layout-studio/assign for new screens.
  */
+import { IconImage } from "@/components/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, authToken, uploadForm, useApi, type DisplayItem } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n/client";
@@ -91,8 +92,16 @@ export function DesignBoard({ doc, art, label, className = "" }: { doc: LayoutDo
 const STYLES = `${FONT_CSS}
 .tpl-board { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; }
 .tpl-board > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.tpl-chip { border: 1px solid var(--color-line); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; min-height: 36px; }
-.tpl-chip[aria-pressed="true"] { background: var(--color-navy-900, #0a1730); border-color: var(--color-navy-900, #0a1730); color: #fff; }
+/* Gallery filters: one label column shared by every row (so all button groups start at the same x), and Pekko's
+   segmented control (.seg, as on My Screens) for the buttons. Phones stack the label above its buttons. */
+.tpl-filters { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 16px; row-gap: 10px; align-items: start; }
+/* 40px = one row of the segmented control (34px buttons + 3px track padding), so a label lines up with the first
+   row of its buttons even when they wrap. */
+.tpl-filter-label { display: flex; align-items: center; min-height: 40px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-muted); }
+.tpl-filter-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.tpl-filter-controls .seg > button { display: inline-flex; align-items: center; gap: 6px; }
+.tpl-filter-controls .seg > button svg { width: 16px; height: 16px; flex: none; }
+@media (max-width: 639px) { .tpl-filters { grid-template-columns: minmax(0, 1fr); row-gap: 6px; } .tpl-filter-label { min-height: 0; } .tpl-filter-label:not(:first-child) { margin-top: 6px; } }
 .tpl-card { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 10px; border: 1px solid var(--color-line); border-radius: 14px; background: #fff; transition: border-color .15s, box-shadow .15s, transform .15s; }
 .tpl-card:hover { border-color: var(--color-primary); box-shadow: 0 10px 26px rgb(11 18 32 / .1); transform: translateY(-2px); }
 .tpl-card .tpl-board { border-radius: 9px; }
@@ -172,19 +181,17 @@ export function TemplateGallery({ onPick, onCancel, onAdvanced }: { onPick: (doc
           <button type="button" className="btn btn-quiet" onClick={onCancel}>{t("tpl.cancel")}</button>
         </div>
       </div>
-      <div className="flex flex-wrap gap-x-5 gap-y-2 items-center mt-4">
-        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterBusiness")}>
-          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterBusiness")}</span>
+      <div className="tpl-filters mt-4" data-testid="gallery-filters">
+        <FilterRow id="tpl-f-business" label={t("tpl.filterBusiness")}>
           {BUSINESSES.map((id) => (
-            <button key={id} type="button" className="tpl-chip" aria-pressed={business === id} onClick={() => setBusiness(id)}>{t(`tpl.business.${id}` as MessageKey)}</button>
+            <button key={id} type="button" aria-pressed={business === id} onClick={() => setBusiness(id)}>{t(`tpl.business.${id}` as MessageKey)}</button>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterStyle")}>
-          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterStyle")}</span>
+        </FilterRow>
+        <FilterRow id="tpl-f-style" label={t("tpl.filterStyle")}>
           {STYLE_IDS.map((id) => (
-            <button key={id} type="button" className="tpl-chip" aria-pressed={style === id} onClick={() => setStyle(id)}>{t(`tpl.style.${id}` as MessageKey)}</button>
+            <button key={id} type="button" aria-pressed={style === id} onClick={() => setStyle(id)}>{t(`tpl.style.${id}` as MessageKey)}</button>
           ))}
-        </div>
+        </FilterRow>
       </div>
       <p className="sr-only" role="status">{t("tpl.count", { n: shown.length })}</p>
       <ul className="grid gap-4 mt-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("tpl.galleryTitle")}>
@@ -1002,6 +1009,19 @@ const STRUCTURES: (Structure | "all")[] = ["all", "single", "columns", "media", 
  * The unified design gallery (UNIFIED_MENU_EDITOR): premium templates, the original layouts and the classic
  * full-screen menu in one place. Every choice opens the same menu designer.
  */
+/** One gallery filter row: its label in the shared label column, then a segmented control (plus optional extras). */
+function FilterRow({ id, label, children, extra }: { id: string; label: string; children: React.ReactNode; extra?: React.ReactNode }) {
+  return (
+    <>
+      <span className="tpl-filter-label" id={id}>{label}</span>
+      <div className="tpl-filter-controls">
+        <div className="seg" role="group" aria-labelledby={id}>{children}</div>
+        {extra}
+      </div>
+    </>
+  );
+}
+
 /** "Start from scratch": one card in the gallery grid, same size and structure as a template card, dashed to mark it as blank. */
 function ScratchCard({ onPick }: { onPick: () => void }) {
   const t = useT();
@@ -1052,26 +1072,28 @@ export function DesignGallery({ onPick, onCancel, brand }: {
         </div>
         <button type="button" className="btn btn-quiet" onClick={onCancel}>{t("tpl.cancel")}</button>
       </div>
-      <div className="grid gap-2 mt-4">
-        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterBusiness")}>
-          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterBusiness")}</span>
+      <div className="tpl-filters mt-4" data-testid="gallery-filters">
+        <FilterRow id="tpl-f-business" label={t("tpl.filterBusiness")}>
           {BUSINESSES.map((id) => (
-            <button key={id} type="button" className="tpl-chip" aria-pressed={business === id} onClick={() => setBusiness(id)}>{t(`tpl.business.${id}` as MessageKey)}</button>
+            <button key={id} type="button" aria-pressed={business === id} onClick={() => setBusiness(id)}>{t(`tpl.business.${id}` as MessageKey)}</button>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterStyle")}>
-          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterStyle")}</span>
+        </FilterRow>
+        <FilterRow id="tpl-f-style" label={t("tpl.filterStyle")}>
           {STYLE_IDS.map((id) => (
-            <button key={id} type="button" className="tpl-chip" aria-pressed={style === id} onClick={() => setStyle(id)}>{t(`tpl.style.${id}` as MessageKey)}</button>
+            <button key={id} type="button" aria-pressed={style === id} onClick={() => setStyle(id)}>{t(`tpl.style.${id}` as MessageKey)}</button>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5 items-center" role="group" aria-label={t("tpl.filterStructure")}>
-          <span className="text-xs font-bold uppercase tracking-wide text-muted mr-1">{t("tpl.filterStructure")}</span>
+        </FilterRow>
+        <FilterRow id="tpl-f-structure" label={t("tpl.filterStructure")}
+          extra={(
+            // An on/off filter that combines with any layout, so it sits apart from the layout choices.
+            <div className="seg">
+              <button type="button" aria-pressed={photos} onClick={() => setPhotos(!photos)} data-testid="filter-photos"><IconImage />{t("tpl.filterPhotos")}</button>
+            </div>
+          )}>
           {STRUCTURES.map((id) => (
-            <button key={id} type="button" className="tpl-chip" aria-pressed={structure === id} onClick={() => setStructure(id)} data-testid={`filter-structure-${id}`}>{t(`tpl.structure.${id}` as MessageKey)}</button>
+            <button key={id} type="button" aria-pressed={structure === id} onClick={() => setStructure(id)} data-testid={`filter-structure-${id}`}>{t(`tpl.structure.${id}` as MessageKey)}</button>
           ))}
-          <button type="button" className="tpl-chip" aria-pressed={photos} onClick={() => setPhotos(!photos)} data-testid="filter-photos">📷 {t("tpl.filterPhotos")}</button>
-        </div>
+        </FilterRow>
       </div>
       <p className="sr-only" role="status">{t("tpl.count", { n: shown.length })}</p>
       <ul className="grid gap-4 mt-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("tpl.galleryTitle")}>
