@@ -7,6 +7,7 @@
  */
 import { localizedPath, MARKETING_PATHS } from "@/lib/seo";
 import type { ChannelKey } from "@/lib/dev-analytics";
+import type { DevFunnel } from "@/lib/funnel";
 
 export const TRACKED_PATHS: readonly string[] = MARKETING_PATHS.flatMap((p) => [localizedPath(p, "en"), localizedPath(p, "es")]);
 
@@ -74,5 +75,7 @@ export type DevTraffic = {
   referrers: { host: string; landings: number }[];
   /** Customer registrations in range (internal/QA/demo/reviewer accounts excluded) and the estimated rate. */
   registrations: { customers: number; conversion: number | null };
+  /** Signup funnel (0032 events + account data). */
+  funnel: DevFunnel;
   notes: TrafficNote[];
 };

@@ -239,7 +239,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: s
           <button type="button" aria-pressed="false" data-id="brunch-house" data-name="Brunch House">Brunch</button>
           <button type="button" aria-pressed="false" data-id="happy-hour" data-name="Happy Hour">Bar</button>
         </div>
-        <p class="tpl-name" id="hero-name" aria-live="polite">Modern Restaurant template · one of 22</p>
+        <p class="tpl-name" id="hero-name" aria-live="polite">Modern Restaurant</p>
       </div>
     </div>
   </section>
@@ -247,7 +247,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: s
   <section id="templates" aria-labelledby="tpl-title">
     <div class="wrap">
       <div class="sec-head">
-        <p class="eyebrow">22 templates · 7 layouts</p>
+        <p class="eyebrow">Professional menu templates</p>
         <h2 id="tpl-title">Type your menu. See it on screen.</h2>
         <p class="lede">This is Pekko’s real menu designer at work. Change the name or a price and watch the template update, just as it will on your TV.</p>
       </div>
@@ -397,7 +397,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: s
     const pre = new Image();
     pre.onload = () => { heroImg.srcset = `assets/${id}-640.webp 640w, assets/${id}-1280.webp 1280w`; heroImg.src = `assets/${id}-640.webp`; heroImg.alt = `${c.dataset.name} menu template shown on a TV`; };
     pre.src = `assets/${id}-${innerWidth > 979 || devicePixelRatio > 1.5 ? 1280 : 640}.webp`;
-    heroName.textContent = `${c.dataset.name} template · one of 22`;
+    heroName.textContent = c.dataset.name;
   }));
 
   // How it works: accessible tabs.

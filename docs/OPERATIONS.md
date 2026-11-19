@@ -64,3 +64,10 @@ Media is not yet kept on the TV across restarts, and full offline play isn't the
 
 ## 7. Legal pages
 `/terms`, `/privacy`, and `/terms#billing` are the published policies, linked from the footer, sign-up, and Settings. They name the operator, public address, and support email. They do not say a lawyer reviewed them, and they do not include a warranty, liability cap, or governing-law clause. Charges stay off until the billing flags are set on purpose.
+
+## 8. Home page, sign-up page and the signup funnel
+- **Home page:** the Option B home (`components/site/marketing/home-b.tsx`) is the default. The previous home page is kept unchanged in `components/site/marketing/home-classic.tsx`. Rollback: set `HOME_VARIANT=classic` in Vercel and redeploy (or promote the previous deployment, as in §5). No database change either way.
+- **Sign-up page:** `/signup` and `/login?mode=up` render `components/auth/signup-view.tsx`. Only the presentation changed; the Supabase `signUp`/`resend` calls, the confirmation redirect and the 60 s resend wait in `app/login/page.tsx` are unchanged.
+- **Funnel counts (migration 0032, additive):** `supabase/migrations/0032_funnel_daily.sql` adds `funnel_daily` (day, event, detail, count) and two service-role functions. Rollback: `supabase/rollback/0032_funnel_daily.sql`.
+  - Until 0032 is applied, `/api/traffic/event` quietly records nothing and the developer console's "Signup funnel" panel says the funnel isn't being collected. Landings (0031), customer registrations and email confirmations still show, from existing data.
+  - Events: trial-button clicks by position (`cta_click`), template previews used on the home page (`template_try`), sign-up page views, submits, and reduced error codes. No email, account, IP address, user agent or cookie is stored; GPC/DNT browsers and signed-in people send nothing. The privacy policy (EN and ES) describes this.

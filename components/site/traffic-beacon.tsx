@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { isTrackedPath, type TrafficBeaconBody } from "@/lib/traffic";
+import { beacon, browserOptedOut, browserSignedIn } from "@/lib/funnel-client";
 
 /**
  * Cookieless page-view beacon for the public marketing pages (see /api/traffic/collect and migration 0031).
@@ -11,26 +12,13 @@ import { isTrackedPath, type TrafficBeaconBody } from "@/lib/traffic";
  * someone is signed in to Pekko (customers and staff are not website visitors).
  */
 const VISIT_FLAG = "pekko_tv_visit";
-const SESSION_KEY = /^sb-.+-auth-token$/;
 let last: { path: string; at: number } | null = null;
-
-function optedOut(): boolean {
-  const nav = navigator as Navigator & { globalPrivacyControl?: boolean; msDoNotTrack?: string };
-  return nav.globalPrivacyControl === true || nav.doNotTrack === "1" || nav.msDoNotTrack === "1";
-}
-
-function signedIn(): boolean {
-  try {
-    for (let i = 0; i < localStorage.length; i++) if (SESSION_KEY.test(localStorage.key(i) ?? "")) return true;
-  } catch { /* storage blocked */ }
-  return false;
-}
 
 export function TrafficBeacon() {
   const pathname = usePathname();
   useEffect(() => {
     const path = pathname ?? "";
-    if (!isTrackedPath(path) || optedOut() || signedIn()) return;
+    if (!isTrackedPath(path) || browserOptedOut() || browserSignedIn()) return;
     const now = Date.now();
     if (last && last.path === path && now - last.at < 2000) return; // React re-mounts in development
     last = { path, at: now };
@@ -50,11 +38,7 @@ export function TrafficBeacon() {
         if (v) body[k] = v.slice(0, 100);
       }
     }
-    const json = JSON.stringify(body);
-    try {
-      const ok = navigator.sendBeacon?.("/api/traffic/collect", new Blob([json], { type: "application/json" }));
-      if (!ok) void fetch("/api/traffic/collect", { method: "POST", body: json, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(() => undefined);
-    } catch { /* never affect the page */ }
+    beacon("/api/traffic/collect", body);
   }, [pathname]);
   return null;
 }

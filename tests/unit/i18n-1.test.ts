@@ -34,7 +34,9 @@ describe("I18N-1 dictionaries", () => {
     const same = (Object.keys(en) as (keyof typeof en)[]).filter((k) => es[k] === en[k] && !ENGLISH_ONLY.includes(k));
     // Words that are the same in both languages.
     // R12-06: "Happy hour" is now "Hora feliz" in Spanish, so ptpl.happy.name left this list.
-    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video"].sort());
+    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video",
+      // Home page template chips: business types spelled the same in Spanish.
+      "home2.chip.bar", "home2.chip.brunch", "home2.chip.cafe", "home2.chip.tacos"].sort());
   });
 
   it("uses formal usted (no tú forms) and never translates Pekko", () => {
@@ -173,7 +175,7 @@ describe("I18N-1 switching language keeps unsaved work", () => {
   const hasBrowser = (() => { try { return existsSync(chromium.executablePath()); } catch { return false; } })();
   const root = process.cwd();
   const stubs: Record<string, string> = {
-    "next/navigation": `export function useRouter(){return {replace(p){window.__replaced=p},refresh(){window.__refreshed=(window.__refreshed||0)+1}}} export function useSearchParams(){return new URLSearchParams(location.search)}`,
+    "next/navigation": `export function useRouter(){return {replace(p){window.__replaced=p},refresh(){window.__refreshed=(window.__refreshed||0)+1}}} export function useSearchParams(){return new URLSearchParams(location.search)} export function usePathname(){return location.pathname}`,
     "next/link": `import React from "react"; export default function Link(p){return React.createElement("a",{href:p.href,className:p.className},p.children)}`,
     "@/lib/supabase-browser": `export function supabaseConfigured(){return true}
       export function getSupabase(){return {auth:{getSession: async()=>({data:{session:null}}),
@@ -190,6 +192,7 @@ describe("I18N-1 switching language keeps unsaved work", () => {
         createRoot(document.getElementById("root")).render(React.createElement(LocaleProvider, { initial: "en" }, React.createElement(LoginPage)));`, resolveDir: root, loader: "tsx" },
       bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic",
       alias: { "@": root }, define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, logLevel: "silent", plugins: [stubPlugin],
+      loader: { ".css": "empty" },
     });
     const browser = await chromium.launch();
     try {

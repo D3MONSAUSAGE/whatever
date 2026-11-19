@@ -12,6 +12,8 @@ export default tseslint.config(
       "playwright-report/**",
       "test-results/**",
       "coverage/**",
+      // Generated, minified bundle for the CRO prototype (rebuild with docs/cro/prototypes/b2/build-demo.mjs).
+      "docs/cro/prototypes/**/assets/*.js",
       "next-env.d.ts",
     ],
   },

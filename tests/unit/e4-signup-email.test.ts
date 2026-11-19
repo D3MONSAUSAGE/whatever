@@ -62,7 +62,7 @@ describe("E4: sign-up confirmation keeps ?next= and can be resent", () => {
   const hasBrowser = (() => { try { return existsSync(chromium.executablePath()); } catch { return false; } })();
   const root = process.cwd();
   const stubs: Record<string, string> = {
-    "next/navigation": `export function useRouter(){return {replace(p){window.__replaced=p}}} export function useSearchParams(){return new URLSearchParams(location.search)}`,
+    "next/navigation": `export function useRouter(){return {replace(p){window.__replaced=p}}} export function useSearchParams(){return new URLSearchParams(location.search)} export function usePathname(){return location.pathname}`,
     "next/link": `import React from "react"; export default function Link(p){return React.createElement("a",{href:p.href,className:p.className},p.children)}`,
     "@/lib/supabase-browser": `export function supabaseConfigured(){return true}
       export function getSupabase(){return {auth:{
@@ -82,6 +82,7 @@ describe("E4: sign-up confirmation keeps ?next= and can be resent", () => {
       stdin: { contents: `import React from "react"; import { createRoot } from "react-dom/client"; import LoginPage from "@/app/login/page"; createRoot(document.getElementById("root")).render(React.createElement(LoginPage));`, resolveDir: root, loader: "tsx" },
       bundle: true, write: false, format: "iife", platform: "browser", jsx: "automatic",
       alias: { "@": root }, define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, logLevel: "silent", plugins: [stubPlugin],
+      loader: { ".css": "empty" },
     });
     const browser = await chromium.launch();
     try {
@@ -92,8 +93,10 @@ describe("E4: sign-up confirmation keeps ?next= and can be resent", () => {
       await page.addScriptTag({ content: out.outputFiles[0].text });
       await page.getByLabel("Email").fill("new@example.com");
       await page.getByLabel("Password").fill("correct-horse-1");
-      await page.getByRole("button", { name: "Create account" }).click();
-      await expect.poll(() => page.getByRole("status").textContent()).toContain("Check your email");
+      await page.getByRole("button", { name: "Create my free menu" }).click();
+      // The redesigned sign-up page switches to "Check your inbox" and names the address.
+      await expect.poll(() => page.getByRole("heading", { name: "Check your inbox" }).count()).toBe(1);
+      await expect.poll(() => page.getByRole("status").textContent()).toContain("We sent a confirmation link to new@example.com.");
       const calls = () => page.evaluate(() => (window as unknown as { __calls: [string, { options?: { emailRedirectTo?: string }; email?: string; type?: string }][] }).__calls);
       expect((await calls())[0][1].options?.emailRedirectTo).toBe("https://pekkotv.test/dashboard/screens?add=1");
 

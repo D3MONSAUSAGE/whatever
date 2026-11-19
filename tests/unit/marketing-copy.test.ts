@@ -8,8 +8,9 @@ import { en } from "@/lib/i18n/en";
 // I18N-1: page copy lives in lib/i18n/en.ts (es.ts mirrors it); pages render it through t().
 const dict = Object.values(en).join("\n");
 
-// The home page is app/page.tsx plus its section components.
-const home = [readFileSync("app/page.tsx", "utf8"), readFileSync("components/site/marketing/showcase.tsx", "utf8")].join("\n");
+// The previous home page (kept as the HOME_VARIANT=classic rollback) is home-classic.tsx plus its section components.
+// The Option B home page has its own checks in tests/unit/home-b.test.ts.
+const home = [readFileSync("app/page.tsx", "utf8"), readFileSync("components/site/marketing/home-classic.tsx", "utf8"), readFileSync("components/site/marketing/showcase.tsx", "utf8")].join("\n");
 const features = readFileSync("app/features/page.tsx", "utf8");
 const pricing = readFileSync("app/pricing/page.tsx", "utf8");
 const signup = readFileSync("app/signup/page.tsx", "utf8");
