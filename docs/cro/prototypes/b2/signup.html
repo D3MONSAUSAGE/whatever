@@ -1,0 +1,181 @@
+<title>Pekko Signup Proposal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;600;700&display=swap">
+<style>
+/* Layout: same dark Pekko world as the landing page. Phone: promise → form. Desktop: what you get (left) | form (right). */
+:root {
+  --night: #070d1c; --panel: #0f1a33; --line: #24365e; --text: #f1f5ff; --muted: #aebcd9;
+  --blue: #2f6bff; --blue-hover: #2259e6; --cyan: #3dd6ff; --ok: #3ddc97; --err: #ff8a8a; --err-bg: #3a1620;
+  --display: "Montserrat", "Arial Black", system-ui, sans-serif; --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--night); color: var(--text); font: 400 16px/1.55 var(--body); }
+a { color: inherit; }
+button, input { font: inherit; }
+:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.proto { background: var(--cyan); color: #04121f; font: 700 12px/1.3 var(--body); text-align: center; padding: 5px 16px; display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; align-items: center; }
+.proto button { border: 1px solid #04121f; background: transparent; color: #04121f; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: 12px; cursor: pointer; min-height: 28px; }
+.proto button[aria-pressed="true"] { background: #04121f; color: var(--cyan); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header .wrap { display: flex; justify-content: space-between; align-items: center; min-height: 60px; }
+.brand { display: flex; align-items: center; gap: 8px; font: 800 19px/1 var(--display); text-decoration: none; }
+.brand b { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--cyan), var(--blue)); color: #fff; display: grid; place-items: center; font-size: 15px; }
+header a.signin { font-weight: 600; font-size: 14px; color: var(--muted); text-decoration: none; padding: 10px 2px; }
+main { padding-block: 8px 48px; background: radial-gradient(700px 360px at 80% 0%, rgb(47 107 255 / .18), transparent 70%); }
+.grid { display: grid; gap: 22px; }
+.grid { grid-template-areas: "intro" "card" "get"; }
+.intro { grid-area: intro; } .card { grid-area: card; } .get-wrap { grid-area: get; }
+@media (min-width: 900px) { .grid { grid-template-columns: 1fr 440px; grid-template-areas: "intro card" "get card"; align-items: start; column-gap: 56px; row-gap: 0; padding-top: 36px; } .card { grid-row: 1 / span 2; } }
+.grid > * { min-width: 0; }
+h1, h2 { font-family: var(--display); letter-spacing: -0.02em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.7rem, 6.4vw, 2.6rem); line-height: 1.08; font-weight: 900; }
+h2 { font-size: 1.35rem; line-height: 1.2; font-weight: 800; }
+p { margin: 0; }
+.promise { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 0; list-style: none; }
+.promise li { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 600; }
+.promise li::before { content: "✓ "; color: var(--ok); }
+.get { margin-top: 20px; display: grid; gap: 10px; padding: 0; list-style: none; }
+.get li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; color: var(--muted); }
+.get li b { color: var(--text); font-weight: 600; }
+.get li::before { content: attr(data-n); width: 28px; height: 28px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); color: var(--cyan); display: grid; place-items: center; font: 800 13px/1 var(--display); }
+.peek { margin-top: 22px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #000; padding: 2%; display: none; }
+.peek img { width: 100%; height: auto; display: block; border-radius: 6px; }
+@media (min-width: 900px) { .peek { display: block; } }
+/* phones: short promise first, then the form; the list moves below the form */
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; }
+.field label { font: 600 14px/1.2 var(--body); }
+.field input { min-height: 50px; border-radius: 12px; border: 1px solid #34497a; background: #0a1328; color: var(--text); padding: 0 14px; font-size: 16px; width: 100%; }
+.field input:focus { border-color: var(--cyan); outline: none; box-shadow: 0 0 0 3px rgb(61 214 255 / .25); }
+.field input[aria-invalid="true"] { border-color: var(--err); }
+.hint { font-size: 13px; color: var(--muted); }
+.err { font-size: 13.5px; color: var(--err); display: flex; gap: 6px; }
+.err[hidden] { display: none; }
+.pw { position: relative; }
+.pw input { padding-right: 76px; }
+.pw button { position: absolute; right: 6px; top: 6px; bottom: 6px; border: 0; background: #1a2747; color: var(--text); border-radius: 9px; padding: 0 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 14px; border: 0; font: 700 17px/1 var(--body); cursor: pointer; width: 100%; background: var(--blue); color: #fff; box-shadow: 0 10px 28px rgb(47 107 255 / .35); }
+.btn:hover { background: var(--blue-hover); }
+.btn[disabled] { opacity: .7; cursor: progress; }
+.btn-quiet { background: transparent; border: 1px solid var(--line); box-shadow: none; color: var(--text); font-size: 15px; min-height: 46px; }
+.legal { font-size: 13px; color: var(--muted); }
+.alert { border-radius: 12px; padding: 12px 14px; font-size: 14.5px; background: var(--err-bg); color: #ffd6d6; border: 1px solid #6a2a36; }
+.alert[hidden] { display: none; }
+.below { text-align: center; font-size: 14px; color: var(--muted); }
+.below a { color: var(--text); font-weight: 600; }
+.inbox { display: grid; gap: 14px; text-align: left; }
+.inbox[hidden], .form[hidden] { display: none; }
+.inbox .mail { font: 700 15px/1.3 ui-monospace, Menlo, monospace; color: var(--text); word-break: break-all; }
+.inbox ol { margin: 0; padding-left: 20px; color: var(--muted); display: grid; gap: 6px; }
+footer { color: var(--muted); font-size: 13px; padding-block: 20px 32px; }
+footer .wrap { display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
+</style>
+
+<div class="proto" role="group" aria-label="Prototype states">Prototype · Signup proposal · show:
+  <button type="button" data-state="form" aria-pressed="true">Form</button>
+  <button type="button" data-state="errors" aria-pressed="false">Validation</button>
+  <button type="button" data-state="server" aria-pressed="false">Server error</button>
+  <button type="button" data-state="inbox" aria-pressed="false">Check inbox</button>
+</div>
+
+<header><div class="wrap"><a class="brand" href="#" aria-label="Pekko home"><b aria-hidden="true">P</b>Pekko</a><a class="signin" href="#">Have an account? Sign in</a></div></header>
+
+<main>
+  <div class="wrap grid">
+    <div class="intro">
+      <h1>Create your free menu</h1>
+      <ul class="promise" aria-label="Trial terms"><li>14-day free trial</li><li>No credit card required</li><li>Every feature</li></ul>
+    </div>
+
+    <div class="card" aria-labelledby="form-title">
+      <form class="form" id="form" novalidate aria-labelledby="form-title">
+        <div style="display:grid;gap:14px">
+          <h2 id="form-title">Start your free trial</h2>
+          <p class="alert" id="server" role="alert" hidden>We couldn’t create your account right now. Check your connection and try again. If it keeps happening, email support@pekkotv.com.</p>
+          <div class="field">
+            <label for="email">Business email</label>
+            <input id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" aria-describedby="email-err" required>
+            <p class="err" id="email-err" hidden>Enter an email address like name@business.com.</p>
+          </div>
+          <div class="field">
+            <label for="password">Create a password</label>
+            <div class="pw"><input id="password" name="password" type="password" autocomplete="new-password" minlength="8" aria-describedby="pw-hint pw-err" required><button type="button" id="toggle" aria-controls="password" aria-pressed="false">Show</button></div>
+            <p class="hint" id="pw-hint">At least 8 characters.</p>
+            <p class="err" id="pw-err" hidden>Use at least 8 characters.</p>
+          </div>
+          <button class="btn" id="submit" type="submit">Create my free menu</button>
+          <p class="legal">By creating an account you agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+        </div>
+      </form>
+
+      <div class="inbox" id="inbox" hidden aria-live="polite">
+        <h2>Check your inbox</h2>
+        <p>We sent a confirmation link to</p>
+        <p class="mail" id="sent-to">rosa@rosaskitchen.com</p>
+        <ol><li>Open the email from Pekko and tap <b>Confirm</b>.</li><li>You’ll land in Pekko, signed in and ready to make your menu.</li></ol>
+        <p class="hint">It can take a minute. Check spam or promotions if you don’t see it.</p>
+        <button type="button" class="btn btn-quiet" id="resend" disabled>Resend email (in 60 s)</button>
+        <button type="button" class="btn btn-quiet" id="change">Use a different email</button>
+      </div>
+
+      <p class="below">Questions? <a href="#">support@pekkotv.com</a></p>
+    </div>
+    <div class="get-wrap">
+        <ul class="get" aria-label="What you can do">
+          <li data-n="1"><span><b>Pick one of 22 templates</b> and type your items and prices.</span></li>
+          <li data-n="2"><span><b>Add food photos</b>, your logo and colours.</span></li>
+          <li data-n="3"><span><b>Show it on your Smart TV</b> by opening pekkotv.com/pair. No extra hardware needed.</span></li>
+        </ul>
+        <div class="peek" aria-hidden="true"><img src="assets/modern-restaurant-640.webp" width="1280" height="720" alt=""></div>
+      </div>
+  </div>
+</main>
+
+<footer><div class="wrap"><span>Prototype for review. Fields, auth and trial rules are unchanged; only presentation, copy and validation messages.</span><span>Terms · Privacy · English / Español</span></div></footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const email = $("email"), pw = $("password"), form = $("form"), inbox = $("inbox");
+  const emailOk = () => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim());
+  const pwOk = () => pw.value.length >= 8;
+  function check(field) {
+    if (field === "email" || !field) { const bad = !emailOk(); email.setAttribute("aria-invalid", String(bad)); $("email-err").hidden = !bad; }
+    if (field === "pw" || !field) { const bad = !pwOk(); pw.setAttribute("aria-invalid", String(bad)); $("pw-err").hidden = !bad; $("pw-hint").hidden = bad; }
+    return emailOk() && pwOk();
+  }
+  // Validate on leaving a field (not while typing), and again on submit; focus the first problem.
+  email.addEventListener("blur", () => email.value && check("email"));
+  pw.addEventListener("blur", () => pw.value && check("pw"));
+  pw.addEventListener("input", () => { if (pw.getAttribute("aria-invalid") === "true") check("pw"); });
+  $("toggle").addEventListener("click", (e) => { const show = pw.type === "password"; pw.type = show ? "text" : "password"; e.currentTarget.textContent = show ? "Hide" : "Show"; e.currentTarget.setAttribute("aria-pressed", String(show)); });
+  let wait;
+  function showInbox() {
+    form.hidden = true; inbox.hidden = false; $("sent-to").textContent = email.value.trim() || "rosa@rosaskitchen.com";
+    let n = 60; const r = $("resend"); r.disabled = true; clearInterval(wait);
+    wait = setInterval(() => { n -= 1; r.textContent = n > 0 ? `Resend email (in ${n} s)` : "Resend email"; if (n <= 0) { clearInterval(wait); r.disabled = false; } }, 1000);
+  }
+  form.addEventListener("submit", (e) => {
+    e.preventDefault(); $("server").hidden = true;
+    if (!check()) { (emailOk() ? pw : email).focus(); return; }
+    const b = $("submit"); b.disabled = true; b.textContent = "Creating your account…";
+    setTimeout(() => { b.disabled = false; b.textContent = "Create my free menu"; showInbox(); }, 700);
+  });
+  $("change").addEventListener("click", () => { inbox.hidden = true; form.hidden = false; clearInterval(wait); email.focus(); email.select(); });
+  $("resend").addEventListener("click", () => showInbox());
+  // Prototype state switcher.
+  document.querySelectorAll(".proto button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".proto button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    const s = b.dataset.state;
+    form.hidden = s === "inbox"; inbox.hidden = s !== "inbox"; $("server").hidden = s !== "server";
+    if (s === "errors") { email.value = "rosa@rosaskitchen"; pw.value = "taco"; check(); }
+    if (s === "form" || s === "server") { email.value = s === "server" ? "rosa@rosaskitchen.com" : ""; pw.value = ""; ["email", "password"].forEach((id) => $(id).removeAttribute("aria-invalid")); $("email-err").hidden = $("pw-err").hidden = true; $("pw-hint").hidden = false; }
+    if (s === "inbox") showInbox();
+  }));
+})();
+</script>

@@ -1,0 +1,468 @@
+<title>Pekko Option B Refined</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Inter:wght@400;600;700&display=swap">
+<link rel="preload" as="image" href="assets/modern-restaurant-640.webp" imagesrcset="assets/modern-restaurant-640.webp 640w, assets/modern-restaurant-1280.webp 1280w" imagesizes="(min-width: 980px) 620px, 92vw" fetchpriority="high">
+<style>
+/* Layout: the TV is the thesis. Mobile first screen = headline, a real Pekko menu on a TV, one CTA, trial line, Smart TV line. */
+:root {
+  --night: #070d1c;
+  --panel: #0f1a33;
+  --panel-2: #142244;
+  --line: #24365e;
+  --text: #f1f5ff;
+  --muted: #aebcd9;       /* 8.9:1 on --night */
+  --blue: #2f6bff;        /* button fill; white text 4.7:1 */
+  --blue-hover: #2259e6;
+  --cyan: #3dd6ff;
+  --ok: #3ddc97;
+  --display: "Montserrat", "Arial Black", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+body { margin: 0; background: var(--night); color: var(--text); font: 400 16px/1.55 var(--body); }
+img { max-width: 100%; display: block; height: auto; }
+a { color: inherit; }
+button { font: inherit; }
+:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.proto { background: var(--cyan); color: #04121f; font: 700 12px/1.3 var(--body); text-align: center; padding: 5px 16px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.02em; }
+h1 { font-weight: 900; font-size: clamp(1.95rem, 8.4vw, 3.9rem); line-height: 1.04; }
+h2 { font-weight: 800; font-size: clamp(1.55rem, 5.4vw, 2.4rem); line-height: 1.1; }
+h3 { font-weight: 800; font-size: 1.08rem; line-height: 1.25; }
+p { margin: 0; }
+.grad { background: linear-gradient(90deg, #9cbcff, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.eyebrow { font: 700 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); }
+.lede { color: var(--muted); font-size: 1.04rem; max-width: 36rem; }
+section { padding-block: 52px; }
+.sec-head { display: grid; gap: 10px; max-width: 44rem; }
+
+/* header: logo + sign in on phones; three links on desktop */
+header.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgb(7 13 28 / .9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--night); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; }
+.brand { display: flex; align-items: center; gap: 8px; font: 800 19px/1 var(--display); text-decoration: none; }
+.brand b { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--cyan), var(--blue)); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.nav-right { display: flex; align-items: center; gap: 18px; font-weight: 600; font-size: 14px; }
+.nav-right a { text-decoration: none; color: var(--muted); }
+.nav-right .desk { display: none; }
+.nav-right .signin { color: var(--text); padding: 10px 2px; }
+@media (min-width: 900px) { .nav-right .desk { display: inline; } }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 26px; border-radius: 14px; font: 700 17px/1 var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+.btn-primary { background: var(--blue); color: #fff; box-shadow: 0 10px 28px rgb(47 107 255 / .38); }
+.btn-primary:hover { background: var(--blue-hover); }
+.btn-ghost { border-color: var(--line); background: var(--panel); color: var(--text); }
+.btn-sm { min-height: 42px; padding: 0 16px; font-size: 15px; border-radius: 12px; }
+
+/* hero */
+.hero { padding-block: 18px 30px; background: radial-gradient(760px 380px at 70% 0%, rgb(47 107 255 / .2), transparent 70%); }
+.hero-grid { display: grid; gap: 16px; }
+.hero-grid > * { min-width: 0; }
+.hero-copy { display: grid; gap: 12px; }
+.hero-sub { color: var(--muted); font-size: 1rem; }
+.hero-sub b { color: var(--text); font-weight: 600; }
+.cta-block { display: grid; gap: 10px; }
+.cta-block .btn { width: 100%; }
+.trial { font-size: 14px; color: var(--muted); text-align: center; }
+.trial b { color: var(--text); }
+.tvline { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; color: var(--text); font-weight: 600; }
+.tvline svg { flex: none; }
+@media (min-width: 980px) {
+  .hero { padding-block: 56px 64px; }
+  .hero-grid { grid-template-columns: .92fr 1.08fr; align-items: center; gap: 44px; grid-template-areas: "copy visual"; }
+  .hero-copy { grid-area: copy; gap: 16px; }
+  .hero-visual { grid-area: visual; }
+  .cta-block { justify-items: start; }
+  .cta-block .btn { width: auto; }
+  .trial, .tvline { text-align: left; justify-content: flex-start; }
+  .hero-sub { font-size: 1.1rem; }
+}
+/* phones: headline, then the TV, then the CTA (all inside the first screen) */
+@media (max-width: 979px) {
+  .hero-grid { grid-template-areas: "head" "visual" "cta"; }
+  .hero-copy { display: contents; }
+  .hero-head { grid-area: head; display: grid; gap: 8px; }
+  .hero-visual { grid-area: visual; }
+  .cta-block { grid-area: cta; }
+}
+.tv { position: relative; border-radius: 14px; background: #000; padding: 2.2%; box-shadow: 0 0 0 1px #2c3d66, 0 20px 50px rgb(0 0 0 / .5); aspect-ratio: 16 / 9; max-width: 100%; }
+.tv img, .tv .svg { width: 100%; height: 100%; border-radius: 8px; object-fit: cover; }
+.tv img { transition: opacity .2s; }
+.tv .badge { position: absolute; left: 3%; bottom: -11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; font: 700 11.5px/1 var(--body); display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.tv .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 18px 0 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; scroll-snap-align: start; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 0 14px; font: 600 14px/1 var(--body); min-height: 40px; cursor: pointer; }
+.chips button[aria-pressed="true"] { background: #fff; color: #07101f; border-color: #fff; }
+.tpl-name { font-size: 12.5px; color: var(--muted); margin-top: 6px; min-height: 1.2em; }
+
+/* how it works: one step visible at a time */
+.steps-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 22px; }
+.steps-tabs button { border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 12px; padding: 10px 6px; font: 700 13px/1.2 var(--body); min-height: 56px; cursor: pointer; text-align: center; }
+.steps-tabs button span { display: block; font: 800 11px/1 var(--body); color: var(--cyan); margin-bottom: 4px; letter-spacing: .06em; }
+.steps-tabs button[aria-selected="true"] { background: #fff; color: #07101f; border-color: #fff; }
+.steps-tabs button[aria-selected="true"] span { color: var(--blue); }
+.step-panel { margin-top: 14px; display: grid; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+@media (min-width: 860px) { .step-panel { grid-template-columns: 1.25fr 1fr; align-items: center; padding: 24px; } }
+.step-panel[hidden] { display: none; }
+.step-panel .pic { border-radius: 12px; overflow: hidden; background: #e9eef6; aspect-ratio: 16 / 10; display: grid; place-items: center; }
+.step-panel .pic img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.step-panel .pic.fit img { object-fit: contain; background: #f1f4fa; }
+.step-copy { display: grid; gap: 8px; }
+.step-copy p { color: var(--muted); }
+.step-copy .who { font: 700 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); }
+/* the TV's pairing screen, drawn from the player's own text and styles */
+.tvcode { width: 100%; height: 100%; background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif; display: grid; place-items: center; text-align: center; padding: 6%; border-radius: 10px; }
+.tvcode .l { font-size: clamp(11px, 2.6vw, 17px); color: #e3e8e6; }
+.tvcode .c { font-size: clamp(24px, 7vw, 44px); font-weight: bold; letter-spacing: .06em; margin: 6px 0; white-space: nowrap; }
+.tvcode .m { font-size: clamp(9px, 2vw, 12px); color: #87918d; }
+.duo .tvcode { aspect-ratio: 16 / 9; height: auto; }
+.duo { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; align-items: center; width: 100%; height: 100%; padding: 10px; background: #0b1226; }
+.step-panel .pic .duo img { border-radius: 10px; height: auto; object-fit: contain; background: #fff; }
+
+/* live demo */
+.demo { margin-top: 22px; display: grid; gap: 16px; }
+@media (min-width: 980px) { .demo { grid-template-columns: 340px minmax(0, 1fr); align-items: start; gap: 28px; } }
+.demo > * { min-width: 0; }
+.demo-form { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: grid; gap: 12px; }
+.demo-form label { display: grid; gap: 6px; font: 600 14px/1.2 var(--body); }
+.demo-form input { min-height: 46px; border-radius: 10px; border: 1px solid #34497a; background: #0a1328; color: var(--text); padding: 0 12px; font: 400 16px var(--body); width: 100%; }
+.demo-form input:focus { border-color: var(--cyan); outline: none; box-shadow: 0 0 0 3px rgb(61 214 255 / .25); }
+.demo-form .row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+.demo-note { font-size: 12.5px; color: var(--muted); }
+.demo .tv .svg > svg { width: 100%; height: 100%; display: block; border-radius: 8px; }
+.demo .tv .svg { background: #0b1226; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+.facts-inline { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 14px; color: var(--muted); padding: 0; list-style: none; }
+.facts-inline li::before { content: "✓ "; color: var(--ok); font-weight: 800; }
+
+/* smart tv band */
+.band { background: linear-gradient(180deg, #0c1630, var(--night)); border-block: 1px solid var(--line); }
+.tvsteps { display: grid; gap: 10px; margin-top: 22px; padding: 0; list-style: none; counter-reset: s; }
+@media (min-width: 860px) { .tvsteps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tvsteps li { counter-increment: s; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: center; font-weight: 600; }
+.tvsteps li::before { content: counter(s); width: 34px; height: 34px; border-radius: 10px; background: var(--blue); color: #fff; display: grid; place-items: center; font: 800 16px/1 var(--display); }
+.tvsteps code { font: 700 14px/1 ui-monospace, Menlo, monospace; color: var(--cyan); }
+.benefits { display: grid; gap: 14px; margin-top: 22px; }
+@media (min-width: 860px) { .benefits { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.benefit { border-top: 2px solid var(--blue); padding-top: 12px; display: grid; gap: 4px; }
+.benefit p { color: var(--muted); font-size: 15px; }
+.fine { margin-top: 18px; font-size: 13px; color: var(--muted); max-width: 52rem; }
+
+/* pricing */
+.plans { display: grid; gap: 10px; margin-top: 22px; }
+@media (min-width: 760px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.plan { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 4px; }
+.plan.pop { background: linear-gradient(180deg, #17295a, var(--panel)); border-color: var(--blue); }
+.price { font: 900 2rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.price small { font: 500 14px var(--body); color: var(--muted); }
+.terms { margin-top: 16px; display: grid; gap: 8px; padding: 0; list-style: none; font-size: 14.5px; color: var(--muted); }
+@media (min-width: 760px) { .terms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.terms li::before { content: "✓ "; color: var(--ok); font-weight: 800; }
+
+/* faq */
+.faq { display: grid; gap: 10px; margin-top: 20px; }
+@media (min-width: 860px) { .faq { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.faq details { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; }
+.faq summary { font: 700 1rem/1.3 var(--body); cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-size: 22px; color: var(--cyan); }
+.faq details[open] summary::after { content: "−"; }
+.faq p { padding-bottom: 14px; color: var(--muted); font-size: 15px; }
+
+/* who */
+.who-box { display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+@media (min-width: 860px) { .who-box { grid-template-columns: 1fr auto; align-items: center; padding: 24px; } }
+.who-box p { color: var(--muted); }
+.who-box .mail { font: 700 15px/1 ui-monospace, Menlo, monospace; color: var(--text); background: #0a1328; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; user-select: all; }
+
+.final .box { border-radius: 22px; padding: 26px 20px; background: radial-gradient(600px 260px at 20% 0%, rgb(61 214 255 / .25), transparent 70%), linear-gradient(135deg, #1d4fe0, #0f2c86); display: grid; gap: 14px; }
+@media (min-width: 860px) { .final .box { grid-template-columns: 1.4fr auto; align-items: center; padding: 40px; } }
+.final .btn-primary { background: #fff; color: #0f2c86; box-shadow: none; }
+.final p { color: #dde7ff; }
+footer { padding-block: 22px 96px; color: var(--muted); font-size: 13px; }
+@media (min-width: 900px) { footer { padding-bottom: 40px; } }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: space-between; }
+
+.sticky-cta { position: fixed; inset: auto 0 0 0; z-index: 25; background: rgb(15 26 51 / .97); border-top: 1px solid var(--line); padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 12px; align-items: center; justify-content: space-between; transform: translateY(110%); transition: transform .25s; }
+.sticky-cta.on { transform: none; }
+.sticky-cta span { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+@media (min-width: 900px) { .sticky-cta { display: none; } }
+.toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #fff; color: #07101f; padding: 10px 14px; border-radius: 10px; font-size: 13px; z-index: 40; max-width: calc(100% - 32px); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<div class="proto">Prototype · Option B refined · not live · buttons are inert</div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Pekko home"><b aria-hidden="true">P</b>Pekko</a>
+    <nav class="nav-right" aria-label="Main">
+      <a class="desk" href="#templates">Templates</a>
+      <a class="desk" href="#how">How it works</a>
+      <a class="desk" href="#pricing">Pricing</a>
+      <a class="signin cta" href="#signin" data-dest="/login">Sign in</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <div class="hero-head">
+          <h1 id="hero-title">Beautiful digital menus on your TV <span class="grad">in minutes.</span></h1>
+          <p class="hero-sub">Pick a template, add your items, prices and food photos, and publish. <b>No design skills needed.</b></p>
+        </div>
+        <div class="cta-block">
+          <a class="btn btn-primary cta" href="#start" data-dest="/signup" data-track="hero">Create my free menu</a>
+          <p class="trial"><b>14-day free trial</b> · No credit card required</p>
+          <p class="tvline"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2"/></svg>Already have a Smart TV? No extra hardware needed.</p>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="tv">
+          <img id="hero-img" src="assets/modern-restaurant-640.webp" srcset="assets/modern-restaurant-640.webp 640w, assets/modern-restaurant-1280.webp 1280w" sizes="(min-width: 980px) 620px, 92vw" width="1280" height="720" alt="Modern Restaurant menu template shown on a TV" fetchpriority="high">
+          <span class="badge">Real Pekko template</span>
+        </div>
+        <div class="chips" role="group" aria-label="See a template for your business">
+          <button type="button" aria-pressed="true" data-id="modern-restaurant" data-name="Modern Restaurant">Restaurant</button>
+          <button type="button" aria-pressed="false" data-id="taqueria-specials" data-name="Taquería Specials">Tacos</button>
+          <button type="button" aria-pressed="false" data-id="coffee-shop" data-name="Coffee Shop">Café</button>
+          <button type="button" aria-pressed="false" data-id="smokehouse-bbq" data-name="Smokehouse BBQ">BBQ</button>
+          <button type="button" aria-pressed="false" data-id="photo-menu-grid" data-name="Photo Menu Grid">Fast casual</button>
+          <button type="button" aria-pressed="false" data-id="brunch-house" data-name="Brunch House">Brunch</button>
+          <button type="button" aria-pressed="false" data-id="happy-hour" data-name="Happy Hour">Bar</button>
+        </div>
+        <p class="tpl-name" id="hero-name" aria-live="polite">Modern Restaurant template · one of 22</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="templates" aria-labelledby="tpl-title">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">22 templates · 7 layouts</p>
+        <h2 id="tpl-title">Type your menu. See it on screen.</h2>
+        <p class="lede">This is Pekko’s real menu designer at work. Change the name or a price and watch the template update, just as it will on your TV.</p>
+      </div>
+      <div class="demo" id="demo">
+        <form class="demo-form" id="demo-form" autocomplete="off" aria-describedby="demo-note">
+          <label for="d-title">Business name<input id="d-title" maxlength="28" placeholder="Ember & Oak"></label>
+          <div class="row">
+            <label for="d-item">First item<input id="d-item" maxlength="26" placeholder="Burrata"></label>
+            <label for="d-price">Price<input id="d-price" maxlength="7" inputmode="decimal" placeholder="$16"></label>
+          </div>
+          <div class="chips" role="group" aria-label="Choose a template" id="demo-chips" style="padding-top:2px">
+            <button type="button" aria-pressed="true" data-id="modern-restaurant">Restaurant</button>
+            <button type="button" aria-pressed="false" data-id="taqueria-specials">Tacos</button>
+            <button type="button" aria-pressed="false" data-id="coffee-shop">Café</button>
+            <button type="button" aria-pressed="false" data-id="smokehouse-bbq">BBQ</button>
+            <button type="button" aria-pressed="false" data-id="photo-menu-grid">Photo grid</button>
+            <button type="button" aria-pressed="false" data-id="brunch-house">Brunch</button>
+          </div>
+          <p class="demo-note" id="demo-note">Prices, photos, colours and every other item are edited the same way in the designer.</p>
+        </form>
+        <div>
+          <div class="tv"><div class="svg" id="demo-board" role="img" aria-label="Live template preview">Loading the live preview…</div></div>
+          <ul class="facts-inline"><li>Add a photo to any item</li><li>Your logo and brand colours</li><li>Text sized to fit automatically</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="how-title" style="padding-top:8px">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">How it works</p>
+        <h2 id="how-title">From empty screen to live menu in four steps</h2>
+      </div>
+      <div class="steps-tabs" role="tablist" aria-label="Steps">
+        <button type="button" role="tab" id="t1" aria-controls="p1" aria-selected="true"><span>1</span>Choose</button>
+        <button type="button" role="tab" id="t2" aria-controls="p2" aria-selected="false" tabindex="-1"><span>2</span>Add menu</button>
+        <button type="button" role="tab" id="t3" aria-controls="p3" aria-selected="false" tabindex="-1"><span>3</span>Connect TV</button>
+        <button type="button" role="tab" id="t4" aria-controls="p4" aria-selected="false" tabindex="-1"><span>4</span>Publish</button>
+      </div>
+      <div class="step-panel" role="tabpanel" id="p1" aria-labelledby="t1">
+        <div class="pic"><img src="assets/ui-gallery.webp" width="960" height="560" loading="lazy" decoding="async" alt="Pekko design gallery with templates for restaurants, cafés, bars and more"></div>
+        <div class="step-copy"><p class="who">On your phone or computer</p><h3>Choose a template</h3><p>Browse templates for your kind of business, or start from scratch.</p></div>
+      </div>
+      <div class="step-panel" role="tabpanel" id="p2" aria-labelledby="t2" hidden>
+        <div class="pic"><img src="assets/ui-editor.webp" width="960" height="560" loading="lazy" decoding="async" alt="Pekko menu editor: items, prices and a food photo, with a live TV preview"></div>
+        <div class="step-copy"><p class="who">On your phone or computer</p><h3>Add your menu</h3><p>Type items and prices, tap the photo square to add a food photo. The preview is exactly what the TV will show.</p></div>
+      </div>
+      <div class="step-panel" role="tabpanel" id="p3" aria-labelledby="t3" hidden>
+        <div class="pic"><div class="duo"><div class="tvcode" aria-label="The TV shows a six-digit code"><div><p class="l">Enter this code in Pekko to connect this TV.</p><p class="c">482 910</p><p class="m">A new code appears every 10 minutes.</p></div></div><img src="assets/ui-pair.webp" width="480" height="240" loading="lazy" decoding="async" alt="Pekko on a phone: code 482910 and the name Front counter, then Connect TV"></div></div>
+        <div class="step-copy"><p class="who">On the TV, then your phone</p><h3>Connect your TV</h3><p>Open the browser on your Smart TV and go to <b>pekkotv.com/pair</b>. Type the code it shows into Pekko on your phone.</p></div>
+      </div>
+      <div class="step-panel" role="tabpanel" id="p4" aria-labelledby="t4" hidden>
+        <div class="pic fit"><img src="assets/ui-publish.webp" width="480" height="507" loading="lazy" decoding="async" alt="Publish to screens dialog with Front counter selected"></div>
+        <div class="step-copy"><p class="who">One tap</p><h3>Publish</h3><p>Pick your screens and publish. Screens update within about 30 seconds, and every later change goes out the same way.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="tv-title">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Use the TV you already have</p>
+        <h2 id="tv-title">Already have a Smart TV? No extra hardware needed.</h2>
+        <p class="lede">Pekko runs in your TV’s built-in web browser. Setup takes four steps:</p>
+      </div>
+      <ol class="tvsteps">
+        <li>Open the browser on your Smart TV</li>
+        <li>Go to <code>pekkotv.com/pair</code></li>
+        <li>Enter the code on your phone or computer</li>
+        <li>Publish your menu</li>
+      </ol>
+      <div class="benefits">
+        <div class="benefit"><h3>No box to buy</h3><p>On supported Smart TVs there’s no separate signage player to purchase.</p></div>
+        <div class="benefit"><h3>No installer</h3><p>If you can open a website on your TV, you can set it up.</p></div>
+        <div class="benefit"><h3>No waiting on anyone</h3><p>Change a price or add a special yourself, from your phone or computer.</p></div>
+        <div class="benefit"><h3>One screen or many</h3><p>Run several screens and locations from one account, with schedules for breakfast, lunch and dinner.</p></div>
+      </div>
+      <p class="fine">Tested on LG, Samsung, Vizio and Insignia Smart TVs. Some older TVs can’t open secure websites; for those, any streaming stick or computer with a web browser connected to the screen works.</p>
+    </div>
+  </section>
+
+  <section id="pricing" aria-labelledby="price-title">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Pricing</p>
+        <h2 id="price-title">Simple monthly plans. Every feature on every plan.</h2>
+      </div>
+      <div class="plans">
+        <div class="plan"><h3>Starter</h3><p class="price">$19 <small>/ month</small></p><p class="lede" style="font-size:15px">1 screen</p></div>
+        <div class="plan pop"><h3>Business</h3><p class="price">$39 <small>/ month</small></p><p class="lede" style="font-size:15px">Up to 3 screens</p></div>
+        <div class="plan"><h3>Multi-screen</h3><p class="price">$59 <small>/ month</small></p><p class="lede" style="font-size:15px">Up to 5 screens</p></div>
+      </div>
+      <ul class="terms">
+        <li>14 days free on up to 5 screens, no credit card</li>
+        <li>After the trial, screens keep playing 3 more days</li>
+        <li>Nothing you made is deleted if you don’t subscribe</li>
+        <li>Billed monthly in USD; taxes may apply</li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="faq-title" style="padding-top:0">
+    <div class="wrap">
+      <h2 id="faq-title">Questions</h2>
+      <div class="faq">
+        <details><summary>Do I need to buy any hardware?</summary><p>No, if your Smart TV has a web browser that can open secure websites. Pekko is tested on LG, Samsung, Vizio and Insignia. Otherwise, connect any streaming stick or computer with a browser to the screen.</p></details>
+        <details><summary>What if the TV is turned off?</summary><p>The TV stays connected to your account. Most TV browsers don’t reopen the page by themselves, so after a power cut open pekkotv.com/pair again and your menu comes back.</p></details>
+        <details><summary>I already have a menu from Canva or a designer.</summary><p>Upload it. Images, MP4 video, PowerPoint and PDF play full screen, and you can mix them with Pekko menus.</p></details>
+        <details><summary>Can I use Pekko in Spanish?</summary><p>Yes. The whole dashboard is available in English and Spanish.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="who-title" style="padding-top:0">
+    <div class="wrap">
+      <div class="who-box">
+        <div><h2 id="who-title" style="font-size:1.3rem">Built and supported by a real person</h2><p style="margin-top:8px">Pekko is independent software made in Los Angeles by Francisco Lopez. Questions go straight to the person who builds it.</p></div>
+        <p class="mail" aria-label="Support email">support@pekkotv.com</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" id="start" style="padding-top:0">
+    <div class="wrap">
+      <div class="box">
+        <div><h2>Put your menu on screen today.</h2><p style="margin-top:8px">Sign up with your email, pick a template, and see your menu in the TV preview right away.</p></div>
+        <a class="btn btn-primary cta" href="#start" data-dest="/signup" data-track="final">Create my free menu</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><span>Pekko · Prototype for review. Templates are shown with Pekko’s own sample content.</span><span>Terms · Privacy · Support</span></div></footer>
+
+<div class="sticky-cta" id="sticky" aria-hidden="true"><span><b style="color:var(--text)">14 days free</b><br>No credit card</span><a class="btn btn-primary btn-sm cta" href="#start" data-dest="/signup" data-track="sticky" tabindex="-1">Create my free menu</a></div>
+
+<script>
+(() => {
+  // Hero: swap between pre-rendered real templates (instant, no script-heavy rendering in the first screen).
+  const heroImg = document.getElementById("hero-img");
+  const heroName = document.getElementById("hero-name");
+  const heroChips = [...document.querySelectorAll(".hero .chips button")];
+  heroChips.forEach((c) => c.addEventListener("click", () => {
+    heroChips.forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+    const id = c.dataset.id;
+    const pre = new Image();
+    pre.onload = () => { heroImg.srcset = `assets/${id}-640.webp 640w, assets/${id}-1280.webp 1280w`; heroImg.src = `assets/${id}-640.webp`; heroImg.alt = `${c.dataset.name} menu template shown on a TV`; };
+    pre.src = `assets/${id}-${innerWidth > 979 || devicePixelRatio > 1.5 ? 1280 : 640}.webp`;
+    heroName.textContent = `${c.dataset.name} template · one of 22`;
+  }));
+
+  // How it works: accessible tabs.
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  function select(tab) {
+    tabs.forEach((t) => { const on = t === tab; t.setAttribute("aria-selected", String(on)); t.tabIndex = on ? 0 : -1; document.getElementById(t.getAttribute("aria-controls")).hidden = !on; });
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => select(t));
+    t.addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; select(n); n.focus(); } });
+  });
+
+  // Live demo: loads Pekko's real renderer (assets/demo.js) and the template fonts only when the section is near.
+  const board = document.getElementById("demo-board");
+  const fields = { title: document.getElementById("d-title"), itemName: document.getElementById("d-item"), itemPrice: document.getElementById("d-price") };
+  const demoChips = [...document.querySelectorAll("#demo-chips button")];
+  let current = "modern-restaurant", ready = false;
+  const photoCache = {};
+  async function dataUri(id) {
+    if (photoCache[id]) return photoCache[id];
+    const blob = await (await fetch(`assets/stock/${id}.jpg`)).blob();
+    photoCache[id] = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+    return photoCache[id];
+  }
+  async function draw() {
+    if (!ready) return;
+    const api = window.PekkoDemo;
+    const hrefs = {};
+    await Promise.all(api.photos(current).map(async (id) => { hrefs[id] = await dataUri(id); }));
+    board.innerHTML = api.render(current, { title: fields.title.value, itemName: fields.itemName.value, itemPrice: fields.itemPrice.value }, hrefs);
+  }
+  function placeholders() {
+    const d = window.PekkoDemo.defaults(current);
+    fields.title.placeholder = d.title; fields.itemName.placeholder = d.itemName; fields.itemPrice.placeholder = d.itemPrice;
+  }
+  let pending;
+  Object.values(fields).forEach((f) => f.addEventListener("input", () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(draw); }));
+  demoChips.forEach((c) => c.addEventListener("click", () => { demoChips.forEach((x) => x.setAttribute("aria-pressed", String(x === c))); current = c.dataset.id; if (ready) { placeholders(); draw(); } }));
+  document.getElementById("demo-form").addEventListener("submit", (e) => e.preventDefault());
+  function boot() {
+    const fonts = document.createElement("link");
+    fonts.rel = "stylesheet";
+    fonts.href = "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=Lobster&family=Montserrat:wght@400;600;700;800&family=Noto+Serif:wght@400;700&family=Oswald:wght@400;500;600;700&display=swap";
+    document.head.appendChild(fonts);
+    const s = document.createElement("script");
+    s.src = "assets/demo.js"; s.async = true;
+    s.onload = async () => { ready = true; placeholders(); await draw(); document.fonts && document.fonts.ready.then(draw); };
+    s.onerror = () => { board.textContent = "The live preview couldn’t load."; };
+    document.head.appendChild(s);
+  }
+  const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { io.disconnect(); boot(); } }, { rootMargin: "400px" });
+  io.observe(document.getElementById("demo"));
+
+  // Prototype: CTAs are inert and say where they go.
+  let timer;
+  document.querySelectorAll(".cta").forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    let t = document.querySelector(".toast");
+    if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = `Prototype: on the live page this opens pekkotv.com${a.dataset.dest}` + (a.dataset.track ? ` and counts a CTA click (${a.dataset.track}).` : ".");
+    clearTimeout(timer); timer = setTimeout(() => t.remove(), 3000);
+  }));
+
+  // Sticky CTA on phones once the hero CTA is off screen.
+  const sticky = document.getElementById("sticky");
+  new IntersectionObserver(([e]) => { const on = !e.isIntersecting; sticky.classList.toggle("on", on); sticky.setAttribute("aria-hidden", String(!on)); sticky.querySelector("a").tabIndex = on ? 0 : -1; }).observe(document.querySelector(".cta-block"));
+})();
+</script>
