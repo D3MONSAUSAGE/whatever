@@ -90,3 +90,12 @@ No run had a page error, a renderer crash or a reported player error, apart from
 8. **Power cycle:** confirm the TV reopens the player and resumes without a new code (if the TV restores the browser at all).
 
 **Required once after this deploy:** refresh or restart each TV once, so it runs the build that can update itself.
+
+## Post-deploy regression (2026-11-20, `2026-11-20.2`)
+
+After #163 a desktop browser player left running unattended could end on a black screen with "This video can't play on this TV."
+
+**Cause (confirmed in Chromium and in the virtual-clock harness):** the new stall watchdog treats any 4 seconds without `currentTime` advancing as a fatal stall. A healthy looping video that is only *paused* (display sleep, lock screen, or a hidden tab) hits that limit, is marked bad, and a one-item playlist then shows the "can't play" message. The same path can also fire around a loop if a seek is slow and `timeupdate` is silent.
+
+**Fix:** ignore stall time while the page is hidden; treat a `currentTime` wrap as a loop, not a freeze; if the element is paused, try `play()` instead of failing; only a *playing* element whose clock does not move is reported as stalled. Real decode / unsupported failures still surface after the existing retries. TVs already running need one refresh (or the next self-update after this build is deployed) to pick it up.
+

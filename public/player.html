@@ -105,7 +105,7 @@
   var TOKEN_KEY = 'pantalla_display_token';
   var STATE_MS = 10000, PAIR_MS = 3000, RETRY_MS = 5000, LOAD_TIMEOUT_MS = 60000;
   // Must match lib/player-build.ts. A running TV that sees a newer build from the server reloads itself once.
-  var PLAYER_BUILD = '2026-11-20.1';
+  var PLAYER_BUILD = '2026-11-20.2';
   // A slide image that has not answered in this time is skipped (a stalled connection may never error).
   var SLIDE_LOAD_MS = 30000;
   // A video that says it is playing but whose clock never moves is treated as stalled after this.
@@ -423,11 +423,34 @@
   }
 
   function noteProgress() { progressAt = new Date().getTime(); }
+  function pageHidden() {
+    try { return !!document.hidden; } catch (eHidden) { return false; }
+  }
+  // A sleeping display, a locked computer or a background tab may pause a healthy video.
+  // Start it again when the page is visible; the stall watchdog handles a clock that still does not move.
+  function resumeShownVideo() {
+    var p;
+    if (!shownVideo || !playlist || isManual()) return;
+    try {
+      if (shownVideo.paused && !shownVideo.ended) {
+        p = shownVideo.play();
+        if (p && typeof p.then === 'function') p.then(function () {}, function () {});
+      }
+    } catch (eResume) {}
+  }
   // Safety net for anything not caught above (an unexpected error inside a slide change, a media event that
   // never comes): an automatic slideshow that has not moved for its longest slide plus 90 seconds moves on.
   function checkStuck() {
     var i, longest = 0, item;
     if (!playlist || isManual() || !progressAt) return;
+    if (pageHidden()) return;
+    // A video on screen is watched by the stall timer. Do not restart it just because time updates were
+    // delayed (a hidden tab, a sleeping display, or a loop).
+    if (shownVideo && shownVideo.className && shownVideo.className.indexOf('on') !== -1 && !shownVideo.ended) {
+      if (shownVideo.paused) resumeShownVideo();
+      else noteProgress();
+      return;
+    }
     for (i = 0; i < playlist.items.length; i++) {
       item = playlist.items[i];
       if (item && item.kind !== 'video' && item.durationMs > longest) longest = item.durationMs;
@@ -819,11 +842,48 @@
       }
       failVideo(index, item, message);
     }
+    function playOrFail(err) {
+      if (gone() || (err && err.name === 'AbortError')) return;
+      if (err && err.name === 'NotSupportedError') failOnce("This video can't play on this TV.");
+      else failOnce('This video was blocked from autoplaying.');
+    }
     function watchPlayback() {
       function tick() {
-        var nowT;
+        var nowT, again;
         if (gone() || shownVideo !== v) return;
         nowT = v.currentTime || 0;
+        // A hidden tab or sleeping display may pause the video or stop time updates. That is not a stall.
+        if (pageHidden()) {
+          stuckFor = 0;
+          lastTime = nowT;
+          watchTimer = setTimeout(tick, 2000);
+          return;
+        }
+        // The clock jumped back: the clip looped. Count that as progress, not a freeze.
+        if (sawTime && nowT + 0.5 < lastTime) {
+          sawTime = true;
+          stuckFor = 0;
+          lastTime = nowT;
+          noteProgress();
+          watchTimer = setTimeout(tick, 2000);
+          return;
+        }
+        // A healthy clip can be paused by the OS or the browser (display sleep, lock screen). Try to
+        // resume; only a playing element whose clock never moves is treated as stalled.
+        if (v.paused && !v.ended) {
+          try {
+            again = v.play();
+            if (again && typeof again.then === 'function') {
+              again.then(function () {}, function (err) {
+                if (gone() || (err && err.name === 'AbortError')) return;
+                if (err && err.name === 'NotSupportedError') failOnce("This video can't play on this TV.");
+                else failOnce('This video was blocked from autoplaying.');
+              });
+            }
+          } catch (ePlay) {}
+          watchTimer = setTimeout(tick, 2000);
+          return;
+        }
         if (!sawTime) {
           // Playing was reported, but no time update yet. Some TVs never send one when the decoder is stuck
           // on the first frame: watch the clock directly, and give up after VIDEO_NO_PROGRESS_MS.
@@ -892,7 +952,7 @@
           try {
             again = v.play();
             if (again && typeof again.then === 'function') {
-              again.then(function () {}, function () { failOnce("This video can't play on this TV."); });
+              again.then(function () {}, playOrFail);
             }
           } catch (e2) { failOnce("This video can't play on this TV."); }
           return;
@@ -902,7 +962,7 @@
           lastTime = 0; stuckFor = 0; watchPlayback(); // keep watching for stalls on every loop
           again = v.play();
           if (again && typeof again.then === 'function') {
-            again.then(function () {}, function () { failOnce("This video can't play on this TV."); });
+            again.then(function () {}, playOrFail);
           }
         } catch (e) { failOnce("This video can't play on this TV."); }
         return;
@@ -915,10 +975,7 @@
       var playResult = v.play();
       if (playResult && typeof playResult.then === 'function') {
         // NotSupportedError means the source failed (a dead link, a bad file), not an autoplay refusal.
-        playResult.then(function () {}, function (err) {
-          if (err && err.name === 'NotSupportedError') failOnce("This video can't play on this TV.");
-          else failOnce('This video was blocked from autoplaying.');
-        });
+        playResult.then(function () {}, playOrFail);
       }
     } catch (err) {
       failOnce("This video can't play on this TV.");
@@ -1550,6 +1607,16 @@
 
   // Check right away when the network comes back.
   window.addEventListener('online', function () { if (mode === 'playing') startPlayback(); });
+  // A desktop tab that was hidden, frozen or sleeping may have paused the video. Resume and do not
+  // treat the pause itself as a stall (the watchdog ignores hidden time and resumes a paused clip).
+  function onPageVisible() {
+    if (pageHidden()) return;
+    noteProgress();
+    resumeShownVideo();
+  }
+  document.addEventListener('visibilitychange', onPageVisible);
+  window.addEventListener('pageshow', onPageVisible);
+  window.addEventListener('focus', onPageVisible);
   window.addEventListener('resize', function () { if (zoneFit) applyZoneFit(); });
 
   function publishedBoard() {
