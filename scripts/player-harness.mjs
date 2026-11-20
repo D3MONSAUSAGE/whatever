@@ -50,7 +50,8 @@ export function createPlayer(options = {}) {
               if (this._src !== src) return;
               if (already) { if (ok) ok(); return; }
               this._playing = src;
-              if (!src || src.includes("bad")) { if (this.onerror) this.onerror(); if (bad) bad(); return; }
+              if (expired(src)) stats.expired++;
+              if (!src || src.includes("bad") || expired(src)) { if (this.onerror) this.onerror(); if (bad) bad({ name: "NotSupportedError" }); return; }
               stats.videoStarts++;
               this.currentTime = 0.1;
               if (this.onplaying) this.onplaying();
@@ -103,6 +104,7 @@ export function createPlayer(options = {}) {
     online: true, token: "tok".repeat(10), version: 1, url: null, playlist: null, stateCalls: 0, errorLog: [], playing: [],
     status: null, // force a status for GET /api/player/state (e.g. 401, 503)
     latency: 300, playerBuild: undefined,
+    linkTtlMs: 0, // when set, a media URL whose sig= is older than this fails like an expired signed link
   };
   function server(method, url, body, headers) {
     if (!S.online) return [0, ""];
@@ -145,11 +147,14 @@ export function createPlayer(options = {}) {
       }, S.latency);
     }
   }
+  const expired = (u) => { const m = /sig=(\d+)/.exec(u || ""); return !!(S.linkTtlMs && m && now - Number(m[1]) > S.linkTtlMs); };
+  stats.expired = 0;
   class Img {
     set src(u) {
       this._u = u;
       if (u.includes("hang")) return;
       setTimeout_(() => {
+        if (expired(u)) { stats.expired++; if (this.onerror) this.onerror(); return; }
         if (u.includes("bad")) { if (this.onerror) this.onerror(); return; }
         stats.imageLoads++;
         if (this.onload) this.onload();

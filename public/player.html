@@ -675,6 +675,7 @@
     var token = slideToken;
     dropPin(item);
     markBad(item);
+    if (!blobFor(item)) needRefresh = true; // a network link failed: ask for fresh signed links on the next poll
     releaseItemVideo(item);
     reportError(message);
     if (!playlist) return;
@@ -849,6 +850,7 @@
       started = true;
       clearTimeout(startTimer);
       noteProgress();
+      delete badLevel[itemKey(item)]; // played fine: a later failure starts its back-off from the beginning
       lastTime = v.currentTime || 0;
       pinUrl(item, url);
       showVideo(v);
@@ -912,7 +914,11 @@
     try {
       var playResult = v.play();
       if (playResult && typeof playResult.then === 'function') {
-        playResult.then(function () {}, function () { failOnce('This video was blocked from autoplaying.'); });
+        // NotSupportedError means the source failed (a dead link, a bad file), not an autoplay refusal.
+        playResult.then(function () {}, function (err) {
+          if (err && err.name === 'NotSupportedError') failOnce("This video can't play on this TV.");
+          else failOnce('This video was blocked from autoplaying.');
+        });
       }
     } catch (err) {
       failOnce("This video can't play on this TV.");
@@ -950,6 +956,7 @@
     function commit() {
       if (token !== slideToken || !playlist) return;
       noteProgress();
+      delete badLevel[itemKey(item)]; // shown fine: a later failure starts its back-off from the beginning
       nextItem = nextGoodItem(index);
       swapTo(src, playlist.transition === 'fade');
       // While this slide has a zone video, do not keep a second clip armed.
@@ -989,6 +996,7 @@
     function failSlide() {
       dropPin(item);
       markBad(item);
+      if (src.indexOf('blob:') !== 0) needRefresh = true; // fresh signed links on the next poll
       reportError('A slide did not load and was skipped.');
       clearSlideTimer();
       if (!playlist) return;
@@ -1027,6 +1035,8 @@
         if (playlist.items[i].url !== items[i].url && !blobFor(playlist.items[i]) && playlist.items[i].mediaId) {
           if (stableSrc[playlist.items[i].mediaId]) delete loadedUrls[stableSrc[playlist.items[i].mediaId]];
           delete stableSrc[playlist.items[i].mediaId];
+          // A first failure was probably the old link: retry with the fresh one now. Repeat failures keep backing off.
+          if ((badLevel[playlist.items[i].mediaId] || 0) <= 1) delete badSkips[playlist.items[i].mediaId];
         }
         playlist.items[i].url = items[i].url;
         playlist.items[i].durationMs = items[i].durationMs;

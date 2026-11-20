@@ -32,6 +32,8 @@ Classification: **Confirmed** = reproduced by a test against the previous player
 | 6 | TVs without Cache Storage keep drawing slides from the first signed link even after it expired (1 h): if the browser drops its in-memory copy, the slide is re-requested from a dead link and shows black | **Confirmed in code**; black screen **plausible** (depends on the TV's memory cache) | Simulator: slides drawn from 240-minute-old links | Medium on older TVs / Medium: black slide | **Fixed (P1):** refreshed links replace pins; the next showing preloads the fresh link first |
 | 7 | Player fixes never reach a TV that stays on for weeks (the page is never reloaded) | **Confirmed in code** | No reload path existed | Certain / Indirect: every future reliability fix | **Fixed (P1):** server sends `playerBuild`; an older page reloads once (6-hour loop guard). Requires **one manual refresh or restart** of each TV to pick up this first version. |
 | 8 | Self-review regression in my first version of #4: a healthy single looping video would be "rescued" after 90 s and then skipped | **Confirmed and fixed before merge** | Harness now matches browsers' `play()` semantics; 1,911 vs ~16,900 loops in 3 days | n/a | Fixed in the same PR (every video time update counts as progress; stall watch re-armed each loop) |
+| 8b | A media link that fails (expired early, e.g. the TV slept past the link's life) is only replaced by the scheduled 30-minute refresh. The item is skipped for at least 4 passes, and the back-off never resets after it plays fine again, so later one-off failures wait longer and longer | **Confirmed** (found by the accelerated no-cache soak; reproduced in the simulator: 38 of ~230 video plays in an hour) | Soak: 7 expired-link video requests in 30 min | Low with 60-min links and 30-min refresh / Medium: a video or slide missing for many loops | **Fixed (P1):** a failed network link requests fresh links on the next poll; a first failure retries with the fresh link at once; back-off resets after a successful play |
+| 8c | A video whose source fails (dead link, bad file) is reported to the owner as "blocked from autoplaying" | **Confirmed** (soak) | `play()` rejections were all labelled as autoplay | Medium / Low: misleading dashboard message | **Fixed (P1):** `NotSupportedError` is reported as "This video can't play on this TV." (existing translated string) |
 | 9 | An edit published while a video is on screen shows black for the new first image's load time (≈ 0.3–3 s) | **Confirmed** (simulator) | Image-to-image edits keep the old slide | Each publish during a video / Low: brief black flash | **P2, not changed** |
 | 10 | The service worker returns a server error page (5xx) at boot instead of the saved player | Plausible | `player-sw.js` uses the cache only when fetch throws | Very low (Vercel outage during a TV boot) / Medium | **P2** |
 | 11 | Memory leak from media elements, listeners, timers or object URLs | **Mitigated** | Two reused video elements; `removeAttribute('src')` and `load()`; object URLs revoked when content leaves the playlist; listener count constant over 7 simulated days; real-Chromium heap flat (see soak) | Low | None |
@@ -46,20 +48,20 @@ Classification: **Confirmed** = reproduced by a test against the previous player
 ## Recommendations
 
 - **P0 (fixed in this change):** #2, #3, #4.
-- **P1 (fixed in this change):** #1, #5, #6, #7.
+- **P1 (fixed in this change):** #1, #5, #6, #7, #8b, #8c.
 - **P2 (optional, not changed):** #9 keep the current video up until the new first image is ready; #10 service worker falls back to the saved page on a 5xx; add an "auto-recovered" note to the dashboard when the safety net fires (needs a new translated message).
 - **Future:** dedicated player hardware/app, kiosk launchers that reopen the browser after power loss, offline-first beyond the existing Cache Storage replay, remote reboot.
 
 ## Test evidence
 
-**Simulator** (`npm run test:player`, in CI): `scripts/simulate-player-reliability.mjs` runs the real player script on a virtual clock. It has 39 scenarios: 7 days of a mixed loop; 3 days of one looping video; a 2-minute video; a stuck image request; a stuck video; exceptions; one 401; 1 hour offline; 30 min of 503s; 360 edits; broken media; refresh; and self-update. **The previous player fails 13; this version passes all 39.** The existing 87 player checks still pass.
+**Simulator** (`npm run test:player`, in CI): `scripts/simulate-player-reliability.mjs` runs the real player script on a virtual clock. It has 41 scenarios: 7 days of a mixed loop; 3 days of one looping video; a 2-minute video; a stuck image request; a stuck video; exceptions; one 401; dead and expired links; 1 hour offline; 30 min of 503s; 360 edits; broken media; refresh; and self-update. **The previous player fails 14; this version passes all 41.** The existing 87 player checks still pass.
 
 **Real Chromium soaks** (`scripts/soak-player.mjs`, headless Chromium 153, local mock server, real JPEGs plus H.264 MP4s). Scripted events: 3 min offline, playlist edits, about 2 min of 503s, a browser refresh, and one 401. Status at merge time; **the longer runs were still in progress** (results are added below when they finish):
 
 | Run | Player | Result so far |
 | --- | --- | --- |
 | 30 min, no Cache Storage, 5-min links | previous | **One 401 unpaired the TV** (pairing screen at end). 3 expired-link video requests, so 3 videos skipped (reported as "blocked from autoplaying"). 0 blank seconds; heap 0.74–1.1 MB |
-| 30 min, no Cache Storage, 5-min links | this | Still paired after the 401; content on screen; heap ≈ 1 MB (final numbers pending) |
+| 30 min, no Cache Storage, 5-min links | this (before #8b/#8c) | **Stayed paired after the 401.** 0 blank seconds, 0 frozen-video seconds, 451 transitions, no page errors. Heap 0.75–1.09 MB, DOM nodes 398–402, renderer RSS 427 → 430 MB. 7 expired-link video skips, which led to fixes #8b and #8c. This run's 5-minute links are shorter than the player's 30-minute refresh, so it cannot exercise #6 itself |
 | 60 min, Cache Storage | previous | In progress: no blank seconds, heap ≈ 1 MB, DOM nodes flat (398) |
 | 90 min, single looping video | this | In progress: video playing, heap ≈ 1 MB, nodes 397 |
 | 120 min, mixed playlist | this | In progress: content on screen, heap ≈ 1.1 MB, nodes 398 |

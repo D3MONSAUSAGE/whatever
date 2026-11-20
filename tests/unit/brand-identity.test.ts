@@ -23,7 +23,7 @@ import { hasUnsavedEdits } from "@/lib/menu-board-unify";
 // Updated intentionally (per-item photos PR): apply-to-all now skips Layout Studio/template boards, which the
 // classic renderer would overwrite. Classic menus and promos are re-rendered exactly as before.
 const APPLY_SHA = "ea543e7fa888252b05a69538dc44b27da74997c5c93d2e58139ec135aa7fe934";
-const PLAYER_SHA = "c5b1a2d521f23f327f673f000833ce5b09cd69ee2f70363af7cbadacb41d7009"; // E5 changed the player (on-TV unpair)
+const PLAYER_SHA = "9fd5d30936756804617489c6ccc0a6cb0f4f23722330d2efd0999601c614a7d0"; // E5 changed the player (on-TV unpair)
 
 const stored: BrandRecord = {
   primaryColor: "#c8102e",

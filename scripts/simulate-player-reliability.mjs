@@ -130,6 +130,20 @@ const advances = (p, from) => p.log.filter((e) => e.at >= from).length;
   R.check("an exception during a slide change is recovered within ~2 minutes", advances(p, t0) >= 20 && p.errors.length >= 1, `${advances(p, t0)} advances, ${p.errors.length} errors`);
 }
 
+// 6c. A dead link (expired early, e.g. the TV slept past the link's life) is replaced on the next poll, not after
+//     the 30-minute refresh: links live 5 minutes here, so the scheduled refresh alone would leave items skipped.
+{
+  const p = started([img("a", 5000), vid("v", 5000), img("b", 5000)]);
+  p.S.linkTtlMs = 5 * 60_000;
+  // Server links and the player's pins both start fresh; only the early expiry is unusual.
+  const t0 = p.now;
+  p.run(60 * 60_000);
+  const shownV = p.log.filter((e) => e.at >= t0 && e.name === "v").length;
+  const shownB = p.log.filter((e) => e.at >= t0 && e.name === "b").length;
+  R.check("dead links are refreshed on the next poll: video and images keep playing (≥ 150 plays each in 60 min)", shownV >= 150 && shownB >= 150, `v=${shownV} b=${shownB} expired=${p.stats.expired}`);
+  R.check("a dead video link is reported as a playback failure, not an autoplay block", !p.S.errorLog.some((e) => /autoplay/.test(e)), p.S.errorLog.slice(0, 3).join("|"));
+}
+
 // 6. A single 401 (e.g. an edge error during a deploy) must not unpair; a real unpair still does.
 {
   const p = started([img("a", 5000), img("b", 5000)]);
