@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { PLAYER_BUILD } from "@/lib/player-build";
 import { setTestDb } from "@/lib/server/supabase";
 import { setScheduleClock } from "@/lib/server/schedule";
 import { GET as me } from "@/app/api/me/route";
@@ -101,7 +102,7 @@ describe("scheduling API", () => {
     expect(shown.body.playlist).toBeUndefined();
     expect(shown.body.nextTransitionAt).toBeUndefined();
     const unchanged = await call(playerState, "http://localhost/api/player/state?v=1", { headers: { "X-Display-Token": token } });
-    expect(unchanged.body).toEqual({ version: 1, unchanged: true, pollMs: 30000, commands: [], layoutStudio: false, catchupMs: 2500, catchupForMs: 120000 });
+    expect(unchanged.body).toEqual({ version: 1, unchanged: true, pollMs: 30000, commands: [], layoutStudio: false, catchupMs: 2500, catchupForMs: 120000, playerBuild: PLAYER_BUILD });
   });
 
   it("manages locations, moves a screen, and refuses to delete one that still has a screen", async () => {
