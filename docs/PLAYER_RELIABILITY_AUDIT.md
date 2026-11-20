@@ -52,7 +52,19 @@ Classification: **Confirmed** = reproduced by a test against the previous player
 
 ## Test evidence
 
-SOAK_RESULTS_PLACEHOLDER
+**Simulator** (`npm run test:player`, in CI): `scripts/simulate-player-reliability.mjs` runs the real player script on a virtual clock. It has 39 scenarios: 7 days of a mixed loop; 3 days of one looping video; a 2-minute video; a stuck image request; a stuck video; exceptions; one 401; 1 hour offline; 30 min of 503s; 360 edits; broken media; refresh; and self-update. **The previous player fails 13; this version passes all 39.** The existing 87 player checks still pass.
+
+**Real Chromium soaks** (`scripts/soak-player.mjs`, headless Chromium 153, local mock server, real JPEGs plus H.264 MP4s). Scripted events: 3 min offline, playlist edits, about 2 min of 503s, a browser refresh, and one 401. Status at merge time; **the longer runs were still in progress** (results are added below when they finish):
+
+| Run | Player | Result so far |
+| --- | --- | --- |
+| 30 min, no Cache Storage, 5-min links | previous | **One 401 unpaired the TV** (pairing screen at end). 3 expired-link video requests, so 3 videos skipped (reported as "blocked from autoplaying"). 0 blank seconds; heap 0.74–1.1 MB |
+| 30 min, no Cache Storage, 5-min links | this | Still paired after the 401; content on screen; heap ≈ 1 MB (final numbers pending) |
+| 60 min, Cache Storage | previous | In progress: no blank seconds, heap ≈ 1 MB, DOM nodes flat (398) |
+| 90 min, single looping video | this | In progress: video playing, heap ≈ 1 MB, nodes 397 |
+| 120 min, mixed playlist | this | In progress: content on screen, heap ≈ 1.1 MB, nodes 398 |
+
+Renderer memory for the previous-player runs summed every renderer on the machine (several soaks ran at once); per-browser figures exist only for this version's runs.
 
 ## Real-TV tests to run yourself
 
