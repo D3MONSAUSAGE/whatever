@@ -5,6 +5,7 @@ import { isMissingSchema } from "@/lib/server/schema";
 import { playlistDeleteMessage, playlistsUsingMedia } from "@/lib/server/media-usage";
 import { fail, json, readJson } from "@/lib/server/http";
 import { mediaRename } from "@/lib/media-rename";
+import { inUseMessage, mediaReferences } from "@/lib/server/media-references";
 import { withLocalizedErrors } from "@/lib/server/locale";
 
 export const runtime = "nodejs";
@@ -94,6 +95,13 @@ export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { 
   const used = await playlistsUsingMedia(admin.accountId, id);
   if (used === null) return fail("Couldn't delete. Try again.", 500);
   if (used.length > 0) return fail(playlistDeleteMessage(used.map((playlist) => playlist.name)), 409);
+
+  // Menu boards (item photos, side photo, layout image/video/logo), promotions and the Brand Kit logo point at files
+  // without a blocking foreign key. Deleting one of those would silently drop it, so refuse and say where it's used.
+  const refs = await mediaReferences(admin.accountId, id);
+  if (refs === null) return fail("Couldn't delete. Try again.", 500);
+  const inUse = inUseMessage(refs);
+  if (inUse) return fail(inUse, 409, "media_in_use");
 
   const { data: path, error } = await db().rpc("delete_media", {
     p_account_id: admin.accountId,

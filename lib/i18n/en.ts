@@ -2006,6 +2006,7 @@ export const en = {
   "ml.delPresTitle": "Delete this presentation?",
   "ml.delPres": "Delete presentation",
   "ml.inPlaylistTitle": "This file is in a playlist",
+  "ml.inUseTitle": "This file is in use",
   "ml.close": "Close",
   "ml.delFileTitle": "Delete this file?",
   "ml.delFile": "Delete file",
