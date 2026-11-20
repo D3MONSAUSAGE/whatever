@@ -21,6 +21,8 @@ const MINUTES = Number(arg("minutes", "20"));
 const PLAYER = arg("player", "public/player.html");
 const TTL_S = Number(arg("ttl", "3600"));
 const NO_CACHE = process.argv.includes("--no-cache");
+// --single-video: the whole run is one looping video (the commonest restaurant set-up besides a menu image).
+const SINGLE_VIDEO = process.argv.includes("--single-video");
 const OUT = arg("out", path.join(process.env.TMPDIR || "/tmp", `pekko-soak-${Date.now()}`));
 mkdirSync(OUT, { recursive: true });
 
@@ -46,6 +48,7 @@ const PLAYLISTS = [
   [img(photos[0]), vid("promo-a.mp4"), img(photos[1]), img(photos[2]), vid("promo-b.mp4"), img(photos[3])],
   [img(photos[4], 4000), img(photos[5], 4000), vid("promo-a.mp4")],
 ];
+if (SINGLE_VIDEO) { PLAYLISTS[0] = [vid("promo-b.mp4")]; PLAYLISTS[1] = [vid("promo-a.mp4")]; }
 state.playlist = PLAYLISTS[0];
 function signed(id) { return `/media/${id}?exp=${Date.now() + TTL_S * 1000}`; }
 function stateBody(url) {
@@ -187,7 +190,8 @@ const events = [
   [0.15 + 3 / MINUTES, "network back", async () => { await context.setOffline(false); state.offline = false; }],
   [0.3, "playlist edit", async () => { state.version++; state.playlist = PLAYLISTS[1]; }],
   [0.4, "server 503 for ~2 min", async () => { state.status = 503; state.statusCount = 12; }],
-  [0.5, "playlist edit back", async () => { state.version++; state.playlist = PLAYLISTS[0]; }],
+  [0.5, "playlist edit back", async () => { state.version++; if (SINGLE_VIDEO) { PLAYLISTS[0] = [vid("promo-b.mp4")]; PLAYLISTS[1] = [vid("promo-a.mp4")]; }
+state.playlist = PLAYLISTS[0]; }],
   [0.6, "browser refresh", async () => { await page.reload(); }],
   [0.75, "one transient 401", async () => { state.status = 401; state.statusCount = 1; }],
   [0.85, "playlist edit", async () => { state.version++; state.playlist = PLAYLISTS[1]; }],
@@ -197,7 +201,7 @@ const t0 = Date.now();
 const end = t0 + MINUTES * 60000;
 let nextSample = t0;
 const log = (s) => { process.stdout.write(s + "\n"); };
-log(`soak: ${MINUTES} min, player=${PLAYER}, ttl=${TTL_S}s, cache=${NO_CACHE ? "disabled" : "enabled"}, out=${OUT}`);
+log(`soak: ${MINUTES} min, player=${PLAYER}, ttl=${TTL_S}s, cache=${NO_CACHE ? "disabled" : "enabled"}, single-video=${SINGLE_VIDEO}, out=${OUT}`);
 while (Date.now() < end) {
   const frac = (Date.now() - t0) / (end - t0);
   while (events.length && events[0][0] <= frac) {
@@ -222,7 +226,7 @@ const firstHalf = periodic.slice(2, Math.max(3, Math.floor(periodic.length / 2))
 const secondHalf = periodic.slice(Math.floor(periodic.length / 2));
 const avg = (l, k) => l.reduce((n, s) => n + s[k], 0) / Math.max(1, l.length);
 const summary = {
-  minutes: MINUTES, player: PLAYER, ttlSeconds: TTL_S, cacheStorage: !NO_CACHE,
+  minutes: MINUTES, player: PLAYER, ttlSeconds: TTL_S, cacheStorage: !NO_CACHE, singleVideo: SINGLE_VIDEO,
   watch, pageErrors, reportedErrors: state.errors.slice(-20), reportedErrorCount: state.errors.length,
   confirmations: state.playing, stateCalls: state.stateCalls, mediaRequests: state.mediaHits, expiredMediaRequests: state.expiredHits,
   pairedAtEnd: !(final.screen.screens || []).includes("pair"),

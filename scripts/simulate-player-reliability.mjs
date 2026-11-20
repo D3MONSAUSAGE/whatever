@@ -35,14 +35,33 @@ const advances = (p, from) => p.log.filter((e) => e.at >= from).length;
   R.check("signed URLs are refreshed about every 30 minutes", p.S.stateCalls > 7 * DAY / 10000 * 0.9);
 }
 
-// 2. Single looping video for 3 days.
+// 2. Single looping video for 3 days: loops back-to-back, is never "rescued" or reported as broken.
 {
   const p = started([vid("loop", 15000)]);
-  const t0 = p.now;
+  const starts0 = p.stats.videoStarts;
   p.run(3 * DAY);
-  R.check("single video loops for 3 days without stopping", p.stats.videoStarts >= 3 * DAY / 15500 * 0.9 || p.log.length >= 1, p.stats.videoStarts);
+  const loops = p.stats.videoStarts - starts0;
+  R.check("single video loops for 3 days without stopping (~16,900 loops of 15 s)", loops >= 16000, loops);
+  R.check("single looping video is never reported as broken", p.S.errorLog.length === 0, p.S.errorLog[0]);
   R.check("single video loop has no uncaught errors", p.errors.length === 0, p.errors[0]);
-  R.check("single video still on screen after 3 days", p.name(p.shown()) === "loop" && p.now - t0 >= 3 * DAY);
+  R.check("single video still on screen after 3 days", p.name(p.shown()) === "loop");
+}
+// 2b. A long video (2 minutes) in a playlist plays to its end; the stuck net (longest image + 90 s) does not cut it.
+{
+  const p = started([img("a", 5000), vid("long", 120000)]);
+  p.run(30 * 60_000);
+  R.check("a 2-minute video is not cut short by the stuck-slideshow net", p.S.errorLog.length === 0 && p.log.filter((e) => e.name === "long").length >= 10, `${p.log.filter((e) => e.name === "long").length} plays, errors ${p.S.errorLog.length}`);
+}
+// 2c. A single looping video that stalls on a later loop is noticed (not frozen forever).
+{
+  const p = started([vid("loop", 10000)]);
+  p.run(5 * 60_000);
+  const v = [p.els.va, p.els.vb].find((x) => x.className.includes("on"));
+  const realPlay = v.play.bind(v);
+  let stalled = false;
+  v.play = function () { if (!stalled) { stalled = true; this.paused = false; this._playing = this._src; return { then(ok) { if (ok) ok(); } }; } return realPlay(); };
+  p.run(5 * 60_000);
+  R.check("a single looping video that stalls on a later loop is detected and retried", p.S.errorLog.some((e) => /stalled/.test(e)) && p.stats.videoStarts > 30, `${p.S.errorLog.join("|")} starts=${p.stats.videoStarts}`);
 }
 
 // 3. A slide image that never answers (stalled connection, no error event).

@@ -36,16 +36,20 @@ export function createPlayer(options = {}) {
       _src: "", _attrs: {}, onplaying: null, onended: null, onerror: null, ontimeupdate: null, loop: false,
       setAttribute(n, val) { this._attrs[n] = String(val); },
       getAttribute(n) { return Object.prototype.hasOwnProperty.call(this._attrs, n) ? this._attrs[n] : null; },
-      removeAttribute(n) { delete this._attrs[n]; if (n === "src") this._src = ""; },
+      removeAttribute(n) { delete this._attrs[n]; if (n === "src") { this._src = ""; this._playing = ""; } },
       load() {},
-      pause() { this.paused = true; },
+      pause() { this.paused = true; this._playing = ""; },
       play() {
         const src = this._src;
+        // Like browsers: play() on an element that is already playing resolves without a new "playing" event.
+        const already = !this.paused && this._playing === src;
         this.paused = false;
         return {
           then: (ok, bad) => {
             setTimeout_(() => {
               if (this._src !== src) return;
+              if (already) { if (ok) ok(); return; }
+              this._playing = src;
               if (!src || src.includes("bad")) { if (this.onerror) this.onerror(); if (bad) bad(); return; }
               stats.videoStarts++;
               this.currentTime = 0.1;
@@ -57,7 +61,7 @@ export function createPlayer(options = {}) {
                 if (this._src !== src || this.paused) return;
                 this.currentTime += 0.25;
                 if (this.ontimeupdate) this.ontimeupdate();
-                if (this.currentTime * 1000 >= this.duration) { if (this.onended) this.onended(); return; }
+                if (this.currentTime * 1000 >= this.duration) { this.paused = true; this._playing = ""; if (this.onended) this.onended(); return; }
                 setTimeout_(step, 250);
               };
               setTimeout_(step, 250);
@@ -68,7 +72,7 @@ export function createPlayer(options = {}) {
     };
     Object.defineProperty(v, "src", {
       get() { return v._src; },
-      set(value) { v._src = value || ""; const m = /dur=(\d+)/.exec(value || ""); v.duration = m ? Number(m[1]) : 3000; v.currentTime = 0; },
+      set(value) { v._src = value || ""; v._playing = ""; v.paused = true; const m = /dur=(\d+)/.exec(value || ""); v.duration = m ? Number(m[1]) : 3000; v.currentTime = 0; },
     });
     return v;
   }

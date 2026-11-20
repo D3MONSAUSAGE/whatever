@@ -870,6 +870,7 @@
       lastTime = v.currentTime || 0;
       sawTime = true;
       stuckFor = 0;
+      noteProgress(); // a playing video is progress, on every loop (the stuck-slideshow net must not restart it)
     };
     v.onended = function () {
       var again;
@@ -885,6 +886,7 @@
         // the network, switch to the local URL so later loops do not re-download.
         if (url.indexOf('blob:') !== 0 && blobFor(item)) {
           url = armVideo(v, item);
+          lastTime = 0; stuckFor = 0; watchPlayback(); // keep watching for stalls on every loop
           try {
             again = v.play();
             if (again && typeof again.then === 'function') {
@@ -895,6 +897,7 @@
         }
         try {
           v.currentTime = 0;
+          lastTime = 0; stuckFor = 0; watchPlayback(); // keep watching for stalls on every loop
           again = v.play();
           if (again && typeof again.then === 'function') {
             again.then(function () {}, function () { failOnce("This video can't play on this TV."); });
