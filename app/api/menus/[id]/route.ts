@@ -8,6 +8,7 @@ import { parseLayout } from "@/lib/layout-studio";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, keepOwnItemPhotos, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { PUBLISH_SCREEN_LIMIT, screensForMenuPublish } from "@/lib/server/menu-screens";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,13 @@ export const GET = withLocalizedErrors(async function GET(req: Request, { params
   return json(menu);
 });
 
+const TOO_MANY_SCREENS = "Choose fewer screens. Fifty is the limit for one publish.";
+
+async function publishTo(accountId: string, playlistId: string, ids: string[]): Promise<boolean> {
+  const pub = await db().rpc("publish_playlist", { p_account_id: accountId, p_playlist_id: playlistId, p_display_ids: ids });
+  return !pub.error && Boolean(pub.data);
+}
+
 /** Save edits: renders a new image and swaps it in everywhere the old one plays. */
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
@@ -41,10 +49,22 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
   if (!isUuid(id)) return fail("Menu not found.", 404);
   const body = await readJson(req);
   const parsed = parseMenuBody(body, true);
+  // Adding screens never removes the ones already showing this board unless the client asks for exactly this set.
+  const replace = body.replace === true;
   if (!parsed.ok) return fail(parsed.error, 400);
   const found = await load(admin.accountId, id);
   if (found.error) return found.error;
   const row = found.row;
+  // Screens to publish to, worked out before anything is written so a refusal changes nothing. They include the
+  // screens already showing this board (publish_playlist clears any screen it isn't given), unless replace is true.
+  let targets: string[] | null = null;
+  if (parsed.value.displayIds?.length) {
+    targets = row.playlist_id
+      ? await screensForMenuPublish(admin.accountId, row.playlist_id, parsed.value.displayIds, replace)
+      : [...new Set(parsed.value.displayIds)];
+    if (!targets) return fail("Couldn't load this board's screens. Try again.", 500);
+    if (targets.length > PUBLISH_SCREEN_LIMIT) return fail(TOO_MANY_SCREENS, 400);
+  }
   // Layout Studio and template boards (layoutVersion 1) are edited on the web. The classic editor path would
   // re-render them as a classic menu and overwrite the layout, item photos included, so older clients may only
   // rename them or put them on screens here.
@@ -57,11 +77,10 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
       if (renamed.error) return fail("Couldn't update the menu.", 500);
     }
     let kept: boolean | undefined;
-    if (parsed.value.displayIds?.length && row.playlist_id) {
+    if (targets && row.playlist_id) {
       const pubLimited = await enforceLimit(`publish:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
       if (pubLimited) return pubLimited;
-      const pub = await db().rpc("publish_playlist", { p_account_id: admin.accountId, p_playlist_id: row.playlist_id, p_display_ids: parsed.value.displayIds });
-      kept = !pub.error && Boolean(pub.data);
+      kept = await publishTo(admin.accountId, row.playlist_id, targets);
     }
     return json({ id, mediaId: row.media_id, playlistId: row.playlist_id, published: kept });
   }
@@ -79,11 +98,10 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
   const { mediaId, playlistId } = result;
 
   let published: boolean | undefined;
-  if (parsed.value.displayIds?.length && playlistId) {
+  if (targets && playlistId) {
     const pubLimited = await enforceLimit(`publish:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
     if (pubLimited) return pubLimited;
-    const pub = await db().rpc("publish_playlist", { p_account_id: admin.accountId, p_playlist_id: playlistId, p_display_ids: parsed.value.displayIds });
-    published = !pub.error && Boolean(pub.data);
+    published = await publishTo(admin.accountId, playlistId, targets);
   }
   return json({ id, mediaId, playlistId, published });
 });

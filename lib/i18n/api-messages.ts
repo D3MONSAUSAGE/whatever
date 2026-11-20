@@ -141,6 +141,7 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "This file is used by {name}. Remove it there, then delete it.": "Este archivo se usa en {name}. Quítelo de ahí y luego elimínelo.",
   "This file is your Brand Kit logo. Choose another logo, then delete it.": "Este archivo es el logotipo de su Kit de marca. Elija otro logotipo y luego elimínelo.",
   "This file is your Brand Kit logo and is used by {name}. Remove it there, then delete it.": "Este archivo es el logotipo de su Kit de marca y se usa en {name}. Quítelo de ahí y luego elimínelo.",
+  "Couldn't load this board's screens. Try again.": "No se pudieron cargar las pantallas de este menú. Intente de nuevo.",
   "Couldn't load your menus.": "No se pudieron cargar sus menús.",
   "Couldn't open that menu.": "No se pudo abrir ese menú.",
   "Couldn't update the menu.": "No se pudo actualizar el menú.",

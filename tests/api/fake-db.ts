@@ -363,10 +363,11 @@ function rpc(store: Store, name: string, args: Record<string, unknown>) {
       id, account_id: args.p_account_id, name: String(args.p_name ?? "Menu").slice(0, 80),
       revision: 1, updated_at: now, default_duration_ms: 10000, transition: "none", playback_mode: "auto",
     });
-    store.playlist_items.push({
-      id: crypto.randomUUID(), playlist_id: id, account_id: args.p_account_id, media_id: media.id,
-      kind: "published", position: 0, duration_ms: 10000, created_at: now,
-    });
+    // Same rows as migration 0007: a draft and a published item at position 0.
+    store.playlist_items.push(
+      { id: crypto.randomUUID(), playlist_id: id, account_id: args.p_account_id, media_id: media.id, kind: "draft", position: 0, duration_ms: null, created_at: now },
+      { id: crypto.randomUUID(), playlist_id: id, account_id: args.p_account_id, media_id: media.id, kind: "published", position: 0, duration_ms: 10000, created_at: now },
+    );
     return id;
   }
   if (name === "menu_swap_media") {
