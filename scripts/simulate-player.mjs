@@ -766,7 +766,8 @@ run(65000);
 check("the screen resumes playing once the plan is active again", screen() === "image" && (shownUrl() || "").indexOf("still.jpg") !== -1);
 
 S.revoked = true;
-run(12000);
+// One 401 can be a passing edge error: the player asks again 5 s later and unpairs on the second one.
+run(20000);
 check("disconnect sends TV back to pairing and clears token", screen() === "pair" && !storage.pantalla_display_token && els.status.className.indexOf("on") === -1);
 
 console.log(`\n${pass} passed, ${failN} failed`);

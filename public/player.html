@@ -104,6 +104,14 @@
   'use strict';
   var TOKEN_KEY = 'pantalla_display_token';
   var STATE_MS = 10000, PAIR_MS = 3000, RETRY_MS = 5000, LOAD_TIMEOUT_MS = 60000;
+  // Must match lib/player-build.ts. A running TV that sees a newer build from the server reloads itself once.
+  var PLAYER_BUILD = '2026-11-20.1';
+  // A slide image that has not answered in this time is skipped (a stalled connection may never error).
+  var SLIDE_LOAD_MS = 30000;
+  // A video that says it is playing but whose clock never moves is treated as stalled after this.
+  var VIDEO_NO_PROGRESS_MS = 10000;
+  // Unpair only after this many unauthorized answers in a row (a single 401 can be a passing edge error).
+  var UNPAIR_AFTER_401S = 2;
 
   function el(id) { return document.getElementById(id); }
   var layers = [el('a'), el('b')];
@@ -122,6 +130,8 @@
   var shownVideo = null, stableSrc = {}, badSkips = {}, badLevel = {}, watchTimer = null, attempt = 0, reportedError = false, skipBurst = 0, zoneFit = null;
   // Polling: the server may send pollMs (older servers do not; then STATE_MS stays).
   var pollMs = STATE_MS, wakeAt = 0, catchupUntil = 0, catchupEvery = 0, ackedVersion = null;
+  // Reliability: consecutive unauthorized answers, and the last time the slideshow visibly moved.
+  var authFails = 0, progressAt = 0;
 
   // ---- persistent media cache (only where the TV browser supports it; otherwise nothing changes)
   // Files are kept by mediaId, which never changes for an upload, so each file is
@@ -412,6 +422,33 @@
     }, hold);
   }
 
+  function noteProgress() { progressAt = new Date().getTime(); }
+  // Safety net for anything not caught above (an unexpected error inside a slide change, a media event that
+  // never comes): an automatic slideshow that has not moved for its longest slide plus 90 seconds moves on.
+  function checkStuck() {
+    var i, longest = 0, item;
+    if (!playlist || isManual() || !progressAt) return;
+    for (i = 0; i < playlist.items.length; i++) {
+      item = playlist.items[i];
+      if (item && item.kind !== 'video' && item.durationMs > longest) longest = item.durationMs;
+    }
+    if (new Date().getTime() - progressAt < longest + 90000) return;
+    noteProgress();
+    slideToken++;
+    clearSlideTimer();
+    clearWatch();
+    try { present((slideIndex + 1) % playlist.items.length, null); } catch (eStuck) {}
+  }
+  // A newer player was deployed. Reload once (not again for the same build for 6 hours, so a stale copy
+  // somewhere can never cause a reload loop). Content comes back from this TV's saved files.
+  function maybeUpdatePlayer(build) {
+    var key = 'pekko_player_reload', last;
+    if (typeof build !== 'string' || !build || build === PLAYER_BUILD) return;
+    last = readJsonKey(key);
+    if (last && last.build === build && new Date().getTime() - last.at < 21600000) return;
+    writeJsonKey(key, { build: build, at: new Date().getTime() });
+    try { window.location.reload(); } catch (eReload) {}
+  }
   function clearSlideTimer() {
     if (slideTimer) { clearTimeout(slideTimer); slideTimer = null; }
   }
@@ -785,8 +822,19 @@
       function tick() {
         var nowT;
         if (gone() || shownVideo !== v) return;
-        if (!sawTime) { watchTimer = setTimeout(tick, 2000); return; }
         nowT = v.currentTime || 0;
+        if (!sawTime) {
+          // Playing was reported, but no time update yet. Some TVs never send one when the decoder is stuck
+          // on the first frame: watch the clock directly, and give up after VIDEO_NO_PROGRESS_MS.
+          if (nowT > lastTime + 0.05) { sawTime = true; lastTime = nowT; stuckFor = 0; }
+          else {
+            stuckFor += 2000;
+            if (stuckFor >= VIDEO_NO_PROGRESS_MS) { failOnce('This video stalled.'); return; }
+          }
+          watchTimer = setTimeout(tick, 2000);
+          return;
+        }
+        noteProgress();
         if (nowT <= lastTime + 0.05) stuckFor += 2000;
         else stuckFor = 0;
         lastTime = nowT;
@@ -800,6 +848,8 @@
       if (gone() || started) return;
       started = true;
       clearTimeout(startTimer);
+      noteProgress();
+      lastTime = v.currentTime || 0;
       pinUrl(item, url);
       showVideo(v);
       slideIndex = index;
@@ -896,6 +946,7 @@
     src = resolveUrl(item);
     function commit() {
       if (token !== slideToken || !playlist) return;
+      noteProgress();
       nextItem = nextGoodItem(index);
       swapTo(src, playlist.transition === 'fade');
       // While this slide has a zone video, do not keep a second clip armed.
@@ -916,9 +967,37 @@
       scheduleAdvance(index, item);
     }
     if ((item.mediaId && stableSrc[item.mediaId]) || loadedUrls[src] === 1) { commit(); return; }
-    var img = new Image();
-    img.onload = function () { pinUrl(item, src); commit(); };
+    var img = new Image(), answered = false;
+    // A stalled connection can leave an image request open with no error. Give up after SLIDE_LOAD_MS
+    // and skip the slide like a broken one, so the menu keeps moving.
+    var loadTimer = setTimeout(function () {
+      if (answered || token !== slideToken) return;
+      answered = true;
+      img.onload = null; img.onerror = null;
+      try { img.src = ''; } catch (eStop) {}
+      failSlide();
+    }, SLIDE_LOAD_MS);
+    img.onload = function () {
+      if (answered) return;
+      answered = true;
+      clearTimeout(loadTimer);
+      pinUrl(item, src); commit();
+    };
+    function failSlide() {
+      dropPin(item);
+      markBad(item);
+      reportError('A slide did not load and was skipped.');
+      clearSlideTimer();
+      if (!playlist) return;
+      slideTimer = setTimeout(function () {
+        if (token !== slideToken || !playlist) return;
+        present((index + 1) % playlist.items.length, null);
+      }, 0);
+    }
     img.onerror = function () {
+      if (answered) return;
+      answered = true;
+      clearTimeout(loadTimer);
       if (token !== slideToken) return;
       // A stale cached blob is tried once. A slide that still fails is skipped
       // so a missing image cannot freeze the loop.
@@ -931,15 +1010,7 @@
         present(index, versionOrNull);
         return;
       }
-      dropPin(item);
-      markBad(item);
-      reportError('A slide did not load and was skipped.');
-      clearSlideTimer();
-      if (!playlist) return;
-      slideTimer = setTimeout(function () {
-        if (token !== slideToken || !playlist) return;
-        present((index + 1) % playlist.items.length, null);
-      }, 0);
+      failSlide();
     };
     img.src = src;
   }
@@ -948,6 +1019,12 @@
     if (!playlist) return;
     for (i = 0; i < playlist.items.length && i < items.length; i++) {
       if (playlist.items[i].mediaId === items[i].mediaId) {
+        // Signed links expire. A slide drawn from the network (no saved copy on this TV) must not keep the
+        // old link: drop the pin so the next showing preloads the fresh link first (no blank frame).
+        if (playlist.items[i].url !== items[i].url && !blobFor(playlist.items[i]) && playlist.items[i].mediaId) {
+          if (stableSrc[playlist.items[i].mediaId]) delete loadedUrls[stableSrc[playlist.items[i].mediaId]];
+          delete stableSrc[playlist.items[i].mediaId];
+        }
         playlist.items[i].url = items[i].url;
         playlist.items[i].durationMs = items[i].durationMs;
         if (items[i].kind === 'video' || items[i].kind === 'image') playlist.items[i].kind = items[i].kind;
@@ -1197,6 +1274,7 @@
       }
     }
     urlRefreshAt = new Date().getTime() + 1800000;
+    noteProgress();
     loadedVersion = version;
     // ?v= and playing.version wait until the opening frame is actually up.
     if (!zoneVideo(items[startAt])) shownVersion = version;
@@ -1257,7 +1335,22 @@
     var url = '/api/player/state?v=' + encodeURIComponent(v) + refresh + '&_=' + new Date().getTime();
     request('GET', url, null, token, function (status, data) {
       if (g !== gen) return;
-      if (status === 401) { clearToken(); clearCache(); startPairing(); return; } // disconnected from dashboard
+      // Whatever happens while this answer is handled, the TV keeps asking: an unexpected error must never
+      // stop content updates for good.
+      try { handleState(g, status, data); }
+      catch (eState) { if (g === gen) later(g, function () { pollState(g); }, STATE_MS); }
+    });
+  }
+  function handleState(g, status, data) {
+      if (status === 401) {
+        // Disconnected from the dashboard. One unauthorized answer can be a passing edge or deploy error, so
+        // keep showing the menu and ask again soon; unpair only when it repeats.
+        authFails += 1;
+        if (authFails >= UNPAIR_AFTER_401S) { authFails = 0; clearToken(); clearCache(); startPairing(); return; }
+        later(g, function () { pollState(g); }, 5000);
+        return;
+      }
+      authFails = 0;
       if (status === 402) {
         // Plan inactive or over the screen limit: stop playback, keep the token and the
         // saved content, and check again so the screen resumes on its own.
@@ -1286,6 +1379,8 @@
         }
         if (data.layoutStudio === false) dropZoneCompositions();
         if (!data.unchanged) { rememberState(data); apply(data); }
+        checkStuck();
+        maybeUpdatePlayer(data.playerBuild);
         applyRemoteCommands(data.commands);
         schedulePlaybackReport();
         confirmPlaying(); // retries a confirmation that failed while offline
@@ -1298,9 +1393,9 @@
         setStatus('Reconnecting...');
         // A board publish can stall one poll. Ask again quickly so the note does not sit for a full interval.
         if (hasImage || shownVersion !== null) wait = 2000;
+        checkStuck();
       }
       later(g, function () { pollState(g); }, wait);
-    });
   }
   function apply(d) {
     if (typeof d.version !== 'number') return;
