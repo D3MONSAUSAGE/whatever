@@ -91,6 +91,7 @@ export function createPlayer(options = {}) {
     navigator: {},
     setTimeout: setTimeout_, clearTimeout: clearTimeout_,
   };
+  let hidden = false;
   const document_ = {
     getElementById: (id) => els[id],
     documentElement: {},
@@ -98,6 +99,8 @@ export function createPlayer(options = {}) {
     addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
     removeEventListener(type, fn) { docListeners[type] = (docListeners[type] || []).filter((f) => f !== fn); },
   };
+  Object.defineProperty(document_, "hidden", { configurable: true, get() { return hidden; } });
+  Object.defineProperty(document_, "visibilityState", { configurable: true, get() { return hidden ? "hidden" : "visible"; } });
 
   // Fake server. `S` is mutated by scenarios.
   const S = {
@@ -228,6 +231,10 @@ export function createPlayer(options = {}) {
     listenerCounts() {
       const count = (m) => Object.values(m).reduce((n, l) => n + l.length, 0);
       return { window: count(winListeners), document: count(docListeners) };
+    },
+    setHidden(value) {
+      hidden = !!value;
+      this.fire("document", "visibilitychange");
     },
   };
 }

@@ -1,6 +1,7 @@
 // Reliability scenarios for public/player.html on a virtual clock (fresh player per scenario).
 // Long-running loops, stuck media, network loss, auth failures, handler exceptions and resource growth.
 // Run: node scripts/simulate-player-reliability.mjs
+import { readFileSync } from "node:fs";
 import { createPlayer, report } from "./player-harness.mjs";
 
 const R = report();
@@ -62,6 +63,48 @@ const advances = (p, from) => p.log.filter((e) => e.at >= from).length;
   v.play = function () { if (!stalled) { stalled = true; this.paused = false; this._playing = this._src; return { then(ok) { if (ok) ok(); } }; } return realPlay(); };
   p.run(5 * 60_000);
   R.check("a single looping video that stalls on a later loop is detected and retried", p.S.errorLog.some((e) => /stalled/.test(e)) && p.stats.videoStarts > 30, `${p.S.errorLog.join("|")} starts=${p.stats.videoStarts}`);
+}
+
+// 2d. A healthy looping video that is paused (display sleep / lock screen) is resumed, not reported as unplayable.
+{
+  const p = started([vid("loop", 8000)]);
+  const v = [p.els.va, p.els.vb].find((x) => x.className.includes("on"));
+  const starts0 = p.stats.videoStarts;
+  const errors0 = p.S.errorLog.length;
+  v.pause();
+  p.run(20_000);
+  R.check("a paused looping video is not reported as broken", p.S.errorLog.length === errors0, p.S.errorLog.slice(errors0).join("|"));
+  R.check("a paused looping video is started again and stays on screen", p.stats.videoStarts > starts0 && p.name(p.shown()) === "loop", `starts=${p.stats.videoStarts - starts0} shown=${p.name(p.shown())} status=${p.els.status.innerHTML}`);
+  R.check("the player does not show 'can't play' after a pause", !/can't play/i.test(p.els.status.innerHTML || ""), p.els.status.innerHTML);
+}
+
+// 2e. A hidden tab with a paused video must not trip the stall watchdog or the stuck-slideshow net.
+{
+  const p = started([vid("loop", 8000)]);
+  const v = [p.els.va, p.els.vb].find((x) => x.className.includes("on"));
+  p.setHidden(true);
+  v.pause();
+  p.run(3 * 60_000);
+  R.check("a hidden paused video is not reported as broken", p.S.errorLog.length === 0, p.S.errorLog[0]);
+  R.check("a hidden paused video is still the current item", p.name(p.shown()) === "loop");
+  p.setHidden(false);
+  p.run(10_000);
+  R.check("the video resumes after the tab is visible again, with no error", p.S.errorLog.length === 0 && p.name(p.shown()) === "loop", p.S.errorLog[0]);
+}
+
+// 2f. A playing video whose clock is frozen is still skipped (real decoder stall).
+{
+  const p = started([vid("loop", 8000)]);
+  const v = [p.els.va, p.els.vb].find((x) => x.className.includes("on"));
+  const frozen = v.currentTime;
+  // A stuck decoder stops the clock and timeupdate, but leaves the element "playing".
+  v.ontimeupdate = null;
+  v.pause();
+  v.play = function () { this.paused = false; this._playing = this._src; return { then(ok) { if (ok) ok(); } }; };
+  Object.defineProperty(v, "paused", { configurable: true, get() { return false; }, set() {} });
+  Object.defineProperty(v, "currentTime", { configurable: true, get() { return frozen; }, set() {} });
+  p.run(15_000);
+  R.check("a playing video whose clock is frozen is still reported as stalled", p.S.errorLog.some((e) => /stalled/.test(e)), p.S.errorLog.join("|"));
 }
 
 // 3. A slide image that never answers (stalled connection, no error event).
@@ -233,7 +276,9 @@ const advances = (p, from) => p.log.filter((e) => e.at >= from).length;
 // 12. Self-update: a newer player build reloads the page once; the same build never loops; matching build is quiet.
 {
   const p = started([img("a", 5000)]);
-  p.S.playerBuild = "2026-11-20.1";
+  const html = readFileSync(new URL("../public/player.html", import.meta.url), "utf8");
+  const currentBuild = /var PLAYER_BUILD = '([^']+)'/.exec(html)[1];
+  p.S.playerBuild = currentBuild;
   p.run(60_000);
   R.check("matching player build: no reload", p.stats.reloads === 0, p.stats.reloads);
   p.S.playerBuild = "2099-01-01.1";
