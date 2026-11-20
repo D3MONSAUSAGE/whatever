@@ -391,7 +391,8 @@ export function MenuBoards({
             displays={displays.data ?? []}
             loading={!displays.data}
             assignAll={async (displayIds) => {
-              await api(`/api/playlists/${pickClassic.playlistId}/publish`, { method: "POST", body: JSON.stringify({ displayIds }) });
+              // Adds the ticked screens. /api/playlists/:id/publish would take the board off every other screen showing it.
+              await api("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId: pickClassic.playlistId, displayIds, commit: true, replace: false }) });
             }}
             onSkip={() => setPickClassic(null)}
             onDone={(message) => { setPickClassic(null); toast.show(message); void liveDisplays.reload(); }}

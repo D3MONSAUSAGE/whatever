@@ -38,9 +38,11 @@ describe("E2b: Show on which screen? after saving a classic board", () => {
     expect(shouldOfferScreens({ ...base, displays: [] })).toBe(true);
   });
 
-  it("classic assigns through the existing playlist publish route; nothing changes until a screen is ticked and confirmed", () => {
+  it("classic adds the ticked screens without taking the board off others; nothing changes until a screen is ticked and confirmed", () => {
     const boards = readFileSync("components/menu-boards.tsx", "utf8");
-    expect(boards).toMatch(/api\(`\/api\/playlists\/\$\{pickClassic\.playlistId\}\/publish`, \{ method: "POST", body: JSON\.stringify\(\{ displayIds \}\) \}\)/);
+    // Gother P0: /api/playlists/:id/publish clears every screen it isn't given, so Show on screens uses the
+    // additive publish (replace: false) instead (tests/api/menu-screen-assignment.test.ts).
+    expect(boards).toContain('api("/api/displays/publish", { method: "POST", body: JSON.stringify({ playlistId: pickClassic.playlistId, displayIds, commit: true, replace: false }) })');
     expect(boards).toMatch(/afterClassicSave\(\{ created, fromScreen, tickedScreens: saved\.tickedScreens/); // E2b-F1: new boards only
     const card = readFileSync("components/show-on-screens.tsx", "utf8");
     expect(card).toMatch(/if \(!targets\.length \|\| busy\) return;/);

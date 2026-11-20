@@ -138,6 +138,7 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Couldn't load boards.": "No se pudieron cargar los menús digitales.",
   "Couldn't load menus.": "No se pudieron cargar los menús.",
   "Couldn't load the menu.": "No se pudo cargar el menú.",
+  "Couldn't load this board's screens. Try again.": "No se pudieron cargar las pantallas de este menú. Intente de nuevo.",
   "Couldn't load your menus.": "No se pudieron cargar sus menús.",
   "Couldn't open that menu.": "No se pudo abrir ese menú.",
   "Couldn't update the menu.": "No se pudo actualizar el menú.",
