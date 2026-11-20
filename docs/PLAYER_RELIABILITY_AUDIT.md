@@ -1,5 +1,7 @@
 # TV player reliability audit (2026-11-20)
 
+**Status:** fixes deployed in production commit `5a3e3f6` (#163). All soak runs are complete (results below). Not yet tested on Smart TV hardware.
+
 Scope: the production TV player `public/player.html` (plain ES5 page at `/player`, `/tv`, `/pair`), its service worker `public/player-sw.js`, and the routes it calls (`/api/player/state`, `/pair`, `/pair/status`, `/unpair`). Evidence is the code, a virtual-clock simulator that runs the real player script, and headless-Chromium soak runs. **No Smart TV hardware was tested.** Browser automation is not equivalent to a Samsung/LG/Android TV browser (different decoders, GPU memory, power management).
 
 ## How the player works (what matters for reliability)
@@ -56,17 +58,25 @@ Classification: **Confirmed** = reproduced by a test against the previous player
 
 **Simulator** (`npm run test:player`, in CI): `scripts/simulate-player-reliability.mjs` runs the real player script on a virtual clock. It has 41 scenarios: 7 days of a mixed loop; 3 days of one looping video; a 2-minute video; a stuck image request; a stuck video; exceptions; one 401; dead and expired links; 1 hour offline; 30 min of 503s; 360 edits; broken media; refresh; and self-update. **The previous player fails 14; this version passes all 41.** The existing 87 player checks still pass.
 
-**Real Chromium soaks** (`scripts/soak-player.mjs`, headless Chromium 153, local mock server, real JPEGs plus H.264 MP4s). Scripted events: 3 min offline, playlist edits, about 2 min of 503s, a browser refresh, and one 401. Status at merge time; **the longer runs were still in progress** (results are added below when they finish):
+**Real Chromium soaks** (`scripts/soak-player.mjs`, headless Chromium 153, local mock server, real JPEGs plus 720p H.264 MP4s). Every run had the same scripted events: 3 min offline, playlist edits, about 2 min of 503s, a browser refresh, and one 401. A watcher checked the screen once per second. "Blank" means no layer or video visible and no status screen. "Frozen" means a shown video's clock didn't move for 3 s or more. All runs **finished after the merge of #163** (production `5a3e3f6`).
 
-| Run | Player | Result so far |
-| --- | --- | --- |
-| 30 min, no Cache Storage, 5-min links | previous | **One 401 unpaired the TV** (pairing screen at end). 3 expired-link video requests, so 3 videos skipped (reported as "blocked from autoplaying"). 0 blank seconds; heap 0.74–1.1 MB |
-| 30 min, no Cache Storage, 5-min links | this (before #8b/#8c) | **Stayed paired after the 401.** 0 blank seconds, 0 frozen-video seconds, 451 transitions, no page errors. Heap 0.75–1.09 MB, DOM nodes 398–402, renderer RSS 427 → 430 MB. 7 expired-link video skips, which led to fixes #8b and #8c. This run's 5-minute links are shorter than the player's 30-minute refresh, so it cannot exercise #6 itself |
-| 60 min, Cache Storage | previous | In progress: no blank seconds, heap ≈ 1 MB, DOM nodes flat (398) |
-| 90 min, single looping video | this | In progress: video playing, heap ≈ 1 MB, nodes 397 |
-| 120 min, mixed playlist | this | In progress: content on screen, heap ≈ 1.1 MB, nodes 398 |
+| Run | Player | Transitions | Blank s | Frozen video s | After one 401 | Expired-link requests | JS heap (1st → 2nd half avg) | DOM nodes | Renderer RSS (1st → 2nd half avg) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 30 min, no Cache Storage, 5-min links | previous | 331 | 0 | 0 | **unpaired** | 3 (videos skipped) | 1.01 → 1.05 MB | 398–416 | n/a¹ |
+| 60 min, Cache Storage | previous | 643 | 0 | 0 | **unpaired** | 0 | 1.05 → 1.10 MB | 398–420 | n/a¹ |
+| 30 min, no Cache Storage, 5-min links | fixed, before #8b/#8c² | 451 | 0 | 0 | paired | 7 (led to #8b/#8c) | 1.01 → 1.05 MB | 398–402 | 427 → 430 MB |
+| 90 min, one looping video | fixed, before #8b/#8c | 4 (one video, looping) | 1³ | 0 | paired | 0 | 1.01 → 1.00 MB | 397–398 | 383 → 391 MB |
+| 120 min, mixed playlist, Cache Storage | fixed, before #8b/#8c | 1,707 | 0 | 0 | paired | 1⁴ | 1.13 → 1.14 MB | 398–402 | 580 → 587 MB |
+| **100 min, no Cache Storage, real 1-hour links** | **deployed build** | 1,433 | 0 | 0 | paired | **0** | 1.04 → 1.09 MB | 398–399 | 508 → 517 MB |
 
-Renderer memory for the previous-player runs summed every renderer on the machine (several soaks ran at once); per-browser figures exist only for this version's runs.
+No run had a page error, a renderer crash or a reported player error, apart from the expired-link skips noted.
+
+1. Previous-player runs measured renderer memory across every Chromium on the machine (several soaks ran side by side), so those numbers aren't comparable and are omitted.
+2. Its 5-minute links are shorter than the player's 30-minute refresh, so this run can't exercise #6. The 100-minute run with real 1-hour links does: it crossed the first expiry with 0 dead-link requests.
+3. The one blank second is the page reloading after the scripted browser refresh (the video was back by the next sample).
+4. One request hit an expired link with no visible effect (no blank, no skip, no error). It was most likely the background download into Cache Storage using a link older than an hour. It's minor and not a blocker.
+
+**Reading the numbers:** the JS heap stays near 1 MB and DOM nodes stay flat. Event listeners vary between 17 and 24 only because of short-lived request handlers. Renderer memory rises by less than 2% between the first and second half of each run, which is no evidence of a leak over 1.5–2 hours in desktop Chromium. That doesn't prove the same on a TV browser with a different media stack, or over days; see the real-TV tests.
 
 ## Real-TV tests to run yourself
 
