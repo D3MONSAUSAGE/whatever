@@ -142,10 +142,15 @@ await page.goto(`${BASE}/player`);
 const cdp = await context.newCDPSession(page);
 await cdp.send("Performance.enable");
 
+// Memory of this browser's own processes (several soaks can run side by side): process ids from CDP, RSS from /proc.
+const browserCdp = await browser.newBrowserCDPSession();
 async function rendererRssMb() {
   try {
-    const out = execFileSync("ps", ["-eo", "rss,args"], { encoding: "utf8" });
-    return Math.round(out.split("\n").filter((l) => l.includes("--type=renderer")).reduce((n, l) => n + Number(l.trim().split(/\s+/)[0] || 0), 0) / 1024);
+    const { processInfo } = await browserCdp.send("SystemInfo.getProcessInfo");
+    const kb = processInfo.filter((p) => p.type === "renderer").reduce((n, p) => {
+      try { return n + Number(/VmRSS:\s+(\d+)/.exec(readFileSync(`/proc/${p.id}/status`, "utf8"))[1]); } catch { return n; }
+    }, 0);
+    return Math.round(kb / 1024);
   } catch { return null; }
 }
 async function sample(label) {
