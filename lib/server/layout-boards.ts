@@ -1,4 +1,4 @@
-import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
+import { layoutStudioEnabled, parseLayout, type LayoutDocument } from "@/lib/layout-studio";
 import { applyLayoutSave, extraImageIds, type LibraryFile } from "@/lib/layout-publish";
 import { imageBytes } from "@/lib/server/brand";
 import { BUCKET, db } from "@/lib/server/supabase";
@@ -61,6 +61,30 @@ export async function loadLayoutStudio(accountId: string) {
     legacy,
     library: rows.map((row) => ({ id: row.id, name: row.name, kind: row.kind, mime: row.mime, url: urls.get(row.path) ?? null, sizeBytes: row.sizeBytes })),
   };
+}
+
+type BoardImageBytes = { bytes: Buffer; mime: "image/png" | "image/jpeg" | "image/webp" };
+
+/**
+ * Every image a board draws, loaded for the server renderer: main photo, template logo and item photos. imageBytes
+ * only returns this account's own JPEG/PNG/WebP files, so another account's id (or a deleted file) is simply not
+ * drawn. Shared by publish (saveLayoutForAccount) and the editor preview (POST /api/layout-studio/preview).
+ */
+export async function loadBoardArt(accountId: string, document: LayoutDocument): Promise<{ photo: BoardImageBytes | null; logo: BoardImageBytes | null; itemImages: Record<string, BoardImageBytes> }> {
+  const { prepareBoardPhoto } = await import("@/lib/server/layout-render");
+  const raw = document.imageMediaId ? await imageBytes(accountId, document.imageMediaId) : null;
+  const photo = raw && raw.bytes.length ? await prepareBoardPhoto(raw.bytes, raw.mime) : null;
+  // Template boards may carry a logo.
+  const logoRaw = document.design && document.logoMediaId ? await imageBytes(accountId, document.logoMediaId) : null;
+  const logo = logoRaw && logoRaw.bytes.length ? await prepareBoardPhoto(logoRaw.bytes, logoRaw.mime) : null;
+  // Every board type can carry item photos (templates and original layouts), each reduced for the board.
+  const itemImages: Record<string, BoardImageBytes> = {};
+  const ids = [...new Set(document.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
+  await Promise.all(ids.map(async (id) => {
+    const item = await imageBytes(accountId, id);
+    if (item && item.bytes.length) itemImages[id] = await prepareBoardPhoto(item.bytes, item.mime, 900);
+  }));
+  return { photo, logo, itemImages };
 }
 
 export async function saveLayoutForAccount(accountId: string, body: {
@@ -126,22 +150,8 @@ export async function saveLayoutForAccount(accountId: string, body: {
       menuId = String(inserted.data.id);
     },
     render: async (document) => {
-      const raw = document.imageMediaId ? await imageBytes(accountId, document.imageMediaId) : null;
-      const { prepareBoardPhoto, renderLayoutPng } = await import("@/lib/server/layout-render");
-      const fitted = raw && raw.bytes.length ? await prepareBoardPhoto(raw.bytes, raw.mime) : null;
-      // Template boards may carry a logo; imageBytes only returns this account's own JPEG/PNG.
-      const logoRaw = document.design && document.logoMediaId ? await imageBytes(accountId, document.logoMediaId) : null;
-      const logo = logoRaw && logoRaw.bytes.length ? await prepareBoardPhoto(logoRaw.bytes, logoRaw.mime) : null;
-      // Item photos: only this account's own images (imageBytes checks the account), each reduced for the board.
-      const itemImages: Record<string, { bytes: Buffer; mime: "image/png" | "image/jpeg" | "image/webp" }> = {};
-      // Every board type can carry item photos (templates and original layouts).
-      {
-        const ids = [...new Set(document.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
-        await Promise.all(ids.map(async (id) => {
-          const raw = await imageBytes(accountId, id);
-          if (raw && raw.bytes.length) itemImages[id] = await prepareBoardPhoto(raw.bytes, raw.mime, 900);
-        }));
-      }
+      const { renderLayoutPng } = await import("@/lib/server/layout-render");
+      const { photo: fitted, logo, itemImages } = await loadBoardArt(accountId, document);
       const png = renderLayoutPng(document, fitted, { logo, itemImages });
       const { storeRenderedImage } = await import("@/lib/server/menus");
       const id = await storeRenderedImage(accountId, boardRenderFileName(body.name, document.title), png);

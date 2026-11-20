@@ -4,7 +4,7 @@ This is the website and backend the phone app already uses as a controller. It i
 
 Auth on every management route below is `Authorization: Bearer <Supabase access token>` (`lib/server/auth.ts` `requireAdmin`). A missing or rejected token is 401. The token's user is resolved to one account. Requests do not accept an account id.
 
-**Status (updated 2026-11-20, web at PR #159).** The web menu designer is live for every customer: `LAYOUT_STUDIO=1` in production, and `MENU_TEMPLATES` / `UNIFIED_MENU_EDITOR` default to everyone (PR #153). Most new boards are therefore web-designer boards (`content.layoutVersion === 1`), which the classic menu routes refuse to edit (409). Read **Menu boards** below before touching menus. Changes the app must handle since Android +14 are listed in **Changes since +14**.
+**Status (updated 2026-11-20, web at PR #161).** The menu designer catalog, preview and switch routes for Flutter parity are in **Menu designer API** below. The web menu designer is live for every customer: `LAYOUT_STUDIO=1` in production, and `MENU_TEMPLATES` / `UNIFIED_MENU_EDITOR` default to everyone (PR #153). Most new boards are therefore web-designer boards (`content.layoutVersion === 1`), which the classic menu routes refuse to edit (409). Read **Menu boards** below before touching menus. Changes the app must handle since Android +14 are listed in **Changes since +14**.
 
 ## Account
 
@@ -181,6 +181,113 @@ Publishing a web-designer board (PR #159) swaps the board's own image on its pla
 
 The player receives expanded image slides. `groupIndex` and `groupCount` are slide counters inside that group. See `docs/PRESENTATION_GROUPS.md`.
 
+## Menu designer API (Flutter parity)
+
+Everything the web gallery and guided editor use, exposed so the app never keeps its own copy of the templates. The catalog is built from the web's own source of truth (`lib/menu-designer.ts` `galleryEntries`, `lib/menu-designs.ts`, `lib/layout-studio.ts`) by `lib/menu-catalog.ts`; a template added or changed on the web appears here with a new `version`. All routes are additive. Android +14/+15 never call them and nothing they use changed.
+
+| Call | Auth | Purpose | Source |
+| --- | --- | --- | --- |
+| `GET /api/menu-templates/catalog` | Bearer | Gallery: filters, 30 entries, seeds | `app/api/menu-templates/catalog/route.ts` |
+| `GET /api/menu-templates/thumbnail/:id` | **Public** | 16:9 PNG of an entry's sample board | `app/api/menu-templates/thumbnail/[id]/route.ts` |
+| `POST /api/menu-templates/switch` | Bearer | Change template / variant / layout, keeping content | `app/api/menu-templates/switch/route.ts` |
+| `POST /api/layout-studio/preview` | Bearer | Exact publish PNG, or fit report only; saves nothing | `app/api/layout-studio/preview/route.ts` |
+| `GET /api/layout-studio` | Bearer | Existing: boards (full `document`) + media library with signed URLs | unchanged |
+| `POST /api/layout-studio` | Bearer | Existing: save draft / publish | unchanged |
+
+`switch` and `preview` return 404 before any database call when `LAYOUT_STUDIO` is not `1` (like the other layout-studio routes; it is `1` in production). The catalog always answers and says `layoutStudio: true|false`.
+
+### `GET /api/menu-templates/catalog`
+
+`200`, `Cache-Control: private, no-cache`. About 70 KB. Shape (`MenuCatalog` in `lib/menu-catalog.ts`):
+
+```jsonc
+{
+  "schema": 1,                       // bumps only on a breaking change; new optional fields keep 1
+  "version": "1.1.fc897e0b",         // changes when any template, name, seed or the renderer revision changes
+  "layoutStudio": true,
+  "filters": {
+    "business":  [{ "id": "all", "name": { "en": "All", "es": "Todos" } }, ... "restaurant", "cafe", "fast", "bar", "sweets"],
+    "style":     [ "all", "dark", "light", "bold" ],             // same {id, name{en,es}} objects
+    "structure": [ "all", "single", "columns", "media", "cards" ]
+  },
+  "fonts": ["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"],
+  "entries": [
+    {
+      "id": "modern-restaurant",       // stable; also the value of content.design on saved boards
+      "kind": "template",              // "template" (22) | "classic" (1, id "full-screen") | "layout" (7)
+      "name": { "en": "Modern Restaurant", "es": "Restaurante moderno" },
+      "description": { "en": "...", "es": "..." },
+      "business": "restaurant",        // "any" on layouts and classic: matches every business filter
+      "style": "dark",
+      "structure": "media",
+      "photos": false,                 // "Built around photos" filter
+      "thumbnailPath": "/api/menu-templates/thumbnail/modern-restaurant?v=1.1.fc897e0b&w=640",
+      "boardName": "Casa Verde",       // Brand Kit business name, or null → use name[lang]
+      "variants": [{ "id": "brass", "name": { "en": "Charcoal & brass", "es": "Carbón y latón" },
+                     "colors": { "paper": "#131416", "ink": "#f3eee5", "muted": "#a89f92", "accent": "#c9a46a", "panel": "#1b1c1f", "tag": "#c9a46a" } }],
+      "create": { "route": "POST /api/layout-studio", "document": { "layoutVersion": 1, "design": "modern-restaurant", "variant": "brass", ... } }
+    },
+    { "id": "full-screen", "kind": "classic", ..., "variants": [],
+      "create": { "route": "POST /api/menus", "template": "classic", "content": { "title": "...", "sections": [...] } } },
+    { "id": "two-column", "kind": "layout", ..., "variants": [], "create": { "route": "POST /api/layout-studio", "document": { ... } } }
+  ],
+  "scratch": { "create": { "route": "POST /api/layout-studio", "document": { ... } } }   // "Start from scratch"
+}
+```
+
+- **Order** is the web gallery's: 22 templates, the classic board, then 7 layouts. Filter exactly like the web: business `all` or equal or entry `any`; style `all` or equal; structure `all` or equal; photos toggle → `photos === true`.
+- **Names** are both languages in every response; pick by the app language. `Accept-Language` doesn't change the body.
+- **Seeds are per account, like the web.** Layout and classic seeds carry this account's Brand Kit (colours, fonts, business name, footer contact); templates take only the kit's business name as `title`. No other account data is included: no ids, emails, media ids or logo.
+- **Create a board:** `POST /api/layout-studio { mode: "draft" | "publish", menuId: null, name, document: entry.create.document }`, or for `kind: "classic"` `POST /api/menus { name, template: "classic", content }` (existing contract). Use `boardName ?? name[lang]` for `name`. To pick a variant other than the first, set `document.variant` to its id (or use `switch`).
+- **Cache** by `version`. Unknown `kind` values or extra fields may appear later; skip entries you don't understand.
+
+### `GET /api/menu-templates/thumbnail/:id`
+
+Public (no token: sample content and bundled stock photos only). Query: `v` (catalog version), `w` (width in px; snaps up to 320, 640, 960, 1280 or 1920; default 640), `variant` (template variant id; omit for the first). Height is `w × 9/16`.
+
+- `200 image/png`, `Cache-Control: public, max-age=86400, s-maxage=31536000, immutable`. Drawn by the same renderer as published boards.
+- Any non-canonical URL (old `v`, unsnapped `w`, first variant spelled out, unknown params) → **308** to the canonical URL. Follow redirects.
+- Unknown id, or an unknown variant (or any variant on a layout/classic) → 404.
+- Build URLs from `thumbnailPath`: append `&variant=<id>`, or replace `w=640` with the size you need. Prefix the API origin (`https://pekkotv.com`).
+
+Item stock photos used by templates are public files at `https://pekkotv.com/menu-templates/<stockPhoto>.jpg`.
+
+### `POST /api/menu-templates/switch`
+
+Body `{ document, to, variant? }`: `document` is a `LayoutDocument` (a template or layout board); `to` is a catalog `template` or `layout` id; `variant` is optional and only for templates. Runs the web editor's own `switchDesign` / `switchToLayout`: sections, items, item photos, title, photo and video stay; template-only settings are removed when moving to a layout.
+
+`200 { document, fit }` (see `fit` below). Errors: 400 "Choose a template or layout from the catalog." / "Choose one of this template's colour styles." / any `parseLayout` message; Spanish for `Accept-Language: es`. Saves nothing. To switch a board to the classic format, create a classic board instead (the web does not convert in place either).
+
+### `POST /api/layout-studio/preview`
+
+Body `{ document, width?: 480 | 960 | 1920, format?: "png" | "fit" }` (`width` snaps up; default 960).
+
+- `format: "png"` (default): `200 image/png`, `Cache-Control: no-store`, the same PNG `POST /api/layout-studio` would publish. Headers: `X-Board-Can-Publish: true|false`, `X-Board-Dropped-Items`, `X-Board-Hidden-Sections`, `X-Board-Hidden-Items`, `X-Board-Clipped-Names` (counts). Rate limit 60/min per user, shared with `POST /api/menus/preview` → 429 `preview_rate_limited` with `Retry-After`.
+- `format: "fit"`: `200 { fit }` with no rendering; 240/min per user. Cheap enough to call after each edit (debounce ~300 ms).
+- Only this account's own JPEG/PNG/WebP files are drawn (photo, logo, item photos); another account's id or a deleted file is simply not drawn. The video box draws as its poster, as on the TV still.
+- Errors: 400 with the `parseLayout` message (localized), 401, 404 when `LAYOUT_STUDIO` is off.
+
+`fit` (`BoardFit` in `lib/board-fit.ts`, the same checks publish enforces):
+
+```jsonc
+{
+  "canPublish": false,     // false only when a template drops items; POST /api/layout-studio {mode:"publish"} would return 400
+  "droppedItems": 3,       // templates: items not drawn
+  "hiddenSections": 0,     // layouts: sections past the layout's columns (not drawn; publish still allowed)
+  "hiddenItems": 0,
+  "clippedNames": [],      // layouts: item names shortened with "…"
+  "suggestions": { "roomierTemplate": "diner-classics", "canMergeSections": false }   // the web editor's fix buttons
+}
+```
+
+### Editing flow for the app
+
+1. `GET /api/layout-studio` → `boards[]` (`id, name, document, mediaId, playlistId, updatedAt`) and `library[]` (`id, name, kind, mime, url, sizeBytes`; `url` is a 1-hour signed URL). Upload new images with the existing media upload routes.
+2. Edit the document locally. Keep every field you don't edit untouched (send the whole document back). Limits: 4 sections, 12 items per section, 24 items; text limits in `MENU_LIMITS` (`lib/menu-templates.ts`).
+3. `preview {format: "fit"}` while editing; `preview` PNG on demand; `switch` for "Change design".
+4. Save with `POST /api/layout-studio {mode: "draft"}`; publish with `{mode: "publish", menuId}`. Publishing a template that drops items returns 400 ("N items don't fit on the screen…"); check `fit.canPublish` first.
+5. Assign screens with `PATCH /api/menus/:id { displayIds }` (additive) or `POST /api/layout-studio/assign { menuId, displayId }` after the first publish.
+
 ## Billing status, read only
 
 `GET /api/entitlements` is the status read (`lib/server/entitlements.ts` `toResponse`). Fields include `state`, `plan`, `plan_name`, `screen_limit`, `active_screens`, `total_screens`, `can_add_screen`, `playback_allowed`, `trial`, `subscription`, `grace_ends_at`, `suspend_at`, `warning`, `enforced`, `server_time`. `enforced` is true only when `BILLING_ENFORCE` is exactly `1`. A dashboard read does not start the existing-customer clock.
@@ -199,7 +306,7 @@ The TV reports a playback error with `POST /api/player/state` and header `X-Disp
 
 Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last saved playlist, images only (`public/player.html` `playSaved`, `public/player-sw.js`). There is no management API for an offline pack. A phone that cannot reach the API shows its own network error. It does not cache the screen's media as a second player.
 
-## Changes since Android +14 (web PRs #148–#159)
+## Changes since Android +14 (web PRs #148–#161)
 
 | Change | What the app sees | PR |
 | --- | --- | --- |
@@ -210,6 +317,7 @@ Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last s
 | Web-designer board publish swaps the right image | No contract change | #159 |
 | Setup step 8 stays done after a TV confirmed content | Same `GET /api/onboarding` shape | #147 |
 | `GET /api/health` returns `commit` | Additive | #153 |
+| Menu designer API: catalog, public thumbnails, switch, preview + fit | New routes only | #161 |
 
 No route was removed or renamed, no response field was removed, and the TV player and `/api/player/*` are unchanged.
 
@@ -222,7 +330,7 @@ These flags are off unless the value is exactly `1`:
 | `BILLING_ENFORCE` | Entitlement reads still work. Screens are not paused for billing | `lib/server/entitlements.ts` |
 | `BILLING_REMINDERS` | The reminder job sends nothing | `app/api/cron/billing-reminders/route.ts` |
 | `ACCOUNT_DELETION` | Status can be read. Scheduling deletion returns 503 | `lib/server/account-deletion.ts` |
-| `LAYOUT_STUDIO` | **On (`1`) in production.** If turned off: no composition on the player, and `GET` / `POST /api/layout-studio`, `/boards`, `/assign` return 404 before a database call | `lib/layout-studio.ts`, `app/api/layout-studio/route.ts` |
+| `LAYOUT_STUDIO` | **On (`1`) in production.** If turned off: no composition on the player, and `GET` / `POST /api/layout-studio`, `/boards`, `/assign`, `/preview` and `POST /api/menu-templates/switch` return 404 before a database call | `lib/layout-studio.ts`, `app/api/layout-studio/route.ts` |
 
 `MENU_TEMPLATES` and `UNIFIED_MENU_EDITOR`: unset = everyone (current production), `developers`, a list of emails/account ids, `all`, or `off` (`lib/menu-templates-flag.ts`).
 

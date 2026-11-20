@@ -12,10 +12,11 @@ const FONT_DIR = path.join(process.cwd(), "assets", "fonts");
 const FONTS = ALL_FONT_FILES.map((f) => path.join(FONT_DIR, f));
 
 /** Render a menu to a 1920×1080 PNG with bundled open-source fonts (no paid service). */
-export function renderMenuPng(template: MenuTemplate, content: MenuContent, art: MenuArt = {}): Uint8Array {
+export function renderMenuPng(template: MenuTemplate, content: MenuContent, art: MenuArt = {}, width?: number): Uint8Array {
   const resvg = new Resvg(menuSvg(template, content, art), {
     font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: "Inter" },
-    fitTo: { mode: "original" },
+    // width only for scaled previews (catalog thumbnails); published boards keep the original 1920×1080.
+    fitTo: width ? { mode: "width", value: width } : { mode: "original" },
   });
   return new Uint8Array(resvg.render().asPng());
 }
