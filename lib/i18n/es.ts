@@ -1994,6 +1994,7 @@ export const es: Record<MessageKey, string> = {
   "ml.delPresTitle": "¿Eliminar esta presentación?",
   "ml.delPres": "Eliminar presentación",
   "ml.inPlaylistTitle": "Este archivo está en una lista de reproducción",
+  "ml.inUseTitle": "Este archivo está en uso",
   "ml.close": "Cerrar",
   "ml.delFileTitle": "¿Eliminar este archivo?",
   "ml.delFile": "Eliminar archivo",

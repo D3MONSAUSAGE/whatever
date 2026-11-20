@@ -192,8 +192,11 @@ export function MediaLibrary({ fixture, pathOverride }: { fixture?: MediaItem[];
       reload();
     } catch (err) {
       const message = (err as Error).message;
-      if (/playlist/i.test(message)) {
+      // The server refuses (409) when a playlist, a menu board, a promotion or the Brand Kit logo still uses the file.
+      if (/playlist|lista de reproducci/i.test(message)) {
         await confirm.ask({ title: t("ml.inPlaylistTitle"), body: message, cancelLabel: t("ml.close") });
+      } else if (/used by|se usa en|Brand Kit logo|Kit de marca/i.test(message)) {
+        await confirm.ask({ title: t("ml.inUseTitle"), body: message, cancelLabel: t("ml.close") });
       } else toast.show(message, true);
     }
   }
