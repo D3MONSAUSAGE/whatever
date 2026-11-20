@@ -6,6 +6,7 @@ import { readPlaybackSchedule } from "@/lib/server/playback";
 import { isMissingSchema } from "@/lib/server/schema";
 import { playerPollMs } from "@/lib/server/limits";
 import { catchupPoll } from "@/lib/server/playback-report";
+import { PLAYER_BUILD } from "@/lib/player-build";
 import { expandPresentationRows } from "@/lib/server/presentation-groups";
 import { attachLayoutCompositions } from "@/lib/server/layout-player";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
@@ -116,11 +117,14 @@ export async function GET(req: Request) {
     layoutStudio: boolean;
     catchupMs?: number;
     catchupForMs?: number;
+    playerBuild: string;
   } = {
     pollMs: pollFor(modeHint, commands),
     commands,
     // false tells an updated player to drop a zone even when the content version did not change.
     layoutStudio: layoutStudioEnabled(),
+    // The current TV player build; an older page still running on a TV reloads itself once (public/player.html).
+    playerBuild: PLAYER_BUILD,
     ...catchupPoll(version, sync.confirmedVersion, sync.confirmedAt),
   };
   if (schedule.kind === "on" && schedule.nextTransitionAt) extra.nextTransitionAt = schedule.nextTransitionAt;
