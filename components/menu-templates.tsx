@@ -34,6 +34,7 @@ import {
   type DesignBusiness, type DesignStyle, type MenuDesign,
 } from "@/lib/menu-designs";
 import { designColors, designSvgWithReport, hasOwnerItemPhoto, itemPhotosShown } from "@/lib/menu-design-svg";
+import { roomierDesignId } from "@/lib/board-fit";
 import type { Brand } from "@/lib/brand-kit";
 import { moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 
@@ -502,8 +503,8 @@ export function TemplateEditor({
   const photosShown = isDesign ? itemPhotosShown(doc, design) : ownerPhotos && doc.photoStyle !== "text";
   const photosHidden = ownerPhotos && !photosShown;
   const photoTemplate = isDesign && (isPhotoDesign(design) || itemPhotosShown(doc, design));
-  // A roomier template that still shows item photos when this one does: three-column thumbnails hold all 24 items.
-  const roomierId = photoTemplate ? "taqueria-specials" : "diner-classics";
+  // A roomier template that still shows item photos when this one does (shared with the preview API).
+  const roomierId = isDesign ? roomierDesignId(doc, design) : null;
   const roomier = isDesign && fit.dropped > 0 && design.id !== roomierId ? designById(roomierId) : null;
   const canHidePhotos = isDesign && fit.dropped > 0 && !photosAlways && itemPhotosShown(doc, design);
   const merged = engine === "layout" && fit.hiddenSections > 0 ? mergeExtraSections(doc) : null;
