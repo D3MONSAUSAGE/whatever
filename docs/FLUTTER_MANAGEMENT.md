@@ -4,7 +4,7 @@ This is the website and backend the phone app already uses as a controller. It i
 
 Auth on every management route below is `Authorization: Bearer <Supabase access token>` (`lib/server/auth.ts` `requireAdmin`). A missing or rejected token is 401. The token's user is resolved to one account. Requests do not accept an account id.
 
-**Status (updated 2026-11-20, web at PR #161).** The menu designer catalog, preview and switch routes for Flutter parity are in **Menu designer API** below. The web menu designer is live for every customer: `LAYOUT_STUDIO=1` in production, and `MENU_TEMPLATES` / `UNIFIED_MENU_EDITOR` default to everyone (PR #153). Most new boards are therefore web-designer boards (`content.layoutVersion === 1`), which the classic menu routes refuse to edit (409). Read **Menu boards** below before touching menus. Changes the app must handle since Android +14 are listed in **Changes since +14**.
+**Status (updated 2026-11-20, web at PR #162).** The menu designer catalog, preview and switch routes for Flutter parity are in **Menu designer API** below. The web menu designer is live for every customer: `LAYOUT_STUDIO=1` in production, and `MENU_TEMPLATES` / `UNIFIED_MENU_EDITOR` default to everyone (PR #153). Most new boards are therefore web-designer boards (`content.layoutVersion === 1`), which the classic menu routes refuse to edit (409). Read **Menu boards** below before touching menus. Changes the app must handle since Android +14 are listed in **Changes since +14**.
 
 ## Account
 
@@ -306,7 +306,7 @@ The TV reports a playback error with `POST /api/player/state` and header `X-Disp
 
 Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last saved playlist, images only (`public/player.html` `playSaved`, `public/player-sw.js`). There is no management API for an offline pack. A phone that cannot reach the API shows its own network error. It does not cache the screen's media as a second player.
 
-## Changes since Android +14 (web PRs #148–#161)
+## Changes since Android +14 (web PRs #148–#162)
 
 | Change | What the app sees | PR |
 | --- | --- | --- |
@@ -317,7 +317,7 @@ Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last s
 | Web-designer board publish swaps the right image | No contract change | #159 |
 | Setup step 8 stays done after a TV confirmed content | Same `GET /api/onboarding` shape | #147 |
 | `GET /api/health` returns `commit` | Additive | #153 |
-| Menu designer API: catalog, public thumbnails, switch, preview + fit | New routes only | #161 |
+| Menu designer API: catalog, public thumbnails, switch, preview + fit | New routes only | #162 |
 
 No route was removed or renamed, no response field was removed, and the TV player and `/api/player/*` are unchanged.
 
