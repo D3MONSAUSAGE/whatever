@@ -165,10 +165,7 @@ export async function saveLayoutForAccount(accountId: string, body: {
         if (linked.error) throw new Error("Couldn't update the screens.");
         return;
       }
-      let from = previous;
-      const item = await db().from("playlist_items").select("media_id").eq("playlist_id", playlistId).eq("account_id", accountId).limit(1);
-      const onScreen = item.data?.[0]?.media_id ? String(item.data[0].media_id) : "";
-      if (onScreen) from = onScreen;
+      const from = await boardItemMedia(accountId, playlistId, previous);
       if (!from) throw new Error("Couldn't update the screens.");
       const swapped = await db().rpc("menu_swap_media", { p_account_id: accountId, p_old_media_id: from, p_new_media_id: next });
       if (swapped.error || !swapped.data) throw new Error("Couldn't update the screens.");
@@ -177,4 +174,28 @@ export async function saveLayoutForAccount(accountId: string, body: {
   });
   if (!saved.ok) return { status: 400 as const, error: saved.error };
   return { status: 200 as const, menuId, swapped: saved.swapped };
+}
+
+/**
+ * The media id of the board's own image on its playlist, the one a publish must swap.
+ *
+ * The playlist can also hold attached promotions (promo_add_to_playlist appends them after the board). The lookup
+ * used to take any one row with no order, which Postgres may return in any order (rows rewritten by an earlier swap
+ * move to the end of the table), so a publish could swap a promotion's image instead of the board's. Now:
+ * published rows only, promotion images excluded, the board's stored media id when it is on the playlist, else the
+ * lowest position (ties by row id); with no such row, the stored media id as before. Null when there is neither.
+ */
+export async function boardItemMedia(accountId: string, playlistId: string, previous: string | null): Promise<string | null> {
+  const [items, promos] = await Promise.all([
+    db().from("playlist_items").select("id, media_id, position").eq("playlist_id", playlistId).eq("account_id", accountId).eq("kind", "published"),
+    db().from("promos").select("media_id").eq("account_id", accountId),
+  ]);
+  if (items.error) return null;
+  const promoMedia = new Set(promos.error ? [] : (promos.data ?? []).map((row) => String(row.media_id ?? "")).filter(Boolean));
+  const rows = ((items.data ?? []) as { id: unknown; media_id: unknown; position: unknown }[])
+    .map((row) => ({ id: String(row.id), mediaId: String(row.media_id ?? ""), position: Number(row.position ?? 0) }))
+    .filter((row) => row.mediaId && !promoMedia.has(row.mediaId))
+    .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+  if (previous && rows.some((row) => row.mediaId === previous)) return previous;
+  return rows[0]?.mediaId ?? previous ?? null;
 }
