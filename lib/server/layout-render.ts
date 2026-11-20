@@ -57,7 +57,7 @@ export function stockPhotoDataUri(id: string | undefined): string | null {
   }
 }
 
-export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, extras?: { logo?: BoardImage | null; itemImages?: Record<string, BoardImage> }): Buffer {
+export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, extras?: { logo?: BoardImage | null; itemImages?: Record<string, BoardImage>; width?: number }): Buffer {
   const href = dataUri(image);
   // Template boards (doc.design) may show a bundled stock photo, a logo and item photos. Original layouts may show
   // item photos (thumbnails). Boards without them render exactly as before.
@@ -84,7 +84,8 @@ export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, 
   }
   const resvg = new Resvg(layoutSvg(doc, art), {
     font: { fontFiles: fontsFor(doc.font, doc.bodyFont), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },
-    fitTo: { mode: "original" },
+    // width only for scaled previews (catalog thumbnails); published boards keep the original 1920×1080.
+    fitTo: extras?.width ? { mode: "width", value: extras.width } : { mode: "original" },
   });
   return Buffer.from(resvg.render().asPng());
 }

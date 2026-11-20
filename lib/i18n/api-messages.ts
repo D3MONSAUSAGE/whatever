@@ -129,6 +129,8 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Check your items.": "Revise sus productos.",
   "Check your sections.": "Revise sus secciones.",
   "Choose a layout.": "Elija un diseño.",
+  "Choose a template or layout from the catalog.": "Elija una plantilla o un diseño del catálogo.",
+  "Choose one of this template's colour styles.": "Elija uno de los estilos de color de esta plantilla.",
   "Couldn't assign that board.": "No se pudo asignar ese menú digital.",
   "Couldn't build the preview.": "No se pudo crear la vista previa.",
   "Couldn't confirm this board belongs to the signed-in account. It was not saved.": "No se pudo confirmar que este menú digital pertenece a la cuenta con la sesión iniciada. No se guardó.",
