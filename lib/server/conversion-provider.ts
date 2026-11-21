@@ -73,15 +73,21 @@ export function coconutProvider(apiKey: string): ConversionProvider {
       return { providerJobId: String(json.id) };
     },
     async downloadOutput(request) {
-      if (!request.outputUrl || !/^https:\/\//i.test(request.outputUrl)) {
-        throw new Error("Conversion output URL is missing.");
-      }
-      return fetchOutputBytes(request.outputUrl);
+      const outputUrl = httpsOutputUrl(request.outputUrl);
+      if (!outputUrl) throw new Error("Conversion output URL is missing.");
+      return fetchOutputBytes(outputUrl);
     },
   };
 }
 
 const MAX_OUTPUT_BYTES = 500 * 1024 * 1024;
+
+/** Coconut examples sometimes use http:// CDN URLs. We only fetch over HTTPS. */
+export function httpsOutputUrl(url: string | undefined): string | null {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  return url.replace(/^http:\/\//i, "https://");
+}
+
 
 export async function fetchOutputBytes(url: string, doFetch: typeof fetch = fetch): Promise<Uint8Array> {
   const res = await doFetch(url, { redirect: "follow" });
