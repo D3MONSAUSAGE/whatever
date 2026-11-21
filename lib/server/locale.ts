@@ -8,13 +8,17 @@ import { isMissingSchema } from "./schema";
 
 /** The signed-in account's saved language (accounts.locale, 0028). Null without a valid session or column. */
 export async function accountLocale(accountId: string): Promise<Locale | null> {
-  const { data, error } = await db().from("accounts").select("locale").eq("id", accountId).maybeSingle();
-  if (error) {
-    if (!isMissingSchema(error)) console.info("account locale read failed");
+  try {
+    const { data, error } = await db().from("accounts").select("locale").eq("id", accountId).maybeSingle();
+    if (error) {
+      if (!isMissingSchema(error)) console.info("account locale read failed");
+      return null;
+    }
+    const value = (data as { locale?: unknown } | null)?.locale;
+    return isLocale(value) ? value : null;
+  } catch {
     return null;
   }
-  const value = (data as { locale?: unknown } | null)?.locale;
-  return isLocale(value) ? value : null;
 }
 
 /**

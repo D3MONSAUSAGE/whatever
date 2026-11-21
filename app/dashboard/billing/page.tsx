@@ -67,7 +67,7 @@ export default function Billing() {
   }, [screens.data, picked]);
 
   const e = ent.data;
-  const allowed = e ? PLAN_SCREENS[e.plan] ?? 0 : 0;
+  const allowed = e ? (e.state === "trial" || e.state === "trial_grace" ? e.screen_limit : PLAN_SCREENS[e.plan] ?? 0) : 0;
   const list = screens.data ?? [];
   const over = e ? e.active_screens > allowed : false;
 

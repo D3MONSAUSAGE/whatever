@@ -4,6 +4,7 @@ import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { buildEntitlementsResponse, loadEffectiveEntitlement } from "@/lib/server/entitlements";
+import { PLAN_CHECK_RETRY_AFTER_SECONDS, rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const ids = Array.isArray(body.displayIds) ? body.displayIds : null;
   if (!ids || ids.length > 100 || !ids.every((x: unknown) => typeof x === "string" && isUuid(x))) {
@@ -26,6 +29,6 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (data === "too_many") return json({ error: "That's more screens than your plan includes.", code: "too_many" }, 400);
   if (data === "not_found") return json({ error: "One of those screens wasn't found.", code: "not_found" }, 403);
   const e = await loadEffectiveEntitlement(admin.accountId);
-  if (e === "error" || !e) return fail("Saved, but couldn't reload your plan. Refresh to see it.", 503);
+  if (e === "error" || !e) return json({ error: "Saved, but couldn't reload your plan. Refresh to see it.", code: "unavailable" }, 503, { "Retry-After": PLAN_CHECK_RETRY_AFTER_SECONDS });
   return json(await buildEntitlementsResponse(req, admin.accountId, admin.userId, e));
 });

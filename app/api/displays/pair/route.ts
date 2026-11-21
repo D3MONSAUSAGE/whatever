@@ -8,6 +8,7 @@ import {
   PAIR_CLAIM_WINDOW_SECONDS,
 } from "@/lib/server/limits";
 import { billingEnforced, loadEffectiveEntitlement } from "@/lib/server/entitlements";
+import { PLAN_CHECK_RETRY_AFTER_SECONDS, PLAN_CHECK_UNAVAILABLE_CODE } from "@/lib/server/subscription-write";
 import { normalizeDisplayName, normalizePairingCode } from "@/lib/server/validate";
 import { screenNameWarning } from "@/lib/screen-names";
 import { allow, clientIp, fail, json, readJson } from "@/lib/server/http";
@@ -36,8 +37,14 @@ export const POST = withLocalizedErrors(async (req: Request) => {
     // Commercial rules (no legacy/free plans, capped trial, ended subscriptions) before the
     // database's own serialized screen-limit check in claim_pairing.
     const e = await loadEffectiveEntitlement(admin.accountId);
-    if (e === "error") return fail("Couldn't check your plan. Try again.", 503);
-    if (!e || !e.playback_allowed || e.state === "trial_grace" || e.state === "past_due") {
+    if (e === "error" || !e) {
+      return json(
+        { error: "Couldn't check your plan. Try again.", code: PLAN_CHECK_UNAVAILABLE_CODE },
+        503,
+        { "Retry-After": PLAN_CHECK_RETRY_AFTER_SECONDS },
+      );
+    }
+    if (!e.playback_allowed || e.state === "trial_grace" || e.state === "past_due") {
       return json({
         error: "Your plan isn't active, so new screens can't be added. Choose a plan to continue.",
         code: "subscription_inactive",
