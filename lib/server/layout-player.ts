@@ -1,5 +1,6 @@
 import { layoutStudioEnabled, parseLayout, playerComposition, type PlayerComposition } from "@/lib/layout-studio";
 import { BUCKET, db } from "@/lib/server/supabase";
+import { isReadyMediaStatus } from "@/lib/media-ready";
 
 const URL_TTL_SECONDS = 3600;
 
@@ -36,13 +37,14 @@ export async function attachLayoutCompositions(items: Item[]): Promise<void> {
     if (!wanted.length) return;
     const media = await db()
       .from("media")
-      .select("id, account_id, storage_path, kind")
+      .select("id, account_id, storage_path, kind, processing_status")
       .in("id", wanted.map((row) => row.videoId));
     if (media.error || !media.data) return;
     const files = new Map(media.data.map((file) => [String(file.id), file]));
     const paths = wanted.map((row) => {
       const file = files.get(row.videoId);
       if (!file || String(file.account_id) !== row.accountId || file.kind !== "video" || !file.storage_path) return "";
+      if (!isReadyMediaStatus(file.processing_status == null ? null : String(file.processing_status))) return "";
       return String(file.storage_path);
     }).filter(Boolean);
     if (!paths.length) return;

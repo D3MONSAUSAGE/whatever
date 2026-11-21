@@ -14,6 +14,7 @@ import {
   inspectMp4,
   mp4ErrorMessage,
 } from "@/lib/mp4";
+import { MAX_CONVERT_EDGE, hevcConversionEnabled, inspectForConversion, startVideoConversion } from "@/lib/server/video-conversion";
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
@@ -38,7 +39,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
     return fail(VIDEO_UNREADABLE_MESSAGE, 415);
   }
   if (body.durationMs > MAX_VIDEO_DURATION_MS) return fail(mp4ErrorMessage("duration"), 415);
-  if (body.width > MAX_VIDEO_EDGE || body.height > MAX_VIDEO_EDGE) return fail(mp4ErrorMessage("dimensions"), 415);
+  const maxEdge = hevcConversionEnabled() ? MAX_CONVERT_EDGE : MAX_VIDEO_EDGE;
+  if (body.width > maxEdge || body.height > maxEdge) return fail(mp4ErrorMessage("dimensions"), 415);
   const rateLimited = await enforceLimit(`upload-complete:${admin.userId}`, UPLOAD_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE);
   if (rateLimited) return rateLimited;
 
@@ -59,13 +61,34 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
     return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage("size"), 413);
   }
 
-  const inspected = await inspectMp4(storedObjectSource(path, size));
-  if (!inspected.ok) {
-    return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage(inspected.reason), 415);
-  }
-  const limited = enforceVideoLimits(inspected, size);
-  if (limited) {
-    return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage(limited), limited === "size" ? 413 : 415);
+  const source = storedObjectSource(path, size);
+  const inspected = await inspectMp4(source);
+  if (!inspected.ok || enforceVideoLimits(inspected, size)) {
+    if (hevcConversionEnabled()) {
+      const decision = await inspectForConversion(source, size);
+      if (decision.convertible) {
+        const thumb = decodeThumb(body.thumbnailBase64);
+        const started = await startVideoConversion({
+          accountId: admin.accountId,
+          mediaId,
+          fileName: normalizeFileName(body.fileName),
+          sizeBytes: size,
+          candidate: decision,
+          thumbnailPath: thumbPath,
+          thumbBytes: thumb,
+        });
+        if (!started.ok) {
+          return discard(admin.accountId, mediaId, [path, thumbPath], started.message, started.status);
+        }
+        return json({ id: mediaId, processingStatus: "processing" }, 201);
+      }
+      return discard(admin.accountId, mediaId, [path, thumbPath], decision.message, decision.status);
+    }
+    if (!inspected.ok) {
+      return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage(inspected.reason), 415);
+    }
+    const limited = enforceVideoLimits(inspected, size);
+    return discard(admin.accountId, mediaId, [path, thumbPath], mp4ErrorMessage(limited!), limited === "size" ? 413 : 415);
   }
 
   const thumb = decodeThumb(body.thumbnailBase64);

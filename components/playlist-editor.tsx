@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, useApi, type MediaItem, type PlaylistDetail } from "@/lib/api";
+import { isReadyMediaStatus } from "@/lib/media-ready";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { LimitNote, PageHeader, atLimit } from "@/components/ui";
@@ -571,7 +572,7 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
                     )}
                   </span>
                   <span className="mt-1 flex items-center gap-2 text-sm min-h-11">
-                    <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]}
+                    <input type="checkbox" className="size-5" aria-label={item.fileName} checked={!!picked[item.id]} disabled={!isReadyMediaStatus(item.processingStatus)}
                       onChange={(event) => setPicked({ ...picked, [item.id]: event.target.checked })} />
                     <span className="truncate">{item.fileName}{item.kind === "presentation" ? ` (${item.slideCount ?? 0})` : ""}</span>
                     {picked[item.id] ? <span className="badge ml-auto" aria-label={t("pe.numberN", { n: picks.indexOf(item.id) + 1 })}>{picks.indexOf(item.id) + 1}</span> : null}
@@ -605,6 +606,7 @@ function AddImages({ existing, picks, setPicks, onClose, onAdd }: {
           onAdd(picks.flatMap((id): Slide[] => {
             const item = rows.find((row) => row.id === id);
             if (item) {
+              if (!isReadyMediaStatus(item.processingStatus)) return [];
               return [{
                 key: `${item.id}-${tag()}`,
                 mediaId: item.id,

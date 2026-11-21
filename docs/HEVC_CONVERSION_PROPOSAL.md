@@ -1,5 +1,7 @@
 # HEVC / incompatible Apple video conversion (proposal only)
 
+> Update, 21 November 2026: the flag-off pipeline is documented in `docs/HEVC_CONVERSION.md`. This file is the original priced investigation. Nothing paid is activated.
+
 Date: 20 November 2026 (America/Los_Angeles). Not implemented. No paid service or recurring infrastructure is activated.
 
 Compatible H.264/AAC (or silent) MP4, MOV, and M4V files already upload without transcoding. This proposal is only for files `inspectMp4` rejects, typically iPhone/Mac HEVC (H.265). Requirements that stay in force: 500 MB cap, TV-safe H.264/AAC output, no weakening of validation or media security, no unnecessary duplicate originals, no TV player change, and no paid activation without approval.

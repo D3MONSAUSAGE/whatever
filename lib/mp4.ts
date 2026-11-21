@@ -92,6 +92,142 @@ export function enforceVideoLimits(info: Mp4Info, sizeBytes: number): Mp4Failure
   return null;
 }
 
+/** Largest edge we will send to a converter (4K). Larger files stay rejected. */
+export const MAX_CONVERT_EDGE = 4096;
+
+const HEVC_CODECS = new Set(["hvc1", "hev1", "dvh1", "dvhe"]);
+const AVC_CODECS = new Set(["avc1", "avc3"]);
+const PRORES_CODECS = new Set(["appr", "apcn", "apch", "apco", "apcs", "ap4h", "ap4x"]);
+const REJECT_VIDEO_CODECS = new Set([
+  "vp09", "vp9 ", "av01", "av1 ", "theora", "theo",
+  ...PRORES_CODECS,
+]);
+
+export type Mp4Probe = {
+  durationMs: number;
+  width: number;
+  height: number;
+  videoCodecs: string[];
+  audioCodecs: string[];
+  profile: number;
+  level: number;
+};
+
+export type Mp4ProbeResult = { ok: true } & Mp4Probe | { ok: false; reason: "type" | "metadata" };
+
+/** Read tracks without applying the TV playback allow-list. Used to decide conversion. */
+export async function probeMp4(source: ByteSource): Promise<Mp4ProbeResult> {
+  if (!source.size || source.size < 8) return { ok: false, reason: "type" };
+  let offset = 0;
+  let sawFtyp = false;
+  let moov: { offset: number; size: number } | null = null;
+  let guard = 0;
+  while (offset + 8 <= source.size && guard < 64) {
+    guard += 1;
+    const header = await source.read(offset, 16);
+    if (header.length < 8) return { ok: false, reason: "type" };
+    const parsed = boxSize(header, 0, source.size - offset);
+    if (!parsed) return { ok: false, reason: "type" };
+    const type = fourcc(header, 4);
+    if (type === "ftyp") sawFtyp = true;
+    if (type === "moov") moov = { offset, size: parsed.size };
+    if (sawFtyp && moov) break;
+    offset += parsed.size;
+  }
+  if (!sawFtyp || !moov) return { ok: false, reason: "type" };
+  if (moov.size > MAX_MOOV_BYTES || moov.size < 8) return { ok: false, reason: "metadata" };
+  const raw = await source.read(moov.offset, moov.size);
+  if (raw.length < Math.min(moov.size, 8)) return { ok: false, reason: "type" };
+  return parseMoovProbe(raw);
+}
+
+export type ConversionCandidate = {
+  convertible: true;
+  videoCodec: string;
+  audioCodec: string | null;
+  durationMs: number;
+  width: number;
+  height: number;
+};
+
+export type ConversionDecision = ConversionCandidate | { convertible: false; reason: Mp4Failure | "unsupported" };
+
+/**
+ * Whether an already-rejected (or over-limit) file can be converted to our TV profile.
+ * Compatible H.264/AAC files must not be sent here; the caller only converts inspect/limit failures.
+ */
+export function conversionDecision(probe: Mp4ProbeResult, sizeBytes: number): ConversionDecision {
+  if (!probe.ok) return { convertible: false, reason: probe.reason };
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return { convertible: false, reason: "type" };
+  if (sizeBytes > MAX_VIDEO_BYTES) return { convertible: false, reason: "size" };
+  if (probe.durationMs < 500 || probe.durationMs > MAX_VIDEO_DURATION_MS) {
+    return { convertible: false, reason: "duration" };
+  }
+  if (!probe.videoCodecs.length || probe.width < 2 || probe.height < 2) {
+    return { convertible: false, reason: "codec" };
+  }
+  if (probe.width > MAX_CONVERT_EDGE || probe.height > MAX_CONVERT_EDGE) {
+    return { convertible: false, reason: "dimensions" };
+  }
+  if (probe.videoCodecs.some((codec) => REJECT_VIDEO_CODECS.has(codec))) {
+    return { convertible: false, reason: "unsupported" };
+  }
+  const hevc = probe.videoCodecs.filter((codec) => HEVC_CODECS.has(codec));
+  const avc = probe.videoCodecs.filter((codec) => AVC_CODECS.has(codec));
+  if (!hevc.length && !avc.length) return { convertible: false, reason: "unsupported" };
+  if (hevc.length && avc.length) return { convertible: false, reason: "unsupported" };
+  if (hevc.length !== 1 && avc.length !== 1 && probe.videoCodecs.length !== 1) {
+    // Multiple video tracks of the same family are unusual; still allow a single family primary.
+    if (hevc.length > 1 && !avc.length) {
+      // ok, use the first
+    } else if (avc.length > 1 && !hevc.length) {
+      // ok
+    } else {
+      return { convertible: false, reason: "unsupported" };
+    }
+  }
+  const oversize = probe.width > MAX_VIDEO_EDGE || probe.height > MAX_VIDEO_EDGE;
+  const avcNeedsTranscode = avc.length > 0 && (oversize || !allowedProfile(probe.profile, probe.level));
+  if (avc.length && !hevc.length && !avcNeedsTranscode) {
+    // Compatible picture, but maybe incompatible audio; allow re-encode of any audio to AAC.
+    if (!probe.audioCodecs.length || probe.audioCodecs.every((codec) => codec === "mp4a")) {
+      return { convertible: false, reason: "codec" };
+    }
+  }
+  return {
+    convertible: true,
+    videoCodec: (hevc[0] || avc[0]) ?? probe.videoCodecs[0],
+    audioCodec: probe.audioCodecs[0] ?? null,
+    durationMs: probe.durationMs,
+    width: probe.width,
+    height: probe.height,
+  };
+}
+
+function parseMoovProbe(moov: Uint8Array): Mp4ProbeResult {
+  const durationMs = readMvhd(findBox(moov, "mvhd", 8, moov.length));
+  if (durationMs == null) return { ok: false, reason: "metadata" };
+  const tracks: Track[] = [];
+  eachChild(moov, 8, moov.length, (type, start, size) => {
+    if (type !== "trak") return;
+    const track = readTrak(moov.subarray(start, start + size));
+    if (track) tracks.push(track);
+  });
+  const video = tracks.filter((track) => track.handler === "vide");
+  const audio = tracks.filter((track) => track.handler === "soun");
+  const primary = video[0];
+  return {
+    ok: true,
+    durationMs,
+    width: primary?.width || 0,
+    height: primary?.height || 0,
+    videoCodecs: video.map((track) => track.codec),
+    audioCodecs: audio.map((track) => track.codec),
+    profile: primary?.profile ?? 0,
+    level: primary?.level ?? 0,
+  };
+}
+
 function parseMoov(moov: Uint8Array): Mp4Result {
   const durationMs = readMvhd(findBox(moov, "mvhd", 8, moov.length));
   if (durationMs == null) return { ok: false, reason: "metadata" };
@@ -165,8 +301,6 @@ function firstSample(stsd: Uint8Array): Uint8Array | null {
 }
 
 function visualSize(sample: Uint8Array): { width: number; height: number } | null {
-  const type = fourcc(sample, 4);
-  if (type !== "avc1" && type !== "avc3") return null;
   if (sample.length < 36) return null;
   const width = u16(sample, 32);
   const height = u16(sample, 34);

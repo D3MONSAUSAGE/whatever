@@ -2,32 +2,77 @@ import {
   MAX_VIDEO_BYTES,
   MAX_VIDEO_DURATION_MS,
   MAX_VIDEO_EDGE,
+  conversionDecision,
   enforceVideoLimits,
   inspectMp4,
   mp4ErrorMessage,
+  probeMp4,
   VIDEO_UNREADABLE_MESSAGE,
   type Mp4Info,
 } from "./mp4";
+
+/** Client bundle flag. The server also requires HEVC_CONVERSION_ENABLED=1 before it will convert. */
+function conversionClientEnabled() {
+  return process.env.NEXT_PUBLIC_HEVC_CONVERSION_ENABLED === "1";
+}
+
+// 1×1 JPEG used when the browser cannot decode an HEVC frame for a preview.
+const PLACEHOLDER_JPEG = Uint8Array.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+  0x00, 0x01, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01,
+  0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff, 0xc4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xda, 0x00, 0x08,
+  0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x7b, 0xdf, 0xff, 0xd9,
+]);
 
 export type PreparedVideo = Mp4Info & { thumbnail: Blob };
 
 /** Read the MP4 with the browser, then grab one JPEG frame for the library. */
 export async function prepareVideo(file: File): Promise<PreparedVideo> {
   if (file.size > MAX_VIDEO_BYTES) throw new Error(mp4ErrorMessage("size"));
-  const info = await inspectMp4({
+  const source = {
     size: file.size,
-    async read(offset, length) {
+    async read(offset: number, length: number) {
       const slice = file.slice(offset, offset + length);
       return new Uint8Array(await slice.arrayBuffer());
     },
-  });
+  };
+  const info = await inspectMp4(source);
+  const limited = info.ok ? enforceVideoLimits(info, file.size) : info.reason;
+  if (!limited && info.ok) {
+    const probed = await probeVideo(file);
+    if (probed.durationMs > MAX_VIDEO_DURATION_MS) throw new Error(mp4ErrorMessage("duration"));
+    if (probed.width > MAX_VIDEO_EDGE || probed.height > MAX_VIDEO_EDGE) throw new Error(mp4ErrorMessage("dimensions"));
+    return { ...info, thumbnail: probed.thumbnail };
+  }
+  if (conversionClientEnabled()) {
+    const probe = await probeMp4(source);
+    const decision = conversionDecision(probe, file.size);
+    if (decision.convertible) {
+      let thumbnail: Blob;
+      try {
+        thumbnail = (await probeVideo(file)).thumbnail;
+      } catch {
+        thumbnail = new Blob([PLACEHOLDER_JPEG], { type: "image/jpeg" });
+      }
+      return {
+        durationMs: decision.durationMs,
+        width: decision.width,
+        height: decision.height,
+        videoCodec: "avc1",
+        audioCodec: null,
+        profile: 0,
+        level: 0,
+        thumbnail,
+      };
+    }
+  }
   if (!info.ok) throw new Error(mp4ErrorMessage(info.reason));
-  const limited = enforceVideoLimits(info, file.size);
-  if (limited) throw new Error(mp4ErrorMessage(limited));
-  const probed = await probeVideo(file);
-  if (probed.durationMs > MAX_VIDEO_DURATION_MS) throw new Error(mp4ErrorMessage("duration"));
-  if (probed.width > MAX_VIDEO_EDGE || probed.height > MAX_VIDEO_EDGE) throw new Error(mp4ErrorMessage("dimensions"));
-  return { ...info, thumbnail: probed.thumbnail };
+  throw new Error(mp4ErrorMessage(limited!));
 }
 
 function probeVideo(file: File): Promise<{ durationMs: number; width: number; height: number; thumbnail: Blob }> {

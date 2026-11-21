@@ -20,7 +20,7 @@ describe("developer console layout", () => {
   it("shows the five sections in order, in English and Spanish", () => {
     for (const locale of ["en", "es"] as const) {
       const out = html(locale);
-      const ids = ["overview", "activation", "revenue", "screens", "health"].map((id) => out.indexOf(`data-testid="dev-section-${id}"`));
+      const ids = ["overview", "activation", "revenue", "screens", "health", "conversions"].map((id) => out.indexOf(`data-testid="dev-section-${id}"`));
       expect(ids.every((i) => i >= 0), locale).toBe(true);
       expect([...ids].sort((a, b) => a - b)).toEqual(ids);
       const dict = locale === "es" ? es : en;

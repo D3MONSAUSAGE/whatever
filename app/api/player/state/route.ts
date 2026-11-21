@@ -10,6 +10,7 @@ import { PLAYER_BUILD } from "@/lib/player-build";
 import { expandPresentationRows } from "@/lib/server/presentation-groups";
 import { attachLayoutCompositions } from "@/lib/server/layout-player";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
+import { isReadyMediaStatus } from "@/lib/media-ready";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -279,7 +280,7 @@ async function publishedPlaylistById(playlistId: string, accountId: string): Pro
   const mediaIds = [...new Set(items.data.map((item) => String(item.media_id)))];
   const media = await db()
     .from("media")
-    .select("id, storage_path, kind, width, height")
+    .select("id, storage_path, kind, width, height, processing_status")
     .eq("account_id", accountId)
     .in("id", mediaIds);
   if (media.error || !media.data) return "error";
@@ -288,6 +289,7 @@ async function publishedPlaylistById(playlistId: string, accountId: string): Pro
   for (const item of items.data) {
     const file = byId.get(String(item.media_id));
     if (!file?.storage_path) return "error";
+    if (!isReadyMediaStatus(file.processing_status == null ? null : String(file.processing_status))) continue;
     rows.push({
       playlist_id: playlistId,
       transition: playlist.data.published_transition,
@@ -313,6 +315,10 @@ async function publishedPlaylist(tokenHash: string): Promise<PlaylistPayload | n
 }
 
 async function signPlaylist(rows: PlaylistRow[]): Promise<PlaylistPayload | null | "error"> {
+  const ready = await dropUnreadyPlaylistRows(rows);
+  if (ready === "error") return "error";
+  rows = ready;
+  if (!rows.length) return null;
   const expanded = await expandPresentationRows(rows.map((item) => ({
     playlistId: item.playlist_id,
     transition: item.transition,
@@ -379,4 +385,18 @@ async function signPlaylist(rows: PlaylistRow[]): Promise<PlaylistPayload | null
     playbackMode: expanded[0].playbackMode === "manual" ? "manual" : "auto",
     items,
   };
+}
+
+
+async function dropUnreadyPlaylistRows(rows: PlaylistRow[]): Promise<PlaylistRow[] | "error"> {
+  const ids = [...new Set(rows.map((row) => row.media_id))];
+  if (!ids.length) return rows;
+  const media = await db().from("media").select("id, processing_status").in("id", ids);
+  if (media.error) return "error";
+  const ready = new Set(
+    (media.data ?? [])
+      .filter((row) => isReadyMediaStatus(row.processing_status == null ? null : String(row.processing_status)))
+      .map((row) => String(row.id)),
+  );
+  return rows.filter((row) => ready.has(row.media_id));
 }

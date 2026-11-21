@@ -21,6 +21,8 @@ export type Store = {
   menus: Row[];
   push_devices: Row[];
   brand_kits: Row[];
+  video_conversion_jobs: Row[];
+  video_conversion_months: Row[];
   objects: Map<string, Uint8Array>;
   /** Missing key means "uploaded now". Null means the storage listing has no created_at. */
   objectTimes: Map<string, string | null>;
@@ -31,6 +33,7 @@ const TABLE_NAMES = [
   "accounts", "locations", "media", "displays", "playlists", "playlist_items",
   "pairing_sessions", "rate_limits", "screen_groups", "screen_group_members", "schedules", "promos",
   "display_playback", "display_commands", "menus", "push_devices", "brand_kits",
+  "video_conversion_jobs", "video_conversion_months",
 ] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
@@ -263,6 +266,79 @@ function rateLimit(store: Store, key: string, windowSeconds: number, max: number
 }
 
 function rpc(store: Store, name: string, args: Record<string, unknown>) {
+  if (name === "reserve_video_conversion") {
+    const month = String(args.p_month);
+    const amount = Number(args.p_reserved_millis);
+    if (!Number.isInteger(amount) || amount <= 0) throw new Error("invalid_reserve");
+    const path = String(args.p_input_path ?? "");
+    if (!path.startsWith(`${args.p_account_id}/`)) throw new Error("invalid_path");
+    const media = store.media.find((row) => row.id === args.p_media_id && row.account_id === args.p_account_id);
+    if (!media) throw new Error("media_not_found");
+    let row = store.video_conversion_months.find((item) => String(item.month) === month);
+    if (!row) {
+      row = { month, cap_millis: 15000, reserved_millis: 0, spent_millis: 0, job_count: 0, failure_count: 0 };
+      store.video_conversion_months.push(row);
+    }
+    const reserved = Number(row.reserved_millis);
+    const spent = Number(row.spent_millis);
+    if (reserved + spent + amount > Number(row.cap_millis)) throw new Error("budget_exhausted");
+    if (store.video_conversion_jobs.some((job) => job.media_id === args.p_media_id && ["reserved", "submitted", "processing"].includes(String(job.status)))) {
+      throw new Error("duplicate_active_job");
+    }
+    row.reserved_millis = reserved + amount;
+    row.job_count = Number(row.job_count) + 1;
+    const id = crypto.randomUUID();
+    store.video_conversion_jobs.push({
+      id,
+      account_id: args.p_account_id,
+      media_id: args.p_media_id,
+      month,
+      status: "reserved",
+      provider: args.p_provider ?? "coconut",
+      provider_job_id: null,
+      webhook_token_hash: args.p_webhook_token_hash,
+      reserved_millis: amount,
+      actual_millis: null,
+      input_codec: args.p_input_codec,
+      input_duration_ms: args.p_input_duration_ms,
+      input_width: args.p_input_width,
+      input_height: args.p_input_height,
+      input_path: args.p_input_path,
+      output_path: args.p_output_path,
+      error: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      completed_at: null,
+    });
+    return id;
+  }
+  if (name === "mark_video_conversion_submitted") {
+    const job = store.video_conversion_jobs.find((item) => item.id === args.p_job_id);
+    if (!job || !["reserved", "submitted"].includes(String(job.status))) return false;
+    job.status = "submitted";
+    job.provider_job_id = args.p_provider_job_id;
+    job.updated_at = new Date().toISOString();
+    return true;
+  }
+  if (name === "complete_video_conversion") {
+    const job = store.video_conversion_jobs.find((item) => item.id === args.p_job_id);
+    if (!job) return false;
+    if (["ready", "failed", "released"].includes(String(job.status))) return true;
+    const reserved = Number(job.reserved_millis);
+    const actual = Math.min(Number(args.p_actual_millis), reserved);
+    const month = store.video_conversion_months.find((item) => String(item.month) === String(job.month));
+    if (month) {
+      month.reserved_millis = Number(month.reserved_millis) - reserved;
+      month.spent_millis = Number(month.spent_millis) + actual;
+      if (args.p_status === "failed") month.failure_count = Number(month.failure_count) + 1;
+    }
+    job.status = args.p_status;
+    job.actual_millis = actual;
+    job.error = args.p_error || null;
+    job.completed_at = new Date().toISOString();
+    job.updated_at = job.completed_at;
+    return true;
+  }
   if (name === "ensure_account") {
     const userId = String(args.p_user_id);
     const existing = store.accounts.find((account) => account.owner_user_id === userId);
@@ -958,6 +1034,7 @@ export function createFakeDb() {
     display_commands: [],
     menus: [],
     push_devices: [], brand_kits: [],
+    video_conversion_jobs: [], video_conversion_months: [],
     objects: new Map(),
     objectTimes: new Map(),
     users: new Map(),
@@ -985,9 +1062,9 @@ export function createFakeDb() {
     storage: {
       from() {
         return {
-          async upload(path: string, body: Uint8Array | Blob) {
+          async upload(path: string, body: Uint8Array | Blob, options?: { upsert?: boolean }) {
             // Supabase Storage replies HTTP 400 with statusCode "409" when upsert is false.
-            if (store.objects.has(path)) {
+            if (store.objects.has(path) && !options?.upsert) {
               return {
                 data: null,
                 error: { message: "The resource already exists", status: 400, statusCode: "409", error: "Duplicate" },
@@ -997,6 +1074,13 @@ export function createFakeDb() {
             store.objects.set(path, Uint8Array.from(bytes));
             if (!store.objectTimes.has(path)) store.objectTimes.set(path, new Date().toISOString());
             return { data: { path }, error: null };
+          },
+          async copy(from: string, to: string) {
+            const bytes = store.objects.get(from);
+            if (!bytes) return { data: null, error: { message: "not found" } };
+            store.objects.set(to, Uint8Array.from(bytes));
+            if (!store.objectTimes.has(to)) store.objectTimes.set(to, new Date().toISOString());
+            return { data: { path: to }, error: null };
           },
           async download(path: string) {
             const bytes = store.objects.get(path);
