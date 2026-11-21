@@ -289,11 +289,13 @@ describe("conversion pipeline with a mocked provider", () => {
     expect(ids.jobId).toBe(String(job.id));
     const lookedUp = await lookupJobByProviderId(String(job.provider_job_id), token);
     expect(lookedUp).toBe(String(job.id));
+    const seen: string[] = [];
     const result = await handleConversionWebhook(
       { ...coconutBody, jobId: ids.jobId, status: "completed" },
       token,
-      { fetchOutput: async () => fixture("h264-aac.mp4") },
+      { fetchOutput: async (url) => { seen.push(url); return fixture("h264-aac.mp4"); } },
     );
+    expect(seen).toEqual(["http://cdn.coconut.co/converted.mp4"]);
     expect(result).toEqual({ ok: true, status: "ready" });
     expect(fake.store.media[0].processing_status).toBe("ready");
   });

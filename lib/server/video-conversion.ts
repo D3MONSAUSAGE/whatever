@@ -366,11 +366,12 @@ type ProviderEvent = { jobId: string; failed: boolean; outputUrl?: string };
 function parseProviderEvent(body: unknown): ProviderEvent | null {
   if (!body || typeof body !== "object") return null;
   const record = body as Record<string, unknown>;
-  // Our adapter also accepts a normalized { jobId, status, outputUrl }.
+  const outputUrl = (typeof record.outputUrl === "string" && record.outputUrl) ? record.outputUrl : outputUrlFromCoconut(record);
+  // Route-normalized { jobId, status } still includes official Coconut fields.
+  // Output URLs live on data.outputs and must be read after jobId is injected.
   if (typeof record.jobId === "string" && record.jobId) {
     const status = String(record.status ?? record.event ?? "completed");
     const failed = /fail|error/i.test(status);
-    const outputUrl = typeof record.outputUrl === "string" ? record.outputUrl : undefined;
     return { jobId: record.jobId, failed, outputUrl };
   }
   const data = record.data && typeof record.data === "object" ? record.data as Record<string, unknown> : record;
@@ -381,30 +382,30 @@ function parseProviderEvent(body: unknown): ProviderEvent | null {
   const jobId = typeof params?.jobId === "string" ? params.jobId : typeof record.metadata === "object" && record.metadata && typeof (record.metadata as { jobId?: string }).jobId === "string"
     ? (record.metadata as { jobId: string }).jobId
     : "";
-  // Coconut notifications include the Coconut job id; we look up by our job id in params, or map via provider_job_id later.
   const ourId = jobId || (typeof params?.pekko_job_id === "string" ? params.pekko_job_id : "");
   const event = String(record.event ?? data.event ?? record.type ?? "job.completed");
   const failed = event.includes("failed") || event.includes("error") || record.status === "job.failed";
+  if (ourId) return { jobId: ourId, failed, outputUrl };
+  return { jobId: id, failed, outputUrl };
+}
+
+function outputUrlFromCoconut(record: Record<string, unknown>): string | undefined {
+  const data = record.data && typeof record.data === "object" ? record.data as Record<string, unknown> : record;
+  const job = data.job && typeof data.job === "object" ? data.job as Record<string, unknown> : data;
   const outputs = record.outputs ?? data.outputs ?? job.outputs;
-  let outputUrl: string | undefined;
   if (Array.isArray(outputs)) {
     const first = outputs.find((item) => item && typeof item === "object" && typeof (item as { url?: string }).url === "string") as { url?: string } | undefined;
-    outputUrl = first?.url;
-  } else if (outputs && typeof outputs === "object") {
-    const values = Object.values(outputs as Record<string, unknown>);
-    for (const value of values) {
-      if (typeof value === "string" && /^https?:/i.test(value)) {
-        outputUrl = value;
-        break;
-      }
+    return first?.url;
+  }
+  if (outputs && typeof outputs === "object") {
+    for (const value of Object.values(outputs as Record<string, unknown>)) {
+      if (typeof value === "string" && /^https?:/i.test(value)) return value;
       if (value && typeof value === "object" && typeof (value as { url?: string }).url === "string") {
-        outputUrl = (value as { url: string }).url;
-        break;
+        return (value as { url: string }).url;
       }
     }
   }
-  if (ourId) return { jobId: ourId, failed, outputUrl };
-  return { jobId: id, failed, outputUrl };
+  return undefined;
 }
 
 export async function lookupJobByProviderId(providerJobId: string, token: string) {
