@@ -11,6 +11,7 @@ export function BillingDisclosure({ className = "", locale = "en" }: { className
     <div className={`text-sm grid gap-2 ${className}`} data-testid="billing-disclosure">
       <p>Seller: {LEGAL_OPERATOR}. {LEGAL_ADDRESS}.</p>
       <p>Monthly prices, in US dollars: {prices}. A plan renews until it is canceled. Canceling stops the next renewal, and access continues through the period already paid. Pausing a screen does not delete content or settings.</p>
+      <p>If you choose a plan during a 14-day trial with at least 48 hours remaining, your card is saved and the first charge is on the original trial end date; the trial is not extended. If fewer than 48 hours remain, or the trial has ended, the first charge is today.</p>
       <p>{REFUND_POLICY}</p>
       <p>
         Email <a className="underline font-semibold" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
@@ -30,6 +31,7 @@ function BillingDisclosureEs({ className }: { className: string }) {
       </p>
       <p>Vendedor: {LEGAL_OPERATOR_ES}. {LEGAL_ADDRESS}.</p>
       <p>Precios mensuales, en dólares estadounidenses: {planPricesEs()}. Un plan se renueva hasta que se cancela. Cancelar detiene la siguiente renovación, y el acceso continúa durante el período ya pagado. Pausar una pantalla no elimina contenido ni configuración.</p>
+      <p>Si selecciona un plan durante una prueba de 14 días con al menos 48 horas restantes, se guarda su tarjeta y el primer cargo se realiza en la fecha original de fin de la prueba; la prueba no se extiende. Si quedan menos de 48 horas, o la prueba ya terminó, el primer cargo es hoy.</p>
       <p>{REFUND_POLICY_ES}</p>
       <p>
         Escriba a <a className="underline font-semibold" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.

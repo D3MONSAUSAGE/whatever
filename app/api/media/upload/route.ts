@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { VIDEO_UNAVAILABLE } from "@/lib/server/schema";
 import { videoSchemaReady } from "@/lib/server/video";
 import { MAX_VIDEO_BYTES, mp4ErrorMessage } from "@/lib/mp4";
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   if (!(await videoSchemaReady())) return fail(VIDEO_UNAVAILABLE, 503);
 
   const body = await readJson(req);

@@ -1,5 +1,6 @@
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { db } from "@/lib/server/supabase";
@@ -16,6 +17,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (!layoutStudioEnabled()) return fail("Not found", 404);
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   if (!isUuid(body.menuId) || !isUuid(body.displayId)) return fail("That board or screen isn't in this account.", 404);
   const menu = await db()

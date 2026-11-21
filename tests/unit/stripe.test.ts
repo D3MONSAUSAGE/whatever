@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Stripe from "stripe";
-import { planChangePaymentFailed, PLAN_CHANGE_PRORATION, billingReturnOrigin, checkoutAction, checkoutBlocked, checkoutSessionRequest, CHECKOUT_API_VERSION, periodEndSeconds, planForPrice, portalAccess, portalReturnUrl, portalSessionParams, priceFor, stripeKey, subscriptionPriceChange, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
+import { planChangePaymentFailed, PLAN_CHANGE_PRORATION, billingReturnOrigin, checkoutAction, checkoutBlocked, checkoutSessionMatchesCharge, checkoutSessionRequest, checkoutTrialEnd, CHECKOUT_API_VERSION, CHECKOUT_MIN_TRIAL_SECONDS, periodEndSeconds, planForPrice, portalAccess, portalReturnUrl, portalSessionParams, priceFor, stripeKey, subscriptionPriceChange, webhookEventAllowed, webhookSecret, WEBHOOK_API_VERSION } from "@/lib/server/stripe";
 
 describe("stripe test mode guard", () => {
   it("refuses live and missing keys", () => {
@@ -154,6 +154,41 @@ describe("checkout session", () => {
     const quoted = checkoutSessionRequest({ ...input, secretKey: "\"sk_test_abc\"", managedPayments: undefined });
     expect(quoted.ok).toBe(true);
     if (quoted.ok) expect(quoted.params.managed_payments).toEqual({ enabled: false });
+  });
+  it("sets Stripe trial_end and card-only methods on a deferred Checkout", () => {
+    const trialEnd = 1_800_000_000;
+    const built = checkoutSessionRequest({ ...input, trialEnd, submitMessage: "You will be charged $59 on Nov 26, 2026 (UTC)." });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.params.subscription_data).toMatchObject({
+      trial_end: trialEnd,
+      trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+    });
+    expect(built.params.payment_method_types).toEqual(["card"]);
+    expect(built.params.custom_text).toEqual({ submit: { message: "You will be charged $59 on Nov 26, 2026 (UTC)." } });
+  });
+  it("omits trial_end when Checkout must charge today", () => {
+    const built = checkoutSessionRequest({ ...input, trialEnd: null, submitMessage: "You will be charged $59 today, then monthly until you cancel. Unused trial days are not credited." });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.params.subscription_data?.trial_end).toBeUndefined();
+    expect(built.params.payment_method_types).toBeUndefined();
+  });
+  it("defers trial_end only when at least 48 hours remain", () => {
+    const now = 1_700_000_000;
+    expect(CHECKOUT_MIN_TRIAL_SECONDS).toBe(48 * 60 * 60);
+    expect(checkoutTrialEnd(new Date((now + CHECKOUT_MIN_TRIAL_SECONDS) * 1000).toISOString(), now)).toBe(now + CHECKOUT_MIN_TRIAL_SECONDS);
+    expect(checkoutTrialEnd(new Date((now + CHECKOUT_MIN_TRIAL_SECONDS - 1) * 1000).toISOString(), now)).toBeNull();
+    expect(checkoutTrialEnd(null, now)).toBeNull();
+  });
+  it("resumes a Checkout session only when the charge mode still matches", () => {
+    expect(checkoutSessionMatchesCharge({ status: "open", amount_total: 0 }, true)).toBe(true);
+    expect(checkoutSessionMatchesCharge({ status: "open", amount_total: 5900 }, true)).toBe(false);
+    expect(checkoutSessionMatchesCharge({ status: "open", amount_total: 5900 }, false)).toBe(true);
+    expect(checkoutSessionMatchesCharge({ status: "open", amount_total: 0 }, false)).toBe(false);
+    expect(checkoutSessionMatchesCharge({ status: "expired", amount_total: 0 }, true)).toBe(false);
+    expect(checkoutSessionMatchesCharge({ status: "open" }, true)).toBe(false);
+    expect(checkoutSessionMatchesCharge({ status: "open", amount_total: null }, false)).toBe(false);
   });
   it("reads the period end from the subscription or, on basil, from the items", () => {
     const asSub = (value: unknown) => periodEndSeconds(value as Stripe.Subscription);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { afterPortalResponse, availabilityOf, billingDate, checkoutNote, jumpToPlansPicker, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
+import { afterPortalResponse, availabilityOf, billingDate, checkoutIsDeferred, checkoutNote, jumpToPlansPicker, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
 
 const active = { status: "active", current_period_end: "2026-12-10T03:42:41+00:00", cancel_at_period_end: false };
 
@@ -53,6 +53,22 @@ describe("plan buttons", () => {
   it("explains that a switch is charged right away", () => {
     expect(checkoutNote("available", "update")).toMatch(/immediately/);
     expect(checkoutNote("available", "update")).toMatch(/no second subscription/);
+  });
+  it("discloses a deferred first charge during an eligible trial", () => {
+    expect(checkoutNote("available", "checkout", { deferredUntil: "Nov 26, 2026 (UTC)" })).toMatch(/bills on Nov 26, 2026 \(UTC\)/);
+    expect(checkoutNote("available", "checkout", { deferredUntil: "Nov 26, 2026 (UTC)" })).toMatch(/will not be charged today/);
+    expect(checkoutNote("available", "checkout", { deferredUntil: "Nov 26, 2026 (UTC)" })).toMatch(/does not extend/);
+  });
+  it("discloses an immediate first charge when the trial cannot be deferred", () => {
+    expect(checkoutNote("available", "checkout")).toMatch(/charges the first month today/);
+    expect(checkoutNote("available", "checkout")).toMatch(/Unused trial days are not credited/);
+  });
+  it("defers checkout only for a trial with at least 48 hours left", () => {
+    const now = Date.parse("2026-11-21T20:00:00Z");
+    expect(checkoutIsDeferred({ state: "trial", trialEndsAt: "2026-11-26T03:31:28.000Z" }, now)).toBe(true);
+    expect(checkoutIsDeferred({ state: "trial", trialEndsAt: "2026-11-23T19:59:59.000Z" }, now)).toBe(false);
+    expect(checkoutIsDeferred({ state: "trial_grace", trialEndsAt: "2026-11-26T03:31:28.000Z" }, now)).toBe(false);
+    expect(checkoutIsDeferred({ state: "active", trialEndsAt: "2026-11-26T03:31:28.000Z" }, now)).toBe(false);
   });
 });
 

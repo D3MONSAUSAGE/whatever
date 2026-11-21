@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { PRESENTATION_UNAVAILABLE, presentationSchemaReady } from "@/lib/server/pptx";
 import { GROUP_DEFAULT_DURATION_MS, presentationGroupsReady } from "@/lib/server/presentation-groups";
@@ -20,6 +21,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLocalizedErrors(async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const groups = await presentationGroupsReady();
   if (!groups && !(await presentationSchemaReady())) return fail(PRESENTATION_UNAVAILABLE, 503);
 

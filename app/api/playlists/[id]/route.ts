@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { PLAYLIST_MAX_DURATION_MS, PLAYLIST_MIN_DURATION_MS } from "@/lib/server/limits";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
@@ -187,6 +188,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request, { params
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Playlist not found.", 404);
   const body = await readJson(req);
@@ -231,6 +234,8 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
 export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Playlist not found.", 404);
 

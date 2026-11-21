@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import {
   PPTX_MAX_BYTES,
   PRESENTATION_UNAVAILABLE,
@@ -18,6 +19,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const groups = await presentationGroupsReady();
   if (!groups && !(await presentationSchemaReady())) return fail(PRESENTATION_UNAVAILABLE, 503);
 

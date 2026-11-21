@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { PLAYLIST_DEFAULT_DURATION_MS } from "@/lib/server/limits";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
@@ -146,6 +147,8 @@ async function draftThumbnails(accountId: string, mediaIds: string[]) {
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const name = normalizePlaylistName(body.name);
   if (!name) return fail("Give the playlist a name.", 400);

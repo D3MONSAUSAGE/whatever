@@ -1,5 +1,6 @@
 import { fail, json, readJson } from "@/lib/server/http";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { designById, switchDesign } from "@/lib/menu-designs";
@@ -18,6 +19,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (!layoutStudioEnabled()) return fail("Not found", 404);
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const parsed = parseLayout(body.document);
   if (!parsed.ok) return fail(parsed.error, 400);

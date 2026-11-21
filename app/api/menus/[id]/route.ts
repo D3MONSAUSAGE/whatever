@@ -1,5 +1,6 @@
 import { detachPromo, PROMO_COLUMNS, type PromoRow } from "@/lib/server/promos";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
@@ -45,6 +46,8 @@ async function publishTo(accountId: string, playlistId: string, ids: string[]): 
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Menu not found.", 404);
   const body = await readJson(req);
@@ -110,6 +113,8 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
 export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Menu not found.", 404);
   // M13: take this menu's promos off first so no "menu + promo" rules are left behind.

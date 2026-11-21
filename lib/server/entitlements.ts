@@ -64,6 +64,20 @@ export function trialEndsAt(createdAt: string): string {
   return addServerDays(createdAt, TRIAL_DAYS);
 }
 
+/** Trial end used for Checkout and access: start + TRIAL_DAYS, never later than a stored end. */
+export function cappedTrialEndsAt(startedAt?: string | null, endsAt?: string | null): string | null {
+  const start = startedAt ? Date.parse(startedAt) : NaN;
+  const raw = endsAt ? Date.parse(endsAt) : NaN;
+  if (Number.isFinite(start)) {
+    const cap = start + TRIAL_DAYS * DAY;
+    const end = Number.isFinite(raw) ? Math.min(raw, cap) : cap;
+    return new Date(end).toISOString();
+  }
+  if (Number.isFinite(raw)) return new Date(raw).toISOString();
+  return null;
+}
+
+
 export function paymentGraceEndsAt(failureRecordedAt: string): string {
   return addServerDays(failureRecordedAt, PAYMENT_GRACE_DAYS);
 }
@@ -221,7 +235,9 @@ const RESTRICTED = (e: EntitlementRow, state: "expired" | "canceled", playbackEn
  *
  * - comp: active, 5 screens max, no expiry, no Stripe requirement, playback allowed (SQL semantics).
  * - grandfathered or any unknown plan: no free access (treated as an ended trial).
- * - trial: exactly TRIAL_DAYS from its start (a later trial_ends_at is capped); no playback grace after it.
+ * - trial: exactly TRIAL_DAYS from its start (a later trial_ends_at is capped), then a
+ *   PLAYBACK_GRACE_DAYS playback-only window (state trial_grace): screens already on
+ *   may keep playing, but new pairings and dashboard writes are locked.
  * - paid plans: active/trialing play; past_due plays only until a recorded grace end;
  *   a canceled subscription plays until the paid-through date only if no payment failure was
  *   recorded (grace_ends_at null), otherwise until the grace end at most;
@@ -250,11 +266,18 @@ export function commercialEntitlement(e: EntitlementRow, enforced = billingEnfor
     if (!Number.isFinite(start)) return e.state === "expired" ? RESTRICTED(e, "expired") : e;
     const cap = start + TRIAL_DAYS * DAY;
     const end = e.trial_ends_at ? Math.min(Date.parse(e.trial_ends_at), cap) : cap;
-    // Commercial rule: trial access ends exactly TRIAL_DAYS after the start. No post-trial playback grace.
+    // 14-day trial, then the advertised 3-day playback grace, then expired.
+    const trialEndIso = new Date(end).toISOString();
+    const graceEnd = end + PLAYBACK_GRACE_DAYS * DAY;
+    const graceEndIso = new Date(graceEnd).toISOString();
     if (now < end) {
-      return { ...e, state: "trial", trial_ends_at: new Date(end).toISOString(), playback_ends_at: new Date(end).toISOString(), playback_allowed: true };
+      const canAdd = e.active_screens < 5;
+      return { ...e, state: "trial", screen_limit: 5, trial_ends_at: trialEndIso, playback_ends_at: graceEndIso, playback_allowed: true, can_add_screen: canAdd };
     }
-    return { ...RESTRICTED(e, "expired"), trial_ends_at: new Date(end).toISOString() };
+    if (now < graceEnd) {
+      return { ...e, state: "trial_grace", screen_limit: 5, trial_ends_at: trialEndIso, playback_ends_at: graceEndIso, playback_allowed: true, can_add_screen: false };
+    }
+    return { ...RESTRICTED(e, "expired"), trial_ends_at: trialEndIso };
   }
   const status = e.subscription_status;
   const grace = e.grace_ends_at ? Date.parse(e.grace_ends_at) : null;
@@ -273,6 +296,16 @@ export function commercialEntitlement(e: EntitlementRow, enforced = billingEnfor
     return RESTRICTED(e, "canceled");
   }
   return RESTRICTED(e, "canceled");
+}
+
+/**
+ * Dashboard edits, uploads, and publishing. Allowed during the 14-day trial and while a
+ * paid (or Stripe-trialing) plan is in force, including past_due. Locked during the
+ * 3-day playback grace, and once the trial or paid plan has fully ended, so the grace
+ * window cannot be used (or waited out) to keep editing.
+ */
+export function subscriptionWritesAllowed(e: Pick<EntitlementRow, "state">): boolean {
+  return e.state === "trial" || e.state === "active" || e.state === "past_due" || e.state === "grandfathered";
 }
 
 /** Entitlement used by every server gate: the SQL row, tightened by the commercial rules when enforced. */

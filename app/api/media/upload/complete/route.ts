@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { VIDEO_UNAVAILABLE, isMissingSchema } from "@/lib/server/schema";
 import { removeStored, storedObjectSize, storedObjectSource, videoSchemaReady } from "@/lib/server/video";
@@ -30,6 +31,8 @@ export const maxDuration = 300;
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   if (!(await videoSchemaReady())) return fail(VIDEO_UNAVAILABLE, 503);
 
   const body = await readJson(req);

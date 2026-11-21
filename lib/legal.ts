@@ -4,7 +4,7 @@
  * They are not read from the environment, so an unset variable cannot put a
  * placeholder back on the site.
  */
-export const LEGAL_UPDATED = "November 8, 2026";
+export const LEGAL_UPDATED = "November 21, 2026";
 export const LEGAL_PRIVACY_UPDATED = "November 19, 2026";
 export const LEGAL_OPERATOR = "Francisco Lopez, a sole proprietor doing business as Pekko";
 export const LEGAL_COPYRIGHT = "Francisco Lopez";

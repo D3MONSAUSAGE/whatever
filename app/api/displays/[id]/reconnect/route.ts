@@ -1,6 +1,7 @@
 import { db } from "@/lib/server/supabase";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { hashCode, isUuid } from "@/lib/server/crypto";
 import { PAIR_CLAIM_MAX_PER_IP, PAIR_CLAIM_MAX_PER_USER, PAIR_CLAIM_WINDOW_SECONDS } from "@/lib/server/limits";
 import { normalizePairingCode } from "@/lib/server/validate";
@@ -18,6 +19,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export const POST = withLocalizedErrors(async (req: Request, { params }: Ctx) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("That screen is not in this account.", 404);
 

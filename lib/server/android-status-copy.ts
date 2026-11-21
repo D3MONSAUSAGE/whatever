@@ -62,8 +62,8 @@ export const STATUS_COPY_CASES: readonly StatusCopyCase[] = [
   {
     id: "warning_trial_grace",
     kind: "trial_ended",
-    from: /^Your free trial has ended\. Screens keep playing until ([^.]+)\. Choose a plan to keep them on\.$/,
-    to: (m) => `Your free trial has ended. Screens keep playing until ${m[1]}.`,
+    from: /^Your free trial has ended\. Screens keep playing until (.+?), but editing and publishing are locked\. Choose a plan to keep them on\.$/,
+    to: (m) => `Your free trial has ended. Screens keep playing until ${m[1]}, but editing and publishing are locked.`,
   },
   {
     id: "warning_past_due_grace_days",
@@ -89,6 +89,19 @@ export const STATUS_COPY_CASES: readonly StatusCopyCase[] = [
     from: /^Your plan isn't active, so new screens can't be added\. Choose a plan to continue\.$/,
     to: "Your plan isn't active, so new screens can't be added.",
   },
+
+  {
+    id: "error_write_locked_grace",
+    code: "subscription_inactive",
+    from: /^Your free trial has ended\. Screens already on can keep playing, but editing and publishing are locked until you choose a plan\.$/,
+    to: "Your free trial has ended. Screens already on can keep playing, but editing and publishing are locked.",
+  },
+  {
+    id: "error_write_locked",
+    code: "subscription_inactive",
+    from: /^Your plan isn't active, so editing and publishing are locked\. Choose a plan to continue\.$/,
+    to: "Your plan isn't active, so editing and publishing are locked.",
+  },
   {
     id: "error_screen_limit",
     code: "screen_limit",
@@ -100,6 +113,19 @@ export const STATUS_COPY_CASES: readonly StatusCopyCase[] = [
     code: "subscription_inactive",
     from: /^Su plan no está activo, por lo que no se pueden agregar pantallas nuevas\. Elija un plan para continuar\.$/,
     to: "Su plan no está activo, por lo que no se pueden agregar pantallas nuevas.",
+  },
+
+  {
+    id: "error_write_locked_grace_es",
+    code: "subscription_inactive",
+    from: /^Su prueba gratis terminó\. Las pantallas que ya están encendidas pueden seguir reproduciendo, pero la edición y la publicación están bloqueadas hasta que elija un plan\.$/,
+    to: "Su prueba gratis terminó. Las pantallas que ya están encendidas pueden seguir reproduciendo, pero la edición y la publicación están bloqueadas.",
+  },
+  {
+    id: "error_write_locked_es",
+    code: "subscription_inactive",
+    from: /^Su plan no está activo, así que la edición y la publicación están bloqueadas\. Elija un plan para continuar\.$/,
+    to: "Su plan no está activo, así que la edición y la publicación están bloqueadas.",
   },
   {
     id: "error_screen_limit_es",
@@ -159,8 +185,8 @@ export const STATUS_COPY_CASES: readonly StatusCopyCase[] = [
   {
     id: "warning_trial_grace_es",
     kind: "trial_ended",
-    from: /^Su prueba gratis terminó\. Las pantallas siguen activas hasta el ([^.]+)\. Elija un plan para mantenerlas encendidas\.$/,
-    to: (m) => `Su prueba gratis terminó. Las pantallas siguen activas hasta el ${m[1]}.`,
+    from: /^Su prueba gratis terminó\. Las pantallas siguen activas hasta el (.+?), pero la edición y la publicación están bloqueadas\. Elija un plan para mantenerlas encendidas\.$/,
+    to: (m) => `Su prueba gratis terminó. Las pantallas siguen activas hasta el ${m[1]}, pero la edición y la publicación están bloqueadas.`,
   },
   {
     id: "warning_past_due_grace_days_es",

@@ -1183,7 +1183,7 @@
    "kind": "trial_ended",
    "deadline": "2026-11-13T08:00:00.000Z",
    "subject": "Your Pekko trial has ended",
-   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 12:00 AM PST. Your content is still saved."
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 12:00 AM PST, but editing and publishing are locked. Your content is still saved."
   }
  ],
  "notices-enforced|trialGrace|null": [
@@ -1191,7 +1191,7 @@
    "kind": "trial_ended",
    "deadline": "2026-11-13T08:00:00.000Z",
    "subject": "Your Pekko trial has ended",
-   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 12:00 AM PST. Your content is still saved."
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 12:00 AM PST, but editing and publishing are locked. Your content is still saved."
   }
  ],
  "notices|trialGrace|America/Mexico_City": [
@@ -1199,7 +1199,7 @@
    "kind": "trial_ended",
    "deadline": "2026-11-13T08:00:00.000Z",
    "subject": "Your Pekko trial has ended",
-   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 2:00 AM CST. Your content is still saved."
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 2:00 AM CST, but editing and publishing are locked. Your content is still saved."
   }
  ],
  "notices-enforced|trialGrace|America/Mexico_City": [
@@ -1207,7 +1207,7 @@
    "kind": "trial_ended",
    "deadline": "2026-11-13T08:00:00.000Z",
    "subject": "Your Pekko trial has ended",
-   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 2:00 AM CST. Your content is still saved."
+   "text": "Your free trial has ended. Screens keep playing until Nov 13, 2026 at 2:00 AM CST, but editing and publishing are locked. Your content is still saved."
   }
  ],
  "notices|trialGraceNoEnd|null": [

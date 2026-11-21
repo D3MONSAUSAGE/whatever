@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { checkArtMedia, getBrand, putBrand } from "@/lib/server/brand";
@@ -20,6 +21,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
 export const PUT = withLocalizedErrors(async function PUT(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const parsed = parseBrandPut(body);
   if (!parsed.ok) return fail(parsed.error, 400);

@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { formatMinute, parseScheduleBody } from "@/lib/server/schedule";
 import { assertTarget } from "@/lib/server/schedule-target";
@@ -57,6 +58,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const parsed = parseScheduleBody(await readJson(req));
   if (!parsed.ok) return fail(parsed.error, 400);
   const limited = await enforceLimit(`create-schedule:${admin.userId}`, CREATE_WINDOW_SECONDS, CREATE_SCHEDULE_MAX_PER_USER, CREATE_SCHEDULE_RATE_MESSAGE);

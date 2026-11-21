@@ -8,7 +8,7 @@ Status: built on branch `cursor/m17-entitlements` (PR below). Not deployed. Enfo
 | state | meaning |
 |---|---|
 | trial | 14-day trial, up to 5 screens, no card |
-| trial_grace | the 3 days after the trial ends: screens keep playing, no new screens |
+| trial_grace | the 3 days after the trial ends: screens keep playing, no new screens; editing, publishing, and uploads return 403 `subscription_inactive` |
 | active | paid plan (Stripe active/trialing, or canceled but still inside the paid period) |
 | past_due | payment failed; screens play until `grace_ends_at` |
 | grandfathered | account that existed before billing ("Early customer"); existing screens never pause |
@@ -30,7 +30,7 @@ Fields: `account_id, state, plan` (`trial|starter|business|multi|grandfathered`)
 | state | TV playback | pair new screen | uploads / publish |
 |---|---|---|---|
 | trial | yes | if under 5 | yes |
-| trial_grace | yes | no: 403 `subscription_inactive` | yes |
+| trial_grace | yes | no: 403 `subscription_inactive` (pairing, edits, uploads, publish) | yes |
 | active | yes, up to the plan limit | if under the limit, else 403 `screen_limit` | yes |
 | past_due | yes until grace_ends_at | no: 403 `subscription_inactive` | yes |
 | grandfathered | yes, all existing screens | if under 5, else 403 `screen_limit` | yes |

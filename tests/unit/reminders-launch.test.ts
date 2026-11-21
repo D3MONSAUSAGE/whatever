@@ -19,14 +19,21 @@ describe("billing reminders at commercial launch", () => {
     expect(src).toMatch(/loadEffectiveEntitlement\(String\(account\.id\)\)/);
     expect(src).not.toMatch(/await loadEntitlement\(/);
   });
-  it("an ended trial under enforcement says screens are paused, never 'keep playing'", () => {
+  it("an ended trial under enforcement keeps playing during the 3-day grace, then pauses", () => {
     const sqlRow = { ...base, state: "trial_grace" as const, server_time: "2026-11-16T08:00:00.000Z" };
     const e = commercialEntitlement(sqlRow, true);
+    expect(e.state).toBe("trial_grace");
     const [n] = billingNotices(e);
     expect(n.kind).toBe("trial_ended");
-    expect(n.text).toMatch(/paused/);
-    expect(n.text).not.toMatch(/keep playing/);
-    expect(n.deadline).toBe("2026-11-15T08:00:00.000Z");
+    expect(n.text).toMatch(/keep playing/);
+    expect(n.text).toMatch(/editing and publishing are locked/);
+    expect(n.text).not.toMatch(/paused/);
+    expect(n.deadline).toBe("2026-11-18T08:00:00.000Z");
+    const expired = commercialEntitlement({ ...sqlRow, server_time: "2026-11-18T08:00:00.000Z" }, true);
+    const [paused] = billingNotices(expired);
+    expect(expired.state).toBe("expired");
+    expect(paused.text).toMatch(/paused/);
+    expect(paused.text).not.toMatch(/keep playing/);
   });
   it("keys are stable across runs when no date is stored (no duplicate emails)", () => {
     const row = { ...base, state: "canceled" as const, plan: "starter" as const, trial_ends_at: null, playback_ends_at: null };

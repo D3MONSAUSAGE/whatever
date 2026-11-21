@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
@@ -22,6 +23,8 @@ async function load(accountId: string, id: string) {
 export const POST = withLocalizedErrors(async function POST(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Promo not found.", 404);
   const body = await readJson(req);
@@ -39,6 +42,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request, { para
 export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Promo not found.", 404);
   const found = await load(admin.accountId, id);

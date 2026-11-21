@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema } from "@/lib/server/schema";
 import { playlistDeleteMessage, playlistsUsingMedia } from "@/lib/server/media-usage";
@@ -20,6 +21,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("File not found.", 404);
   const row = await db()
@@ -50,6 +53,8 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
 export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("File not found.", 404);
 

@@ -3,7 +3,7 @@ import { BillingStatusBanner, type EntitlementsStatus } from "@/components/billi
 import { LocalizedBillingDisclosure } from "@/components/localized-billing-disclosure";
 import { ManageBilling } from "@/components/manage-billing";
 import { PLANS } from "@/lib/plans";
-import { availabilityOf, checkoutNote, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
+import { availabilityOf, checkoutIsDeferred, checkoutNote, planButton, planChangeMode, planStatus } from "@/lib/billing-view";
 import { useEffect, useState } from "react";
 import { api, useApi, type DisplayItem } from "@/lib/api";
 import { BillingEmailSelfTest } from "@/components/billing-email-selftest";
@@ -142,7 +142,11 @@ export default function Billing() {
             </li>
           ))}
         </ul>
-        <p className="text-muted mt-3 text-sm min-h-5" data-testid="checkout-note">{checkoutNote(availability, mode)}</p>
+        {(() => {
+          const deferred = checkoutIsDeferred({ state: e?.state, trialEndsAt: e?.trial?.ends_at ?? null });
+          const until = deferred && e?.trial?.ends_at ? local(e.trial.ends_at) : null;
+          return <p className="text-muted mt-3 text-sm min-h-5" data-testid="checkout-note">{checkoutNote(availability, mode, { deferredUntil: until })}</p>;
+        })()}
         <LocalizedBillingDisclosure className="mt-4" />
       </section>
 

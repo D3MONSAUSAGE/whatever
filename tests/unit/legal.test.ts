@@ -19,7 +19,7 @@ const PAGES = [
 describe("published legal pages", () => {
   it("uses the authorized operator, address, mailbox, and refund policy", () => {
     expect(LEGAL_OPERATOR).toBe("Francisco Lopez, a sole proprietor doing business as Pekko");
-    expect(LEGAL_UPDATED).toBe("November 8, 2026");
+    expect(LEGAL_UPDATED).toBe("November 21, 2026");
     expect(LEGAL_PRIVACY_UPDATED).toBe("November 19, 2026");
     expect(LEGAL_ADDRESS).toBe("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
     expect(SUPPORT_EMAIL).toBe("support@pekkotv.com");
