@@ -7,11 +7,13 @@ import type { MediaItem } from "@/lib/api";
 
 describe("E3: upload a logo or photo from the editor", () => {
   it("only accepts files the logo and photo pickers can list", () => {
-    expect(ART_UPLOAD_ACCEPT).toBe("image/jpeg,image/png");
+    expect(ART_UPLOAD_ACCEPT).toBe("image/jpeg,image/png,image/heic,image/heif,.heic,.heif");
     expect(artUploadError({ type: "image/png", name: "logo.png" })).toBeNull();
     expect(artUploadError({ type: "image/jpeg", name: "Patio.JPEG" })).toBeNull();
-    expect(artUploadError({ type: "image/webp", name: "logo.webp" })).toBe("Choose a JPG or PNG image.");
-    expect(artUploadError({ type: "image/png", name: "logo" })).toBe("Choose a JPG or PNG image.");
+    expect(artUploadError({ type: "image/heic", name: "IMG_1000.HEIC" })).toBeNull();
+    expect(artUploadError({ type: "", name: "photo.heif" })).toBeNull();
+    expect(artUploadError({ type: "image/webp", name: "logo.webp" })).toBe("Choose a JPG, PNG, or HEIC image.");
+    expect(artUploadError({ type: "image/png", name: "logo" })).toBe("Choose a JPG, PNG, or HEIC image.");
     // Anything accepted shows up in the same picker list the upload selects from.
     const item = { id: "m1", kind: "image", fileName: "Patio.JPEG" } as MediaItem;
     expect(artImages([item])).toHaveLength(1);

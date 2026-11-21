@@ -20,6 +20,8 @@ import {
 import { editorPanelForZone, keepDraftOnZoneChange, previewHits, zoneEditorPlacement } from "@/lib/layout-studio-editor";
 import { api, authToken, uploadForm, useApi, type DisplayItem } from "@/lib/api";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
+import { asUploadImage } from "@/lib/prepare-image";
+import { IMAGE_UPLOAD_ACCEPT, isImageUploadFile } from "@/lib/media-accept";
 import { findSameVideo } from "@/lib/layout-account";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
 import { BrandSummary, type BrandKitFixture } from "@/components/brand-kit";
@@ -660,13 +662,19 @@ export function LayoutStudio({
     }
   }
 
-  function onPhoto(file: File | undefined) {
+  async function onPhoto(file: File | undefined) {
     if (!file) { removePhoto(); return; }
-    const imageOk = !file.type || file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp" || /\.(jpe?g|png|webp)$/i.test(file.name);
-    if (!imageOk) { setNote(t("ls.badFormat")); return; }
+    if (!isImageUploadFile(file)) { setNote(t("ls.badFormat")); return; }
+    let upload = file;
+    try {
+      upload = await asUploadImage(file, t);
+    } catch (err) {
+      setNote((err as Error).message || t("ls.badFormat"));
+      return;
+    }
     const exclusive = zone === "feature" && template !== "signature";
     const replacedVideo = exclusive && Boolean(draft.videoMediaId || clipUrl || videoOn);
-    const local = URL.createObjectURL(file);
+    const local = URL.createObjectURL(upload);
     setImageHref(local);
     if (exclusive) {
       if (clipUrl) URL.revokeObjectURL(clipUrl);
@@ -675,17 +683,17 @@ export function LayoutStudio({
       setDraft((current) => placeZoneMedia(current, "photo", current.imageMediaId, true));
     }
     if (!accountMode && !sessionToken) {
-      if (file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES) { setNote(t("ls.photoTooBig")); setImageHref(null); return; }
+      if (upload.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES) { setNote(t("ls.photoTooBig")); setImageHref(null); return; }
       const reader = new FileReader();
       reader.onload = () => setImageHref(typeof reader.result === "string" ? reader.result : local);
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(upload);
       setNote(replacedVideo ? t("ls.imageReplacesVideo") : t("ls.photoPreviewOnly"));
       return;
     }
     setProgress(t("ed.uploading"));
     const form = new FormData();
-    form.set("file", file);
-    form.set("name", file.name);
+    form.set("file", upload);
+    form.set("name", upload.name);
     const send = sessionToken
       ? uploadForm("/api/media", form, sessionToken, (percent) => setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading")))
       : authToken().then((token) => uploadForm("/api/media", form, token, (percent) => setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading"))));
@@ -1317,7 +1325,7 @@ function SelectedZoneEditor({
             <ColorField label={t("ls.menuBg")} ariaLabel={t("ls.menuBg")} value={draft.backgroundColor} fallback="#f6f9fe" onChange={(next) => update({ ...draft, backgroundColor: next })} />
           ) : null}
           {template === "triple-column" && zone === "photo" ? (
-            <FileUploadControl kind="image" accept="image/jpeg,image/png,image/webp" limitLabel={isolatedPhotoLimit ? t("fu.limit", { mb: 1.5 }) : undefined} onFiles={(files) => onPhoto(files[0])} />
+            <FileUploadControl kind="image" accept={IMAGE_UPLOAD_ACCEPT} limitLabel={isolatedPhotoLimit ? t("fu.limit", { mb: 1.5 }) : undefined} onFiles={(files) => onPhoto(files[0])} />
           ) : null}
         </div>
       ) : null}
@@ -1521,7 +1529,7 @@ function ZoneMedia({
             <FileUploadControl
               kind="image"
               label={imageLabel}
-              accept="image/jpeg,image/png,image/webp"
+              accept={IMAGE_UPLOAD_ACCEPT}
               limitLabel={imageLimitLabel}
               buttonClass={`btn cursor-pointer min-h-11 ${imagePrimary ? "btn-primary" : "btn-quiet"}`}
               onFiles={(files) => onPhoto(files[0])}

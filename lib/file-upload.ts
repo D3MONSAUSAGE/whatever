@@ -1,4 +1,5 @@
 import { MAX_VIDEO_MB } from "@/lib/mp4";
+import { IMAGE_UPLOAD_ACCEPT, VIDEO_UPLOAD_ACCEPT } from "@/lib/media-accept";
 import { makeT, type T } from "@/lib/i18n";
 
 const EN: T = makeT("en");
@@ -19,16 +20,16 @@ export const FILE_UPLOAD: Record<FileUploadKind, FileUploadMeta> = {
   image: {
     kind: "image",
     label: "Upload image",
-    accept: "image/jpeg,image/png,image/webp",
-    acceptLabel: "JPG, PNG, or WebP",
+    accept: IMAGE_UPLOAD_ACCEPT,
+    acceptLabel: "JPG, PNG, WebP, or HEIC",
     limitLabel: "15 MB or smaller",
     limitBytes: 15 * 1024 * 1024,
   },
   video: {
     kind: "video",
     label: "Upload video",
-    accept: "video/mp4,.mp4",
-    acceptLabel: "MP4 (H.264)",
+    accept: VIDEO_UPLOAD_ACCEPT,
+    acceptLabel: "MP4, MOV, or M4V (H.264)",
     limitLabel: `${MAX_VIDEO_MB} MB or smaller`,
     limitBytes: MAX_VIDEO_MB * 1024 * 1024,
   },

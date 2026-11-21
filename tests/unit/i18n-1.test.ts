@@ -34,7 +34,7 @@ describe("I18N-1 dictionaries", () => {
     const same = (Object.keys(en) as (keyof typeof en)[]).filter((k) => es[k] === en[k] && !ENGLISH_ONLY.includes(k));
     // Words that are the same in both languages.
     // R12-06: "Happy hour" is now "Hora feliz" in Spanish, so ptpl.happy.name left this list.
-    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video",
+    expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video",
       // Home page template chips: business types spelled the same in Spanish.
       "home2.chip.bar", "home2.chip.brunch", "home2.chip.cafe", "home2.chip.tacos"].sort());
   });

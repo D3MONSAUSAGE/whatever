@@ -26,6 +26,8 @@ import { menuSvg } from "@/lib/menu-classic-svg";
 import { parseMenuContent, sampleMenu } from "@/lib/menu-templates";
 import { seedClassicMenu } from "@/lib/brand-kit";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
+import { asUploadImage } from "@/lib/prepare-image";
+import { IMAGE_UPLOAD_ACCEPT, VIDEO_UPLOAD_ACCEPT, isImageUploadFile, isVideoUploadFile } from "@/lib/media-accept";
 import {
   ORIGINAL_LAYOUTS, classicSaveContent, engineOf, filterGallery, fixedColumns, fromClassic, galleryEntries, layoutMedia, layoutReport,
   mergeExtraSections, newLayoutDocument, switchToLayout, toClassic,
@@ -412,10 +414,11 @@ export function TemplateEditor({
 
   async function upload(file: File | undefined, role: "photo" | "logo" | "item", target?: { si: number; ii: number }) {
     if (!file || preview) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { toast.show(t("tpl.photoType"), true); return; }
+    if (!isImageUploadFile(file)) { toast.show(t("tpl.photoType"), true); return; }
     setBusy("upload");
     try {
-      const form = new FormData(); form.set("file", file); form.set("name", file.name);
+      const upload = await asUploadImage(file, t);
+      const form = new FormData(); form.set("file", upload); form.set("name", upload.name);
       const body = await authToken().then((token) => uploadForm("/api/media", form, token, () => {})) as { id?: string };
       await reloadLibrary();
       if (body.id && role === "item" && target) setItemPhoto(target.si, target.ii, body.id);
@@ -432,7 +435,7 @@ export function TemplateEditor({
   /** Same signed upload as the previous layout editor: prepare, upload straight to storage, then register. */
   async function uploadVideo(file: File | undefined) {
     if (!file || preview) return;
-    if (file.type && file.type !== "video/mp4" && !/\.mp4$/i.test(file.name)) { toast.show(t("tpl.videoType"), true); return; }
+    if (file.type && !isVideoUploadFile(file)) { toast.show(t("tpl.videoType"), true); return; }
     const existing = findSameVideo(library, file);
     if (existing) { setBoardVideo(existing.id); toast.show(t("ls.videoInLibrary")); return; }
     setBusy("upload");
@@ -635,7 +638,7 @@ export function TemplateEditor({
                   <>
                     <div className="flex flex-wrap gap-2">
                       {brand?.logoMediaId ? <button type="button" className="btn btn-quiet" onClick={() => patch({ logoMediaId: brand.logoMediaId })}>{t("tpl.logoFromKit")}</button> : null}
-                      <label className="btn btn-quiet cursor-pointer">{t("tpl.uploadLogo")}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void upload(e.target.files?.[0], "logo")} /></label>
+                      <label className="btn btn-quiet cursor-pointer">{t("tpl.uploadLogo")}<input type="file" accept={IMAGE_UPLOAD_ACCEPT} className="sr-only" onChange={(e) => void upload(e.target.files?.[0], "logo")} /></label>
                       {doc.logoMediaId ? <button type="button" className="btn btn-quiet text-danger" onClick={() => patch({ logoMediaId: null })}>{t("tpl.removeLogo")}</button> : null}
                     </div>
                     <p className="text-xs text-muted">{doc.logoMediaId ? t("tpl.logoOn") : t("tpl.logoOff")}</p>
@@ -717,7 +720,7 @@ export function TemplateEditor({
                 <>
                   <p className="text-sm text-muted" data-testid="tpl-photo-area">{engine === "classic" ? t("tpl.classicPhotoArea") : media?.photo === "background" ? t("tpl.backgroundPhotoArea") : engine === "layout" ? t("tpl.layoutPhotoArea") : t("tpl.photosLede")}</p>
                   <div className="flex flex-wrap gap-2">
-                    <label className="btn btn-quiet cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" data-testid="tpl-board-upload" onChange={(e) => void upload(e.target.files?.[0], "photo")} /></label>
+                    <label className="btn btn-quiet cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}<input type="file" accept={IMAGE_UPLOAD_ACCEPT} className="sr-only" data-testid="tpl-board-upload" onChange={(e) => void upload(e.target.files?.[0], "photo")} /></label>
                     {isDesign && design.stock ? <button type="button" className="btn btn-quiet" onClick={() => patch({ imageMediaId: null, stockPhoto: design.stock ?? undefined })}>{t("tpl.useSample")}</button> : null}
                     <button type="button" className="btn btn-quiet" data-testid="tpl-board-none" onClick={() => (isDesign ? patch({ imageMediaId: null, stockPhoto: undefined }) : setBoardPhoto(null))}>{t("tpl.noPhoto")}</button>
                   </div>
@@ -740,7 +743,7 @@ export function TemplateEditor({
                           </select>
                         </label>
                         {selectedVideo ? <p className="text-sm" data-testid="tpl-video-name">{selectedVideo.missing ? t("tpl.videoKept", { name: selectedVideo.name || t("tpl.videoUnlisted") }) : t("tpl.videoOnBoard", { name: selectedVideo.name })}</p> : null}
-                        {unified ? <label className="btn btn-quiet cursor-pointer justify-self-start">{t("tpl.uploadVideo")}<input type="file" accept="video/mp4,.mp4" className="sr-only" data-testid="tpl-video-upload" onChange={(e) => void uploadVideo(e.target.files?.[0])} /></label> : null}
+                        {unified ? <label className="btn btn-quiet cursor-pointer justify-self-start">{t("tpl.uploadVideo")}<input type="file" accept={VIDEO_UPLOAD_ACCEPT} className="sr-only" data-testid="tpl-video-upload" onChange={(e) => void uploadVideo(e.target.files?.[0])} /></label> : null}
                         <span className="text-xs text-muted font-normal">{media?.exclusive ? t("tpl.videoOrPhoto") : t("tpl.videoNote")}</span>
                       </div>
                     )}
@@ -921,7 +924,7 @@ export function TemplateEditor({
               <p className="text-sm text-muted">{t("tpl.photoForBody")}</p>
               <div className="flex flex-wrap gap-2">
                 <label className="btn btn-primary cursor-pointer">{busy === "upload" ? t("tpl.uploading") : unified && current ? t("tpl.replacePhoto") : t("tpl.uploadPhoto")}
-                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" data-testid="tpl-item-upload"
+                  <input type="file" accept={IMAGE_UPLOAD_ACCEPT} className="sr-only" data-testid="tpl-item-upload"
                     onChange={(e) => { const target = photoFor; void upload(e.target.files?.[0], "item", target).then(() => setPhotoFor(null)); }} />
                 </label>
                 {item.imageMediaId || item.stockPhoto ? <button type="button" className="btn btn-quiet text-danger" data-testid="tpl-item-remove" onClick={() => { setItemPhoto(photoFor.si, photoFor.ii, null); setPhotoFor(null); }}>{t("tpl.removePhoto")}</button> : null}

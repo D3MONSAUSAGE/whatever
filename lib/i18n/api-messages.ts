@@ -83,7 +83,6 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Rename presentations with their own Rename button.": "Cambie el nombre de las presentaciones con su propio botón Cambiar nombre.",
   "That presentation is not ready yet.": "Esa presentación todavía no está lista.",
   "That slide is no longer in this presentation.": "Esa diapositiva ya no está en esta presentación.",
-  "This browser couldn't read that video. Export it as H.264 MP4.": "Este navegador no pudo leer ese video. Expórtelo como MP4 H.264.",
   "Upload a JPG, PNG, or WebP image.": "Suba una imagen JPG, PNG o WebP.",
   "Upload didn't arrive. Try again.": "La subida no llegó. Intente de nuevo.",
   "Upload failed. Try again.": "La subida falló. Intente de nuevo.",

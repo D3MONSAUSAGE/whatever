@@ -39,6 +39,9 @@ export function memorySource(bytes: Uint8Array): ByteSource {
   };
 }
 
+export const VIDEO_UNREADABLE_MESSAGE =
+  "This browser couldn't read that video. Export it as H.264 (Most Compatible on iPhone) in an MP4, MOV, or M4V file.";
+
 export function mp4ErrorMessage(reason: Mp4Failure): string {
   if (reason === "size") return `Videos must be ${MAX_VIDEO_MB} MB or smaller.`;
   if (reason === "duration") return "Videos must be 3 minutes or shorter.";
@@ -47,10 +50,10 @@ export function mp4ErrorMessage(reason: Mp4Failure): string {
     return "Use H.264 Baseline, Main, or High profile at level 4.2 or below. High 10, 4:2:2, and 4:4:4 are not supported.";
   }
   if (reason === "codec") {
-    return "This video isn't H.264 with AAC audio (or no audio). HEVC, VP9, and AV1 can't play on these TVs.";
+    return "This video isn't H.264 with AAC audio (or no audio). HEVC (H.265), ProRes, VP9, and AV1 can't play on these TVs. On iPhone, edit the video and share it as “Most Compatible” (H.264). On a Mac, export it from QuickTime or Photos as an H.264 MP4 or MOV.";
   }
   if (reason === "metadata") return "This MP4's metadata is too large to check. Re-export a smaller file.";
-  return "That file isn't an H.264 MP4. Export it as MP4 with H.264 video and AAC audio, or with no audio.";
+  return "That file isn't an H.264 MP4 or a compatible H.264 MOV or M4V. Export it as H.264 with AAC audio, or with no audio. On iPhone, use “Most Compatible”.";
 }
 
 export async function inspectMp4(source: ByteSource): Promise<Mp4Result> {
