@@ -17,7 +17,9 @@ import {
   convertedVideoPath,
   handleConversionWebhook,
   hevcConversionEnabled,
+  idsFromConversionWebhook,
   isJobStoragePath,
+  lookupJobByProviderId,
   newWebhookToken,
   originalVideoPath,
   reserveMillisForDuration,
@@ -27,6 +29,7 @@ import {
 import { getMockJob, resetMockProvider, setMockOutput } from "@/lib/server/conversion-provider";
 
 const fixture = (name: string) => new Uint8Array(readFileSync(new URL(`../fixtures/${name}`, import.meta.url)));
+const webhookToken = (url: string) => new URL(url).searchParams.get("token") ?? "";
 
 describe("HEVC conversion flag and budget math", () => {
   it("stays off unless HEVC_CONVERSION_ENABLED is exactly 1", () => {
@@ -180,7 +183,7 @@ describe("conversion pipeline with a mocked provider", () => {
     const mock = getMockJob(String(job.id));
     expect(mock).toBeTruthy();
     setMockOutput(String(job.id), fixture("h264-aac.mp4"));
-    const token = mock!.request.webhookUrl.split("token=")[1];
+    const token = webhookToken(mock!.request.webhookUrl);
     const first = await handleConversionWebhook(
       { jobId: String(job.id), status: "completed", outputUrl: "https://cdn.example/converted.mp4" },
       token,
@@ -218,7 +221,7 @@ describe("conversion pipeline with a mocked provider", () => {
     expect(started.ok).toBe(true);
     const job = fake.store.video_conversion_jobs[0];
     const mock = getMockJob(String(job.id))!;
-    const token = mock.request.webhookUrl.split("token=")[1];
+    const token = webhookToken(mock.request.webhookUrl);
     const result = await handleConversionWebhook(
       { jobId: String(job.id), status: "completed", outputUrl: "https://cdn.example/bad.mp4" },
       token,
@@ -238,7 +241,7 @@ describe("conversion pipeline with a mocked provider", () => {
     const started = await start();
     expect(started.ok).toBe(true);
     const job = fake.store.video_conversion_jobs[0];
-    const token = getMockJob(String(job.id))!.request.webhookUrl.split("token=")[1];
+    const token = webhookToken(getMockJob(String(job.id))!.request.webhookUrl);
     const result = await handleConversionWebhook({ jobId: String(job.id), status: "failed" }, token);
     expect(result).toEqual({ ok: true, status: "failed" });
     expect(fake.store.video_conversion_months[0].reserved_millis).toBe(0);
@@ -246,6 +249,62 @@ describe("conversion pipeline with a mocked provider", () => {
     expect(fake.store.video_conversion_months[0].failure_count).toBe(1);
     expect(fake.store.objects.has(original)).toBe(false);
     expect(fake.store.objects.has(otherPath)).toBe(true);
+  });
+
+  it("parses official Coconut notification params from the query string and job_id", () => {
+    const jobId = "11111111-1111-4111-8111-111111111111";
+    const url = new URL(`https://pekkotv.com/api/webhooks/video-conversion?token=abc&pekko_job_id=${jobId}`);
+    const ids = idsFromConversionWebhook(url, {
+      job_id: "ZtSfnBHOZeuAXj",
+      event: "job.completed",
+      data: {
+        type: "job",
+        status: "job.completed",
+        id: "ZtSfnBHOZeuAXj",
+        outputs: [{ key: "mp4", url: "http://cdn.coconut.co/converted.mp4", status: "video.encoded" }],
+      },
+    });
+    expect(ids).toEqual({ token: "abc", jobId, providerJobId: "ZtSfnBHOZeuAXj" });
+  });
+
+  it("accepts the official Coconut job.completed payload by looking up the provider job id", async () => {
+    const started = await start();
+    expect(started.ok).toBe(true);
+    const job = fake.store.video_conversion_jobs[0];
+    const mock = getMockJob(String(job.id))!;
+    const hookUrl = new URL(mock.request.webhookUrl);
+    expect(hookUrl.searchParams.get("pekko_job_id")).toBe(String(job.id));
+    const token = webhookToken(mock.request.webhookUrl);
+    const coconutBody = {
+      job_id: job.provider_job_id,
+      event: "job.completed",
+      data: {
+        type: "job",
+        status: "job.completed",
+        id: job.provider_job_id,
+        outputs: [{ key: "mp4", url: "http://cdn.coconut.co/converted.mp4", status: "video.encoded" }],
+      },
+    };
+    const ids = idsFromConversionWebhook(hookUrl, coconutBody);
+    expect(ids.jobId).toBe(String(job.id));
+    const lookedUp = await lookupJobByProviderId(String(job.provider_job_id), token);
+    expect(lookedUp).toBe(String(job.id));
+    const result = await handleConversionWebhook(
+      { ...coconutBody, jobId: ids.jobId, status: "completed" },
+      token,
+      { fetchOutput: async () => fixture("h264-aac.mp4") },
+    );
+    expect(result).toEqual({ ok: true, status: "ready" });
+    expect(fake.store.media[0].processing_status).toBe("ready");
+  });
+
+  it("returns 404 instead of 503 when a Coconut job id is passed as our job id", async () => {
+    const result = await handleConversionWebhook(
+      { jobId: "ZtSfnBHOZeuAXj", status: "completed", outputUrl: "https://cdn.example/converted.mp4" },
+      "a".repeat(32),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.http).toBe(404);
   });
 
   it("refuses a new job when reserved plus spent would exceed the $15 cap", async () => {

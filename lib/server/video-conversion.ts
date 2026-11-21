@@ -12,7 +12,7 @@ import {
   type ConversionCandidate,
   type ByteSource,
 } from "@/lib/mp4";
-import { sha256 } from "@/lib/server/crypto";
+import { isUuid, sha256 } from "@/lib/server/crypto";
 import { BUCKET, db } from "@/lib/server/supabase";
 import { removeStored } from "@/lib/server/video";
 import { getConversionProvider, type ConversionProvider } from "@/lib/server/conversion-provider";
@@ -222,7 +222,7 @@ export async function startVideoConversion(
   }
 
   try {
-    const webhookUrl = conversionWebhookUrl(token);
+    const webhookUrl = conversionWebhookUrl(token, jobId);
     const inputUrl = await signedInputUrl(path);
     const submitted = await provider.submit({
       jobId,
@@ -262,6 +262,7 @@ export async function handleConversionWebhook(
   const event = parseProviderEvent(body);
   if (!event) return { ok: false, http: 400, message: "bad event" };
 
+  if (!isUuid(event.jobId)) return { ok: false, http: 404, message: "not found" };
   const found = await db()
     .from("video_conversion_jobs")
     .select("id, account_id, media_id, status, webhook_token_hash, reserved_millis, input_path, output_path, provider_job_id")
@@ -417,10 +418,39 @@ export async function lookupJobByProviderId(providerJobId: string, token: string
   return String(found.data.id);
 }
 
-function conversionWebhookUrl(token: string): string {
+function conversionWebhookUrl(token: string, jobId: string): string {
   const base = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "").replace(/\/$/, "");
   if (!base) throw new Error("NEXT_PUBLIC_APP_URL is not set");
-  return `${base}/api/webhooks/video-conversion?token=${encodeURIComponent(token)}`;
+  const url = new URL(`${base}/api/webhooks/video-conversion`);
+  url.searchParams.set("token", token);
+  url.searchParams.set("pekko_job_id", jobId);
+  return url.toString();
+}
+
+/** Pull the per-job token and ids out of a Coconut webhook URL and JSON body.
+ *  Coconut `notification.params` are sent as query-string fields, not in the JSON.
+ *  The official payload uses `job_id` / `data.id` for the Coconut id, not our UUID. */
+export function idsFromConversionWebhook(url: URL, body: unknown): {
+  token: string;
+  jobId: string | null;
+  providerJobId: string | null;
+} {
+  const record = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const params = record.params && typeof record.params === "object" ? record.params as Record<string, unknown> : {};
+  const data = record.data && typeof record.data === "object" ? record.data as Record<string, unknown> : {};
+  const token = url.searchParams.get("token")
+    || (typeof params.token === "string" ? params.token : "")
+    || (typeof record.token === "string" ? record.token : "");
+  const hints = [
+    url.searchParams.get("pekko_job_id"),
+    params.pekko_job_id,
+    record.jobId,
+    params.jobId,
+  ];
+  const jobId = hints.find((value) => isUuid(value)) ?? null;
+  const providerRaw = record.job_id ?? record.id ?? data.id ?? "";
+  const providerJobId = providerRaw == null || providerRaw === "" ? null : String(providerRaw);
+  return { token, jobId, providerJobId };
 }
 
 async function signedInputUrl(path: string): Promise<string> {

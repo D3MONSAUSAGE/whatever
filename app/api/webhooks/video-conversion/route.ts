@@ -1,5 +1,5 @@
 import { fail, json, readJson } from "@/lib/server/http";
-import { handleConversionWebhook, hevcConversionEnabled, lookupJobByProviderId } from "@/lib/server/video-conversion";
+import { handleConversionWebhook, hevcConversionEnabled, idsFromConversionWebhook, lookupJobByProviderId } from "@/lib/server/video-conversion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,10 +12,12 @@ export const maxDuration = 300;
 export async function POST(req: Request) {
   if (!hevcConversionEnabled()) return fail("Not found.", 404);
   const url = new URL(req.url);
-  const queryToken = url.searchParams.get("token") || "";
   const body = await readJson(req);
-  const token = queryToken || tokenFromBody(body);
-  const jobId = await resolveJobId(body, token);
+  const ids = idsFromConversionWebhook(url, body);
+  const token = ids.token || tokenFromBody(body);
+  let jobId = ids.jobId;
+  if (!jobId && ids.providerJobId) jobId = await lookupJobByProviderId(ids.providerJobId, token);
+  if (!jobId) jobId = await resolveJobId(body, token);
   const normalized = jobId ? { ...asRecord(body), jobId, status: statusOf(body) } : body;
   const result = await handleConversionWebhook(normalized, token);
   if (!result.ok) return fail(result.message, result.http);
@@ -45,7 +47,8 @@ async function resolveJobId(body: unknown, token: string): Promise<string | null
   const params = record.params && typeof record.params === "object" ? record.params as Record<string, unknown> : null;
   if (typeof params?.pekko_job_id === "string" && params.pekko_job_id) return params.pekko_job_id;
   if (typeof record.jobId === "string" && record.jobId) return record.jobId;
-  const coconutId = record.id ?? (record.job && typeof record.job === "object" ? (record.job as { id?: unknown }).id : null);
-  if (coconutId != null) return lookupJobByProviderId(String(coconutId), token);
+  const data = record.data && typeof record.data === "object" ? record.data as Record<string, unknown> : {};
+  const coconutId = record.job_id ?? record.id ?? data.id ?? (record.job && typeof record.job === "object" ? (record.job as { id?: unknown }).id : null);
+  if (coconutId != null && String(coconutId)) return lookupJobByProviderId(String(coconutId), token);
   return null;
 }
