@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
-import { loadEffectiveEntitlement, toResponse } from "@/lib/server/entitlements";
+import { buildEntitlementsResponse, loadEffectiveEntitlement } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,5 +27,5 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (data === "not_found") return json({ error: "One of those screens wasn't found.", code: "not_found" }, 403);
   const e = await loadEffectiveEntitlement(admin.accountId);
   if (e === "error" || !e) return fail("Saved, but couldn't reload your plan. Refresh to see it.", 503);
-  return json(toResponse(admin.accountId, e, process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin));
+  return json(await buildEntitlementsResponse(req, admin.accountId, admin.userId, e));
 });

@@ -2445,6 +2445,13 @@ export const es: Record<MessageKey, string> = {
   "billing.opening": "Abriendo…",
   "billing.title": "Plan y facturación",
   "billing.eyebrow": "Cuenta",
+  "billing.resume": "Reanudar el pago",
+  "billing.startOver": "Empezar de nuevo",
+  "billing.unfinishedTitle": "Tiene un pago sin terminar",
+  "billing.unfinishedBody": "Empezó el plan {plan} pero no terminó el pago. No se ha cobrado nada. Puede reanudar ese pago o empezar de nuevo.",
+  "billing.reviewPlan": "Revisar plan y facturación",
+  "billing.addPayment": "Agregar un método de pago",
+  "acct.billing.statusFallback": "Vea su plan y los detalles de facturación.",
   // R11 follow-ups
   "ss.noun.locations": "ubicaciones",
   "ss.noun.schedules": "horarios",

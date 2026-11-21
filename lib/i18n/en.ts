@@ -2457,6 +2457,13 @@ export const en = {
   "billing.opening": "Opening…",
   "billing.title": "Plan & billing",
   "billing.eyebrow": "Account",
+  "billing.resume": "Resume checkout",
+  "billing.startOver": "Start over",
+  "billing.unfinishedTitle": "You have an unfinished checkout",
+  "billing.unfinishedBody": "You started {plan} but haven't finished payment. Nothing has been charged. You can resume that checkout or start over.",
+  "billing.reviewPlan": "Review plan & billing",
+  "billing.addPayment": "Add a payment method",
+  "acct.billing.statusFallback": "View your plan and billing details.",
   // R11 follow-ups
   "ss.noun.locations": "locations",
   "ss.noun.schedules": "schedules",

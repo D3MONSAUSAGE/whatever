@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PRODUCT_NAME } from "@/components/brand";
 import {
-  billingEnforced, daysLeft, downgradeNeedsScreenSelection, ENTITLEMENT_STATES, rolloutNotice, SUSPENDED_PAYLOAD, toResponse, warningFor, type EntitlementRow,
+  billingEnforced, daysLeft, downgradeNeedsScreenSelection, ENTITLEMENT_STATES, rolloutNotice, statusDetailFor, SUSPENDED_PAYLOAD, toResponse, warningFor, type EntitlementRow,
 } from "@/lib/server/entitlements";
 
 const base: EntitlementRow = {
@@ -96,5 +96,65 @@ describe("billingEnforced", () => {
     expect(billingEnforced({})).toBe(false);
     expect(billingEnforced({ BILLING_ENFORCE: "true" })).toBe(false);
     expect(billingEnforced({ BILLING_ENFORCE: "1" })).toBe(true);
+  });
+});
+
+describe("additive billing fields", () => {
+  it("exposes payment method, owner, and checkout_pending without changing existing fields", () => {
+    const r = toResponse("acc", base, "https://example.test/", {
+      isOwner: true,
+      paymentMethod: { brand: "visa", last4: "4242" },
+      checkoutPending: { plan: "multi", expires_at: "2026-11-22T20:28:20.000Z" },
+      hasStripeCustomer: false,
+    });
+    expect(r.has_payment_method).toBe(true);
+    expect(r.payment_method).toEqual({ brand: "visa", last4: "4242" });
+    expect(r.is_owner).toBe(true);
+    expect(r.checkout_pending).toEqual({ plan: "multi", expires_at: "2026-11-22T20:28:20.000Z" });
+    expect(r.billing_starts_at).toBe(base.trial_ends_at);
+    expect(r.portal_available).toBe(false);
+    expect(r.plan).toBe("trial");
+  });
+
+  it("does not treat a missing payment method or open checkout as a card on file", () => {
+    const r = toResponse("acc", base, "https://example.test/", {
+      checkoutPending: { plan: "multi", expires_at: "2026-11-22T20:28:20.000Z" },
+    });
+    expect(r.has_payment_method).toBe(false);
+    expect(r.payment_method).toBeNull();
+    expect(r.billing_starts_at).toBeNull();
+  });
+
+  it("uses status_detail, not a trial-ending warning, for a Stripe-trialing paid plan", () => {
+    const row: EntitlementRow = {
+      ...base,
+      state: "active",
+      plan: "multi",
+      subscription_status: "trialing",
+      current_period_end: "2026-12-01T00:00:00.000Z",
+      trial_started_at: null,
+      trial_ends_at: null,
+    };
+    expect(warningFor(row)).toBeNull();
+    expect(statusDetailFor(row, { paymentMethod: { brand: "visa", last4: "4242" } })?.kind).toBe("trialing");
+    const r = toResponse("acc", row, "https://example.test/", { paymentMethod: { brand: "visa", last4: "4242" }, isOwner: true, hasStripeCustomer: true });
+    expect(r.warning).toBeNull();
+    expect(r.status_detail?.kind).toBe("trialing");
+    expect(r.trial).toBeNull();
+    expect(r.state).toBe("active");
+    expect(r.billing_starts_at).toBe(row.current_period_end);
+    expect(r.next_billing_at).toBe(row.current_period_end);
+    expect(r.portal_available).toBe(true);
+  });
+
+  it("localizes trial-ending copy and mentions a card on file when present", () => {
+    const row = { ...base, server_time: "2026-11-10T08:00:00Z" };
+    expect(warningFor(row)?.message).toMatch(/Add a payment method/);
+    expect(warningFor(row, { locale: "es" })?.message).toMatch(/Agregue un método de pago/);
+    const withCard = warningFor(row, { paymentMethod: { brand: "visa", last4: "4242" } });
+    expect(withCard?.kind).toBe("trial_ending");
+    expect(withCard?.message).toMatch(/visa •••• 4242/);
+    expect(withCard?.message).toMatch(/billing starts when the trial ends/);
+    expect(warningFor(row, { locale: "es", paymentMethod: { brand: "visa", last4: "4242" } })?.message).toMatch(/facturación/);
   });
 });

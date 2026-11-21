@@ -7,14 +7,14 @@
  * `X-Pekko-Client: android/<version>` header is also accepted.
  *
  * Applied in one place (`withLocalizedErrors`) after error localization.
- * Only top-level `error` (when `code` is present), `warning.message` and
- * top-level `rollout_notice` are rewritten. Web requests are returned
+ * Only top-level `error` (when `code` is present), `warning.message`,
+ * `status_detail.message`, and top-level `rollout_notice` are rewritten. Web requests are returned
  * unchanged (same Response object). `code` and `plan_name` are never rewritten.
  */
 
 /** Purchase / web-steering phrases. Used as a narrow guard after code/kind matching, not as a walk of arbitrary strings. */
 export const PURCHASE_STEERING =
-  /choose a plan|elija un plan|pick a plan|seleccione un plan|\bupgrade\b|\bsubscribe\b|suscr[ií]base|update your payment|update your card|actualice|manage billing|administrar facturación|\bcheckout\b|\bdashboard\b|\bpricing\b|\bbilling\b|\bfacturación\b|\bprecios\b/i;
+  /choose a plan|elija un plan|pick a plan|seleccione un plan|\bupgrade\b|\bsubscribe\b|suscr[ií]base|update your payment|update your card|actualice|add a payment method|agregue un método de pago|manage billing|administrar facturación|\bcheckout\b|\bdashboard\b|\bpricing\b|\bbilling\b|\bfacturación\b|\bprecios\b/i;
 
 /** Error codes whose `error` text may carry plan/payment steering. Other codes are left untouched. */
 const ERROR_CODES = new Set([
@@ -28,7 +28,7 @@ const ERROR_CODES = new Set([
 ]);
 
 /** Warning kinds whose message may carry plan/payment steering. */
-const WARNING_KINDS = new Set(["expired", "canceled", "trial_ended", "payment_failed"]);
+const WARNING_KINDS = new Set(["expired", "canceled", "trial_ended", "payment_failed", "trial_ending", "trialing", "complimentary", "active", "canceling"]);
 
 export function isAndroidAppRequest(req: Request): boolean {
   const ua = (req.headers.get("user-agent") ?? "").trim();
@@ -143,6 +143,109 @@ export const STATUS_COPY_CASES: readonly StatusCopyCase[] = [
     from: /^Only the account owner can manage billing\.$/,
     to: "Only the account owner can manage the plan.",
   },
+
+  {
+    id: "warning_expired_es",
+    kind: "expired",
+    from: /^Su prueba gratis terminó, así que sus pantallas están en pausa\. Su contenido y ajustes se conservan\. Elija un plan para volver a activarlas\.$/,
+    to: "Su prueba gratis terminó, así que sus pantallas están en pausa. Su contenido y ajustes se conservan.",
+  },
+  {
+    id: "warning_canceled_es",
+    kind: "canceled",
+    from: /^Su plan no está activo, así que sus pantallas están en pausa\. Su contenido y ajustes se conservan\. Elija un plan para volver a activarlas\.$/,
+    to: "Su plan no está activo, así que sus pantallas están en pausa. Su contenido y ajustes se conservan.",
+  },
+  {
+    id: "warning_trial_grace_es",
+    kind: "trial_ended",
+    from: /^Su prueba gratis terminó\. Las pantallas siguen activas hasta el ([^.]+)\. Elija un plan para mantenerlas encendidas\.$/,
+    to: (m) => `Su prueba gratis terminó. Las pantallas siguen activas hasta el ${m[1]}.`,
+  },
+  {
+    id: "warning_past_due_grace_days_es",
+    kind: "payment_failed",
+    from: /^El período de gracia del pago termina en (?:1 día|\d+ días), el ([^.]+)\. Actualice su método de pago para que las pantallas sigan activas\. Su contenido no se elimina\.$/,
+    to: (m) => `El pago de su plan está vencido. Las pantallas siguen activas hasta el ${m[1]}. Su contenido no se elimina.`,
+  },
+  {
+    id: "warning_past_due_before_date_es",
+    kind: "payment_failed",
+    from: /^No pudimos procesar su último pago\. Actualice su método de pago antes del ([^.]+) para que las pantallas sigan activas\.$/,
+    to: (m) => `El pago de su plan está vencido. Las pantallas siguen activas hasta el ${m[1]}.`,
+  },
+  {
+    id: "warning_past_due_no_date_es",
+    kind: "payment_failed",
+    from: /^No pudimos procesar su último pago\. Actualice su método de pago para que las pantallas sigan activas\.$/,
+    to: "El pago de su plan está vencido. Su contenido no se elimina.",
+  },
+  {
+    id: "warning_trial_ending_add_method",
+    kind: "trial_ending",
+    from: /^((?:1 day|\d+ days) left in your free trial), ending ([^.]+)\. Add a payment method to keep your screens on\.$/,
+    to: (m) => `${m[1]}, ending ${m[2]}.`,
+  },
+  {
+    id: "warning_trial_ending_card",
+    kind: "trial_ending",
+    from: /^((?:1 day|\d+ days) left in your free trial), ending ([^.]+)\. Your payment method( \([^)]+\))? is on file; billing starts when the trial ends\.$/,
+    to: (m) => `${m[1]}, ending ${m[2]}. Your payment method${m[3] ?? ""} is on file. The first charge is when the trial ends.`,
+  },
+  {
+    id: "warning_trial_ending_add_method_es",
+    kind: "trial_ending",
+    from: /^((?:Queda 1 día|Quedan \d+ días) de prueba gratis), hasta el ([^.]+)\. Agregue un método de pago para mantener sus pantallas activas\.$/,
+    to: (m) => `${m[1]}, hasta el ${m[2]}.`,
+  },
+  {
+    id: "warning_trial_ending_card_es",
+    kind: "trial_ending",
+    from: /^((?:Queda 1 día|Quedan \d+ días) de prueba gratis), hasta el ([^.]+)\. Su método de pago( \([^)]+\))? está guardado; la facturación comienza cuando termine la prueba\.$/,
+    to: (m) => `${m[1]}, hasta el ${m[2]}. Su método de pago${m[3] ?? ""} está guardado. El primer cobro es cuando termine la prueba.`,
+  },
+  {
+    id: "status_trialing",
+    kind: "trialing",
+    from: /^You're on a trial\. Your payment method( \([^)]+\))? is on file; billing starts on ([^.]+)\.$/,
+    to: (m) => `You're on a trial. Your payment method${m[1] ?? ""} is on file. The first charge is on ${m[2]}.`,
+  },
+  {
+    id: "status_trialing_es",
+    kind: "trialing",
+    from: /^Está en un período de prueba\. Su método de pago( \([^)]+\))? está guardado; la facturación comienza el ([^.]+)\.$/,
+    to: (m) => `Está en un período de prueba. Su método de pago${m[1] ?? ""} está guardado. El primer cobro es el ${m[2]}.`,
+  },
+  {
+    id: "portal_not_owner_es",
+    code: "not_owner",
+    from: /^Solo el propietario de la cuenta puede administrar la facturación\.$/,
+    to: "Solo el propietario de la cuenta puede administrar el plan.",
+  },
+  {
+    id: "checkout_choose_plan_es",
+    code: "plan",
+    from: /^Elija un plan\.$/,
+    to: "Eso no está disponible en esta app.",
+  },
+  {
+    id: "checkout_unavailable_es",
+    code: "billing_unavailable",
+    from: /^Checkout todavía no está disponible\.$/,
+    to: "Eso no está disponible en esta app.",
+  },
+  {
+    id: "portal_unavailable_es",
+    code: "billing_unavailable",
+    from: /^La facturación todavía no está disponible\.$/,
+    to: "Eso no está disponible en esta app.",
+  },
+  {
+    id: "checkout_manage_billing_es",
+    code: "subscription_exists",
+    from: /^Use Administrar facturación para cambiar este plan\.$/,
+    to: "El plan no se puede cambiar en esta app.",
+  },
   {
     id: "rollout_notice_unenforced",
     from: /^You're an early Pekko customer\. Enforcement is off, so your 14-day transition has not started\. You keep full access and get a notice before billing changes\. Your content stays\.$/,
@@ -213,6 +316,19 @@ function rewriteBody(body: unknown): { value: unknown; changed: boolean } {
     }
   }
 
+  const statusDetail = record.status_detail;
+  if (statusDetail && typeof statusDetail === "object" && !Array.isArray(statusDetail)) {
+    const d = statusDetail as Record<string, unknown>;
+    if (typeof d.message === "string") {
+      const kind = typeof d.kind === "string" ? d.kind : undefined;
+      const next = statusOnlyText(d.message, { kind });
+      if (next !== d.message) {
+        out.status_detail = { ...d, message: next };
+        changed = true;
+      }
+    }
+  }
+
   if (typeof record.rollout_notice === "string") {
     const next = statusOnlyText(record.rollout_notice);
     if (next !== record.rollout_notice) {
@@ -226,7 +342,7 @@ function rewriteBody(body: unknown): { value: unknown; changed: boolean } {
 
 /**
  * For Android-app requests, rewrite only top-level `error` (when `code` is
- * present), `warning.message` and top-level `rollout_notice`. Non-app requests
+ * present), `warning.message`, `status_detail.message` and top-level `rollout_notice`. Non-app requests
  * and unchanged bodies return the original Response.
  */
 export async function rewriteAndroidStatusCopy(req: Request, res: Response): Promise<Response> {

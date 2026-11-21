@@ -18,11 +18,13 @@ import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
 import { filterScreens, SCREEN_FILTER_MIN, type ScreenStatusFilter } from "@/lib/screen-filter";
+import { BillingStatusBanner, type EntitlementsStatus } from "@/components/billing-status-banner";
 
 export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; groups?: ScreenGroupItem[] } } = {}) {
   const t = useT();
   const liveDisplays = useApi<DisplayItem[]>(fixture ? null : "/api/displays", 10_000);
   const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
+  const entitlements = useApi<EntitlementsStatus>(fixture ? null : "/api/entitlements");
   const displays = fixture ? { data: fixture.displays, error: null as string | null } : liveDisplays;
   const groups = fixture ? { data: fixture.groups ?? [], error: null as string | null } : liveGroups;
   const list = displays.data ?? [];
@@ -39,6 +41,7 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
       <PageHeader compact title={t("screens.title")} lede={t("screens.lede")}
         action={<Link href="/dashboard/screens/add#add-screen" className="btn btn-primary min-h-11">{t("screens.add")}</Link>}
       />
+      {!fixture && entitlements.data ? <div className="mb-3"><BillingStatusBanner entitlements={entitlements.data} /></div> : null}
       {list.length ? (
         <div className="hidden sm:grid grid-cols-3 gap-2 mb-3">
           <Stat compact label={t("screens.total")} value={list.length} />

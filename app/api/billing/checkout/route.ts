@@ -1,6 +1,8 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
+import { isMissingSchema } from "@/lib/server/schema";
+import { CHECKOUT_CLEAR_PATCH, checkoutPendingFromRow, checkoutSessionPatch, expireOwnCheckoutSession, resumeOpenCheckoutUrl, writeAccountBillingPatch } from "@/lib/server/billing-status";
 import { billingDiagnostics, billingReturnOrigin, checkoutAction, checkoutAvailable, checkoutBlocked, checkoutSessionRequest, PAID_PLANS, planChangePaymentFailed, priceFor, stripe, stripeKey, subscriptionPriceChange, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
@@ -19,7 +21,11 @@ export async function POST(req: Request) {
   if (!PAID_PLANS.includes(plan)) return json({ error: "Choose a plan.", code: "plan" }, 400);
   const price = priceFor(plan);
   if (!price) return json({ error: "Checkout isn't available yet.", code: "billing_unavailable" }, 503);
-  const a = await db().from("accounts").select("id, owner_user_id, stripe_customer_id, stripe_subscription_id, subscription_status").eq("id", admin.accountId).maybeSingle();
+  const COLS = "id, owner_user_id, stripe_customer_id, stripe_subscription_id, subscription_status, checkout_session_id, checkout_session_price, checkout_session_expires_at";
+  let a = await db().from("accounts").select(COLS).eq("id", admin.accountId).maybeSingle();
+  if (a.error && isMissingSchema(a.error)) {
+    a = await db().from("accounts").select("id, owner_user_id, stripe_customer_id, stripe_subscription_id, subscription_status").eq("id", admin.accountId).maybeSingle();
+  }
   if (a.error || !a.data) return fail("Couldn't load your account.", 500);
   if (a.data.owner_user_id !== admin.userId) return json({ error: "Only the account owner can change the plan.", code: "not_owner" }, 403);
   if (checkoutBlocked(a.data.subscription_status)) {
@@ -52,6 +58,31 @@ export async function POST(req: Request) {
     }
     return json({ updated: true, plan });
   }
+  const replace = body.replace === true;
+  const stored = checkoutPendingFromRow({
+    checkout_session_id: (a.data as { checkout_session_id?: string | null }).checkout_session_id,
+    checkout_session_price: (a.data as { checkout_session_price?: string | null }).checkout_session_price,
+    checkout_session_expires_at: (a.data as { checkout_session_expires_at?: string | null }).checkout_session_expires_at,
+  });
+  if (stored && stored.price === price && !replace) {
+    try {
+      const url = await resumeOpenCheckoutUrl(s, stored.session_id);
+      if (url) return json({ url, resumed: true });
+    } catch {
+      /* session is gone; create a new one */
+    }
+    await writeAccountBillingPatch(admin.accountId, { ...CHECKOUT_CLEAR_PATCH });
+  }
+  if (stored && (replace || stored.price !== price)) {
+    try {
+      await expireOwnCheckoutSession(s, admin.accountId, stored.session_id);
+    } catch (err) {
+      if ((err as Error).message === "checkout_session_mismatch") {
+        return json({ error: "Couldn't update checkout. Try again.", code: "checkout_conflict" }, 409);
+      }
+    }
+    await writeAccountBillingPatch(admin.accountId, { ...CHECKOUT_CLEAR_PATCH });
+  }
   const origin = billingReturnOrigin(new URL(req.url).origin);
   const built = checkoutSessionRequest({
     price,
@@ -64,6 +95,7 @@ export async function POST(req: Request) {
   });
   if (!built.ok) return json({ error: built.error, code: built.code }, 503);
   const session = await s.checkout.sessions.create(built.params, built.options);
+  await writeAccountBillingPatch(admin.accountId, checkoutSessionPatch(session, price));
   return json({ url: session.url });
 }
 

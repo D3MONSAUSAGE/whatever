@@ -1,4 +1,5 @@
 "use client";
+import { BillingStatusBanner, type EntitlementsStatus } from "@/components/billing-status-banner";
 import { LocalizedBillingDisclosure } from "@/components/localized-billing-disclosure";
 import { ManageBilling } from "@/components/manage-billing";
 import { PLANS } from "@/lib/plans";
@@ -10,13 +11,12 @@ import { PageHeader } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useLocale } from "@/lib/i18n/client";
 
-type Entitlements = {
-  state: string; plan: string; plan_name: string; screen_limit: number; active_screens: number; total_screens: number;
+type Entitlements = EntitlementsStatus & {
+  screen_limit: number; active_screens: number; total_screens: number;
   can_add_screen: boolean; playback_allowed: boolean; enforced: boolean;
   trial: { started_at: string; ends_at: string; days_left: number } | null;
   subscription: { status: string; current_period_end: string | null; cancel_at_period_end: boolean } | null;
   suspend_at: string | null;
-  warning: { kind: string; message: string; action: string | null } | null;
 };
 
 const PLAN_SCREENS: Record<string, number> = { trial: 5, starter: 1, business: 3, multi: 5, grandfathered: 5, comp: 5 };
@@ -91,6 +91,9 @@ export default function Billing() {
       {locale !== "en" ? <p className="text-sm text-muted" lang={locale} data-testid="english-only-note">{t("common.englishOnlyNote")}</p> : null}
 
       {ent.error && <div className="card p-5 text-danger">{ent.error}</div>}
+      {e?.checkout_pending && e.is_owner ? (
+        <BillingStatusBanner entitlements={e} allowCheckoutActions onChanged={() => void ent.reload()} />
+      ) : null}
       {e && (
         <section className="card p-5 space-y-2" aria-labelledby="plan-heading" data-testid="plan-status">
           {(() => {

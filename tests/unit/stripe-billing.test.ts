@@ -330,4 +330,34 @@ describe("stripe billing events", () => {
       current_period_end: new Date(itemEnd * 1000).toISOString(),
     });
   });
+
+  it("syncs a payment method and clears a stored checkout on checkout.session.completed", async () => {
+    setTestDb(db as never);
+    db.seed({
+      id: "acct_1",
+      billing_event_created: null,
+      checkout_session_id: "cs_test_open",
+      checkout_session_price: "price_biz",
+      checkout_session_expires_at: "2026-11-08T00:00:00.000Z",
+    });
+    const live = sub({
+      default_payment_method: { card: { brand: "visa", last4: "4242" } },
+    });
+    expect(await applyEvent(event("checkout.session.completed", 80, {
+      id: "cs_test_open",
+      client_reference_id: "acct_1",
+      subscription: "sub_1",
+    }, "evt_checkout_done"), { now: NOW, fetchSubscription: async () => live })).toBe(true);
+    expect(db.accounts.get("acct_1")).toMatchObject({
+      stripe_subscription_id: "sub_1",
+      stripe_customer_id: "cus_1",
+      subscription_status: "active",
+      payment_method_brand: "visa",
+      payment_method_last4: "4242",
+      checkout_session_id: null,
+      checkout_session_price: null,
+      checkout_session_expires_at: null,
+    });
+    expect(db.accounts.get("acct_1")?.payment_method_synced_at).toBeTruthy();
+  });
 });
