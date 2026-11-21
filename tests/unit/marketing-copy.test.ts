@@ -148,7 +148,7 @@ describe("marketing redesign: honest samples and safe scope", () => {
 
   it("describes video in the media panel as muted MP4 with a still-image fallback", () => {
     expect(en["mk.video.body"]).toMatch(/muted video/);
-    expect(en["mk.video.p1"]).toBe("MP4 (H.264) video, played muted");
+    expect(en["mk.video.p1"]).toBe("H.264 video (MP4, MOV, or M4V), played muted");
     expect(en["mk.video.p3"]).toMatch(/still image/);
   });
 

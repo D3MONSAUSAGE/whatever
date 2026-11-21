@@ -94,14 +94,52 @@ Bytes are private. Clients receive a short-lived signed URL, not a public object
 | Call | Behavior | Source |
 | --- | --- | --- |
 | `GET /api/media` | This account's library. Optional list query | `app/api/media/route.ts` |
-| `POST /api/media` | Multipart image. JPG, PNG, or WebP. Returns `{ id }` | same |
+| `POST /api/media` | Multipart image. JPG, PNG, or WebP bytes only (magic-byte sniff). Returns `{ id }`. HEIC must be converted by the client first | same |
 | `DELETE /api/media/:id` | Delete if this account owns it and nothing uses it. **409** when a playlist uses it (`error` names the playlists), or (PR #158) **409 `code: "media_in_use"`** when a menu board (item photo, classic side photo, layout image/video/logo), a promotion, or the Brand Kit logo uses it. `error` names them and is localized. Show it as-is | `app/api/media/[id]/route.ts`, `lib/server/media-references.ts` |
 | `POST /api/media/upload` | `{ sizeBytes }` starts an MP4 upload. Returns `{ mediaId, path, token, signedUrl }` | `app/api/media/upload/route.ts` |
 | `POST /api/media/upload/complete` | `{ mediaId, durationMs, width, height }` after the bytes are stored | `app/api/media/upload/complete/route.ts` |
 
 Storage paths are `${accountId}/...` (`lib/server/supabase.ts` bucket `media`). A signed URL is the reference a client may fetch. It expires.
 
+
 The production `media` bucket allows 500 MB (`file_size_limit` 524288000), matching `MAX_VIDEO_BYTES` on `POST /api/media/upload`. Its `allowed_mime_types` are `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `application/vnd.openxmlformats-officedocument.presentationml.presentation`, and `application/pdf`. Video uploads, including TUS, must use `contentType` `video/mp4` or Storage will reject the object.
+
+### Supported media contract (Apple formats)
+
+Written 20 November 2026 for the web/backend Apple media work. This is the contract Flutter should follow. It does not change the Android +14 release artifacts.
+
+**1) Allowed `contentType` values (bucket unchanged)**
+
+The production `media` bucket allow-list is unchanged: `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `application/vnd.openxmlformats-officedocument.presentationml.presentation`, `application/pdf`. Do not send `video/quicktime`, `video/x-m4v`, `image/heic`, or `image/heif` as the Storage `contentType`.
+
+- Compatible `.mov`, `.MOV`, and `.m4v` files are accepted after content inspection. Upload the original bytes with TUS/PUT `contentType` `video/mp4`. The server always stores the object at `${accountId}/{mediaId}.mp4` with `mime_type: "video/mp4"`. The original filename may stay on the media row.
+- HEIC/HEIF is **not** accepted raw by `POST /api/media` or by the bucket. The client must convert it to JPEG (orientation baked in) and upload `contentType` `image/jpeg` (filename `.jpg`). The original HEIC is not stored.
+
+**2) Compatible MOV / M4V, and server codec checks**
+
+A file is compatible when `inspectMp4` + `enforceVideoLimits` (`lib/mp4.ts`) succeed. The container brand is not used as a gate (`ftyp qt` and `M4V ` are fine). The server always re-checks on `POST /api/media/upload/complete` and discards the object if it fails. Client-side checks are helpful but not sufficient.
+
+Accepted: H.264 (`avc1` / `avc3`) Baseline, Main, or High at level 4.2 or below; AAC audio (`mp4a`) or no audio; each edge ≤ 1920 px; duration 0.5 s–3 minutes; size ≤ 500 MB.
+
+Rejected (intentional, TV safety): HEVC/H.265, ProRes, PCM/LPCM audio, VP9, AV1, High 10 / 4:2:2 / 4:4:4, 4K (level 5.x), and files with no `ftyp`+`moov`.
+
+**3) HEIC conversion**
+
+The web client converts HEIC/HEIF to JPEG in the browser, bakes in EXIF orientation (`createImageBitmap` with `imageOrientation: "from-image"` where available, then canvas), preserves proportions, and resizes to the existing 1920×1080 (or 1080×1920) JPEG-on-black pipeline. Native decode works in Safari and on iPhone. There is **no server-side HEIC fallback**: Vercel’s Sharp/libvips build does not include HEIF, the bucket rejects `image/heic`, and `sniffImage` only accepts JPEG, PNG, and WebP magic bytes. Flutter should convert on-device with the platform codec (no new paid dependency) and upload JPEG.
+
+**4) HEVC processing state**
+
+Not supported. There is no processing status field, no poll endpoint, and no in-progress media row. HEVC (and other incompatible video) is rejected immediately on complete (and by the web client before upload). The TV player and editors only ever see ready, already-validated H.264/AAC (or silent) `video/mp4` library items.
+
+- HTTP **415**
+- `code`: **`video_codec`** (stable; from the exact `mp4ErrorMessage("codec")` catalog entry)
+- `error`: English or Spanish (Accept-Language / account locale) explaining that the file must be H.264/AAC and how to export “Most Compatible” on iPhone or H.264 from QuickTime/Photos on a Mac
+
+Other video failures use `video_type`, `video_profile`, `video_duration`, `video_dimensions`, `video_size` (413), `video_metadata`, or `video_unreadable`, all similarly catalogued in `lib/i18n/en.ts` / `es.ts` as `apiError.video_*`.
+
+**5) Live status**
+
+Implemented on the web/backend in the Apple media compatibility change (branch `pantalla/apple-media-compat`, 20 November 2026, America/Los_Angeles). It is **not live in production until that change is deployed**. Do not ship a Flutter build that depends on server acceptance of MOV bytes or on `video_codec` until production is confirmed. The bucket allow-list is already live and does not change.
 
 ## Playlists, assignment, scheduling
 

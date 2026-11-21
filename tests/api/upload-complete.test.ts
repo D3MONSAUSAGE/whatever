@@ -30,7 +30,7 @@ function auth(body: unknown): RequestInit {
 async function call(handler: (req: Request) => Promise<Response>, url: string, init?: RequestInit) {
   const res = await handler(new Request(url, init));
   const body = await res.json().catch(() => null);
-  return { status: res.status, body: body as { id?: string; error?: string; mediaId?: string; path?: string } };
+  return { status: res.status, body: body as { id?: string; error?: string; code?: string; mediaId?: string; path?: string } };
 }
 
 async function stage(name: string, bytes: Uint8Array, thumb?: Uint8Array) {
@@ -130,5 +130,28 @@ describe("POST /api/media/upload/complete", () => {
     expect(rows(staged.mediaId)).toHaveLength(0);
     expect(store.objects.has(staged.path)).toBe(false);
     expect(store.objects.has(staged.thumbPath)).toBe(false);
+  });
+
+  it("accepts an H.264/AAC MOV or M4V and stores it as the same .mp4 library row", async () => {
+    for (const name of ["clip.MOV", "clip.m4v"]) {
+      const bytes = fixture(name.toLowerCase().endsWith(".m4v") ? "h264-aac.m4v" : "h264-aac.mov");
+      const staged = await stage(name, bytes);
+      const done = await call(completeVideoUpload, "http://localhost/api/media/upload/complete", completeBody(staged.mediaId, name));
+      expect(done.status, name).toBe(201);
+      expect(done.body).toEqual({ id: staged.mediaId });
+      expect(rows(staged.mediaId)[0]).toMatchObject({ kind: "video", storage_path: staged.path, mime_type: "video/mp4" });
+      expect(staged.path.endsWith(".mp4")).toBe(true);
+      expect(store.objects.has(staged.path)).toBe(true);
+    }
+  });
+
+  it("rejects HEVC MOV with video_codec and does not leave the object", async () => {
+    const staged = await stage("clip.mov", fixture("hevc-aac.mov"));
+    const rejected = await call(completeVideoUpload, "http://localhost/api/media/upload/complete", completeBody(staged.mediaId, "clip.mov"));
+    expect(rejected.status).toBe(415);
+    expect(rejected.body.code).toBe("video_codec");
+    expect(rejected.body.error).toMatch(/Most Compatible/);
+    expect(rows(staged.mediaId)).toHaveLength(0);
+    expect(store.objects.has(staged.path)).toBe(false);
   });
 });

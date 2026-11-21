@@ -9,6 +9,7 @@ import {
   MAX_VIDEO_BYTES,
   MAX_VIDEO_DURATION_MS,
   MAX_VIDEO_EDGE,
+  VIDEO_UNREADABLE_MESSAGE,
   enforceVideoLimits,
   inspectMp4,
   mp4ErrorMessage,
@@ -34,7 +35,7 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   const mediaId = body.mediaId;
   if (!isUuid(mediaId)) return fail("Upload didn't arrive. Try again.", 400);
   if (!positiveInt(body.durationMs) || !positiveInt(body.width) || !positiveInt(body.height)) {
-    return fail("This browser couldn't read that video. Export it as H.264 MP4.", 415);
+    return fail(VIDEO_UNREADABLE_MESSAGE, 415);
   }
   if (body.durationMs > MAX_VIDEO_DURATION_MS) return fail(mp4ErrorMessage("duration"), 415);
   if (body.width > MAX_VIDEO_EDGE || body.height > MAX_VIDEO_EDGE) return fail(mp4ErrorMessage("dimensions"), 415);

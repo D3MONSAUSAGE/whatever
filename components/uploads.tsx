@@ -3,6 +3,8 @@ import { useT } from "@/lib/i18n/client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api, authToken, uploadForm } from "@/lib/api";
 import { prepareImage } from "@/lib/prepare-image";
+import { heicToJpegName, looksLikeHeic } from "@/lib/heic";
+import { isImageUploadFile } from "@/lib/media-accept";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
 import { useToast } from "@/components/toast";
 import { UPLOAD_SUCCESS_TOAST_MS, bannerJobs, uploadSuccessCopy } from "@/lib/upload-notice";
@@ -10,7 +12,6 @@ import { makeT, type T } from "@/lib/i18n";
 
 const EN: T = makeT("en");
 
-const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX = 15 * 1024 * 1024;
 const PPTX_MAX = 50 * 1024 * 1024;
 
@@ -171,14 +172,15 @@ export function UploadProgress({ jobs: jobsOverride, onDismiss }: { jobs?: Uploa
 }
 
 async function uploadImage(file: File, onProgress: (progress: number, detail: string) => void, t: T = EN) {
-  if (!TYPES.includes(file.type)) throw new Error(t("up.badImage"));
+  if (!isImageUploadFile(file)) throw new Error(t("up.badImage"));
   if (file.size > MAX) throw new Error(t("up.imageTooBig"));
   onProgress(5, t("up.prepImage"));
-  const blob = await prepareImage(file);
+  const blob = await prepareImage(file, t);
   onProgress(15, t("ed.uploading"));
   const form = new FormData();
-  form.append("file", blob, "image.jpg");
-  form.append("name", file.name);
+  const uploadName = looksLikeHeic(file) ? heicToJpegName(file.name) : "image.jpg";
+  form.append("file", blob, uploadName);
+  form.append("name", looksLikeHeic(file) ? heicToJpegName(file.name) : file.name);
   const token = await authToken();
   return uploadForm("/api/media", form, token, (progress) => onProgress(Math.max(15, progress), t("ed.uploading")));
 }

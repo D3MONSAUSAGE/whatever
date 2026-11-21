@@ -5,6 +5,7 @@ import {
   enforceVideoLimits,
   inspectMp4,
   mp4ErrorMessage,
+  VIDEO_UNREADABLE_MESSAGE,
   type Mp4Info,
 } from "./mp4";
 
@@ -37,7 +38,7 @@ function probeVideo(file: File): Promise<{ durationMs: number; width: number; he
     video.playsInline = true;
     video.preload = "auto";
     let settled = false;
-    const timer = window.setTimeout(() => finish(new Error("This browser couldn't read that video. Export it as H.264 MP4.")), 20000);
+    const timer = window.setTimeout(() => finish(new Error(VIDEO_UNREADABLE_MESSAGE)), 20000);
     function finish(error?: Error, value?: { durationMs: number; width: number; height: number; thumbnail: Blob }) {
       if (settled) return;
       settled = true;
@@ -48,13 +49,13 @@ function probeVideo(file: File): Promise<{ durationMs: number; width: number; he
       if (error) reject(error);
       else if (value) resolve(value);
     }
-    video.onerror = () => finish(new Error("This browser couldn't read that video. Export it as H.264 MP4."));
+    video.onerror = () => finish(new Error(VIDEO_UNREADABLE_MESSAGE));
     video.onloadedmetadata = () => {
       const durationMs = Math.round((video.duration || 0) * 1000);
       const width = video.videoWidth;
       const height = video.videoHeight;
       if (!durationMs || !width || !height) {
-        finish(new Error("This browser couldn't read that video. Export it as H.264 MP4."));
+        finish(new Error(VIDEO_UNREADABLE_MESSAGE));
         return;
       }
       const capture = () => {

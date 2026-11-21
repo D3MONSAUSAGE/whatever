@@ -18,7 +18,7 @@ const enT = makeT("en");
 const PREFIXES = ["bk.", "sched.", "day.", "dp.", "diu.", "dup.", "fu.", "sos.", "lg.", "mif.", "ed.", "mb.", "pl.", "sv.", "hub.", "cnav.", "cp.", "mf.", "ce.", "tpl.", "ls.", "zone.", "font.", "ml.", "up.", "pd.", "pe.", "ss.", "ps.", "ptpl.", "promo.field."];
 const keys = (Object.keys(en) as (keyof typeof en)[]).filter((k) => PREFIXES.some((p) => k.startsWith(p)));
 // Same in both languages on purpose: loan words and format strings.
-const SAME = new Set(["cp.filter.video", "cp.type.video", "fu.video.accept", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video", "ptpl.happy.name"]);
+const SAME = new Set(["cp.filter.video", "cp.type.video", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video", "ptpl.happy.name"]);
 
 describe("I18N-3: dictionaries", () => {
   it("covers the editor screens with Spanish in usted, following the glossary", () => {

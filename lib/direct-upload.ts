@@ -1,14 +1,15 @@
 import { makeT, type T } from "@/lib/i18n";
+import { ART_UPLOAD_ACCEPT, isArtUploadFile } from "@/lib/media-accept";
 
 const EN: T = makeT("en");
 
 /**
  * E3: upload a logo or photo straight from Brand Kit or the classic editor.
- * Only JPG and PNG are offered, because only those appear in the logo and photo
- * pickers (see artImages in lib/brand-kit.ts). Size limits are the existing 15 MB.
+ * JPG, PNG, and HEIC are offered. HEIC is converted to JPEG before upload so it
+ * appears in the logo and photo pickers (see artImages in lib/brand-kit.ts). Size
+ * limits are the existing 15 MB. WebP stays out of this picker.
  */
-export const ART_UPLOAD_ACCEPT = "image/jpeg,image/png";
-export const ART_UPLOAD_TYPES = ["image/jpeg", "image/png"] as const;
+export { ART_UPLOAD_ACCEPT };
 
 export type DirectUploadState =
   | { phase: "idle" }
@@ -19,7 +20,7 @@ export type DirectUploadState =
 
 /** Reject files the logo/photo pickers could not list, before anything is sent. */
 export function artUploadError(file: Pick<File, "type" | "name">, t: T = EN): string | null {
-  if (!(ART_UPLOAD_TYPES as readonly string[]).includes(file.type) || !/\.(png|jpe?g)$/i.test(file.name)) {
+  if (!isArtUploadFile(file)) {
     return t("diu.badType");
   }
   return null;

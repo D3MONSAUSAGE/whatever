@@ -285,7 +285,7 @@ describe("isolated studio photo limit copy", () => {
     const studio = readFileSync("components/layout-studio.tsx", "utf8");
     expect(studio).toContain("export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000");
     expect(studio).toContain('export const ISOLATED_STUDIO_PHOTO_LIMIT_LABEL = "1.5 MB or smaller"');
-    expect(studio).toContain("file.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES");
+    expect(studio).toContain("upload.size > ISOLATED_STUDIO_PHOTO_MAX_BYTES");
     expect(studio).toContain('setNote(t("ls.photoTooBig"))');
     expect(en["ls.photoTooBig"]).toBe("Use a photo under 1.5 MB.");
     expect(studio).toContain("isolatedPhotoLimit={!accountMode && !sessionToken}");
