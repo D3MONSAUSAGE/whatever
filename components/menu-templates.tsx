@@ -16,8 +16,10 @@ import { Dialog } from "@/components/dialog";
 import { useToast } from "@/components/toast";
 import { useRegisterStudioLeave } from "@/components/studio-leave";
 import { fontFaceCss } from "@/lib/board-fonts";
-import { MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, templateSpec, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
+import { BOARD_H, BOARD_W, MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, templateSpec, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
 import { accountSaveBody, findSameVideo, placeZoneMedia, readAccountStudio, type AccountLibraryFile } from "@/lib/layout-account";
+import { mediaHits, selectedVideoOption, videoPreview } from "@/lib/board-preview";
+import { ZoneVideo } from "@/components/zone-video";
 import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
 import { ColorField } from "@/components/color-field";
 import { menuSvg } from "@/lib/menu-classic-svg";
@@ -92,7 +94,10 @@ export function DesignBoard({ doc, art, label, className = "" }: { doc: LayoutDo
 
 const STYLES = `${FONT_CSS}
 .tpl-board { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; }
-.tpl-board > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tpl-board-svg, .tpl-board-svg > svg, .tpl-board > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tpl-zone-hit { position: absolute; z-index: 3; padding: 0; cursor: pointer; background: transparent; border: 2px solid transparent; }
+.tpl-zone-hit:hover, .tpl-zone-hit:focus-visible { border-color: var(--color-primary); outline: none; }
+.tpl-zone-hit > span { position: absolute; left: 6px; top: 6px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; background: rgb(11 18 32 / .72); color: #fff; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; line-height: 14px; }
 /* Gallery filters: one label column shared by every row (so all button groups start at the same x), and Pekko's
    segmented control (.seg, as on My Screens) for the buttons. Phones stack the label above its buttons. */
 .tpl-filters { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 16px; row-gap: 10px; align-items: start; }
@@ -240,10 +245,14 @@ function classicArt(classic: ClassicSettings, brand: Brand | null, art: Art) {
   };
 }
 
-/** The board exactly as the TV shows it, for any engine. */
-export function BoardView({ engine, doc, classic, art, brand, label, className = "" }: {
+/** The board as the TV shows it, plus a live muted video overlay when the editor has a zone video. */
+export function BoardView({ engine, doc, classic, art, brand, label, className = "", video = null, hits, onHit }: {
   engine: Engine; doc: LayoutDocument; classic: ClassicSettings | null; art: Art; brand: Brand | null; label?: string; className?: string;
+  video?: ReturnType<typeof videoPreview>;
+  hits?: { id: string; label: string; box: { x: number; y: number; w: number; h: number } }[];
+  onHit?: (id: string) => void;
 }) {
+  const t = useT();
   const svg = useMemo(() => {
     if (engine === "classic" && classic) {
       const { template, content } = toClassic(doc, classic);
@@ -253,14 +262,43 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
     return designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages }).svg;
   }, [engine, doc, classic, art.imageHref, art.logoHref, art.itemImages, brand]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className={`tpl-board ${className}`} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}
-      dangerouslySetInnerHTML={{ __html: svg }} />
+    <div className={`tpl-board ${className}`} role={label && !hits?.length ? "img" : undefined} aria-label={label && !hits?.length ? label : undefined}>
+      <div className="tpl-board-svg" aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
+      {video ? (
+        <ZoneVideo
+          box={video.box}
+          src={video.src}
+          poster={video.poster}
+          fileName={video.fileName}
+          label={video.fileName ? t("tpl.videoOnBoard", { name: video.fileName }) : t("tpl.videoUnlisted")}
+          fallbackLabel={t("tpl.videoUnlisted")}
+        />
+      ) : null}
+      {(hits ?? []).map((hit) => (
+        <button
+          key={hit.id}
+          type="button"
+          className="tpl-zone-hit"
+          data-testid={`tpl-hit-${hit.id}`}
+          aria-label={hit.label}
+          onClick={() => onHit?.(hit.id)}
+          style={{
+            left: `${(hit.box.x / BOARD_W) * 100}%`,
+            top: `${(hit.box.y / BOARD_H) * 100}%`,
+            width: `${(hit.box.w / BOARD_W) * 100}%`,
+            height: `${(hit.box.h / BOARD_H) * 100}%`,
+          }}
+        >
+          <span>{hit.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
 export function TemplateEditor({
   menuId: initialMenuId, name: initialName, document: initialDoc, displays, brand, preview = false, onClose, onAdvanced, onSaved, onSplit,
-  unified = false, classic: initialClassic = null, onNewBoard,
+  unified = false, classic: initialClassic = null, onNewBoard, fixtureLibrary,
 }: {
   menuId: string | null;
   name: string;
@@ -279,6 +317,8 @@ export function TemplateEditor({
   classic?: ClassicSettings | null;
   /** Start a NEW board with this content in another design (classic boards can't change storage type in place). */
   onNewBoard?: (document: LayoutDocument, name: string) => void;
+  /** Preview harness only: the fixture media library, including videos. */
+  fixtureLibrary?: AccountLibraryFile[];
 }) {
   const { locale, t } = useLocale();
   const L = locale === "es" ? "es" : "en";
@@ -305,9 +345,12 @@ export function TemplateEditor({
   async function reloadLibrary() {
     if (preview) {
       // UI preview only (no account): two bundled sample photos stand in for the owner's media.
+      // Fixture videos (and any other library files) stay available so a selected video can preview.
       const sample: AccountLibraryFile[] = ["salad", "bowl"].map((n) => ({ id: `00000000-0000-4000-8000-00000000f00${n === "salad" ? 1 : 2}`, name: `${n}.jpg`, kind: "image", mime: "image/jpeg", url: `/menu-templates/${n}.jpg` }));
-      setLibrary(sample);
-      return sample;
+      const extras = (fixtureLibrary ?? []).filter((item) => !sample.some((row) => row.id === item.id));
+      const next = [...sample, ...extras];
+      setLibrary(next);
+      return next;
     }
     const body = readAccountStudio(await api("/api/layout-studio"));
     const next = body?.library ?? [];
@@ -511,6 +554,21 @@ export function TemplateEditor({
   const columns = engine === "layout" ? fixedColumns(doc.template) : null;
   const images = library.filter((f) => f.kind === "image");
   const videos = library.filter((f) => f.kind === "video");
+  const selectedVideo = selectedVideoOption(library, doc.videoMediaId);
+  const previewVideo = engine === "classic" ? null : videoPreview(doc, library, art.imageHref);
+  const previewHits = engine === "classic" ? [] : mediaHits(doc).map((hit) => ({
+    id: hit.id,
+    box: hit.box,
+    label: hit.id === "video" ? t("tpl.editVideoArea") : t("tpl.editPhotoArea"),
+  }));
+  function openMediaArea(id: string) {
+    setStep(2);
+    requestAnimationFrame(() => {
+      const node = document.querySelector<HTMLElement>(id === "video" ? "[data-testid='tpl-video']" : "[data-testid='tpl-board-upload']");
+      node?.focus();
+      node?.scrollIntoView({ block: "nearest" });
+    });
+  }
   const stepNames = [t("tpl.step.business"), t("tpl.step.menu"), t("tpl.step.photos"), t("tpl.step.look")];
   const styleName = engine === "classic" ? t("tpl.classicName") : engine === "layout" ? layoutName(doc.template, t) : design.name[L];
 
@@ -541,8 +599,8 @@ export function TemplateEditor({
       <h2 id="tpl-editor-title" className="sr-only">{t("tpl.editorTitle")}</h2>
       <div className="tpl-grid">
         <div className="tpl-preview">
-          <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{t("tpl.previewCap")}</span><span>1920 × 1080</span></p>
-          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} />
+          <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{previewVideo ? t("tpl.previewCapVideo") : t("tpl.previewCap")}</span><span>1920 × 1080</span></p>
+          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={previewHits} onHit={openMediaArea} />
           {fit.dropped > 0 ? (
             <div className="note-warn text-sm mt-3 grid gap-2" role="status" data-testid="tpl-dropped">
               <p>{engine === "layout" ? t("tpl.columnsHidden", { n: fit.dropped, cols: columns ?? 0 }) : t(photoTemplate ? "tpl.droppedPhotos" : "tpl.dropped", { n: fit.dropped })}</p>
@@ -650,7 +708,12 @@ export function TemplateEditor({
             <div className="grid gap-3">
               <h3 className="font-display font-bold text-lg">{t("tpl.photosTitle")}</h3>
               {unified ? <p className="text-sm text-muted" data-testid="tpl-photos-items">{t("tpl.itemPhotosWhere")}</p> : null}
-              {engine === "design" && !designHasMedia(design) ? <p className="text-sm text-muted">{t("tpl.noPhotoArea")}</p> : (
+              {engine === "design" && !designHasMedia(design) ? (
+                <div className="grid gap-2">
+                  <p className="text-sm text-muted">{t("tpl.noPhotoArea")}</p>
+                  {doc.videoMediaId ? <p className="text-sm" data-testid="tpl-video-kept">{t("tpl.videoKeptHidden", { name: selectedVideo?.name || t("tpl.videoUnlisted") })}</p> : null}
+                </div>
+              ) : (
                 <>
                   <p className="text-sm text-muted" data-testid="tpl-photo-area">{engine === "classic" ? t("tpl.classicPhotoArea") : media?.photo === "background" ? t("tpl.backgroundPhotoArea") : engine === "layout" ? t("tpl.layoutPhotoArea") : t("tpl.photosLede")}</p>
                   <div className="flex flex-wrap gap-2">
@@ -670,9 +733,13 @@ export function TemplateEditor({
                         <label className="form-label grid gap-1">{t("tpl.video")}
                           <select className="field" value={doc.videoMediaId ?? ""} onChange={(e) => setBoardVideo(e.target.value || null)} data-testid="tpl-video">
                             <option value="">{t("tpl.noVideo")}</option>
+                            {selectedVideo && !videos.some((f) => f.id === selectedVideo.id) ? (
+                              <option value={selectedVideo.id}>{selectedVideo.name || t("tpl.videoUnlisted")}</option>
+                            ) : null}
                             {videos.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                           </select>
                         </label>
+                        {selectedVideo ? <p className="text-sm" data-testid="tpl-video-name">{selectedVideo.missing ? t("tpl.videoKept", { name: selectedVideo.name || t("tpl.videoUnlisted") }) : t("tpl.videoOnBoard", { name: selectedVideo.name })}</p> : null}
                         {unified ? <label className="btn btn-quiet cursor-pointer justify-self-start">{t("tpl.uploadVideo")}<input type="file" accept="video/mp4,.mp4" className="sr-only" data-testid="tpl-video-upload" onChange={(e) => void uploadVideo(e.target.files?.[0])} /></label> : null}
                         <span className="text-xs text-muted font-normal">{media?.exclusive ? t("tpl.videoOrPhoto") : t("tpl.videoNote")}</span>
                       </div>

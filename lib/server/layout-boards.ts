@@ -23,16 +23,17 @@ export async function loadLayoutStudio(accountId: string) {
   if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
   const menus = await db().from("menus").select("id, name, content, media_id, playlist_id, updated_at").eq("account_id", accountId);
   if (menus.error) return { status: 500 as const, error: "Couldn't load boards." };
-  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path, size_bytes").eq("account_id", accountId);
+  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path, size_bytes, thumbnail_path").eq("account_id", accountId);
   if (media.error) return { status: 500 as const, error: "Couldn't load your media library." };
   const rows = (media.data ?? []).flatMap((row) => {
     const mime = String(row.mime_type ?? "");
     const kind = libraryKind(row.kind, mime);
     if (!kind) return [];
     const size = Number(row.size_bytes);
-    return [{ id: String(row.id), name: String(row.file_name ?? "File"), kind, mime, path: String(row.storage_path ?? ""), sizeBytes: Number.isFinite(size) && size > 0 ? size : null }];
+    const thumb = String(row.thumbnail_path ?? "");
+    return [{ id: String(row.id), name: String(row.file_name ?? "File"), kind, mime, path: String(row.storage_path ?? ""), thumb, sizeBytes: Number.isFinite(size) && size > 0 ? size : null }];
   });
-  const paths = rows.map((row) => row.path).filter((path) => path.startsWith(`${accountId}/`));
+  const paths = rows.flatMap((row) => [row.path, row.thumb]).filter((path) => path.startsWith(`${accountId}/`));
   const signed = paths.length ? await db().storage.from(BUCKET).createSignedUrls(paths, 3600) : { data: [], error: null };
   const urls = new Map<string, string>();
   for (const row of signed.data ?? []) {
@@ -59,7 +60,7 @@ export async function loadLayoutStudio(accountId: string) {
     status: 200 as const,
     boards,
     legacy,
-    library: rows.map((row) => ({ id: row.id, name: row.name, kind: row.kind, mime: row.mime, url: urls.get(row.path) ?? null, sizeBytes: row.sizeBytes })),
+    library: rows.map((row) => ({ id: row.id, name: row.name, kind: row.kind, mime: row.mime, url: urls.get(row.path) ?? null, sizeBytes: row.sizeBytes, thumbnailUrl: row.thumb ? urls.get(row.thumb) ?? null : null })),
   };
 }
 

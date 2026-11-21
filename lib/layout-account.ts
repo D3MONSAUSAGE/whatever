@@ -9,6 +9,8 @@ export type AccountLibraryFile = {
   url: string | null;
   /** Stored size in bytes, when known. Used to reuse an identical upload instead of storing it twice. */
   sizeBytes?: number | null;
+  /** Signed URL of the stored video thumbnail, when one exists. */
+  thumbnailUrl?: string | null;
 };
 
 /**
@@ -65,6 +67,7 @@ function file(value: unknown): AccountLibraryFile | null {
     mime: row.mime,
     url: typeof row.url === "string" ? row.url : null,
     sizeBytes: typeof row.sizeBytes === "number" && Number.isFinite(row.sizeBytes) ? row.sizeBytes : null,
+    thumbnailUrl: typeof row.thumbnailUrl === "string" ? row.thumbnailUrl : null,
   };
 }
 
