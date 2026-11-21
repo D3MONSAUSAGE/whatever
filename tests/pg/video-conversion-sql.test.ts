@@ -133,7 +133,7 @@ describe.skipIf(!databaseUrl)("0033 video conversion budget ledger", () => {
     expect(Number(after.reserved_millis)).toBe(10_000);
     expect(Number(after.spent_millis)).toBe(15);
     await client.query(`select public.complete_video_conversion($1, 'ready', 15, null)`, [jobId]);
-    const replay = (await client.query(`select reserved_millis, spent_millis, actual_millis from public.video_conversion_months m join public.video_conversion_jobs j on j.month = m.month where j.id = $1`, [jobId])).rows[0];
+    const replay = (await client.query(`select m.reserved_millis, m.spent_millis, j.actual_millis from public.video_conversion_months m join public.video_conversion_jobs j on j.month = m.month where j.id = $1`, [jobId])).rows[0];
     expect(Number(replay.reserved_millis)).toBe(10_000);
     expect(Number(replay.spent_millis)).toBe(15);
     expect(Number(replay.actual_millis)).toBe(15);
