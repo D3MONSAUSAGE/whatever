@@ -7,6 +7,7 @@ import { normalizePlaybackMode, normalizePlaylistName, normalizeTransition, pars
 import { GROUP_MAX_DURATION_MS, GROUP_MIN_DURATION_MS } from "@/lib/server/presentation-groups";
 import { fail, json, readJson } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { unreadyMediaError } from "@/lib/server/media-ready-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -207,6 +208,8 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
   if (!items) return fail("Check the slides and try again.", 400);
   const checked = await durationsFitMedia(admin.accountId, items);
   if (checked) return fail(checked, 400);
+  const unready = await unreadyMediaError(admin.accountId, items.map((item) => item.mediaId));
+  if (unready) return fail(unready, 409, "video_not_ready");
 
   const { data: ok, error } = await db().rpc("save_playlist", {
     p_account_id: admin.accountId,

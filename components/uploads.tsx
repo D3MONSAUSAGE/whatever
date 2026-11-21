@@ -207,7 +207,7 @@ async function uploadVideo(file: File, onProgress: (progress: number, detail: st
   await uploadToSignedUrl(signed.signedUrl, file, (progress) => onProgress(Math.max(5, Math.min(90, progress)), t("up.uploadingVideo")), file.name, signed.token);
   onProgress(92, t("ed.saving"));
   const thumbnailBase64 = await blobToBase64(prepared.thumbnail);
-  await api("/api/media/upload/complete", {
+  const completed = await api<{ id: string; processingStatus?: string }>("/api/media/upload/complete", {
     method: "POST",
     body: JSON.stringify({
       mediaId: signed.mediaId,
@@ -218,7 +218,7 @@ async function uploadVideo(file: File, onProgress: (progress: number, detail: st
       thumbnailBase64,
     }),
   });
-  onProgress(100, t("up.uploaded"));
+  onProgress(100, completed.processingStatus === "processing" ? t("up.convertingVideo") : t("up.uploaded"));
 }
 
 async function uploadPresentation(file: File, onProgress: (progress: number, detail: string) => void, t: T = EN) {
@@ -241,7 +241,7 @@ async function uploadPresentation(file: File, onProgress: (progress: number, det
     (progress) => onProgress(Math.max(10, Math.min(55, 10 + progress * 0.45)), pdf ? t("up.uploadingPdf") : t("up.uploadingPptx")),
     name,
   );
-  onProgress(60, t("up.converting"));
+  onProgress(60, t("up.convertingVideo"));
   const done = await finishPresentation(signed.mediaId, name, onProgress, t);
   onProgress(100, done.slideCount === 1 ? "1 slide ready" : `${done.slideCount} slides ready`);
   return { playlistId: done.playlistId };
@@ -270,9 +270,9 @@ async function finishPresentation(
           return;
         }
         const percent = total > 0 ? 60 + Math.round(35 * Math.min(1, done / total)) : 64;
-        onProgress(percent, total > 0 ? t("up.savingSlide", { n: Math.min(done + 1, total), total }) : t("up.converting"));
+        onProgress(percent, total > 0 ? t("up.savingSlide", { n: Math.min(done + 1, total), total }) : t("up.convertingVideo"));
       } catch {
-        onProgress(64, t("up.converting"));
+        onProgress(64, t("up.convertingVideo"));
       }
     }
   })();

@@ -1,6 +1,8 @@
+import { isReadyMediaStatus } from "@/lib/media-ready";
 import { layoutStudioEnabled, parseLayout, type LayoutDocument } from "@/lib/layout-studio";
 import { applyLayoutSave, extraImageIds, type LibraryFile } from "@/lib/layout-publish";
 import { imageBytes } from "@/lib/server/brand";
+import { UNREADY_MEDIA_MESSAGE } from "@/lib/server/media-ready-guard";
 import { BUCKET, db } from "@/lib/server/supabase";
 function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
   if (kind === "video") return "video";
@@ -23,12 +25,13 @@ export async function loadLayoutStudio(accountId: string) {
   if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
   const menus = await db().from("menus").select("id, name, content, media_id, playlist_id, updated_at").eq("account_id", accountId);
   if (menus.error) return { status: 500 as const, error: "Couldn't load boards." };
-  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path, size_bytes, thumbnail_path").eq("account_id", accountId);
+  const media = await db().from("media").select("id, file_name, mime_type, kind, storage_path, size_bytes, thumbnail_path, processing_status").eq("account_id", accountId);
   if (media.error) return { status: 500 as const, error: "Couldn't load your media library." };
   const rows = (media.data ?? []).flatMap((row) => {
     const mime = String(row.mime_type ?? "");
     const kind = libraryKind(row.kind, mime);
     if (!kind) return [];
+    if (kind === "video" && !isReadyMediaStatus(row.processing_status == null ? null : String(row.processing_status))) return [];
     const size = Number(row.size_bytes);
     const thumb = String(row.thumbnail_path ?? "");
     return [{ id: String(row.id), name: String(row.file_name ?? "File"), kind, mime, path: String(row.storage_path ?? ""), thumb, sizeBytes: Number.isFinite(size) && size > 0 ? size : null }];
@@ -102,9 +105,12 @@ export async function saveLayoutForAccount(accountId: string, body: {
   const extra = parsedForIds.ok ? extraImageIds(parsedForIds.value) : [];
   const ids = [...new Set([doc.imageMediaId, doc.videoMediaId, ...extra].filter((id): id is string => typeof id === "string" && id.length > 0))].slice(0, 60);
   const found = ids.length
-    ? await db().from("media").select("id, account_id, mime_type, kind").eq("account_id", accountId).in("id", ids)
+    ? await db().from("media").select("id, account_id, mime_type, kind, processing_status").eq("account_id", accountId).in("id", ids)
     : { data: [], error: null };
   if (found.error) return { status: 500 as const, error: "Couldn't check your media library." };
+  if ((found.data ?? []).some((row) => !isReadyMediaStatus(row.processing_status == null ? null : String(row.processing_status)))) {
+    return { status: 409 as const, error: UNREADY_MEDIA_MESSAGE };
+  }
   const files: LibraryFile[] = (found.data ?? []).map((row) => ({
     id: String(row.id),
     accountId: String(row.account_id),

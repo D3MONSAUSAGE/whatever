@@ -127,15 +127,28 @@ Rejected (intentional, TV safety): HEVC/H.265, ProRes, PCM/LPCM audio, VP9, AV1,
 
 The web client converts HEIC/HEIF to JPEG in the browser, bakes in EXIF orientation (`createImageBitmap` with `imageOrientation: "from-image"` where available, then canvas), preserves proportions, and resizes to the existing 1920×1080 (or 1080×1920) JPEG-on-black pipeline. Native decode works in Safari and on iPhone. There is **no server-side HEIC fallback**: Vercel’s Sharp/libvips build does not include HEIF, the bucket rejects `image/heic`, and `sniffImage` only accepts JPEG, PNG, and WebP magic bytes. Flutter should convert on-device with the platform codec (no new paid dependency) and upload JPEG.
 
-**4) HEVC processing state**
+**4) HEVC processing state (inactive until enabled)**
 
-Not supported. There is no processing status field, no poll endpoint, and no in-progress media row. HEVC (and other incompatible video) is rejected immediately on complete (and by the web client before upload). The TV player and editors only ever see ready, already-validated H.264/AAC (or silent) `video/mp4` library items.
+**Live behavior today (flag off):** unchanged from the Apple media contract. HEVC (and other incompatible video) is rejected immediately on `POST /api/media/upload/complete` (and by the web client before upload). There is no in-progress media row for video.
 
 - HTTP **415**
 - `code`: **`video_codec`** (stable; from the exact `mp4ErrorMessage("codec")` catalog entry)
 - `error`: English or Spanish (Accept-Language / account locale) explaining that the file must be H.264/AAC and how to export “Most Compatible” on iPhone or H.264 from QuickTime/Photos on a Mac
 
 Other video failures use `video_type`, `video_profile`, `video_duration`, `video_dimensions`, `video_size` (413), `video_metadata`, or `video_unreadable`, all similarly catalogued in `lib/i18n/en.ts` / `es.ts` as `apiError.video_*`.
+
+**When automatic conversion is enabled** (not live; requires Francisco's approval to turn on `HEVC_CONVERSION_ENABLED=1` and `NEXT_PUBLIC_HEVC_CONVERSION_ENABLED=1` plus a provider key). Until then Flutter must keep treating HEVC as a hard 415 `video_codec` rejection.
+
+- Convertible uploads (HEVC/H.265 in MOV/MP4/M4V, and some otherwise-incompatible H.264 such as 4K or High 10, still within 500 MB and 3 minutes) return **201** `{ id, processingStatus: "processing" }` from `POST /api/media/upload/complete`. The Storage `contentType` is still `video/mp4`.
+- Poll **`GET /api/media`** (existing library list). Each video may include:
+  - `processingStatus`: `null` or omitted (treat as **ready**, including all existing media), `processing`, `ready`, or `failed`
+  - `processingError`: a short code on failure (`conversion_failed`, `conversion_invalid_output`, `conversion_budget`, `conversion_provider`) or `null`
+- There is no separate conversion poll endpoint.
+- Editors must not add `processing` or `failed` videos to playlists, boards, or published shows. The server rejects those saves and publishes with **409** `video_not_ready`.
+- TVs never receive processing or failed media: `player_playlist` / player-state omit them. Existing media with `processingStatus` null keeps playing.
+- While `processing`, `url` is omitted so the unconverted original is not handed to a player or editor preview. A thumbnail may still be present.
+- Monthly conversion budget exhaustion returns **429** and `code` may be `conversion_budget`; the object is not kept. Ask the user to export as H.264 (Most Compatible) or retry next month.
+- Do not wait for or implement this path in a Play release until Pantalla confirms the flag is on in production.
 
 **5) Live status**
 

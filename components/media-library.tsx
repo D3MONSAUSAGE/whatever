@@ -2,6 +2,7 @@
 import { Dialog } from "@/components/dialog";
 import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatDuration, formatSize, type MediaItem, type PlaylistSummary } from "@/lib/api";
@@ -54,6 +55,11 @@ function usePagedMedia(enabled: boolean, query: string, sort: SortKey, kind: Kin
     }
   }, [enabled, url]);
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    if (!page?.items.some((item) => item.processingStatus === "processing" || item.processingStatus === "pending")) return;
+    const timer = setInterval(() => { void reload(); }, 4000);
+    return () => clearInterval(timer);
+  }, [page, reload]);
   const loadMore = useCallback(async () => {
     if (!page || page.nextOffset === null) return;
     setMore(true);
@@ -347,7 +353,11 @@ function Meta({ item }: { item: MediaItem }) {
   const t = useT();
   const { locale } = useLocale();
   const when = item.createdAt ? new Date(item.createdAt).toLocaleDateString(locale === "es" ? "es" : undefined) : "";
-  const status = item.processingStatus === "processing" ? t("ml.processing") : item.processingStatus === "failed" ? t("ml.failed") : item.kind === "presentation" ? t("ml.ready") : "";
+  const status = item.processingStatus === "processing" || item.processingStatus === "pending"
+    ? (item.kind === "video" ? t("ml.videoProcessing") : t("ml.processing"))
+    : item.processingStatus === "failed"
+      ? (item.kind === "video" ? videoFailureLabel(item.processingError, t) : t("ml.failed"))
+      : item.kind === "presentation" ? t("ml.ready") : "";
   return (
     <p className="text-xs text-muted flex flex-wrap items-center gap-x-2 gap-y-1">
       <span className="badge">{item.kind === "video" ? t("ml.video") : item.kind === "presentation" ? t("ml.presentation") : item.slideIndex != null ? t("ml.slideN", { n: (item.slideIndex ?? 0) + 1 }) : t("ml.image")}</span>
@@ -357,6 +367,7 @@ function Meta({ item }: { item: MediaItem }) {
         <span>
           {item.kind === "video" && item.durationMs ? `${formatDuration(item.durationMs)} · ` : ""}
           {formatSize(item.sizeBytes)}
+          {status ? ` · ${status}` : ""}
         </span>
       )}
       {item.usedIn && item.usedIn.length > 0 ? <span>{t("ml.in", { names: formatNameList(item.usedIn.map((playlist) => playlist.name), locale) })}</span> : null}
@@ -470,4 +481,12 @@ function sortMedia(items: MediaItem[], query: string, sort: SortKey) {
     return Date.parse(b.createdAt) - Date.parse(a.createdAt);
   });
   return filtered;
+}
+
+
+function videoFailureLabel(code: string | null | undefined, t: T) {
+  if (code === "conversion_budget") return t("ml.videoBudget");
+  if (code === "conversion_invalid_output") return t("ml.videoInvalidOutput");
+  if (code) return t("ml.videoFailed");
+  return t("ml.failed");
 }

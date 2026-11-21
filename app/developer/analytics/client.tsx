@@ -23,11 +23,18 @@ import "@/components/developer/console.css";
 
 type Load = { state: "loading" } | { state: "notFound" } | { state: "error"; message: string } | { state: "ready"; data: DevAnalytics };
 
-const SECTIONS = ["overview", "activation", "revenue", "screens", "health"] as const;
+const SECTIONS = ["overview", "activation", "revenue", "screens", "health", "conversions"] as const;
 type SectionId = (typeof SECTIONS)[number];
 
 type View = "analytics" | "accounts" | "traffic";
 /** ?view=accounts opens the Customer Accounts tab (the old /developer/accounts URL redirects here). */
+async function developerFetch(url: string, token: string) {
+  return fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, "Accept-Language": currentLocale() },
+    cache: "no-store",
+  });
+}
+
 const ACCOUNTS_VIEW_URL = "/developer/analytics?view=accounts";
 /** ?view=traffic opens the Website traffic tab. */
 const TRAFFIC_VIEW_URL = "/developer/analytics?view=traffic";
@@ -67,10 +74,7 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
     if (includeInternal) params.set("include", "internal");
     setLoad((prev) => (prev.state === "ready" ? prev : { state: "loading" }));
     try {
-      const res = await fetch(`/api/developer/analytics?${params}`, {
-        headers: { Authorization: `Bearer ${token}`, "Accept-Language": currentLocale() },
-        cache: "no-store",
-      });
+      const res = await developerFetch(`/api/developer/analytics?${params}`, token);
       if (res.status === 404 || res.status === 401) { setLoad({ state: "notFound" }); return; }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) { setLoad({ state: "error", message: body.error || t("common.somethingWrong") }); return; }
@@ -528,6 +532,8 @@ export function Dashboard({ data }: { data: DevAnalytics }) {
           ) : <p className="dc-empty">{t("dev.rv.none")}</p>}
         </Panel>
       </Section>
+
+      <ConversionBudgetSection />
     </div>
   );
 }
@@ -544,5 +550,62 @@ function StatusRow({ label, value, state }: { label: string; value: string; stat
       <span className="dc-status-label">{label}</span>
       <span className="dc-status-value">{value}</span>
     </li>
+  );
+}
+
+
+type ConversionBudget = {
+  enabled: boolean;
+  month: string;
+  capUsd: number;
+  reservedUsd: number;
+  spentUsd: number;
+  remainingUsd: number;
+  jobCount: number;
+  failureCount: number;
+};
+
+function ConversionBudgetSection() {
+  const t = useT();
+  const f = useFormat();
+  const [data, setData] = useState<ConversionBudget | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let gone = false;
+    (async () => {
+      try {
+        if (!supabaseConfigured()) return;
+        const { data: session } = await getSupabase().auth.getSession();
+        const token = session.session?.access_token;
+        if (!token) return;
+        const res = await developerFetch("/api/developer/conversion-budget", token);
+        if (res.status === 404 || res.status === 401) return;
+        if (!res.ok) throw new Error("fail");
+        const body = await res.json() as ConversionBudget;
+        if (!gone) setData(body);
+      } catch {
+        if (!gone) setError(t("dc.conv.loadError"));
+      }
+    })();
+    return () => { gone = true; };
+  }, [t]);
+  const money = (n: number) => new Intl.NumberFormat(currentLocale() === "es" ? "es-MX" : "en-US", { style: "currency", currency: "USD" }).format(n);
+  return (
+    <Section id="conversions" title={t("dc.tab.conversions")} intro={t("dc.conv.intro")}>
+      {error ? <p>{error}</p> : null}
+      {!error && !data ? <p>{t("dc.conv.unavailable")}</p> : null}
+      {data ? (
+        <div className="dc-kpis">
+          <Kpi label={t("dc.conv.enabled")} value={data.enabled ? t("dc.conv.on") : t("dc.conv.off")} />
+          <Kpi label={t("dc.conv.month")} value={data.month} />
+          <Kpi label={t("dc.conv.cap")} value={money(data.capUsd)} />
+          <Kpi label={t("dc.conv.spent")} value={money(data.spentUsd)} />
+          <Kpi label={t("dc.conv.reserved")} value={money(data.reservedUsd)} />
+          <Kpi label={t("dc.conv.remaining")} value={money(data.remainingUsd)} />
+          <Kpi label={t("dc.conv.jobs")} value={f.num(data.jobCount)} />
+          <Kpi label={t("dc.conv.failures")} value={f.num(data.failureCount)} />
+        </div>
+      ) : null}
+    </Section>
   );
 }

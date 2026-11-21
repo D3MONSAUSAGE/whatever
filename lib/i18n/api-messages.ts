@@ -257,6 +257,13 @@ export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   "Send a valid request.": "Envíe una solicitud válida.",
   "Not found": "No se encontró.",
   "Unauthorized.": "No autorizado.",
+  "This month's video conversion budget is fully reserved. Export the video as H.264 (Most Compatible), or try again next month.": "El presupuesto de conversión de video de este mes ya está reservado. Expórtelo como H.264 (Más compatible) o vuelva a intentarlo el mes siguiente.",
+  "Couldn't start video conversion. Try again, or export the video as H.264 (Most Compatible).": "No se pudo iniciar la conversión de video. Vuelva a intentarlo o expórtelo como H.264 (Más compatible).",
+  "That video is still being converted, or conversion failed. Wait until it's ready, or pick a different video.": "Ese video todavía se está convirtiendo, o la conversión falló. Espere a que esté listo o elija otro video.",
+  "This playlist includes a video that is still being converted, or that failed conversion. Wait until it's ready, or remove it, then publish again.": "Esta lista incluye un video que todavía se está convirtiendo, o cuya conversión falló. Espere a que esté listo o quítelo, y luego publique de nuevo.",
+
+  "Couldn't load the conversion budget.": "No se pudo cargar el presupuesto de conversión.",
+
 };
 
 type Pattern = { re: RegExp; names: string[]; es: string };

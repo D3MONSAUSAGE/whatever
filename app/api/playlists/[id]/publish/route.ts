@@ -5,6 +5,7 @@ import { isMissingSchema, PLAYLISTS_UNAVAILABLE } from "@/lib/server/schema";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { unreadyPublishedDraftError } from "@/lib/server/media-ready-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request, { para
   }
   const limited = await enforceLimit(`publish:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);
   if (limited) return limited;
+  const unready = await unreadyPublishedDraftError(admin.accountId, id);
+  if (unready) return fail(unready, 409, "video_not_ready");
 
   const { data: ok, error } = await db().rpc("publish_playlist", {
     p_account_id: admin.accountId,

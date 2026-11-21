@@ -8,9 +8,10 @@ import { usageByMedia } from "@/lib/server/media-usage";
 import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
 import { enforceLimit, fail, json } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { isReadyMediaStatus } from "@/lib/media-ready";
 
 const MEDIA_COLUMNS = "id, file_name, storage_path, size_bytes, created_at";
-const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path, source_media_id, slide_index`;
+const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path, source_media_id, slide_index, processing_status, processing_error`;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,12 +124,19 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
         for (const playlist of usage?.get(childId) ?? []) used.set(playlist.id, playlist);
       }
     }
+    const processingStatus = r.kind === "presentation"
+      ? (group?.processing_status ?? r.processing_status ?? null)
+      : (r.processing_status ?? null);
+    const processingError = r.kind === "presentation"
+      ? (group?.processing_error ?? r.processing_error ?? null)
+      : (r.processing_error ?? null);
+    const hideSource = r.kind === "presentation" || (r.kind === "video" && !isReadyMediaStatus(processingStatus));
     const base = {
       id: r.id,
       fileName: r.file_name,
       sizeBytes: r.size_bytes,
       createdAt: r.created_at,
-      url: r.kind === "presentation" ? null : urls.get(r.storage_path) ?? null,
+      url: hideSource ? null : urls.get(r.storage_path) ?? null,
       kind: r.kind === "video" ? "video" : r.kind === "presentation" ? "presentation" : "image",
       durationMs: r.duration_ms ?? null,
       width: r.width ?? null,
@@ -137,13 +145,15 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
       sourceMediaId: r.source_media_id ?? null,
       slideIndex: r.slide_index ?? null,
       usedIn: [...used.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      processingStatus,
+      processingError,
     };
     if (!group && r.kind !== "presentation") return base;
     return {
       ...base,
       slideCount: group?.slide_count ?? null,
-      processingStatus: group?.processing_status ?? null,
-      processingError: group?.processing_error ?? null,
+      processingStatus,
+      processingError,
       processingDone: group?.processing_done ?? null,
       defaultDurationMs: group?.group_duration_ms ?? null,
       updatedAt: group?.updated_at ?? null,
@@ -180,6 +190,8 @@ type MediaRow = {
   thumbnail_path?: string | null;
   source_media_id?: string | null;
   slide_index?: number | null;
+  processing_status?: string | null;
+  processing_error?: string | null;
 };
 
 export const POST = withLocalizedErrors(async function POST(req: Request) {
