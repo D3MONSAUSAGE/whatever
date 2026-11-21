@@ -60,12 +60,29 @@ export function planButton(input: {
 }
 
 /** Line under the plan grid. Empty while loading so "coming soon" never flashes. */
-export function checkoutNote(availability: "loading" | "available" | "unavailable", mode: "checkout" | "update" | "portal"): string {
+/** Matches Stripe Checkout's minimum: trial_end must be at least 48 hours away. */
+export const CHECKOUT_MIN_TRIAL_MS = 48 * 60 * 60 * 1000;
+
+/** True when choosing a plan should save the card and bill at the original trial end. */
+export function checkoutIsDeferred(input: { state?: string | null; trialEndsAt?: string | null }, now = Date.now()): boolean {
+  if (input.state !== "trial" || !input.trialEndsAt) return false;
+  const end = Date.parse(input.trialEndsAt);
+  return Number.isFinite(end) && end - now >= CHECKOUT_MIN_TRIAL_MS;
+}
+
+export function checkoutNote(
+  availability: "loading" | "available" | "unavailable",
+  mode: "checkout" | "update" | "portal",
+  opts?: { deferredUntil?: string | null },
+): string {
   if (availability === "loading") return "";
   if (availability === "unavailable") return "Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed.";
   if (mode === "update") return "Switching plans changes your current subscription right away; no second subscription is created. Stripe charges the price difference for the rest of this billing period immediately (a downgrade becomes a credit on your next invoice).";
   if (mode === "portal") return "Your last payment didn't go through. Use Manage billing to update your card or change plans.";
-  return "You'll finish payment on Stripe's secure checkout. Nothing is charged until you confirm there.";
+  if (opts?.deferredUntil) {
+    return `You'll finish on Stripe's secure checkout. Confirming saves your card and bills on ${opts.deferredUntil}; you will not be charged today. The plan then renews monthly until you cancel. This does not extend your free trial.`;
+  }
+  return "You'll finish on Stripe's secure checkout. Confirming charges the first month today, then monthly until you cancel. Unused trial days are not credited.";
 }
 
 /** Availability from the checkout GET: loading until it answers; an error counts as unavailable. */

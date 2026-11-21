@@ -68,10 +68,10 @@ export function billingWarningCopy(
       action: "open_plan",
       message: es
         ? (date
-          ? `Su prueba gratis terminó. Las pantallas siguen activas hasta el ${date}. Elija un plan para mantenerlas encendidas.`
+          ? `Su prueba gratis terminó. Las pantallas siguen activas hasta el ${date}, pero la edición y la publicación están bloqueadas. Elija un plan para mantenerlas encendidas.`
           : "Su prueba gratis terminó. Elija un plan para mantener sus pantallas encendidas.")
         : (date
-          ? `Your free trial has ended. Screens keep playing until ${date}. Choose a plan to keep them on.`
+          ? `Your free trial has ended. Screens keep playing until ${date}, but editing and publishing are locked. Choose a plan to keep them on.`
           : "Your free trial has ended. Choose a plan to keep your screens on."),
     };
   }
@@ -176,4 +176,22 @@ export function paidPlanLabel(plan: string, locale: Locale): string {
   if (plan === "business") return "Business";
   if (plan === "multi") return locale === "es" ? "Multi-pantalla" : "Multi-screen";
   return plan;
+}
+
+export function checkoutSubmitMessage(input: {
+  deferred: boolean;
+  price: number;
+  chargeDate: string;
+  locale?: Locale;
+}): string {
+  const es = input.locale === "es";
+  const amount = `$${input.price}`;
+  if (input.deferred) {
+    return es
+      ? `Se le cobrará ${amount} el ${input.chargeDate}. Luego la suscripción se renueva cada mes hasta que la cancele. Cancele antes de esa fecha para evitar el primer cobro. Esto no extiende su prueba.`
+      : `You will be charged ${amount} on ${input.chargeDate}. The subscription then renews monthly until you cancel. Cancel before that date to avoid the first charge. This does not extend your trial.`;
+  }
+  return es
+    ? `Se le cobrará ${amount} hoy, y luego cada mes hasta que cancele. Los días de prueba no usados no se acreditan.`
+    : `You will be charged ${amount} today, then monthly until you cancel. Unused trial days are not credited.`;
 }

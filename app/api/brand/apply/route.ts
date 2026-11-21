@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
@@ -19,6 +20,8 @@ const BATCH = 8;
 export async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const after = typeof body.after === "string" && isUuid(body.after) ? body.after : null;
   const limited = await enforceLimit(`brand-apply:${admin.userId}`, 60, 30, "Too many updates. Wait a minute.");

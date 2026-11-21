@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema, PLAYLISTS_UNAVAILABLE, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS } from "@/lib/server/limits";
@@ -16,6 +17,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export const POST = withLocalizedErrors(async function POST(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Playlist not found.", 404);
   const limited = await enforceLimit(`snapshot:${admin.userId}`, PUBLISH_WINDOW_SECONDS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE);

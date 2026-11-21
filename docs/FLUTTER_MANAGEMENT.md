@@ -377,6 +377,18 @@ Older app versions can ignore the additive fields below. Treat them as optional.
 
 Stripe `subscription.status` `"trialing"` still maps to entitlements `state: "active"` and `trial: null`. `current_period_end` is Stripe `trial_end`. No `trial_ending` or `expired` warning fires in that case; use `status_detail.kind` `"trialing"`.
 
+### Option B checkout and the 3-day playback grace (no new fields)
+
+Flutter +27 can keep using the existing values and fields. This change does not add a state, `status_detail.kind`, `warning.kind`, or date field.
+
+- Choosing a plan during the 14-day no-card trial, with at least 48 hours remaining, creates a Stripe Checkout subscription whose `trial_end` is the original Pekko trial end (capped at 14 days from start). The first charge is on that date; the trial is not extended. After Checkout completes, entitlements are a paid plan (`starter` | `business` | `multi`), `state: "active"`, `subscription.status: "trialing"`, `status_detail.kind: "trialing"`, `has_payment_method: true`, `billing_starts_at` and `next_billing_at` equal to Stripe `trial_end`, `trial: null`, and no `trial_ending` warning.
+- If fewer than 48 hours remain (Stripe Checkout's minimum `trial_end`), or the trial has ended, Checkout charges the first month today. The billing page and Stripe submit message disclose that clearly.
+- Resume only reuses a stored session when its charge mode still matches: a deferred session must have `amount_total === 0`; an immediate-charge session must have `amount_total > 0`. Only an org-tracked `checkout_session_id` may be expired. Untracked sessions are never looked up or expired.
+- After the no-card trial ends without a paid (or Stripe-trialing) subscription, `state` is `"trial_grace"` for 3 days. `warning.kind` is `"trial_ended"`. `suspend_at` is `trial.ends_at` + 3 days (also during the 14-day trial, because `playback_ends_at` is that grace end). `grace_ends_at` remains payment-failure only and stays `null` during trial and `trial_grace`. `playback_allowed` is true; `can_add_screen` is false; `features_locked` stays `[]`. Editing, publishing, uploads, and pairing are refused with 403 `subscription_inactive`. After the grace window, the existing expired rules apply (`playback_allowed` false).
+- Expired and canceled orgs are also write-locked (same 403 code), so waiting out the grace period cannot unlock editing.
+- Play builds stay status-only and must not open Checkout or the portal. Private test APKs may prototype the portal only behind a compile-time flag that is off by default.
+
+
 ### Localization
 
 Warning and `status_detail` messages are localized on the server. Precedence is:
@@ -404,7 +416,7 @@ Returns:
 
 Play builds must not call this endpoint. Private test APKs may prototype it only behind a compile-time flag that is off by default.
 
-`GET /api/billing/checkout` returns `{ available }` and no secrets. `POST /api/billing/checkout` starts or resumes a Stripe Checkout session (`{ plan, replace?: boolean }` → `{ url, resumed?: true }`). Resume returns the existing unpaid session for the same plan instead of opening a second one; `replace: true` expires only that org's stored session and creates a new one. It never charges automatically. `POST /api/billing/webhook` is Stripe's. None of these are status reads.
+`GET /api/billing/checkout` returns `{ available }` and no secrets. `POST /api/billing/checkout` starts or resumes a Stripe Checkout session (`{ plan, replace?: boolean }` → `{ url, resumed?: true }`). During an eligible trial it sets Stripe `subscription_data.trial_end` to the original trial end; otherwise the first charge is today. Resume returns the existing unpaid session for the same plan and charge mode instead of opening a second one; `replace: true` expires only that org's stored session and creates a new one. It never charges automatically and never expires an untracked session. `POST /api/billing/webhook` is Stripe's. None of these are status reads. Play builds must not call checkout.
 
 `GET /api/entitlements/active-screens` and `POST /api/entitlements/active-screens` choose which screens stay on when a plan is over its limit. That writes. A status display does not need it.
 

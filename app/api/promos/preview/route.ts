@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { enforceLimit, fail, readJson } from "@/lib/server/http";
 import { isPromoTemplate, parsePromoContent } from "@/lib/promo-templates";
@@ -13,6 +14,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLocalizedErrors(async (req: Request) => {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   if (!isPromoTemplate(body.template)) return fail("Choose a template.", 400);
   const content = parsePromoContent(body.content);

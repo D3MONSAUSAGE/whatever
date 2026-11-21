@@ -93,7 +93,8 @@ export async function TrialDetails() {
       {locale !== "en" ? <p className="text-muted" lang={locale} data-testid="english-only-note">{t("common.englishOnlyNote")}</p> : null}
       <h3 className="font-semibold text-base">How the trial works</h3>
       <p>Your {TRIAL.days}-day trial starts when you create your account and includes every feature on up to {TRIAL.screens} screens, the full Multi-screen experience. We don&apos;t ask for a card.</p>
-      <p>When the trial ends, your screens keep playing for 3 more days. If you don&apos;t choose a plan, they pause. Your content and settings are kept, and choosing a plan turns them back on.</p>
+      <p>You can choose a plan during the trial without being charged that day, as long as at least 48 hours remain. Your card is saved and the first charge is on the original trial end date; the trial is not extended. If fewer than 48 hours remain, the first charge is due when you confirm.</p>
+      <p>When the trial ends, your screens keep playing for 3 more days, but editing, publishing, and new pairings are locked. If you don&apos;t choose a plan, they pause after those 3 days. Your content and settings are kept, and choosing a plan turns them back on.</p>
       <p>Prices are in US dollars, billed monthly. Taxes may apply. These pages do not set a tax rate.</p>
       <BillingDisclosure />
     </div>
@@ -106,7 +107,8 @@ function TrialDetailsEs() {
     <div className="mt-8 card p-6 text-sm grid gap-2" data-testid="trial-details" lang="es">
       <h3 className="font-semibold text-base">Cómo funciona la prueba</h3>
       <p>Su prueba de {TRIAL.days} días comienza cuando crea su cuenta e incluye todas las funciones en hasta {TRIAL.screens} pantallas, la experiencia completa de Multi-screen. No le pedimos tarjeta.</p>
-      <p>Cuando termina la prueba, sus pantallas siguen reproduciendo durante 3 días más. Si no selecciona un plan, se pausan. Su contenido y configuración se conservan, y al seleccionar un plan se vuelven a activar.</p>
+      <p>Puede elegir un plan durante la prueba sin que se le cobre ese día, siempre que queden al menos 48 horas. Se guarda su tarjeta y el primer cargo se realiza en la fecha original de fin de la prueba; la prueba no se extiende. Si quedan menos de 48 horas, el primer cargo vence cuando usted confirma.</p>
+      <p>Cuando termina la prueba, sus pantallas siguen reproduciendo durante 3 días más, pero la edición, la publicación y las vinculaciones nuevas quedan bloqueadas. Si no selecciona un plan, se pausan después de esos 3 días. Su contenido y configuración se conservan, y al seleccionar un plan se vuelven a activar.</p>
       <p>Los precios están en dólares estadounidenses y se facturan mensualmente. Pueden aplicarse impuestos. Estas páginas no fijan una tasa de impuestos.</p>
       <BillingDisclosure locale="es" />
     </div>

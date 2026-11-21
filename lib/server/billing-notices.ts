@@ -141,10 +141,10 @@ export function billingNotices(e: EntitlementRow, opts?: { transitionEndsAt?: st
       es ? "Su prueba gratis de Pekko terminó" : "Your Pekko trial has ended",
       es
         ? (e.state === "trial_grace" && e.playback_ends_at
-          ? `Su prueba gratis terminó. Las pantallas siguen reproduciendo hasta el ${formatWhen(e.playback_ends_at, opts?.tz, "es")}. Su contenido sigue guardado.`
+          ? `Su prueba gratis terminó. Las pantallas siguen reproduciendo hasta el ${formatWhen(e.playback_ends_at, opts?.tz, "es")}, pero la edición y la publicación están bloqueadas. Su contenido sigue guardado.`
           : "Su prueba gratis terminó y las pantallas están en pausa. Su contenido sigue guardado. Elija un plan para volver a encenderlas.")
         : e.state === "trial_grace" && e.playback_ends_at
-          ? `Your free trial has ended. Screens keep playing until ${formatWhen(e.playback_ends_at, opts?.tz)}. Your content is still saved.`
+          ? `Your free trial has ended. Screens keep playing until ${formatWhen(e.playback_ends_at, opts?.tz)}, but editing and publishing are locked. Your content is still saved.`
           : "Your free trial has ended and screens are paused. Your content is still saved. Choose a plan to turn them back on.",
     ));
   }

@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
@@ -15,6 +16,8 @@ type Ctx = { params: Promise<{ id: string }> };
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Screen group not found.", 404);
   const body = await readJson(req);
@@ -62,6 +65,8 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
 export const DELETE = withLocalizedErrors(async function DELETE(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const { id } = await params;
   if (!isUuid(id)) return fail("Screen group not found.", 404);
   const deleted = await db().from("screen_groups").delete().eq("id", id).eq("account_id", admin.accountId).select("id");

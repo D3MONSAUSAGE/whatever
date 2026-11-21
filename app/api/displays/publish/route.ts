@@ -1,5 +1,6 @@
 import { ONLINE_MS, PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS } from "@/lib/server/limits";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { loadDisplaySchedules } from "@/lib/server/display-schedules";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
@@ -20,6 +21,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   const started = Date.now();
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const playlistId = body.playlistId;
   if (!isUuid(playlistId)) return fail("Playlist not found.", 404);

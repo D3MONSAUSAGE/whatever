@@ -1,5 +1,6 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isUuid } from "@/lib/server/crypto";
 import { fail, json, readJson } from "@/lib/server/http";
 import { GROUPS_UNAVAILABLE, parseGroupDurationMs, presentationGroupsReady } from "@/lib/server/presentation-groups";
@@ -23,6 +24,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request, ctx: Ctx
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, ctx: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   if (!(await presentationGroupsReady())) return fail(GROUPS_UNAVAILABLE, 503);
   const { id } = await ctx.params;
   if (!isUuid(id)) return fail("Presentation not found.", 404);

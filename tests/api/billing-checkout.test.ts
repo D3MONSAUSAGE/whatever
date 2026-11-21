@@ -70,9 +70,16 @@ async function account() {
   return row;
 }
 
+function withOpenTrial(row: Store["accounts"][number]) {
+  const start = new Date();
+  row.trial_started_at = start.toISOString();
+  row.trial_ends_at = new Date(start.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  return row;
+}
+
 describe("billing checkout resume", () => {
   it("creates a session and stores it on the account", async () => {
-    const row = await account();
+    const row = withOpenTrial(await account());
     sessions.create.mockResolvedValue({
       id: "cs_test_new",
       url: "https://checkout.stripe.com/c/pay/cs_test_new",
@@ -82,12 +89,15 @@ describe("billing checkout resume", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_test_new" });
     expect(sessions.create).toHaveBeenCalledTimes(1);
+    const created = sessions.create.mock.calls[0][0] as { subscription_data?: { trial_end?: number }; payment_method_types?: string[] };
+    expect(created.subscription_data?.trial_end).toBeGreaterThan(Math.floor(Date.now() / 1000) + 47 * 60 * 60);
+    expect(created.payment_method_types).toEqual(["card"]);
     expect(row.checkout_session_id).toBe("cs_test_new");
     expect(row.checkout_session_price).toBe("price_multi");
   });
 
   it("resumes an eligible open session instead of creating a second one", async () => {
-    const row = await account();
+    const row = withOpenTrial(await account());
     const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     row.checkout_session_id = "cs_test_open";
     row.checkout_session_price = "price_multi";
@@ -97,12 +107,41 @@ describe("billing checkout resume", () => {
       status: "open",
       url: "https://checkout.stripe.com/c/pay/cs_test_open",
       client_reference_id: row.id,
+      amount_total: 0,
     });
     const res = await post({ plan: "multi" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_test_open", resumed: true });
     expect(sessions.create).not.toHaveBeenCalled();
     expect(sessions.expire).not.toHaveBeenCalled();
+  });
+
+
+  it("does not resume a due-today session when the trial should defer the first charge", async () => {
+    const row = withOpenTrial(await account());
+    row.checkout_session_id = "cs_test_due";
+    row.checkout_session_price = "price_multi";
+    row.checkout_session_expires_at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    sessions.retrieve.mockResolvedValue({
+      id: "cs_test_due",
+      status: "open",
+      url: "https://checkout.stripe.com/c/pay/cs_test_due",
+      client_reference_id: row.id,
+      amount_total: 5900,
+    });
+    sessions.expire.mockResolvedValue({ id: "cs_test_due", status: "expired" });
+    sessions.create.mockResolvedValue({
+      id: "cs_test_deferred",
+      url: "https://checkout.stripe.com/c/pay/cs_test_deferred",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const res = await post({ plan: "multi" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ url: "https://checkout.stripe.com/c/pay/cs_test_deferred" });
+    expect(sessions.expire).toHaveBeenCalledWith("cs_test_due");
+    expect(sessions.create).toHaveBeenCalledTimes(1);
+    const created = sessions.create.mock.calls[0][0] as { subscription_data?: { trial_end?: number } };
+    expect(created.subscription_data?.trial_end).toBeGreaterThan(Math.floor(Date.now() / 1000) + 47 * 60 * 60);
   });
 
   it("expires only this org's session when replace is true, then creates a new one", async () => {

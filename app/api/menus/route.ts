@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
@@ -24,6 +25,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const parsed = parseMenuBody(await readJson(req));
   if (!parsed.ok) return fail(parsed.error, 400);
   const input = parsed.value as MenuInput;

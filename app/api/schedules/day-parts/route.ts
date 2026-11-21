@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE as SCHEDULES_UNAVAILABLE_TEXT } from "@/lib/server/schema";
@@ -21,6 +22,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const parts = body.parts;
   if (!Array.isArray(parts) || parts.length < 1 || parts.length > DAY_PART_MAX) return fail(`Add 1 to ${DAY_PART_MAX} parts of the day.`, 400);

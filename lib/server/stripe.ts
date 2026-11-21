@@ -133,6 +133,27 @@ export function managedPaymentsEnabled(value: string | undefined): boolean {
 
 const LIVE_MANAGED_PAYMENTS_ERROR = "Set STRIPE_MANAGED_PAYMENTS to 0 before live Checkout. Standard Stripe Billing sends managed_payments[enabled]=false so Pekko stays the seller. An unset value is refused and the account default is not used.";
 
+/**
+ * Stripe Checkout requires subscription_data.trial_end to be at least 48 hours
+ * in the future. Shorter remaining trials fall back to an immediate first charge.
+ * The timestamp is the original trial end; this never extends or restarts a trial.
+ */
+export const CHECKOUT_MIN_TRIAL_SECONDS = 48 * 60 * 60;
+
+export function checkoutTrialEnd(trialEndsAt: string | null | undefined, nowSeconds = Math.floor(Date.now() / 1000)): number | null {
+  if (!trialEndsAt) return null;
+  const end = Math.floor(Date.parse(trialEndsAt) / 1000);
+  if (!Number.isFinite(end) || end - nowSeconds < CHECKOUT_MIN_TRIAL_SECONDS) return null;
+  return end;
+}
+
+/** An open session is only reusable when its due-today total matches deferred vs immediate charging. */
+export function checkoutSessionMatchesCharge(session: { status?: string | null; amount_total?: number | null }, deferredTrial: boolean): boolean {
+  if (session.status !== "open") return false;
+  if (typeof session.amount_total !== "number") return false;
+  return deferredTrial ? session.amount_total === 0 : session.amount_total > 0;
+}
+
 export function checkoutSessionRequest(input: {
   price: string;
   accountId: string;
@@ -141,17 +162,28 @@ export function checkoutSessionRequest(input: {
   origin: string;
   managedPayments: string | undefined;
   secretKey: string | undefined;
+  trialEnd?: number | null;
+  submitMessage?: string | null;
 }):
   | { ok: true; params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } }; options: Stripe.RequestOptions }
   | { ok: false; code: "managed_payments_config"; error: string } {
+  const trialEnd = typeof input.trialEnd === "number" && input.trialEnd > 0 ? input.trialEnd : null;
   const params: Stripe.Checkout.SessionCreateParams & { managed_payments?: { enabled: boolean } } = {
     mode: "subscription",
     line_items: [{ price: input.price, quantity: 1 }],
     client_reference_id: input.accountId,
     ...(input.customerId ? { customer: input.customerId } : { customer_email: input.email }),
-    subscription_data: { metadata: { account_id: input.accountId } },
+    subscription_data: {
+      metadata: { account_id: input.accountId },
+      ...(trialEnd ? {
+        trial_end: trialEnd,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+      } : {}),
+    },
     success_url: `${input.origin}/dashboard/billing?checkout=success`,
     cancel_url: `${input.origin}/dashboard/billing?checkout=canceled`,
+    ...(trialEnd ? { payment_method_types: ["card"] } : {}),
+    ...(input.submitMessage ? { custom_text: { submit: { message: input.submitMessage } } } : {}),
   };
   const options: Stripe.RequestOptions = { apiVersion: CHECKOUT_API_VERSION };
   const key = clean(input.secretKey);

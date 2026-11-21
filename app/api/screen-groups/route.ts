@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { isMissingSchema, SCHEDULES_UNAVAILABLE } from "@/lib/server/schema";
 import { normalizePlaylistName } from "@/lib/server/validate";
 import { CREATE_GROUP_MAX_PER_USER, CREATE_GROUP_RATE_MESSAGE, CREATE_WINDOW_SECONDS } from "@/lib/server/limits";
@@ -51,6 +52,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const name = normalizePlaylistName(body.name);
   if (!name) return fail("Give this group a name.", 400);

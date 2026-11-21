@@ -1,6 +1,7 @@
 import { BUCKET, db } from "@/lib/server/supabase";
 import { fetchAll, inChunks, matches, pageOf, parseListQuery, signAll } from "@/lib/server/paging";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { checkImage } from "@/lib/server/images";
 import { MAX_UPLOAD_BYTES, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { isMissingSchema } from "@/lib/server/schema";
@@ -197,6 +198,8 @@ type MediaRow = {
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
 
   let form: FormData;
   try {

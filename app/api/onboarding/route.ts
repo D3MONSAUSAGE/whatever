@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/supabase";
 import { requireAdmin } from "@/lib/server/auth";
+import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { fail, json, readJson } from "@/lib/server/http";
 import { isMissingSchema } from "@/lib/server/schema";
 import { onboardingState } from "@/lib/server/onboarding";
@@ -26,6 +27,8 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
 export const POST = withLocalizedErrors(async function POST(req: Request) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
+  const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
+  if (writeBlocked) return writeBlocked;
   const body = await readJson(req);
   const patch: { onboarding_dismissed_at?: string | null; business_confirmed_at?: string } = {};
   if ("dismissed" in body) {
