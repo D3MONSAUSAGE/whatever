@@ -139,7 +139,7 @@ Other video failures use `video_type`, `video_profile`, `video_duration`, `video
 
 **5) Live status**
 
-Implemented on the web/backend in the Apple media compatibility change (branch `pantalla/apple-media-compat`, 20 November 2026, America/Los_Angeles). It is **not live in production until that change is deployed**. Do not ship a Flutter build that depends on server acceptance of MOV bytes or on `video_codec` until production is confirmed. The bucket allow-list is already live and does not change.
+**Live in production as of 20 November 2026, 9:39 PM PT (America/Los_Angeles).** Merge commit `9500dd3` (PR #168), production deployment `dpl_9oRQyHErgSX8qhAM4KWUeJg8z8fa` on pekkotv.com (health `commit` 9500dd3). Rollback target: `dpl_4AZSnZY78wWswQ2M3N1mmQdXvg87` (58c643e). Flutter can now rely on server acceptance of compatible MOV/M4V bytes uploaded as `video/mp4`, on client-side HEIC→JPEG, and on `code: "video_codec"` for HEVC rejection. The bucket allow-list is unchanged.
 
 ## Playlists, assignment, scheduling
 
