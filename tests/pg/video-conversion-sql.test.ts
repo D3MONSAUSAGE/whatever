@@ -48,7 +48,35 @@ describe.skipIf(!databaseUrl)("0033 video conversion budget ledger", () => {
       create table public.media (
         id uuid primary key,
         account_id uuid not null references public.accounts(id),
-        processing_status text
+        processing_status text,
+        storage_path text,
+        kind text,
+        width integer,
+        height integer,
+        duration_ms integer
+      );
+      create table public.displays (
+        id uuid primary key,
+        account_id uuid references public.accounts(id),
+        token_hash text,
+        status text,
+        assigned_playlist_id uuid,
+        assigned_media_id uuid,
+        last_seen_at timestamptz,
+        content_version integer
+      );
+      create table public.playlists (
+        id uuid primary key,
+        published_transition text,
+        published_playback_mode text
+      );
+      create table public.playlist_items (
+        id uuid primary key default gen_random_uuid(),
+        playlist_id uuid,
+        kind text,
+        position integer,
+        media_id uuid,
+        duration_ms integer
       );
       insert into public.accounts (id) values ('${ACCOUNT}');
       insert into public.media (id, account_id, processing_status) values
