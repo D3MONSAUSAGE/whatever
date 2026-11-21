@@ -4,7 +4,7 @@ This is the website and backend the phone app already uses as a controller. It i
 
 Auth on every management route below is `Authorization: Bearer <Supabase access token>` (`lib/server/auth.ts` `requireAdmin`). A missing or rejected token is 401. The token's user is resolved to one account. Requests do not accept an account id.
 
-**Status (updated 2026-11-20, web at PR #162).** The menu designer catalog, preview and switch routes for Flutter parity are in **Menu designer API** below. The web menu designer is live for every customer: `LAYOUT_STUDIO=1` in production, and `MENU_TEMPLATES` / `UNIFIED_MENU_EDITOR` default to everyone (PR #153). Most new boards are therefore web-designer boards (`content.layoutVersion === 1`), which the classic menu routes refuse to edit (409). Read **Menu boards** below before touching menus. Changes the app must handle since Android +14 are listed in **Changes since +14**.
+**Status (updated 2026-11-20).** The menu designer catalog, preview and switch routes for Flutter parity are in **Menu designer API** below. The web menu designer is live for every customer: `LAYOUT_STUDIO=1` in production, and `MENU_TEMPLATES` / `UNIFIED_MENU_EDITOR` default to everyone (PR #153). Most new boards are therefore web-designer boards (`content.layoutVersion === 1`), which the classic menu routes refuse to edit (409). Create and edit those boards with `POST /api/layout-studio` (the phone has done this since Android +17). Read **Menu boards** below before touching menus. Changes the app must handle since Android +14 are listed in **Changes since +14**.
 
 ## Account
 
@@ -101,6 +101,8 @@ Bytes are private. Clients receive a short-lived signed URL, not a public object
 
 Storage paths are `${accountId}/...` (`lib/server/supabase.ts` bucket `media`). A signed URL is the reference a client may fetch. It expires.
 
+The production `media` bucket allows 500 MB (`file_size_limit` 524288000), matching `MAX_VIDEO_BYTES` on `POST /api/media/upload`. Its `allowed_mime_types` are `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `application/vnd.openxmlformats-officedocument.presentationml.presentation`, and `application/pdf`. Video uploads, including TUS, must use `contentType` `video/mp4` or Storage will reject the object.
+
 ## Playlists, assignment, scheduling
 
 | Call | Behavior | Source |
@@ -146,13 +148,13 @@ Menus are still images on the TV. The server renders a 1920×1080 PNG and stores
 | Kind | How to tell | `content` | Edited by | Phone |
 | --- | --- | --- | --- | --- |
 | Classic full-screen | `content.layoutVersion` absent | `MenuContent` (`lib/menu-templates.ts`): `title, subtitle, footer, sections[{ name, items[{ name, price, description, imageMediaId? }] }], photoMediaId?, useBrand?, headingFont?, bodyFont?, itemPhotos?` | `POST /api/menus`, `PATCH /api/menus/:id` (re-render, swap image on its screens; no draft) | Create, edit, rename, assign |
-| Original layout (7) | `content.layoutVersion === 1`, no `design` | `LayoutDocument` (`lib/layout-studio.ts`): `layoutVersion: 1, template ∈ {two-column, menu-promo-67, two-menu-promo, triple-column, split-50, menu-banner, signature}, split, title, subtitle, footer, sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font, bodyFont?, textColor, backgroundColor, featureTitle, featureDetail, columnWidths, imageFit, imageAnchor`; items may have `imageMediaId` | `POST /api/layout-studio {mode: "draft"\|"publish", menuId, name, document}` | Rename, assign. **Content edits refused (409)** |
+| Original layout (7) | `content.layoutVersion === 1`, no `design` | `LayoutDocument` (`lib/layout-studio.ts`): `layoutVersion: 1, template ∈ {two-column, menu-promo-67, two-menu-promo, triple-column, split-50, menu-banner, signature}, split, title, subtitle, footer, sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font, bodyFont?, textColor, backgroundColor, featureTitle, featureDetail, columnWidths, imageFit, imageAnchor`; items may have `imageMediaId` | `POST /api/layout-studio {mode: "draft"\|"publish", menuId, name, document}` | Create, edit, rename, assign via `POST /api/layout-studio` (phone since Android +17). `PATCH /api/menus/:id` with `content` or `template` is still 409 |
 | Professional template (22) | `content.layoutVersion === 1` **and** `content.design` | `LayoutDocument` + `design` (template id), `variant`, `stockPhoto?`, `logoMediaId?`, `photoStyle?: "thumbs"\|"text"`; items may have `imageMediaId` and `stockPhoto` | same as layouts | same as layouts |
 
 Rules for clients:
 
 1. **Branch on `content.layoutVersion === 1`, never on `template`.** For web-designer boards `menus.template` holds the palette (`classic` / `fresh` / `bold`), so it looks like a classic board.
-2. **409 protection.** `PATCH /api/menus/:id` with `content` or `template` on a `layoutVersion: 1` board returns **409** "This menu board was made in the web editor. Edit it at pekkotv.com." Nothing is written. `name` and `displayIds` still work (`displayIds` is additive, see above). `POST /api/brand/apply` skips these boards.
+2. **409 protection.** `PATCH /api/menus/:id` with `content` or `template` on a `layoutVersion: 1` board returns **409** "This menu board was made in the web editor. Edit it at pekkotv.com." Nothing is written. Edit the document with `POST /api/layout-studio` instead. `name` and `displayIds` still work (`displayIds` is additive, see above). `POST /api/brand/apply` skips these boards.
 3. **Nullable ids.** A web-designer board saved as a draft and never published has **`playlistId: null`**; its `mediaId` / `imageUrl` are the draft preview still (not on any screen) or null. Published boards always have both. Treat all three as nullable; label `playlistId == null` as "Draft" and don't offer screen assignment until it is published.
 4. **Unknown keys.** Parse tolerantly. New optional keys are additive.
 5. **Lossless classic edits.** The server keeps what an older client omits: `headingFont` / `bodyFont` and `itemPhotos` when the key is absent, and an item's `imageMediaId` when the item is sent without that key (matched by section name or position, then item **name**, first match). An explicit `null` clears. Renaming an item on a client that omits `imageMediaId` therefore loses that item's photo: send `imageMediaId` back unchanged (keep each item's raw JSON).
@@ -306,7 +308,7 @@ The TV reports a playback error with `POST /api/player/state` and header `X-Disp
 
 Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last saved playlist, images only (`public/player.html` `playSaved`, `public/player-sw.js`). There is no management API for an offline pack. A phone that cannot reach the API shows its own network error. It does not cache the screen's media as a second player.
 
-## Changes since Android +14 (web PRs #148–#162)
+## Changes since Android +14 (web PRs #148–#163)
 
 | Change | What the app sees | PR |
 | --- | --- | --- |
@@ -318,8 +320,9 @@ Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last s
 | Setup step 8 stays done after a TV confirmed content | Same `GET /api/onboarding` shape | #147 |
 | `GET /api/health` returns `commit` | Additive | #153 |
 | Menu designer API: catalog, public thumbnails, switch, preview + fit | New routes only | #162 |
+| Additive `playerBuild` on `GET /api/player/state` | Current value `2026-11-20.2`. Older clients can ignore it. The phone does not call this route | #163 |
 
-No route was removed or renamed, no response field was removed, and the TV player and `/api/player/*` are unchanged.
+No route was removed or renamed, and no response field was removed. `GET /api/player/state` now includes an additive `playerBuild` field (PR #163; current value `2026-11-20.2`). Older clients can ignore it. The phone does not call `/api/player/*`.
 
 ## Flags in production
 
@@ -334,7 +337,7 @@ These flags are off unless the value is exactly `1`:
 
 `MENU_TEMPLATES` and `UNIFIED_MENU_EDITOR`: unset = everyone (current production), `developers`, a list of emails/account ids, `all`, or `off` (`lib/menu-templates-flag.ts`).
 
-Web-designer internals (the phone does not need these to assign or rename boards):
+Web-designer internals. The phone has created and edited these boards with `POST /api/layout-studio` since Android +17:
 
 | Piece | What it is | Source |
 | --- | --- | --- |
