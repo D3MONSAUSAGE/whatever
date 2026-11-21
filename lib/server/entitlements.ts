@@ -1,4 +1,9 @@
 import { db } from "./supabase";
+import type { Locale } from "@/lib/i18n/locales";
+import { billingWarningCopy, type PaymentMethodSummary } from "./billing-copy";
+import { checkoutPendingFromRow, loadAccountBilling, resolvePaymentMethod } from "./billing-status";
+import { entitlementsLocale } from "./locale";
+import { planForPrice, readCustomerPaymentMethod, type PaidPlan } from "./stripe";
 
 /** Server-side billing enforcement. Off unless BILLING_ENFORCE=1 (reads still work when off). */
 export function billingEnforced(env: Record<string, string | undefined> = process.env) {
@@ -111,32 +116,93 @@ export function downgradeNeedsScreenSelection(activeScreens: number, nextLimit: 
   return activeScreens > nextLimit;
 }
 
-export function warningFor(e: EntitlementRow): Warning {
+export type ToResponseExtra = {
+  transitionEndsAt?: string | null;
+  locale?: Locale;
+  isOwner?: boolean;
+  paymentMethod?: PaymentMethodSummary | null;
+  checkoutPending?: { plan: PaidPlan; expires_at: string } | null;
+  hasStripeCustomer?: boolean;
+};
+
+export type WarningOptions = {
+  locale?: Locale;
+  paymentMethod?: PaymentMethodSummary | null;
+};
+
+export function warningFor(e: EntitlementRow, opts: WarningOptions = {}): Warning {
+  const locale = opts.locale ?? "en";
+  const pm = opts.paymentMethod ?? null;
   if (e.state === "expired") {
-    return { kind: "expired", action: "open_plan", message: "Your free trial has ended, so your screens are paused. Your content and settings are saved. Choose a plan to turn them back on." };
+    return billingWarningCopy("expired", locale) as Warning;
   }
   if (e.state === "canceled") {
-    return { kind: "canceled", action: "open_plan", message: "Your plan isn't active, so your screens are paused. Your content and settings are saved. Choose a plan to turn them back on." };
+    return billingWarningCopy("canceled", locale) as Warning;
   }
   if (e.state === "trial_grace" && e.playback_ends_at) {
-    return { kind: "trial_ended", action: "open_plan", message: `Your free trial has ended. Screens keep playing until ${utcDate(e.playback_ends_at)}. Choose a plan to keep them on.` };
+    return billingWarningCopy("trial_ended", locale, { date: utcDate(e.playback_ends_at) }) as Warning;
   }
   if (e.state === "past_due") {
     const graceLeft = daysLeft(e.grace_ends_at, e.server_time);
-    if (e.grace_ends_at && (graceLeft === 1 || graceLeft === 2)) {
-      return { kind: "payment_failed", action: "open_plan", message: `Your payment grace ends in ${graceLeft} day${graceLeft === 1 ? "" : "s"}, on ${utcDate(e.grace_ends_at)}. Update your payment method to keep your screens playing. Your content is not deleted.` };
-    }
-    return { kind: "payment_failed", action: "open_plan", message: e.grace_ends_at
-      ? `We couldn't take your last payment. Update your payment method before ${utcDate(e.grace_ends_at)} to keep your screens playing.`
-      : "We couldn't take your last payment. Update your payment method to keep your screens playing." };
+    return billingWarningCopy("payment_failed", locale, {
+      date: e.grace_ends_at ? utcDate(e.grace_ends_at) : "",
+      daysLeft: graceLeft ?? undefined,
+    }) as Warning;
   }
   if (e.state !== "grandfathered" && e.active_screens > e.screen_limit) {
-    return { kind: "over_limit", action: "select_screens", message: `Your plan includes ${e.screen_limit} screen${e.screen_limit === 1 ? "" : "s"} but ${e.active_screens} are on. Choose which screens stay on; the others pause and nothing is deleted.` };
+    return billingWarningCopy("over_limit", locale, {
+      screenLimit: e.screen_limit,
+      activeScreens: e.active_screens,
+    }) as Warning;
   }
   const left = daysLeft(e.trial_ends_at, e.server_time);
   if (e.state === "trial" && left !== null && left <= 7) {
-    const when = e.trial_ends_at ? ` on ${utcDate(e.trial_ends_at)}` : "";
-    return { kind: "trial_ending", action: "open_plan", message: `${left} day${left === 1 ? "" : "s"} left in your free trial${when}.` };
+    return billingWarningCopy("trial_ending", locale, {
+      daysLeft: left,
+      date: e.trial_ends_at ? utcDate(e.trial_ends_at) : "",
+      paymentMethod: pm,
+    }) as Warning;
+  }
+  return null;
+}
+
+/** Informational plan status. Not a warning: paid, complimentary, and Stripe-trialing accounts must not show an expiring-trial banner. */
+export function statusDetailFor(e: EntitlementRow, opts: WarningOptions = {}): { kind: string; message: string } | null {
+  if (warningFor(e, opts)) return null;
+  const locale = opts.locale ?? "en";
+  const pm = opts.paymentMethod ?? null;
+  if (e.plan === "comp") {
+    const copy = billingWarningCopy("complimentary", locale, { planName: PLAN_NAMES.comp });
+    return { kind: copy.kind, message: copy.message };
+  }
+  if (e.subscription_status === "trialing") {
+    const copy = billingWarningCopy("trialing", locale, { date: e.current_period_end ? utcDate(e.current_period_end) : "", paymentMethod: pm });
+    return { kind: copy.kind, message: copy.message };
+  }
+  if (e.state === "active" && e.cancel_at_period_end && e.current_period_end) {
+    const copy = billingWarningCopy("canceling", locale, { date: utcDate(e.current_period_end) });
+    return { kind: copy.kind, message: copy.message };
+  }
+  if (e.state === "active") {
+    const copy = billingWarningCopy("active", locale, { date: e.current_period_end ? utcDate(e.current_period_end) : "" });
+    return { kind: copy.kind, message: copy.message };
+  }
+  if (e.state === "trial" && pm && e.trial_ends_at) {
+    const copy = billingWarningCopy("trialing", locale, { date: utcDate(e.trial_ends_at), paymentMethod: pm });
+    return { kind: copy.kind, message: copy.message };
+  }
+  return null;
+}
+
+export function billingStartsAt(e: EntitlementRow, hasPaymentMethod: boolean): string | null {
+  if (e.subscription_status === "trialing") return e.current_period_end;
+  if (e.plan === "trial" && e.state === "trial" && hasPaymentMethod) return e.trial_ends_at;
+  return null;
+}
+
+export function nextBillingAt(e: EntitlementRow): string | null {
+  if (e.subscription_status === "active" || e.subscription_status === "trialing" || e.subscription_status === "past_due") {
+    return e.current_period_end;
   }
   return null;
 }
@@ -244,9 +310,14 @@ export const OVER_LIMIT_PAYLOAD = {
   message: "Your Pekko plan's screen allowance is full. Your content is saved. The account owner can choose which screens stay on, or pick a plan with more screens, from the Pekko dashboard.",
 };
 
-export function toResponse(accountId: string, e: EntitlementRow, appUrl: string, extra?: { transitionEndsAt?: string | null }) {
+export function toResponse(accountId: string, e: EntitlementRow, appUrl: string, extra?: ToResponseExtra) {
   const enforced = billingEnforced();
   const transitionEndsAt = enforced ? (extra?.transitionEndsAt ?? null) : null;
+  const locale = extra?.locale ?? "en";
+  const paymentMethod = extra?.paymentMethod ?? null;
+  const hasPaymentMethod = !!paymentMethod;
+  const isOwner = extra?.isOwner === true;
+  const warningOpts = { locale, paymentMethod };
   return {
     account_id: accountId,
     state: e.state,
@@ -267,7 +338,15 @@ export function toResponse(accountId: string, e: EntitlementRow, appUrl: string,
     suspend_at: e.state === "expired" || e.state === "canceled" ? null : e.playback_ends_at,
     /** Gated premium features. None in M17: every plan and the trial get every feature. */
     features_locked: [] as string[],
-    warning: warningFor(e),
+    warning: warningFor(e, warningOpts),
+    status_detail: statusDetailFor(e, warningOpts),
+    has_payment_method: hasPaymentMethod,
+    payment_method: paymentMethod ? { brand: paymentMethod.brand, last4: paymentMethod.last4 } : null,
+    is_owner: isOwner,
+    billing_starts_at: billingStartsAt(e, hasPaymentMethod),
+    next_billing_at: nextBillingAt(e),
+    checkout_pending: extra?.checkoutPending ?? null,
+    portal_available: isOwner && extra?.hasStripeCustomer === true,
     rollout_notice: rolloutNotice(e, transitionEndsAt, enforced),
     transition_ends_at: transitionEndsAt,
     enforced,
@@ -313,3 +392,35 @@ export const SUSPENDED_PAYLOAD = {
   title: "This screen is paused",
   message: "The Pekko plan for this screen isn't active. Your content is saved. The account owner can turn it back on from the Pekko dashboard.",
 };
+
+
+/** Full entitlements body, including additive payment-method and owner fields. */
+export async function buildEntitlementsResponse(
+  req: Request,
+  accountId: string,
+  userId: string,
+  e: EntitlementRow,
+  extra?: { transitionEndsAt?: string | null },
+) {
+  const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
+  const [locale, billing] = await Promise.all([
+    entitlementsLocale(accountId, req),
+    loadAccountBilling(accountId),
+  ]);
+  const paymentMethod = billing
+    ? await resolvePaymentMethod(accountId, billing, readCustomerPaymentMethod)
+    : null;
+  const pending = checkoutPendingFromRow(billing);
+  const plan = pending ? planForPrice(pending.price) : null;
+  const checkoutPending = pending && plan ? { plan, expires_at: pending.expires_at } : null;
+  const isOwner = !!billing && String(billing.owner_user_id ?? "") === userId;
+  const hasStripeCustomer = !!String(billing?.stripe_customer_id ?? "").trim();
+  return toResponse(accountId, e, origin, {
+    transitionEndsAt: extra?.transitionEndsAt,
+    locale,
+    isOwner,
+    paymentMethod,
+    checkoutPending,
+    hasStripeCustomer,
+  });
+}

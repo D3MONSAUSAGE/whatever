@@ -1,8 +1,9 @@
 import { db } from "./supabase";
 import { requireAdmin } from "./auth";
-import { localizeError } from "./error-codes";
+import { localizeError, requestLocale } from "./error-codes";
 import { rewriteAndroidStatusCopy } from "./android-status-copy";
 import { isLocale, type Locale } from "@/lib/i18n/locales";
+export type { Locale };
 import { isMissingSchema } from "./schema";
 
 /** The signed-in account's saved language (accounts.locale, 0028). Null without a valid session or column. */
@@ -14,6 +15,17 @@ export async function accountLocale(accountId: string): Promise<Locale | null> {
   }
   const value = (data as { locale?: unknown } | null)?.locale;
   return isLocale(value) ? value : null;
+}
+
+/**
+ * Locale for entitlement warnings and status_detail.
+ * Precedence: the account's saved locale, then Accept-Language, then English.
+ * There is no locale query parameter; a `locale` request param is ignored.
+ */
+export async function entitlementsLocale(accountId: string, req: Request): Promise<Locale> {
+  const saved = await accountLocale(accountId);
+  if (saved) return saved;
+  return requestLocale(req);
 }
 
 /** Locale for error text: the session's account locale; runs only when a route has already failed. */

@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 /**
  * Opens the Stripe Customer Portal for this signed-in org only.
  * The body is ignored. A missing Stripe customer returns the plan picker instead of an error.
+ * Auth is requireAdmin (Authorization: Bearer). 403 not_owner shape is stable: { error, code: "not_owner" }.
  */
 export async function POST(req: Request) {
   const admin = await requireAdmin(req);

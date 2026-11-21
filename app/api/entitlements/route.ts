@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/server/auth";
 import { fail, json } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
-import { loadEffectiveEntitlement, readTransitionStart, toResponse, transitionEndsAt } from "@/lib/server/entitlements";
+import { buildEntitlementsResponse, loadEffectiveEntitlement, readTransitionStart, transitionEndsAt } from "@/lib/server/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
   if (e === "error" || !e) return fail("Couldn't load your plan. Try again.", 503);
   // Read only. The reminder dispatcher stamps this after the notice email succeeds.
   const started = e.plan === "grandfathered" ? await readTransitionStart(admin.accountId) : null;
-  return json(toResponse(admin.accountId, e, process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin, {
+  return json(await buildEntitlementsResponse(req, admin.accountId, admin.userId, e, {
     transitionEndsAt: transitionEndsAt(started),
   }));
 });

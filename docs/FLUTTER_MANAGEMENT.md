@@ -343,9 +343,68 @@ Body `{ document, width?: 480 | 960 | 1920, format?: "png" | "fit" }` (`width` s
 
 ## Billing status, read only
 
-`GET /api/entitlements` is the status read (`lib/server/entitlements.ts` `toResponse`). Fields include `state`, `plan`, `plan_name`, `screen_limit`, `active_screens`, `total_screens`, `can_add_screen`, `playback_allowed`, `trial`, `subscription`, `grace_ends_at`, `suspend_at`, `warning`, `enforced`, `server_time`. `enforced` is true only when `BILLING_ENFORCE` is exactly `1`. A dashboard read does not start the existing-customer clock.
+`GET /api/entitlements` is the authoritative status read (`lib/server/entitlements.ts` `toResponse` / `buildEntitlementsResponse`). `enforced` is true only when `BILLING_ENFORCE` is exactly `1`. A dashboard or app read does not start the existing-customer clock and never charges anyone.
 
-`GET /api/billing/checkout` returns `{ available }` and no secrets. `POST /api/billing/checkout` starts a Stripe session for the website. `POST /api/billing/webhook` is Stripe's. Neither is a status read.
+Existing fields are unchanged: `account_id`, `state`, `plan`, `plan_name`, `screen_limit`, `active_screens`, `total_screens`, `can_add_screen`, `playback_allowed`, `trial`, `subscription`, `grace_ends_at`, `suspend_at`, `features_locked`, `warning`, `rollout_notice`, `transition_ends_at`, `enforced`, `billing_url`, `server_time`.
+
+Older app versions can ignore the additive fields below. Treat them as optional.
+
+### Additive `GET /api/entitlements` fields (exact shapes)
+
+```json
+{
+  "has_payment_method": false,
+  "payment_method": { "brand": "visa", "last4": "4242" },
+  "is_owner": true,
+  "billing_starts_at": "2026-11-26T03:31:28.000Z",
+  "next_billing_at": "2026-11-26T03:31:28.000Z",
+  "checkout_pending": { "plan": "multi", "expires_at": "2026-11-22T20:28:20.000Z" },
+  "status_detail": { "kind": "trialing", "message": "You're on a trial. Your payment method (visa •••• 4242) is on file; billing starts on Nov 26, 2026 (UTC)." },
+  "portal_available": false
+}
+```
+
+- `has_payment_method` (boolean): true only when a card brand/last4 is cached from Stripe. An open unpaid Checkout session is never a payment method.
+- `payment_method`: `{ "brand": string, "last4": string }` when `has_payment_method` is true; otherwise `null`. Brand is a Stripe card brand such as `visa`. Last4 is four digits only.
+- `is_owner` (boolean): true when the bearer token's user is `accounts.owner_user_id`.
+- `billing_starts_at`: ISO-8601 timestamp or `null`. Set when a no-card Pekko trial has a card on file (`trial.ends_at`) or when Stripe `subscription.status` is `"trialing"` (`subscription.current_period_end`, which equals Stripe `trial_end`).
+- `next_billing_at`: ISO-8601 timestamp or `null`. Set for Stripe `active`, `trialing`, or `past_due` from `current_period_end`.
+- `checkout_pending`: `{ "plan": "starter" | "business" | "multi", "expires_at": string }` or `null`. No Checkout URL is returned on this endpoint.
+- `status_detail`: `{ "kind": string, "message": string }` or `null`. Informational (active paid, complimentary, Stripe-trialing, cancel-at-period-end, early trial with a card). It is omitted from being a `warning`. A genuine paid or Stripe-trialing subscription never gets `warning.kind` `"trial_ending"` or `"expired"`.
+- `portal_available` (boolean): true only when `is_owner` is true and the org has a stored `stripe_customer_id`. **Play builds must ignore this field and must not call the portal**, even if it is true. Private test APKs may use it behind a compile-time flag that is off by default.
+
+`warning` keeps its existing shape `{ kind, message, action }` and existing kind values: `trial_ending`, `trial_ended`, `payment_failed`, `over_limit`, `expired`, `canceled`. `trial_ending` copy now distinguishes card-on-file vs no card.
+
+Stripe `subscription.status` `"trialing"` still maps to entitlements `state: "active"` and `trial: null`. `current_period_end` is Stripe `trial_end`. No `trial_ending` or `expired` warning fires in that case; use `status_detail.kind` `"trialing"`.
+
+### Localization
+
+Warning and `status_detail` messages are localized on the server. Precedence is:
+
+1. The account's saved locale (`accounts.locale`)
+2. The `Accept-Language` request header
+3. English
+
+There is no `locale` query or body parameter. If one is sent, it is ignored. Support `Accept-Language` at minimum (`es` or `en`; see `localeFromAcceptLanguage`). HTTP 4xx/5xx `error` text uses the same precedence (`withLocalizedErrors`).
+
+### Android / Dart User-Agent (status-only)
+
+Requests whose User-Agent starts with `Dart/` (case-insensitive) or that send `X-Pekko-Client: android/...` get status-only wording: `error` (when `code` is present), `warning.message`, `status_detail.message`, and `rollout_notice` are rewritten to remove purchase or web-steering language (`lib/server/android-status-copy.ts`). `code`, `kind`, `action`, `plan_name`, `billing_url`, and structured fields are not rewritten. Web responses are unchanged. This path is unchanged in intent; `store_policy_test` is not modified. Play builds remain status-only.
+
+### `POST /api/billing/portal`
+
+This endpoint accepts the app's bearer token. Auth is `requireAdmin` in `lib/server/auth.ts`: `Authorization: Bearer <access token>`. The body is ignored and a customer id in the body is not honored. The customer comes only from the stored `accounts.stripe_customer_id` for the signed-in org.
+
+Returns:
+
+- `200 { "url": string }` — Stripe Customer Portal session URL. `return_url` is `{origin}/dashboard/account`, where origin is the allowlisted request origin (production customers land on `https://pekkotv.com/dashboard/account`). The app cannot set `return_url`.
+- `200 { "action": "plans" }` — owner, but no Stripe customer yet (show the plan picker; no portal session).
+- `403 { "error": "Only the account owner can manage billing.", "code": "not_owner" }` — **stable shape**. Status is always 403 and `code` is always `"not_owner"`. This billing route is not passed through `withLocalizedErrors`, so `error` stays this English sentence for web and Dart/Android callers alike. Tests cover the bearer-token path and this 403 body.
+- `401` if the bearer token is missing or invalid; `503 { "error", "code": "billing_unavailable" }` if Stripe is not configured.
+
+Play builds must not call this endpoint. Private test APKs may prototype it only behind a compile-time flag that is off by default.
+
+`GET /api/billing/checkout` returns `{ available }` and no secrets. `POST /api/billing/checkout` starts or resumes a Stripe Checkout session (`{ plan, replace?: boolean }` → `{ url, resumed?: true }`). Resume returns the existing unpaid session for the same plan instead of opening a second one; `replace: true` expires only that org's stored session and creates a new one. It never charges automatically. `POST /api/billing/webhook` is Stripe's. None of these are status reads.
 
 `GET /api/entitlements/active-screens` and `POST /api/entitlements/active-screens` choose which screens stay on when a plan is over its limit. That writes. A status display does not need it.
 

@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
 import { LanguageSelect } from "@/components/i18n/language-select";
 import { useDeveloperAccess } from "@/lib/dev-access";
+import { useApi } from "@/lib/api";
+import { BillingStatusBanner, type EntitlementsStatus } from "@/components/billing-status-banner";
 
 // I18N-2: copy lives in the dictionary (acct.<id>.title/body/action).
 const CARDS = [
@@ -17,9 +19,11 @@ const CARDS = [
 export default function AccountHub() {
   const t = useT();
   const developer = useDeveloperAccess();
+  const ent = useApi<EntitlementsStatus>("/api/entitlements");
   return (
     <section className="min-w-0 pb-28 lg:pb-0">
       <PageHeader title={t("acct.title")} lede={t("acct.lede")} />
+      {ent.data ? <div className="mb-4"><BillingStatusBanner entitlements={ent.data} variant="card" /></div> : null}
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
         {CARDS.map((card) => (
           <li key={card.id} className="card ps-hub-card flex flex-col p-5">

@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 import { publicAppOrigin } from "@/lib/public-url";
 import { db } from "./supabase";
+import { isMissingSchema } from "./schema";
+import { CHECKOUT_CLEAR_PATCH, paymentMethodFromSubscription, paymentMethodFromStripe, paymentMethodPatch } from "./billing-status";
 
 /** Stripe billing. Live charges stay off unless STRIPE_LIVE_ENABLED is exactly "1". */
 export type PaidPlan = "starter" | "business" | "multi";
@@ -177,6 +179,23 @@ export function stripe(): Stripe | null {
   if (cached?.key !== k) cached = { key: k, client: new Stripe(k) };
   return cached.client;
 }
+
+export async function readCustomerPaymentMethod(customerId: string): Promise<import("./billing-copy").PaymentMethodSummary | null | "error"> {
+  const s = stripe();
+  if (!s) return "error";
+  try {
+    const customer = await s.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] });
+    if ((customer as { deleted?: boolean }).deleted) return null;
+    const def = (customer as Stripe.Customer).invoice_settings?.default_payment_method;
+    const fromDef = paymentMethodFromStripe(typeof def === "object" ? def : null);
+    if (fromDef) return fromDef;
+    const list = await s.paymentMethods.list({ customer: customerId, type: "card", limit: 1 });
+    return paymentMethodFromStripe(list.data[0] ?? null);
+  } catch {
+    return "error";
+  }
+}
+
 export function priceFor(plan: PaidPlan, env?: Record<string, string | undefined>): string | null {
   const values = billingEnv(env);
   const name = (billingMode(env) === "live" ? LIVE_PRICE_ENV : PRICE_ENV)[plan];
@@ -297,14 +316,29 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
       };
       const plan = planForPrice(sub.items.data[0]?.price?.id);
       if (plan) patch.plan = plan;
-      let q = db().from("accounts").update(patch);
-      q = accountId ? q.eq("id", accountId) : q.eq("stripe_subscription_id", sub.id);
-      // A newer event overwrites. The same second also overwrites, because the handler
-      // re-fetches the subscription. A canceled row stays canceled at that second:
-      // trial_will_end and subscription.deleted often share event.created.
+      const pm = paymentMethodFromSubscription(sub);
+      if (pm) Object.assign(patch, paymentMethodPatch(pm, now));
+      if (ev.type === "checkout.session.completed" || status === "active" || status === "trialing") {
+        Object.assign(patch, CHECKOUT_CLEAR_PATCH);
+      }
       const created = ev.created ?? 0;
       const sameSecond = `and(billing_event_created.eq.${created},subscription_status.not.in.(canceled,incomplete_expired))`;
-      await must(q.or(`billing_event_created.is.null,billing_event_created.lt.${created},${sameSecond}`));
+      const filter = `billing_event_created.is.null,billing_event_created.lt.${created},${sameSecond}`;
+      async function writePatch(body: Record<string, unknown>) {
+        let q = db().from("accounts").update(body);
+        q = accountId ? q.eq("id", accountId) : q.eq("stripe_subscription_id", sub.id);
+        return q.or(filter);
+      }
+      const written = await writePatch(patch);
+      if (written.error && isMissingSchema(written.error)) {
+        const legacy = { ...patch };
+        for (const key of ["payment_method_brand", "payment_method_last4", "payment_method_synced_at", "checkout_session_id", "checkout_session_price", "checkout_session_expires_at"]) {
+          delete legacy[key];
+        }
+        await must(writePatch(legacy));
+      } else if (written.error) {
+        throw new Error(written.error.message);
+      }
     }
   }
 

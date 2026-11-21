@@ -22,6 +22,33 @@ afterEach(() => {
   else process.env.STRIPE_TEST_SECRET_KEY = previousKey;
 });
 
+
+function notOwnerDb() {
+  const account = {
+    id: "acct-not-owner",
+    owner_user_id: "99999999-9999-4999-8999-999999999999",
+    stripe_customer_id: "cus_existing",
+    locale: "en",
+  };
+  return {
+    auth: {
+      getUser: async (token: string) => token === "token-owner"
+        ? { data: { user: { id: "11111111-1111-4111-8111-111111111111", email: "owner@example.com" } }, error: null }
+        : { data: { user: null }, error: { message: "invalid" } },
+    },
+    rpc: async (name: string) => name === "ensure_account"
+      ? { data: account.id, error: null }
+      : { data: null, error: { message: "unhandled" } },
+    from() {
+      return {
+        select() { return this; },
+        eq() { return this; },
+        maybeSingle: async () => ({ data: account, error: null }),
+      };
+    },
+  };
+}
+
 function bearer(token: string, body = "{}") {
   return new Request("https://pekkotv.com/api/billing/portal", {
     method: "POST",
@@ -50,5 +77,33 @@ describe("billing portal", () => {
     const res = await portal(bearer("token-owner", JSON.stringify({ customerId: "cus_other" })));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ action: "plans" });
+  });
+
+  it("accepts the app bearer token and returns a stable 403 not_owner shape", async () => {
+    setTestDb(notOwnerDb() as never);
+    const res = await portal(bearer("token-owner"));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: "Only the account owner can manage billing.",
+      code: "not_owner",
+    });
+  });
+
+  it("keeps the same 403 not_owner shape for a Dart User-Agent", async () => {
+    setTestDb(notOwnerDb() as never);
+    const res = await portal(new Request("https://pekkotv.com/api/billing/portal", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer token-owner",
+        "Content-Type": "application/json",
+        "user-agent": "Dart/3.8.0 (dart:io)",
+      },
+      body: "{}",
+    }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: "Only the account owner can manage billing.",
+      code: "not_owner",
+    });
   });
 });
