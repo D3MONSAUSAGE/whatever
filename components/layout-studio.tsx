@@ -35,6 +35,7 @@ import type { Brand } from "@/lib/brand-kit";
 import { canAddItem, canAddSection, firstNamelessItem, sectionLimitMessage, menuCounts, moveItem, moveSection, needsName, normalizePrice, withoutNamelessItems } from "@/lib/menu-fields";
 import { ItemNotes, MenuLimits, OrderButtons, ProductCard, useOpenItem } from "@/components/menu-item-fields";
 import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
+import { ZoneVideo } from "@/components/zone-video";
 
 /** Isolated signed-out preview keeps the photo as a data URL in the browser. This is not the account-library 15 MB limit. */
 export const ISOLATED_STUDIO_PHOTO_MAX_BYTES = 1_500_000;
@@ -1361,15 +1362,7 @@ function Stage({ svg, video, videoSrc, label, hits, active, onHit }: {
         <div style={{ position: "absolute", width: 1920, height: 1080, left: frame.left, top: frame.top, transform: `scale(${frame.scale})`, transformOrigin: "top left" }}>
           <div dangerouslySetInnerHTML={{ __html: svg }} />
           {video ? (
-            <video
-              src={videoSrc}
-              muted
-              autoPlay
-              loop
-              playsInline
-              {...{ "webkit-playsinline": "webkit-playsinline" }}
-              style={{ position: "absolute", left: video.x, top: video.y, width: video.w, height: video.h, objectFit: "cover", background: "transparent", pointerEvents: "none" }}
-            />
+            <ZoneVideo box={video} src={videoSrc || null} poster={null} units="px" fallbackLabel={t("ls.video")} />
           ) : null}
         </div>
         {hits.map((hit) => (

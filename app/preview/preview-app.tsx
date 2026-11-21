@@ -379,7 +379,7 @@ const studioFixture: AccountStudio = {
   legacy: [],
   library: [
     { id: studioImageId, name: "lunch-special.png", kind: "image", mime: "image/png", url: studioPhoto },
-    { id: studioVideoId, name: "promo.mp4", kind: "video", mime: "video/mp4", url: "/layout-studio/media/promo" },
+    { id: studioVideoId, name: "promo.mp4", kind: "video", mime: "video/mp4", url: "/layout-studio/media/promo", thumbnailUrl: "/layout-studio/media/poster" },
   ],
 };
 

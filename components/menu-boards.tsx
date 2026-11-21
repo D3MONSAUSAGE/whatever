@@ -312,6 +312,7 @@ export function MenuBoards({
           displays={displays.data ? displays.data.filter((d) => d.connected) : null}
           brand={kit}
           preview={Boolean(fixture)}
+          fixtureLibrary={fixture?.studio?.library}
           onClose={() => { setView({ mode: "list" }); void menus.reload(); }}
           onSaved={() => { void menus.reload(); }}
           onAdvanced={(menuId) => setView({ mode: "layout", boardId: menuId, template: view.document.template, screenId: null })}
