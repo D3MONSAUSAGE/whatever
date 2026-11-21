@@ -189,12 +189,12 @@ export function statusDetailFor(e: EntitlementRow, opts: WarningOptions = {}): {
     const copy = billingWarningCopy("complimentary", locale, { planName: PLAN_NAMES.comp });
     return { kind: copy.kind, message: copy.message };
   }
-  if (e.subscription_status === "trialing") {
-    const copy = billingWarningCopy("trialing", locale, { date: e.current_period_end ? utcDate(e.current_period_end) : "", paymentMethod: pm });
-    return { kind: copy.kind, message: copy.message };
-  }
   if (e.state === "active" && e.cancel_at_period_end && e.current_period_end) {
     const copy = billingWarningCopy("canceling", locale, { date: utcDate(e.current_period_end) });
+    return { kind: copy.kind, message: copy.message };
+  }
+  if (e.subscription_status === "trialing") {
+    const copy = billingWarningCopy("trialing", locale, { date: e.current_period_end ? utcDate(e.current_period_end) : "", paymentMethod: pm });
     return { kind: copy.kind, message: copy.message };
   }
   if (e.state === "active") {
@@ -209,7 +209,7 @@ export function statusDetailFor(e: EntitlementRow, opts: WarningOptions = {}): {
 }
 
 export function billingStartsAt(e: EntitlementRow, hasPaymentMethod: boolean): string | null {
-  if (e.subscription_status === "trialing") return e.current_period_end;
+  if (e.subscription_status === "trialing" && !e.cancel_at_period_end) return e.current_period_end;
   if (e.plan === "trial" && e.state === "trial" && hasPaymentMethod) return e.trial_ends_at;
   return null;
 }
@@ -260,12 +260,19 @@ export function commercialEntitlement(e: EntitlementRow, enforced = billingEnfor
     };
   }
   if (!COMMERCIAL_PLANS.includes(e.plan)) return RESTRICTED(e, "expired");
-  if (e.plan === "trial") {
+  const isPreChargeTrialCancel =
+    e.subscription_status === "canceled"
+    && e.grace_ends_at === null
+    && e.trial_ends_at !== null
+    && (e.state === "trial" || e.state === "trial_grace" || e.state === "expired");
+  if (e.plan === "trial" || isPreChargeTrialCancel) {
     if (e.state !== "trial" && e.state !== "trial_grace" && e.state !== "expired") return RESTRICTED(e, "expired");
     const start = e.trial_started_at ? Date.parse(e.trial_started_at) : NaN;
-    if (!Number.isFinite(start)) return e.state === "expired" ? RESTRICTED(e, "expired") : e;
-    const cap = start + TRIAL_DAYS * DAY;
-    const end = e.trial_ends_at ? Math.min(Date.parse(e.trial_ends_at), cap) : cap;
+    const rawEnd = e.trial_ends_at ? Date.parse(e.trial_ends_at) : NaN;
+    const end = Number.isFinite(start)
+      ? (Number.isFinite(rawEnd) ? Math.min(rawEnd, start + TRIAL_DAYS * DAY) : start + TRIAL_DAYS * DAY)
+      : rawEnd;
+    if (!Number.isFinite(end)) return e.state === "expired" ? RESTRICTED(e, "expired") : e;
     // 14-day trial, then the advertised 3-day playback grace, then expired.
     const trialEndIso = new Date(end).toISOString();
     const graceEnd = end + PLAYBACK_GRACE_DAYS * DAY;
@@ -317,9 +324,13 @@ export async function loadEffectiveEntitlement(accountId: string): Promise<Entit
 
 /** Owning account of a display (null if none). */
 export async function displayAccountId(displayId: string): Promise<string | null | "error"> {
-  const { data, error } = await db().from("displays").select("account_id").eq("id", displayId).maybeSingle();
-  if (error) return "error";
-  return data?.account_id ? String(data.account_id) : null;
+  try {
+    const { data, error } = await db().from("displays").select("account_id").eq("id", displayId).maybeSingle();
+    if (error) return "error";
+    return data?.account_id ? String(data.account_id) : null;
+  } catch {
+    return "error";
+  }
 }
 
 /**
@@ -361,7 +372,7 @@ export function toResponse(accountId: string, e: EntitlementRow, appUrl: string,
     total_screens: e.total_screens,
     can_add_screen: e.can_add_screen,
     playback_allowed: e.playback_allowed,
-    trial: e.plan === "trial"
+    trial: e.plan === "trial" || ((e.state === "trial" || e.state === "trial_grace" || e.state === "expired") && e.trial_ends_at !== null)
       ? { started_at: e.trial_started_at, ends_at: e.trial_ends_at, days_left: daysLeft(e.trial_ends_at, e.server_time) }
       : null,
     subscription: e.subscription_status
@@ -389,10 +400,14 @@ export function toResponse(accountId: string, e: EntitlementRow, appUrl: string,
 }
 
 export async function loadEntitlement(accountId: string): Promise<EntitlementRow | null | "error"> {
-  const { data, error } = await db().rpc("account_entitlement", { p_account: accountId });
-  if (error) return "error";
-  const row = Array.isArray(data) ? data[0] : data;
-  return (row as EntitlementRow) ?? null;
+  try {
+    const { data, error } = await db().rpc("account_entitlement", { p_account: accountId });
+    if (error) return "error";
+    const row = Array.isArray(data) ? data[0] : data;
+    return (row as EntitlementRow) ?? null;
+  } catch {
+    return "error";
+  }
 }
 
 /**
@@ -400,23 +415,35 @@ export async function loadEntitlement(accountId: string): Promise<EntitlementRow
  * successful notice. A dashboard request never writes this column.
  */
 export async function readTransitionStart(accountId: string): Promise<string | null> {
-  const row = await db().from("accounts").select("billing_transition_started_at").eq("id", accountId).maybeSingle();
-  if (row.error || !row.data?.billing_transition_started_at) return null;
-  return String(row.data.billing_transition_started_at);
+  try {
+    const row = await db().from("accounts").select("billing_transition_started_at").eq("id", accountId).maybeSingle();
+    if (row.error || !row.data?.billing_transition_started_at) return null;
+    return String(row.data.billing_transition_started_at);
+  } catch {
+    return null;
+  }
 }
 
 /** Player gate. Fails open on a database error so a DB blip never blanks paying customers' screens. */
 export async function displayEntitled(displayId: string): Promise<boolean> {
-  const { data, error } = await db().rpc("display_entitled", { p_display: displayId });
-  if (error) return true;
-  return data === true;
+  try {
+    const { data, error } = await db().rpc("display_entitled", { p_display: displayId });
+    if (error) return true;
+    return data === true;
+  } catch {
+    return true;
+  }
 }
 
 /** Ids of this account's screens that may play now (same rule as display_entitled). */
 export async function entitledDisplayIds(accountId: string): Promise<Set<string> | "error"> {
-  const { data, error } = await db().rpc("entitled_display_ids", { p_account: accountId });
-  if (error) return "error";
-  return new Set(((data ?? []) as Array<{ display_id: string } | string>).map((r) => (typeof r === "string" ? r : r.display_id)));
+  try {
+    const { data, error } = await db().rpc("entitled_display_ids", { p_account: accountId });
+    if (error) return "error";
+    return new Set(((data ?? []) as Array<{ display_id: string } | string>).map((r) => (typeof r === "string" ? r : r.display_id)));
+  } catch {
+    return "error";
+  }
 }
 
 export const SUSPENDED_PAYLOAD = {

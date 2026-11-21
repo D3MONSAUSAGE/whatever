@@ -336,14 +336,35 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
         : null;
       const accountId = accountFromSession || sub.metadata?.account_id || null;
       const status = statusFor(ev, sub, now);
-      const grace = await graceEndsAt(accountId, sub.id, status, now);
+      const periodEnd = periodEndSeconds(sub);
+      const snap = await loadAccountBillingState(accountId, sub.id);
+      const grace = nextGraceEnd({
+        status,
+        previousStatus: snap.subscription_status,
+        previousGrace: snap.grace_ends_at,
+        now,
+      });
+      const invoiceAmountPaid = ev.type === "invoice.paid"
+        ? (ev.data.object as Stripe.Invoice).amount_paid ?? null
+        : null;
+      const trialCanceledBeforeCharge = nextTrialCanceledBeforeCharge({
+        status,
+        eventType: ev.type,
+        invoiceAmountPaid,
+        subTrialEnd: typeof sub.trial_end === "number" ? sub.trial_end : null,
+        periodEnd,
+        graceEndsAt: grace,
+        previousStatus: snap.subscription_status,
+        previousTrialCanceled: snap.trial_canceled_before_charge,
+      });
       const patch: Record<string, unknown> = {
         stripe_subscription_id: sub.id,
         stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
         subscription_status: status,
-        current_period_end: ts(periodEndSeconds(sub)),
+        current_period_end: ts(periodEnd),
         cancel_at_period_end: sub.cancel_at_period_end,
         grace_ends_at: grace,
+        trial_canceled_before_charge: trialCanceledBeforeCharge,
         billing_event_created: ev.created ?? 0,
       };
       const plan = planForPrice(sub.items.data[0]?.price?.id);
@@ -364,7 +385,7 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
       const written = await writePatch(patch);
       if (written.error && isMissingSchema(written.error)) {
         const legacy = { ...patch };
-        for (const key of ["payment_method_brand", "payment_method_last4", "payment_method_synced_at", "checkout_session_id", "checkout_session_price", "checkout_session_expires_at"]) {
+        for (const key of ["payment_method_brand", "payment_method_last4", "payment_method_synced_at", "checkout_session_id", "checkout_session_price", "checkout_session_expires_at", "trial_canceled_before_charge"]) {
           delete legacy[key];
         }
         await must(writePatch(legacy));
@@ -383,19 +404,60 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
  * When an unpaid subscription then ends (canceled, unpaid, incomplete_expired), the grace end is
  * kept, so the unpaid period is not played for free until its period end. A paid status clears it.
  */
-async function graceEndsAt(accountId: string | null, subscriptionId: string, status: string, now: number): Promise<string | null> {
-  if (status !== "past_due" && !UNPAID_END_STATUSES.includes(status)) return null;
-  const q = db().from("accounts").select("subscription_status, grace_ends_at");
-  const row = accountId
-    ? await q.eq("id", accountId).maybeSingle()
-    : await q.eq("stripe_subscription_id", subscriptionId).maybeSingle();
+async function loadAccountBillingState(accountId: string | null, subscriptionId: string): Promise<{
+  subscription_status: string | null;
+  grace_ends_at: string | null;
+  trial_canceled_before_charge: boolean;
+}> {
+  const select = (cols: string) => {
+    const q = db().from("accounts").select(cols);
+    return accountId ? q.eq("id", accountId).maybeSingle() : q.eq("stripe_subscription_id", subscriptionId).maybeSingle();
+  };
+  let row = await select("subscription_status, grace_ends_at, trial_canceled_before_charge");
+  if (row.error && isMissingSchema(row.error)) {
+    row = await select("subscription_status, grace_ends_at");
+  }
   if (row.error) throw new Error(row.error.message);
-  return nextGraceEnd({ status, previousStatus: row.data?.subscription_status ?? null, previousGrace: row.data?.grace_ends_at ? String(row.data.grace_ends_at) : null, now });
+  const data = row.data as { subscription_status?: unknown; grace_ends_at?: unknown; trial_canceled_before_charge?: unknown } | null;
+  return {
+    subscription_status: data?.subscription_status ? String(data.subscription_status) : null,
+    grace_ends_at: data?.grace_ends_at ? String(data.grace_ends_at) : null,
+    trial_canceled_before_charge: data?.trial_canceled_before_charge === true,
+  };
 }
 
 const UNPAID_END_STATUSES = ["canceled", "unpaid", "incomplete_expired"];
 
-/** Pure rule behind graceEndsAt (exported for tests). */
+/**
+ * Option B pre-charge cancellation rule (exported for tests): a scheduled Stripe trial that
+ * ends/cancels before any paid cycle keeps the original 3-day playback-only grace after
+ * trial_ends_at, then expires. Any active/past_due/paid subscription never gets trial_grace.
+ */
+export function nextTrialCanceledBeforeCharge(input: {
+  status: string;
+  eventType?: string;
+  invoiceAmountPaid?: number | null;
+  subTrialEnd: number | null;
+  periodEnd: number | null;
+  graceEndsAt: string | null;
+  previousStatus: string | null;
+  previousTrialCanceled: boolean;
+}): boolean {
+  if (input.status === "active" || input.status === "past_due" || input.status === "trialing") return false;
+  if (input.eventType === "invoice.paid" && typeof input.invoiceAmountPaid === "number" && input.invoiceAmountPaid > 0) {
+    return false;
+  }
+  if (input.status === "canceled") {
+    if (input.graceEndsAt !== null) return false;
+    if (input.previousStatus === "canceled") return input.previousTrialCanceled;
+    if (input.previousStatus !== null && input.previousStatus !== "trialing") return false;
+    if (typeof input.subTrialEnd !== "number") return false;
+    return input.periodEnd === null || input.periodEnd <= input.subTrialEnd;
+  }
+  return false;
+}
+
+/** Pure rule behind grace_ends_at (exported for tests). */
 export function nextGraceEnd(input: { status: string; previousStatus: string | null; previousGrace: string | null; now: number }): string | null {
   if (input.status === "past_due") {
     if (input.previousStatus === "past_due" && input.previousGrace) return input.previousGrace;

@@ -8,7 +8,7 @@ Status: built on branch `cursor/m17-entitlements` (PR below). Not deployed. Enfo
 | state | meaning |
 |---|---|
 | trial | 14-day trial, up to 5 screens, no card |
-| trial_grace | the 3 days after the trial ends: screens keep playing, no new screens; editing, publishing, and uploads return 403 `subscription_inactive` |
+| trial_grace | the 3 days after the trial ends (including Option B canceled before first charge): screens keep playing, no new screens; editing, publishing, uploads, pairing, and `active-screens` return 403 `subscription_inactive` |
 | active | paid plan (Stripe active/trialing, or canceled but still inside the paid period) |
 | past_due | payment failed; screens play until `grace_ends_at` |
 | grandfathered | account that existed before billing ("Early customer"); existing screens never pause |
@@ -41,7 +41,7 @@ Pairing (`POST /api/displays/pair`) error body: `{error, code}`. A paused TV get
 
 ## 4. Screens over the limit
 - `GET /api/displays`: each item has `entitled: boolean` (false means paused by billing). It is always true when not enforced, or if the check errors.
-- `POST /api/entitlements/active-screens` with body `{"displayIds": ["uuid", ...]}` sets which screens stay on. Unlisted screens pause; nothing is deleted. 200 returns the entitlements body. Errors: 400 `invalid` (bad body), 400 `too_many` (more than screen_limit), 403 `not_found` (an id isn't this account's active screen). 409 is not used: the call is idempotent and the last write wins.
+- `POST /api/entitlements/active-screens` with body `{"displayIds": ["uuid", ...]}` sets which screens stay on. Unlisted screens pause; nothing is deleted. 200 returns the entitlements body. Errors: 403 `subscription_inactive` during `trial_grace`, `expired`, or `canceled`; 503 `plan_check_unavailable` (`Retry-After: 5`) if plan lookup fails; 400 `invalid` (bad body), 400 `too_many` (more than screen_limit), 403 `not_found` (an id isn't this account's active screen). 409 is not used: the call is idempotent and the last write wins.
 - Default if the owner never picks: the most recently active screens stay on (latest confirmed playback, then newest).
 
 ## 5. Push: trial_reminder
