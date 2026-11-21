@@ -121,25 +121,19 @@ A file is compatible when `inspectMp4` + `enforceVideoLimits` (`lib/mp4.ts`) suc
 
 Accepted: H.264 (`avc1` / `avc3`) Baseline, Main, or High at level 4.2 or below; AAC audio (`mp4a`) or no audio; each edge ≤ 1920 px; duration 0.5 s–3 minutes; size ≤ 500 MB.
 
-Rejected (intentional, TV safety): HEVC/H.265, ProRes, PCM/LPCM audio, VP9, AV1, High 10 / 4:2:2 / 4:4:4, 4K (level 5.x), and files with no `ftyp`+`moov`.
+Rejected without conversion (intentional, TV safety): ProRes, PCM/LPCM audio, VP9, AV1, and files with no `ftyp`+`moov`. HEVC/H.265, and some otherwise-incompatible H.264 such as 4K or High 10, still within 500 MB and 3 minutes, are accepted for automatic conversion (item 4). Direct playback still requires H.264 High ≤ 4.2, AAC or silent, and each edge ≤ 1920 px.
 
 **3) HEIC conversion**
 
 The web client converts HEIC/HEIF to JPEG in the browser, bakes in EXIF orientation (`createImageBitmap` with `imageOrientation: "from-image"` where available, then canvas), preserves proportions, and resizes to the existing 1920×1080 (or 1080×1920) JPEG-on-black pipeline. Native decode works in Safari and on iPhone. There is **no server-side HEIC fallback**: Vercel’s Sharp/libvips build does not include HEIF, the bucket rejects `image/heic`, and `sniffImage` only accepts JPEG, PNG, and WebP magic bytes. Flutter should convert on-device with the platform codec (no new paid dependency) and upload JPEG.
 
-**4) HEVC processing state (inactive until enabled)**
+**4) HEVC processing state (live as of 21 November 2026)**
 
-**Live behavior today (flag off):** unchanged from the Apple media contract. HEVC (and other incompatible video) is rejected immediately on `POST /api/media/upload/complete` (and by the web client before upload). There is no in-progress media row for video.
+**Live in production as of 21 November 2026, 9:39 AM PT (America/Los_Angeles).** `HEVC_CONVERSION_ENABLED=1` and `NEXT_PUBLIC_HEVC_CONVERSION_ENABLED=1` are set for Production only. Pipeline: PRs #170, #171, and #172. Current production is merge commit `23f3f39` (PR #172), deployment `dpl_CfsVxRkZkRitPcPcrXkXZDiniYeK` on pekkotv.com. Flag-off rollback: set both flags to `0` or delete them and redeploy; the last flag-off production build is `dpl_4AnTC1PHfuPoLEwtaWi28fTBdzux` (`e2240f6`). Google Play / +14 releases are unchanged.
 
-- HTTP **415**
-- `code`: **`video_codec`** (stable; from the exact `mp4ErrorMessage("codec")` catalog entry)
-- `error`: English or Spanish (Accept-Language / account locale) explaining that the file must be H.264/AAC and how to export “Most Compatible” on iPhone or H.264 from QuickTime/Photos on a Mac
+Convertible uploads (HEVC/H.265 in MOV/MP4/M4V, and some otherwise-incompatible H.264 such as 4K or High 10, still within 500 MB and 3 minutes) now go through automatic conversion to TV-compatible H.264/AAC 1080p:
 
-Other video failures use `video_type`, `video_profile`, `video_duration`, `video_dimensions`, `video_size` (413), `video_metadata`, or `video_unreadable`, all similarly catalogued in `lib/i18n/en.ts` / `es.ts` as `apiError.video_*`.
-
-**When automatic conversion is enabled** (not live; requires Francisco's approval to turn on `HEVC_CONVERSION_ENABLED=1` and `NEXT_PUBLIC_HEVC_CONVERSION_ENABLED=1` plus a provider key). Until then Flutter must keep treating HEVC as a hard 415 `video_codec` rejection.
-
-- Convertible uploads (HEVC/H.265 in MOV/MP4/M4V, and some otherwise-incompatible H.264 such as 4K or High 10, still within 500 MB and 3 minutes) return **201** `{ id, processingStatus: "processing" }` from `POST /api/media/upload/complete`. The Storage `contentType` is still `video/mp4`.
+- Return **201** `{ id, processingStatus: "processing" }` from `POST /api/media/upload/complete`. The Storage `contentType` is still `video/mp4`.
 - Poll **`GET /api/media`** (existing library list). Each video may include:
   - `processingStatus`: `null` or omitted (treat as **ready**, including all existing media), `processing`, `ready`, or `failed`
   - `processingError`: a short code on failure (`conversion_failed`, `conversion_invalid_output`, `conversion_budget`, `conversion_provider`) or `null`
@@ -147,12 +141,18 @@ Other video failures use `video_type`, `video_profile`, `video_duration`, `video
 - Editors must not add `processing` or `failed` videos to playlists, boards, or published shows. The server rejects those saves and publishes with **409** `video_not_ready`.
 - TVs never receive processing or failed media: `player_playlist` / player-state omit them. Existing media with `processingStatus` null keeps playing.
 - While `processing`, `url` is omitted so the unconverted original is not handed to a player or editor preview. A thumbnail may still be present.
-- Monthly conversion budget exhaustion returns **429** and `code` may be `conversion_budget`; the object is not kept. Ask the user to export as H.264 (Most Compatible) or retry next month.
-- Do not wait for or implement this path in a Play release until Pantalla confirms the flag is on in production.
+- After `ready`, `url` is a signed URL for the converted H.264/AAC MP4 (validated with `inspectMp4`: High ≤ 4.2, AAC or silent, each edge ≤ 1920 px).
+- Monthly conversion budget is $15 (Coconut, billed only for successful conversions). Exhaustion returns **429** and `code` may be `conversion_budget`; the object is not kept. Ask the user to export as H.264 (Most Compatible) or retry next month.
+- Non-convertible files (ProRes, VP9, AV1, and similar) are still rejected immediately with **415** and the existing `video_codec` / `video_profile` / related codes.
+- Flutter may now ship the processing/ready/failed path. Do not change a locked Play release solely for this; coordinate the app update in the usual way.
+
+Other video failures use `video_type`, `video_profile`, `video_duration`, `video_dimensions`, `video_size` (413), `video_metadata`, or `video_unreadable`, all similarly catalogued in `lib/i18n/en.ts` / `es.ts` as `apiError.video_*`.
 
 **5) Live status**
 
-**Live in production as of 20 November 2026, 9:39 PM PT (America/Los_Angeles).** Merge commit `9500dd3` (PR #168), production deployment `dpl_9oRQyHErgSX8qhAM4KWUeJg8z8fa` on pekkotv.com (health `commit` 9500dd3). Rollback target: `dpl_4AZSnZY78wWswQ2M3N1mmQdXvg87` (58c643e). Flutter can now rely on server acceptance of compatible MOV/M4V bytes uploaded as `video/mp4`, on client-side HEIC→JPEG, and on `code: "video_codec"` for HEVC rejection. The bucket allow-list is unchanged.
+**Apple media (compatible MOV/M4V and HEIC→JPEG)** has been live since 20 November 2026, 9:39 PM PT (America/Los_Angeles). Merge commit `9500dd3` (PR #168), production deployment `dpl_9oRQyHErgSX8qhAM4KWUeJg8z8fa`.
+
+**Automatic HEVC conversion is live as of 21 November 2026, 9:39 AM PT (America/Los_Angeles).** Merge commit `23f3f39` (PR #172, on top of #170 and #171), production deployment `dpl_CfsVxRkZkRitPcPcrXkXZDiniYeK` on pekkotv.com (health `commit` 23f3f39). Flutter can now rely on: compatible MOV/M4V bytes uploaded as `video/mp4`; client-side HEIC→JPEG; HEVC (and some other convertible video) returning `processingStatus` `processing` then `ready` or `failed`; 409 `video_not_ready` for unready playlist/publish; and 429 `conversion_budget` if the $15 month cap is reserved. The bucket allow-list is unchanged.
 
 ## Playlists, assignment, scheduling
 
@@ -385,6 +385,8 @@ These flags are off unless the value is exactly `1`:
 | `BILLING_REMINDERS` | The reminder job sends nothing | `app/api/cron/billing-reminders/route.ts` |
 | `ACCOUNT_DELETION` | Status can be read. Scheduling deletion returns 503 | `lib/server/account-deletion.ts` |
 | `LAYOUT_STUDIO` | **On (`1`) in production.** If turned off: no composition on the player, and `GET` / `POST /api/layout-studio`, `/boards`, `/assign`, `/preview` and `POST /api/menu-templates/switch` return 404 before a database call | `lib/layout-studio.ts`, `app/api/layout-studio/route.ts` |
+| `HEVC_CONVERSION_ENABLED` | **On (`1`) in Production only, as of 21 November 2026.** If not exactly `1`: HEVC and other convertible video is rejected immediately with 415 `video_codec`. Rollback: set to `0` or delete and redeploy | `lib/server/video-conversion.ts` |
+| `NEXT_PUBLIC_HEVC_CONVERSION_ENABLED` | **On (`1`) in Production only, as of 21 November 2026.** Must match the server flag. If not exactly `1`: the web client rejects HEVC before upload. Rollback: set to `0` or delete and redeploy | `lib/prepare-video.ts` |
 
 `MENU_TEMPLATES` and `UNIFIED_MENU_EDITOR`: unset = everyone (current production), `developers`, a list of emails/account ids, `all`, or `off` (`lib/menu-templates-flag.ts`).
 
