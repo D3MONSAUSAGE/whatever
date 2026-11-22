@@ -16,7 +16,7 @@ import { Dialog } from "@/components/dialog";
 import { useToast } from "@/components/toast";
 import { useRegisterStudioLeave } from "@/components/studio-leave";
 import { fontFaceCss } from "@/lib/board-fonts";
-import { BOARD_H, BOARD_W, MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, templateSpec, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
+import { BOARD_H, BOARD_W, MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
 import { accountSaveBody, findSameVideo, readAccountStudio, selectFeaturedMedia, type AccountLibraryFile } from "@/lib/layout-account";
 import { isProcessingMediaStatus, isReadyMediaStatus } from "@/lib/media-ready";
 import { mediaHits, selectedVideoOption, videoPreview } from "@/lib/board-preview";
@@ -39,7 +39,10 @@ import {
   type DesignBusiness, type DesignStyle, type MenuDesign,
 } from "@/lib/menu-designs";
 import { designColors, designSvgWithReport, hasOwnerItemPhoto, itemPhotosShown } from "@/lib/menu-design-svg";
-import { roomierDesignId } from "@/lib/board-fit";
+import { customOverflow, roomierDesignId, safeResetPaths } from "@/lib/board-fit";
+import { applyCustomReset, customizationSpec } from "@/lib/board-custom";
+import { CustomizeLook, type HeadingScope } from "@/components/menu-customize";
+import { boardSvgWithReport } from "@/lib/layout-studio";
 import type { Brand } from "@/lib/brand-kit";
 import { moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 
@@ -84,7 +87,7 @@ export function useMenuTemplatesFlag(skip = false): boolean | null {
   return flag.data.enabled && !optOut;
 }
 
-type Art = { imageHref: string | null; logoHref: string | null; itemImages?: Record<string, string> };
+type Art = { imageHref: string | null; logoHref: string | null; itemImages?: Record<string, string>; imageSize?: { w: number; h: number } | null };
 
 /** The board exactly as the TV will show it. */
 export function DesignBoard({ doc, art, label, className = "" }: { doc: LayoutDocument; art: Art; label?: string; className?: string }) {
@@ -100,6 +103,8 @@ const STYLES = `${FONT_CSS}
 .tpl-board-svg, .tpl-board-svg > svg, .tpl-board > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tpl-zone-hit { position: absolute; z-index: 3; padding: 0; cursor: pointer; background: transparent; border: 2px solid transparent; }
 .tpl-zone-hit:hover, .tpl-zone-hit:focus-visible { border-color: var(--color-primary); outline: none; }
+.tpl-zone-hit.tpl-region-hit > span { opacity: 0; }
+.tpl-zone-hit.tpl-region-hit:hover > span, .tpl-zone-hit.tpl-region-hit:focus-visible > span { opacity: 1; }
 .tpl-zone-hit > span { position: absolute; left: 6px; top: 6px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; background: rgb(11 18 32 / .72); color: #fff; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; line-height: 14px; }
 /* Gallery filters: one label column shared by every row (so all button groups start at the same x), and Pekko's
    segmented control (.seg, as on My Screens) for the buttons. Phones stack the label above its buttons. */
@@ -269,7 +274,7 @@ function classicArt(classic: ClassicSettings, brand: Brand | null, art: Art) {
 export function BoardView({ engine, doc, classic, art, brand, label, className = "", video = null, hits, onHit }: {
   engine: Engine; doc: LayoutDocument; classic: ClassicSettings | null; art: Art; brand: Brand | null; label?: string; className?: string;
   video?: ReturnType<typeof videoPreview>;
-  hits?: { id: string; label: string; box: { x: number; y: number; w: number; h: number } }[];
+  hits?: { id: string; label: string; box: { x: number; y: number; w: number; h: number }; region?: boolean }[];
   onHit?: (id: string) => void;
 }) {
   const t = useT();
@@ -278,9 +283,9 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
       const { template, content } = toClassic(doc, classic);
       return menuSvg(template, content, classicArt(classic, brand, art));
     }
-    if (engine === "layout") return layoutSvg(doc, { imageHref: art.imageHref, itemImages: art.itemImages });
-    return designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages }).svg;
-  }, [engine, doc, classic, art.imageHref, art.logoHref, art.itemImages, brand]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (engine === "layout") return layoutSvg(doc, { imageHref: art.imageHref, itemImages: art.itemImages, ...(art.imageSize ? { imageSize: art.imageSize } : {}) });
+    return designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages, ...(art.imageSize ? { imageSize: art.imageSize } : {}) }).svg;
+  }, [engine, doc, classic, art.imageHref, art.logoHref, art.itemImages, art.imageSize, brand]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={`tpl-board ${className}`} role={label && !hits?.length ? "img" : undefined} aria-label={label && !hits?.length ? label : undefined}>
       <div className="tpl-board-svg" aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
@@ -298,7 +303,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
         <button
           key={hit.id}
           type="button"
-          className="tpl-zone-hit"
+          className={hit.region ? "tpl-zone-hit tpl-region-hit" : "tpl-zone-hit"}
           data-testid={`tpl-hit-${hit.id}`}
           aria-label={hit.label}
           onClick={() => onHit?.(hit.id)}
@@ -412,7 +417,24 @@ export function TemplateEditor({
   const itemImages = useMemo(() => Object.fromEntries(library.filter((f) => f.kind === "image" && f.url).map((f) => [f.id, f.url as string])), [library]);
   // Classic boards show the Brand Kit logo (when "Use my Brand Kit" is on); templates show the board's own logo.
   const logoId = engine === "classic" ? brand?.logoMediaId : doc.logoMediaId;
-  const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(logoId), itemImages };
+  // Natural size of the featured photo, so a focal point places it exactly as the server PNG does.
+  const photoSrc = urlFor(doc.imageMediaId) ?? (isDesign && doc.stockPhoto ? `/menu-templates/${doc.stockPhoto}.jpg` : null);
+  const [imageSize, setImageSize] = useState<{ src: string; w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!photoSrc || imageSize?.src === photoSrc || typeof Image === "undefined") return;
+    const img = new Image();
+    img.onload = () => { if (img.naturalWidth && img.naturalHeight) setImageSize({ src: photoSrc, w: img.naturalWidth, h: img.naturalHeight }); };
+    img.src = photoSrc;
+  }, [photoSrc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sizeNow = imageSize && imageSize.src === photoSrc ? imageSize : null;
+  const imageSizeMemo = useMemo(() => (sizeNow ? { w: sizeNow.w, h: sizeNow.h } : null), [sizeNow?.w, sizeNow?.h]); // eslint-disable-line react-hooks/exhaustive-deps
+  const art: Art = { imageHref: urlFor(doc.imageMediaId), logoHref: urlFor(logoId), itemImages, imageSize: imageSizeMemo };
+  const [czOpen, setCzOpen] = useState(false);
+  const [czScope, setCzScope] = useState<HeadingScope>("all");
+  // Guided customization: overflow the owner's size changes add (never an existing board's own fit), and the
+  // targeted reset that removes it. Same functions as the preview API and publish (lib/board-fit.ts).
+  const czOverflow = useMemo(() => (engine === "classic" ? [] : customOverflow(doc)), [engine, doc]);
+  const czSafe = useMemo(() => (czOverflow.length ? safeResetPaths(doc) : null), [czOverflow, doc]);
   const fit: Fit = useMemo(() => {
     if (engine === "design") { const r = designSvgWithReport(doc, art).report; return { dropped: r.dropped, scale: r.scale, hiddenSections: 0, clipped: [] }; }
     if (engine === "layout") { const r = layoutReport(doc, art); return { dropped: r.hiddenItems, scale: 1, hiddenSections: r.hiddenSections, clipped: r.clipped }; }
@@ -646,11 +668,41 @@ export function TemplateEditor({
   const activeVideoId = supportsVideo ? doc.videoMediaId : null;
   const activePhotoId = activeVideoId ? null : doc.imageMediaId;
   const previewVideo = engine === "classic" ? null : videoPreview(doc, library, art.imageHref);
-  const previewHits = engine === "classic" ? [] : mediaHits(doc).map((hit) => ({
+  const regions = useMemo(() => (engine === "classic" || step !== 3 ? [] : boardSvgWithReport(doc).report.regions), [engine, step, doc]);
+  const previewHits = engine === "classic" ? [] : step === 3 ? regions.map((region) => {
+    const target = region.target;
+    const label = target.kind === "featuredMedia" ? t("cz.hitMedia")
+      : target.kind === "businessName" ? t("cz.hitBusinessName")
+        : target.kind === "featuredText" ? t("cz.hitFeaturedText")
+          : target.kind === "sectionHeading" ? t("cz.hitSection", { name: doc.sections[target.sectionIndex]?.name || t("cz.headingUntitled", { n: target.sectionIndex + 1 }) })
+            : t("cz.hitItem", { name: doc.sections[target.sectionIndex]?.items[target.itemIndex]?.name || t("tpl.item") });
+    return { id: region.id.replace(/[^A-Za-z0-9_-]/g, "-"), box: region.box, label, region: true, target };
+  }) : mediaHits(doc).map((hit) => ({
     id: hit.id,
     box: hit.box,
     label: hit.id === "video" ? t("tpl.editVideoArea") : t("tpl.editPhotoArea"),
   }));
+  /** Click-to-select in Step 4: open the matching control (no dragging). */
+  function selectRegion(id: string) {
+    const hit = previewHits.find((h) => h.id === id) as (typeof previewHits)[number] & { target?: (typeof regions)[number]["target"] } | undefined;
+    const target = hit?.target;
+    if (!target) return;
+    let testid = "tpl-cz-media";
+    if (target.kind !== "featuredMedia") setCzOpen(true);
+    if (target.kind === "businessName" || target.kind === "featuredText") testid = `tpl-cz-role-${target.kind}-size`;
+    if (target.kind === "menuItem") testid = "tpl-cz-role-itemName-size";
+    if (target.kind === "sectionHeading") { setCzScope(target.sectionIndex); testid = "tpl-cz-heading-override-size"; }
+    if (target.kind === "featuredMedia" && !customizationSpec(doc).media) { setCzOpen(true); testid = "tpl-cz-fill"; }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const node = document.querySelector<HTMLElement>(`[data-testid='${testid}']`);
+      node?.focus();
+      node?.scrollIntoView({ block: "nearest" });
+    }));
+  }
+  function onPreviewHit(id: string) {
+    if (step === 3) selectRegion(id);
+    else openMediaArea(id);
+  }
   function openMediaArea(id: string) {
     void id;
     setStep(2);
@@ -692,7 +744,16 @@ export function TemplateEditor({
       <div className="tpl-grid">
         <div className="tpl-preview">
           <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{previewVideo ? t("tpl.previewCapVideo") : t("tpl.previewCap")}</span><span>1920 × 1080</span></p>
-          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={previewHits} onHit={openMediaArea} />
+          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={previewHits} onHit={onPreviewHit} />
+          {czOverflow.length ? (
+            <div className="note-warn text-sm mt-3 grid gap-2" role="alert" data-testid="tpl-cz-overflow">
+              {czOverflow.map((reason) => <p key={reason}>{t(`cz.overflow.${reason}` as MessageKey)}</p>)}
+              <p className="text-xs">{t("cz.overflowBody")}</p>
+              {czSafe ? (
+                <div><button type="button" className="btn btn-quiet min-h-9" data-testid="tpl-cz-safe" onClick={() => { update(applyCustomReset(doc, czSafe)); toast.show(t("cz.safeDone")); }}>{t("cz.safeSize")}</button></div>
+              ) : null}
+            </div>
+          ) : null}
           {fit.dropped > 0 ? (
             <div className="note-warn text-sm mt-3 grid gap-2" role="status" data-testid="tpl-dropped">
               <p>{engine === "layout" ? t("tpl.columnsHidden", { n: fit.dropped, cols: columns ?? 0 }) : t(photoTemplate ? "tpl.droppedPhotos" : "tpl.dropped", { n: fit.dropped })}</p>
@@ -705,7 +766,7 @@ export function TemplateEditor({
             </div>
           )
             : fit.scale < 0.72 ? <p className="text-sm mt-3 text-[#7a4a00]" role="status">{t("tpl.tight")}</p>
-              : <p className="text-sm mt-3 text-live-ink" role="status">✓ {t("tpl.fits")}</p>}
+              : <p className="text-sm mt-3 text-live-ink" role="status">✓ {t(engine !== "classic" && (doc.custom || doc.sections.some((s) => s.headingOverride)) ? "cz.fits" : "tpl.fits")}</p>}
           {fit.clipped.length ? <p className="note-warn text-sm mt-2" role="status" data-testid="tpl-clipped">{t("ls.clippedNames", { names: fit.clipped.map((x) => `“${x}”`).join(", ") })}</p> : null}
         </div>
         <div className="tpl-form card p-4 grid gap-4 min-w-0">
@@ -995,6 +1056,16 @@ export function TemplateEditor({
                 </div>
               )}
               {engine === "classic" ? (
+                <div className="grid gap-2" data-testid="tpl-cz-classic">
+                  <p className="form-label">{t("cz.classicTitle")}</p>
+                  <p className="text-xs text-muted">{t("cz.classicBody")}</p>
+                  {onNewBoard ? <button type="button" className="btn btn-quiet justify-self-start" onClick={() => onNewBoard(doc, `${name} (2)`)} data-testid="tpl-cz-classic-copy">{t("cz.classicCopy")}</button> : null}
+                </div>
+              ) : (
+                <CustomizeLook doc={doc} update={update} open={czOpen} onOpen={setCzOpen} scope={czScope} onScope={setCzScope}
+                  hasPhoto={Boolean(art.imageHref || (isDesign && doc.stockPhoto && designHasMedia(design)) || (engine === "layout" && doc.imageMediaId))} />
+              )}
+              {engine === "classic" ? (
                 <div className="grid gap-2" data-testid="tpl-classic-switch">
                   <p className="form-label">{t("tpl.switchTitle")}</p>
                   <p className="text-xs text-muted">{t("tpl.classicSwitchBody")}</p>
@@ -1075,6 +1146,12 @@ export function TemplateEditor({
           <div className="grid gap-3" data-testid="tpl-publish-dialog">
             <h3 className="font-display font-bold text-lg">{t("tpl.publishTitle")}</h3>
             {fit.dropped > 0 ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-blocked">{t("tpl.publishBlocked", { n: fit.dropped })}</p> : null}
+            {czOverflow.length ? (
+              <div className="note-warn text-sm grid gap-2" role="alert" data-testid="tpl-publish-cz-blocked">
+                <p>{t("cz.publishBlocked")}</p>
+                {czSafe ? <div><button type="button" className="btn btn-quiet min-h-9" onClick={() => { update(applyCustomReset(doc, czSafe)); toast.show(t("cz.safeDone")); }}>{t("cz.safeSize")}</button></div> : null}
+              </div>
+            ) : null}
             {unreadySelectedVideo ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-video-blocked">{t("tpl.videoUnreadyBlocked")}</p> : null}
             <p className="text-sm text-muted">{engine === "classic" ? t("tpl.classicPublishBody") : t("tpl.publishBody")}</p>
             {displays === null ? <p className="text-sm text-muted">{t("common.loading")}</p> : displays.length === 0 ? <p className="text-sm text-muted">{t("tpl.noScreens")}</p> : (
@@ -1093,7 +1170,7 @@ export function TemplateEditor({
             <p className="text-xs text-muted">{t("tpl.publishNote")}</p>
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className="btn btn-quiet" onClick={() => setPublishOpen(false)}>{t("tpl.cancel")}</button>
-              <button type="button" className="btn btn-primary" disabled={busy !== null || fit.dropped > 0} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
+              <button type="button" className="btn btn-primary" disabled={busy !== null || fit.dropped > 0 || czOverflow.length > 0} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
                 {busy === "publish" ? t("tpl.publishing") : engine === "classic" && !Object.values(picked).some(Boolean) ? t("tpl.classicSave") : t("tpl.publishN", { n: Object.values(picked).filter(Boolean).length })}
               </button>
             </div>
@@ -1155,8 +1232,7 @@ function layoutName(template: LayoutTemplate, t: ReturnType<typeof useLocale>["t
 /** Everything the previous layout editor could set that isn't a first-step choice, behind one disclosure. */
 function AdvancedLook({ engine, doc, patch }: { engine: Engine; doc: LayoutDocument; patch: (p: Partial<LayoutDocument>) => void }) {
   const { t } = useLocale();
-  const spec = templateSpec(doc.template);
-  const proportion = engine === "layout" && (doc.template === "menu-promo-67" || doc.template === "split-50" || doc.template === "menu-banner" || doc.template === "signature");
+  // The menu/photo proportion is the Step 4 Basic "Featured photo size" slider now (custom.mediaSize, synced to split).
   const columnWidths = engine === "layout" && (doc.template === "triple-column" || doc.template === "two-menu-promo");
   const widths: [number, number, number] = doc.columnWidths ?? (doc.template === "two-menu-promo" ? [0.35, 0.35, 0.3] : [doc.split, (1 - doc.split) / 2, (1 - doc.split) / 2]);
   function setWidth(index: number, value: number) {
@@ -1212,11 +1288,6 @@ function AdvancedLook({ engine, doc, patch }: { engine: Engine; doc: LayoutDocum
             <p className="text-xs text-muted">{t("ls.roomNote")}</p>
           </div>
         ) : null}
-        {proportion ? (
-          <label className="form-label grid gap-1">{proportionLabel(doc.template, t)} {Math.round(doc.split * 100)}%
-            <input type="range" min={spec.min} max={spec.max} step={0.01} value={doc.split} data-testid="tpl-split-range" onChange={(e) => patch({ split: Number(e.target.value) })} />
-          </label>
-        ) : null}
         {columnWidths ? (
           <fieldset className="grid gap-1 border border-line rounded-xl p-3" data-testid="tpl-column-widths">
             <legend className="form-label px-1">{t("ls.columnWidths")}</legend>
@@ -1231,13 +1302,6 @@ function AdvancedLook({ engine, doc, patch }: { engine: Engine; doc: LayoutDocum
       </div>
     </details>
   );
-}
-
-function proportionLabel(template: LayoutTemplate, t: ReturnType<typeof useLocale>["t"]) {
-  if (template === "menu-banner") return t("ls.bannerHeight");
-  if (template === "signature") return t("ls.cardWidth");
-  if (template === "split-50") return t("ls.leftSide");
-  return t("ls.menuWidth");
 }
 
 function SwitchCard({ design, current, art, label, onPick }: { design: MenuDesign; current: LayoutDocument; art: Art; label: string; onPick: () => void }) {

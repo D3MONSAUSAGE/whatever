@@ -15,6 +15,10 @@ import { galleryEntries, newLayoutDocument, type GalleryEntry, type Structure } 
 import { sampleLayout, type LayoutDocument } from "@/lib/layout-studio";
 import { sampleMenu, type MenuContent } from "@/lib/menu-templates";
 import { seedClassicMenu, type Brand } from "@/lib/brand-kit";
+import {
+  designCustomizationSpec, fontWeightsByFont, layoutCustomizationSpec, CUSTOM_VERSION, READABLE_FLOORS, ROLE_KEYS, ROLE_SCALE, SPACING_SCALE,
+  TEXT_SCALE, TEXT_SIZE_PRESETS, WEIGHT_CHOICES, type CustomizationSpec,
+} from "@/lib/board-custom";
 
 /** Bump when the rendered look of existing templates changes without their definitions changing (renderer fixes). */
 export const CATALOG_RENDER_REVISION = 1;
@@ -43,6 +47,11 @@ export type CatalogEntry = {
   variants: CatalogVariant[];
   /** Suggested board name: the Brand Kit business name when set, else null (use `name` in the app's language). */
   boardName: string | null;
+  /**
+   * Guided customization this entry supports (additive): the featured media slider bounds (null = no slider), roles it
+   * draws, section heading overrides, spacing and photo focus. Null for the classic board (make a customizable copy).
+   */
+  customization: CustomizationSpec | null;
   /** How to create a board from this entry. */
   create:
     | { route: "POST /api/layout-studio"; document: LayoutDocument }
@@ -59,9 +68,25 @@ export type MenuCatalog = {
     structure: { id: Structure | "all"; name: Localized }[];
   };
   fonts: string[];
+  /** Shared customization limits (additive). Bounds are clamped by the server too; floors are in canvas px (1920×1080). */
+  customization: typeof CUSTOMIZATION_META;
   entries: CatalogEntry[];
   /** "Start from scratch": an empty template board (same seed as the web). */
   scratch: { create: { route: "POST /api/layout-studio"; document: LayoutDocument } };
+};
+
+export const CUSTOMIZATION_META = {
+  version: CUSTOM_VERSION,
+  canvas: { width: 1920, height: 1080 },
+  roles: [...ROLE_KEYS],
+  textScale: { ...TEXT_SCALE, presets: TEXT_SIZE_PRESETS },
+  roleScale: ROLE_SCALE,
+  spacingScale: SPACING_SCALE,
+  imageFocus: { min: 0, max: 100 },
+  weights: [...WEIGHT_CHOICES],
+  /** Weight choices each bundled font can draw (others snap to the nearest shipped face at render time). */
+  fontWeights: fontWeightsByFont(),
+  readableFloors: READABLE_FLOORS,
 };
 
 const EN = makeT("en");
@@ -81,6 +106,7 @@ function entryFor(entry: GalleryEntry, brand: Brand | null, version: string): Ca
     return {
       ...base, kind: "template", name: d.name, description: d.blurb,
       variants: d.variants.map((v) => ({ id: v.id, name: v.name, colors: { paper: v.paper, ink: v.ink, muted: v.muted, accent: v.accent, panel: v.panel, tag: v.tag ?? v.accent } })),
+      customization: designCustomizationSpec(d.composition),
       // Same as the web: the kit's business name replaces the sample title on templates; nothing else is branded.
       create: { route: "POST /api/layout-studio", document: brandTitle(designDocument(d), brand) },
     };
@@ -89,11 +115,12 @@ function entryFor(entry: GalleryEntry, brand: Brand | null, version: string): Ca
     return {
       ...base, kind: "layout", name: both(`lo.${entry.id}.name` as MessageKey), description: both(`lo.${entry.id}.blurb` as MessageKey),
       variants: [],
+      customization: layoutCustomizationSpec(entry.template),
       create: { route: "POST /api/layout-studio", document: newLayoutDocument(entry.template, brand) },
     };
   }
   return {
-    ...base, kind: "classic", name: both("lo.full-screen.name"), description: both("lo.full-screen.blurb"), variants: [],
+    ...base, kind: "classic", name: both("lo.full-screen.name"), description: both("lo.full-screen.blurb"), variants: [], customization: null,
     create: { route: "POST /api/menus", template: "classic", content: seedClassicMenu(sampleMenu(), brand) },
   };
 }
@@ -122,7 +149,7 @@ let cachedVersion: string | null = null;
 export function catalogVersion(): string {
   if (cachedVersion) return cachedVersion;
   const unbranded = galleryEntries().map((e) => ({ id: e.id, kind: e.kind, business: e.business, style: e.style, structure: e.structure, photos: e.photos, seed: unbrandedSeed(e.id) }));
-  cachedVersion = `${CATALOG_SCHEMA}.${CATALOG_RENDER_REVISION}.${hash(JSON.stringify({ unbranded, designs: MENU_DESIGNS }))}`;
+  cachedVersion = `${CATALOG_SCHEMA}.${CATALOG_RENDER_REVISION}.${hash(JSON.stringify({ unbranded, designs: MENU_DESIGNS, customization: CUSTOMIZATION_META }))}`;
   return cachedVersion;
 }
 
@@ -137,6 +164,7 @@ export function buildCatalog(brand: Brand | null): MenuCatalog {
       structure: STRUCTURES.map((id) => ({ id, name: both(`tpl.structure.${id}` as MessageKey) })),
     },
     fonts: [...BOARD_FONT_IDS],
+    customization: CUSTOMIZATION_META,
     entries: galleryEntries().map((e) => entryFor(e, brand, version)),
     scratch: { create: { route: "POST /api/layout-studio", document: scratchDocument() } },
   };

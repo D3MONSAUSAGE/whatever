@@ -1,3 +1,4 @@
+import { customPublishError } from "@/lib/board-fit";
 import { parseLayout, type LayoutDocument } from "@/lib/layout-studio";
 import { isDesignId } from "@/lib/menu-designs";
 import { itemPhotoIds } from "@/lib/menu-item-photos";
@@ -91,6 +92,12 @@ export async function applyLayoutSave(input: {
   if (input.mode === "publish" && doc.design && isDesignId(doc.design)) {
     const { dropped } = designSvgWithReport(doc).report;
     if (dropped > 0) return { ok: false, error: dropped === 1 ? "1 item doesn't fit on the screen. Remove an item or choose a roomier template, then publish." : `${dropped} items don't fit on the screen. Remove some items or choose a roomier template, then publish.` };
+  }
+  // Guided customization: refused only when the owner's size/spacing changes add overflow the same board without them
+  // doesn't have. Existing boards (no customization) are never refused for this, whatever their current fit.
+  if (input.mode === "publish") {
+    const customError = customPublishError(doc);
+    if (customError) return { ok: false, error: customError };
   }
   const effect = boardSaveEffect(input.mode);
   // Write the menu row first. A new board has no id until this returns, and the

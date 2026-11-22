@@ -4,6 +4,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { Resvg } from "@resvg/resvg-js";
 import { fontFamily, layoutSvg, type LayoutDocument } from "@/lib/layout-studio";
 import { boardFont } from "@/lib/board-fonts";
+import { dataUriDims, imageDims } from "@/lib/image-dims";
 
 const BOARD_EDGE = 1920;
 
@@ -81,6 +82,11 @@ export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, 
       }
     }
     art = { imageHref: href, stockHref: href ? null : stockPhotoDataUri(doc.stockPhoto), logoHref: dataUri(extras?.logo), stockHrefs, itemImages };
+  }
+  // Guided customization: a focal point needs the featured photo's own size to place it exactly (as the editor does).
+  if (doc.custom?.imageFocus) {
+    const source = image && image.bytes.length ? imageDims(image.bytes) : dataUriDims(art?.stockHref ?? (doc.design ? stockPhotoDataUri(doc.stockPhoto) : null));
+    art = { ...art, imageSize: source };
   }
   const resvg = new Resvg(layoutSvg(doc, art), {
     font: { fontFiles: fontsFor(doc.font, doc.bodyFont), loadSystemFonts: false, defaultFontFamily: fontFamily(doc.font) },

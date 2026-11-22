@@ -5,6 +5,7 @@
  *
  * The drawing lives in lib/menu-design-svg.ts and is shared by the browser preview and the server PNG.
  */
+import { normalizeCustomFor } from "@/lib/board-custom";
 import type { BoardFontId } from "@/lib/board-fonts";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
@@ -646,7 +647,9 @@ export function switchDesign(doc: LayoutDocument, design: MenuDesign): LayoutDoc
   if (design.look.body !== design.look.head) next.bodyFont = design.look.body;
   else delete next.bodyFont;
   // A list design has no video area; the video stays in the document for the next design that shows one.
-  return next;
+  // Customization (text sizes, weights, spacing, section heading overrides) carries over; the featured media size is
+  // clamped to this design's bounds, or dropped when it has no media area.
+  return normalizeCustomFor(next);
 }
 
 /** True when this design can show a photo or video. */

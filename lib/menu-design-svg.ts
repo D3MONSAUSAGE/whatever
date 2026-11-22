@@ -9,6 +9,10 @@ import { FONT_METRICS } from "@/lib/board-font-metrics";
 import { boardFont, type BoardFontId } from "@/lib/board-fonts";
 import { designById, designVariant, isPhotoDesign, type MenuDesign } from "@/lib/menu-designs";
 import type { LayoutDocument, LayoutItem, LayoutSection, ZoneBox } from "@/lib/layout-studio";
+import {
+  activeCustom, emptyClips, fixedRegion, focusPlacement, itemRegion, sectionHeadingStyle, sectionRegion, snapWeight, READABLE_FLOORS,
+  type ActiveCustom, type BoardRegion, type ClipArea, type RoleKey,
+} from "@/lib/board-custom";
 
 const W = 1920;
 const H = 1080;
@@ -169,8 +173,89 @@ type Style = {
   /** Draw a tinted initial tile for items without a photo (photo templates); text templates leave the space clean. */
   placeholders?: boolean;
 };
-type PlacedItem = { lines: string[]; desc: string[]; price: string; priceW: number; h: number; photo?: string | null; initial?: string };
-type PlacedSection = { name: string; items: PlacedItem[]; headH: number; h: number; thumbs?: boolean };
+type PlacedItem = { lines: string[]; desc: string[]; price: string; priceW: number; h: number; photo?: string | null; initial?: string; src?: LayoutItem };
+type PlacedSection = { name: string; items: PlacedItem[]; headH: number; h: number; thumbs?: boolean; src?: LayoutSection; head?: { size: number; weight: number } };
+
+/* ---------------- guided customization (lib/board-custom.ts) ---------------- */
+
+/**
+ * State of the render in progress. `active` is null for boards without customization: every size, position and
+ * weight then comes from exactly the same expressions as before. Regions and clip counts are only recorded, never drawn.
+ */
+type Run = {
+  active: ActiveCustom | null;
+  /** Scale the uncustomized board fitted its menu at (reference for "never smaller than the template"). */
+  s0: number;
+  regions: BoardRegion[];
+  clips: Record<ClipArea, number>;
+  sections: Map<object, number>;
+  items: Map<object, [number, number]>;
+  imageSize?: { w: number; h: number } | null;
+  doc: LayoutDocument;
+};
+let run: Run | null = null;
+
+function note(area: ClipArea, original: string, drawn: string | string[]) {
+  if (!run) return;
+  const last = Array.isArray(drawn) ? drawn[drawn.length - 1] ?? "" : drawn;
+  if (last.endsWith("…") && !original.trim().endsWith("…")) run.clips[area] += 1;
+}
+function addRegion(region: BoardRegion | null) { if (run && region) run.regions.push(region); }
+function roleScale(role: RoleKey) { return run?.active ? run.active.scale[role] : 1; }
+/** Role weight: the template's, or the chosen weight snapped to the family's shipped faces. */
+function roleWeight(role: RoleKey, family: string, def: number) {
+  const choice = run?.active?.weight[role];
+  return choice ? snapWeight(family, choice) : def;
+}
+/** A fixed-size text scaled by its role, never below min(readable floor, template size). */
+function roleSize(role: RoleKey, def: number) {
+  if (!run?.active) return def;
+  return Math.max(Math.min(READABLE_FLOORS[role], def), def * run.active.scale[role]);
+}
+/** Left edge of the photo/video column: the template's, or the owner's featured media size. */
+function mediaLeft(active: ActiveCustom | null, def: number) {
+  return active && active.mediaSize != null ? Math.round(W * (1 - active.mediaSize)) : def;
+}
+function customStyle(st: Style): Style {
+  const a = run?.active;
+  if (!a) return st;
+  const name = st.name.size * a.scale.itemName;
+  return {
+    ...st,
+    name: { ...st.name, size: name, weight: roleWeight("itemName", st.name.family, st.name.weight) },
+    price: { ...st.price, size: st.price.size * a.scale.price, weight: roleWeight("price", st.price.family, st.price.weight) },
+    desc: { ...st.desc, size: st.desc.size * a.scale.description, weight: roleWeight("description", st.desc.family, st.desc.weight) },
+    section: { ...st.section, size: st.section.size * a.scale.sectionHeading, weight: roleWeight("sectionHeading", st.section.family, st.section.weight) },
+    itemGap: st.itemGap * a.itemGap, sectionGap: st.sectionGap * a.sectionGap,
+    thumb: st.thumb ? Math.round(name * 2.3) : 0,
+  };
+}
+/** Heading size and weight for one section on a customized board (its own override wins). */
+function sectionHead(section: LayoutSection, st: Style): { size: number; weight: number } | undefined {
+  const a = run?.active;
+  if (!a) return undefined;
+  const hs = sectionHeadingStyle(a, section);
+  const global = a.scale.sectionHeading || 1;
+  return { size: (st.section.size * hs.scale) / global, weight: hs.weight ? snapWeight(st.section.family, hs.weight) : st.section.weight };
+}
+/** Title fit for the business name: role size and weight on customized boards, never below the readable floor. */
+function titleFit(value: string, max: number, start: number, min: number, family: string, weight: number, tracking = 0, cap = Infinity) {
+  if (!run?.active) return { ...fitTitle(value, max, start, min, family, weight, tracking), weight };
+  const k = run.active.scale.businessName;
+  const w = roleWeight("businessName", family, weight);
+  const lo = Math.max(Math.min(READABLE_FLOORS.businessName, min), Math.min(cap, min * k));
+  const hi = Math.max(lo, Math.min(cap, start * k));
+  return { ...fitTitle(value, max, hi, lo, family, w, tracking), weight: w };
+}
+/** The featured photo: the template's placement, or the owner's focal point when it fills the box. */
+function photoImage(href: string, box: { x: number; y: number; w: number; h: number }, doc: LayoutDocument) {
+  const focus = run?.active?.focus;
+  if (!focus || doc.imageFit === "contain") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${aspect(doc)}"/>`;
+  const place = focusPlacement(box, focus, run?.imageSize);
+  if (place.kind === "anchor") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${place.aspect}"/>`;
+  const id = `fp${clipSeq++}`;
+  return `<clipPath id="${id}"><rect x="${n(box.x)}" y="${n(box.y)}" width="${n(box.w)}" height="${n(box.h)}"/></clipPath><image href="${esc(href)}" x="${n(place.x)}" y="${n(place.y)}" width="${n(place.w)}" height="${n(place.h)}" preserveAspectRatio="none" clip-path="url(#${id})"/>`;
+}
 
 /** Where an item's photo comes from: the owner's photo, else the template's sample photo, else none. */
 export type ItemPhotoResolver = (item: LayoutItem) => string | null;
@@ -202,10 +287,12 @@ function measureSection(section: LayoutSection, colW: number, st: Style, photoOf
     const lineH = st.name.size * 1.17;
     const tagH = st.tags && price ? st.price.size * 1.25 : 0;
     const h = Math.max(lines.length * lineH, tagH) + (desc.length ? st.desc.size * 0.32 + desc.length * st.desc.size * 1.32 : 0) + st.itemGap;
-    items.push({ lines, desc, price, priceW, h });
+    items.push({ lines, desc, price, priceW, h, ...(run ? { src: item } : {}) });
   }
-  const headH = section.name ? st.section.size * 1.05 + (st.rule ? st.section.size * 0.45 + 2 : 0) + st.headGap : 0;
-  return { name: section.name, items, headH, h: headH + items.reduce((a, i) => a + i.h, 0) };
+  const head = sectionHead(section, st);
+  const hsz = head ? head.size : st.section.size;
+  const headH = section.name ? hsz * 1.05 + (st.rule ? hsz * 0.45 + 2 : 0) + st.headGap : 0;
+  return { name: section.name, items, headH, h: headH + items.reduce((a, i) => a + i.h, 0), ...(run ? { src: section } : {}), ...(head ? { head } : {}) };
 }
 function initialOf(name: string) { return ([...name.trim()][0] ?? "").toUpperCase(); }
 function measureThumbSection(section: LayoutSection, colW: number, st: Style, photoOf: ItemPhotoResolver): PlacedSection {
@@ -224,10 +311,12 @@ function measureThumbSection(section: LayoutSection, colW: number, st: Style, ph
     const lineH = st.name.size * 1.17;
     const tagH = st.tags && price ? st.price.size * 1.25 : 0;
     const textH = Math.max(lines.length * lineH, tagH) + (desc.length ? st.desc.size * 0.32 + desc.length * st.desc.size * 1.32 : 0);
-    items.push({ lines, desc, price, priceW, h: Math.max(textH, st.thumb) + st.itemGap, photo: photoOf(item), initial: initialOf(item.name) });
+    items.push({ lines, desc, price, priceW, h: Math.max(textH, st.thumb) + st.itemGap, photo: photoOf(item), initial: initialOf(item.name), ...(run ? { src: item } : {}) });
   }
-  const headH = section.name ? st.section.size * 1.05 + (st.rule ? st.section.size * 0.45 + 2 : 0) + st.headGap : 0;
-  return { name: section.name, items, headH, h: headH + items.reduce((a, i) => a + i.h, 0), thumbs: true };
+  const head = sectionHead(section, st);
+  const hsz = head ? head.size : st.section.size;
+  const headH = section.name ? hsz * 1.05 + (st.rule ? hsz * 0.45 + 2 : 0) + st.headGap : 0;
+  return { name: section.name, items, headH, h: headH + items.reduce((a, i) => a + i.h, 0), thumbs: true, ...(run ? { src: section } : {}), ...(head ? { head } : {}) };
 }
 
 /** Sections in order, kept whole, into `cols` columns of height `colH`. Null when they do not fit. */
@@ -338,6 +427,31 @@ function fit(sectionsIn: LayoutSection[], base: Style, options: { cols: number; 
   return { style: st, columns, cols: opt.cols, scale: minScale, dropped };
 }
 
+/**
+ * fit() for a customized board: the owner's sizes, starting at the scale the template itself would use (so "Large" is
+ * always larger than the default) and never shrinking any role below min(readable floor, the template's own size).
+ * When even that does not fit, items are left off and the board reports it (publish is then refused).
+ */
+function fitC(sectionsIn: LayoutSection[], base: Style, options: { cols: number; colW: number }[], colH: number, maxScale: number, minScale: number, preferFewerAbove = 0.9, photoOf?: ItemPhotoResolver): FitResult {
+  const a = run?.active;
+  if (!a || !run) return fit(sectionsIn, base, options, colH, maxScale, minScale, preferFewerAbove, photoOf);
+  const cb = customStyle(base);
+  const s0 = run.s0;
+  const need = (floor: number, def: number, custom: number) => (custom > 0 ? Math.min(floor, def * s0) / custom : 0);
+  const headScales = sectionsIn.filter((s) => s.name).map((s) => sectionHeadingStyle(a, s).scale);
+  const minHead = headScales.length ? Math.min(...headScales) : a.scale.sectionHeading;
+  let lo = Math.max(
+    minScale,
+    need(READABLE_FLOORS.itemName, base.name.size, cb.name.size),
+    need(READABLE_FLOORS.price, base.price.size, cb.price.size),
+    need(READABLE_FLOORS.description, base.desc.size, cb.desc.size),
+    need(READABLE_FLOORS.sectionHeading, base.section.size, base.section.size * minHead),
+  );
+  lo = Math.ceil(lo * 1000) / 1000;
+  const hi = Math.max(lo, s0);
+  return fit(sectionsIn, cb, options, colH, hi, lo, preferFewerAbove, photoOf);
+}
+
 function paintColumns(parts: string[], result: FitResult, x0: number, top: number, colW: number, gap: number, c: DesignColors) {
   const st = result.style;
   result.columns.forEach((col, ci) => {
@@ -346,14 +460,25 @@ function paintColumns(parts: string[], result: FitResult, x0: number, top: numbe
     col.sections.forEach((sec, si) => {
       if (si > 0) y += st.sectionGap;
       if (sec.name) {
+        const hs = sec.head ?? st.section;
         const label = st.section.upper ? sec.name.toUpperCase() : sec.name;
-        const base = y + st.section.size * 0.82;
-        parts.push(text(x, base, ellipsize(label, st.section.size, st.section.family, st.section.weight, colW, st.section.tracking), { size: st.section.size, family: st.section.family, weight: st.section.weight, fill: c.accent, tracking: st.section.tracking }));
-        y += st.section.size * 1.05;
-        if (st.rule) { y += st.section.size * 0.45; parts.push(rect(x, y, colW, 2, mix(c.accent, c.paper, 0.55))); y += 2; }
+        const base = y + hs.size * 0.82;
+        const shown = ellipsize(label, hs.size, st.section.family, hs.weight, colW, st.section.tracking);
+        note("menu", label, shown);
+        const si = sec.src && run ? run.sections.get(sec.src) : undefined;
+        if (si != null && run) addRegion(sectionRegion(run.doc.sections[si] ?? sec.src!, si, { x, y, w: colW, h: hs.size * 1.05 }));
+        parts.push(text(x, base, shown, { size: hs.size, family: st.section.family, weight: hs.weight, fill: c.accent, tracking: st.section.tracking }));
+        y += hs.size * 1.05;
+        if (st.rule) { y += hs.size * 0.45; parts.push(rect(x, y, colW, 2, mix(c.accent, c.paper, 0.55))); y += 2; }
         y += st.headGap;
       }
       for (const item of sec.items) {
+        if (run && item.src) {
+          const at = run.items.get(item.src);
+          if (at) addRegion(itemRegion(item.src, at[0], at[1], { x, y, w: colW, h: item.h - st.itemGap }));
+          note("menu", st.name.upper ? item.src.name.toUpperCase() : item.src.name, item.lines);
+          if (item.src.description) note("menu", item.src.description, item.desc);
+        }
         if (sec.thumbs) { paintThumbItem(parts, item, x, y, colW, st, c); y += item.h; continue; }
         const lineH = st.name.size * 1.17;
         const tagH = st.tags && item.price ? st.price.size * 1.25 : 0;
@@ -468,8 +593,15 @@ export type DesignArt = {
   itemImages?: Record<string, string>;
   /** Template sample photos by stock id (data URIs on the server; the editor uses /menu-templates/<id>.jpg). */
   stockHrefs?: Record<string, string>;
+  /** Natural size of the featured photo, so a focal point places it exactly (preview and TV alike). */
+  imageSize?: { w: number; h: number } | null;
 };
-export type DesignReport = { dropped: number; scale: number };
+export type DesignReport = {
+  dropped: number; scale: number;
+  /** Shortened ("…") texts per area, and the board's selectable regions (canvas px). Recorded only; never drawn. */
+  clips?: Record<ClipArea, number>;
+  regions?: BoardRegion[];
+};
 
 function family(id: BoardFontId) { return boardFont(id).family; }
 function fonts(doc: LayoutDocument, design: MenuDesign) {
@@ -521,21 +653,24 @@ function withThumbs(st: Style, on: boolean, placeholders = true): Style { return
 export function designVideoBox(doc: LayoutDocument): ZoneBox | null {
   const design = designById(doc.design);
   if (!design) return null;
+  // The owner's featured media size moves the video exactly as it moves the photo (same mediaLeft as the renderer).
+  const active = activeCustom(doc);
   if (design.composition === "showcase") {
     const band = (doc.featureTitle || doc.featureDetail || "").trim() ? 200 : 0;
-    return { x: 1140, y: 0, w: W - 1140, h: H - band };
+    const L = mediaLeft(active, 1140);
+    return { x: L, y: 0, w: W - L, h: H - band };
   }
-  if (design.composition === "columns") return { x: 1344, y: 0, w: W - 1344, h: 640 };
-  if (design.composition === "promo") return { x: 1260, y: 0, w: W - 1260, h: 713 };
+  if (design.composition === "columns") { const L = mediaLeft(active, 1344); return { x: L, y: 0, w: W - L, h: 640 }; }
+  if (design.composition === "promo") { const L = mediaLeft(active, 1260); return { x: L, y: 0, w: W - L, h: 713 }; }
   return null;
 }
 
 function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
-  const L = 1140; const x0 = 90; const top = 92;
+  const L = mediaLeft(run?.active ?? null, 1140); const x0 = 90; const top = 92;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(`<image href="${esc(photo)}" x="${L}" y="0" width="${W - L}" height="${H}" preserveAspectRatio="${aspect(doc)}"/>`);
+    parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: H }, doc));
     parts.push(`<defs><linearGradient id="dg-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.44" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.86" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="1" stop-color="${c.paper}" stop-opacity="0.98"/></linearGradient></defs>`);
     parts.push(rect(L, 0, W - L, H, "url(#dg-fade)"));
   } else {
@@ -545,9 +680,10 @@ function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, top, 104, c.paper);
   const tx = x0 + (logoSize ? logoSize + 28 : 0);
   const maxW = L - x0 - 90 - (logoSize ? logoSize + 28 : 0);
-  const t = fitTitle(doc.title || "", maxW, 86, 52, f.head, design.look.headWeight);
+  const t = titleFit(doc.title || "", maxW, 86, 52, f.head, design.look.headWeight);
+  note("businessName", doc.title || "", t.value);
   const titleBase = top + t.size * 0.84 + (logoSize ? Math.max(0, (104 - t.size * 1.6) / 2) : 0);
-  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: design.look.headWeight, fill: c.ink }));
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink }));
   let headBottom = titleBase + t.size * 0.22;
   if (doc.subtitle) {
     const sub = ellipsize(doc.subtitle.toUpperCase(), 24, f.body, 700, maxW, 0.22);
@@ -555,6 +691,7 @@ function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
     headBottom = titleBase + 58;
   }
   headBottom = Math.max(headBottom, logoSize ? top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: x0, y: top, w: L - x0 - 90, h: headBottom - top + 8 }));
   parts.push(rect(x0, headBottom + 40, 180, 2, mix(c.accent, c.paper, 0.6)));
   const menuTop = headBottom + 84;
   const footerH = doc.footer ? 52 : 0;
@@ -562,75 +699,88 @@ function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   const shown = itemPhotosShown(doc, design);
   const base = withThumbs(baseStyle(design, f, { name: 38, price: 38, desc: 25, section: 30, itemGap: 22, sectionGap: 44, headGap: 24 }), shown, isPhotoDesign(design));
   const avail = L - x0 - 90;
-  const result = fit(doc.sections, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 64) / 2 }], colH, 1.25, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
+  const result = fitC(doc.sections, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 64) / 2 }], colH, 1.25, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 64) / 2, 64, c);
   if (doc.footer) parts.push(text(x0, H - 56, ellipsize(doc.footer, 24, f.head, 400, avail), { size: 24, family: f.head, weight: 400, fill: c.muted }));
   // Feature text on the photo's lower band (the video box ends above it).
   const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  addRegion(fixedRegion("featuredMedia", { x: L, y: 0, w: W - L, h: H - (title || detail ? 200 : 0) }));
   if (title || detail) {
     const fx = L + 64; const fw = W - L - 128;
     const onPanel = !photo;
     const ink = onPanel ? c.panelInk : c.ink;
-    const lines = detail ? wrapText(detail, 40, f.head, 400, fw, 2) : [];
-    const y = H - 60 - (lines.length - 1) * 50;
-    lines.forEach((line, i) => parts.push(text(fx, y + i * 50, line, { size: 40, family: f.head, weight: 400, fill: ink })));
-    if (title) parts.push(text(fx, (lines.length ? y : H - 60) - (lines.length ? 64 : 0), ellipsize(title.toUpperCase(), 22, f.body, 700, fw, 0.24), { size: 22, family: f.body, weight: 700, fill: onPanel ? c.panelInk : c.accent, tracking: 0.24 }));
+    const ds = roleSize("featuredText", 40); const ts = roleSize("featuredText", 22); const dw = roleWeight("featuredText", f.head, 400);
+    const lines = detail ? wrapText(detail, ds, f.head, dw, fw, 2) : [];
+    note("featuredText", detail, lines);
+    const y = H - 60 - (lines.length - 1) * (50 * ds / 40);
+    lines.forEach((line, i) => parts.push(text(fx, y + i * (50 * ds / 40), line, { size: ds, family: f.head, weight: dw, fill: ink })));
+    const label = title ? ellipsize(title.toUpperCase(), ts, f.body, 700, fw, 0.24) : "";
+    note("featuredText", title.toUpperCase(), label);
+    if (title) parts.push(text(fx, (lines.length ? y : H - 60) - (lines.length ? 64 * ds / 40 : 0), label, { size: ts, family: f.body, weight: 700, fill: onPanel ? c.panelInk : c.accent, tracking: 0.24 }));
+    addRegion(fixedRegion("featuredText", { x: L, y: H - 200, w: W - L, h: 200 }));
   }
   return { dropped: result.dropped, scale: result.scale };
 }
 
 function columns(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
-  const L = 1344; const x0 = 84; const top = 80;
+  const L = mediaLeft(run?.active ?? null, 1344); const x0 = 84; const top = 80;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
-  if (photo) parts.push(`<image href="${esc(photo)}" x="${L}" y="0" width="${W - L}" height="640" preserveAspectRatio="${aspect(doc)}"/>`);
+  if (photo) parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: 640 }, doc));
   else parts.push(rect(L, 0, W - L, 640, mix(c.panel, c.paper, 0.6)));
   parts.push(rect(L, 640, W - L, H - 640, c.panel));
   const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, top, 92, c.paper);
   const tx = x0 + (logoSize ? logoSize + 24 : 0);
   const maxW = L - x0 - 84 - (logoSize ? logoSize + 24 : 0);
-  const t = fitTitle(doc.title || "", maxW, 68, 44, f.head, design.look.headWeight);
+  const t = titleFit(doc.title || "", maxW, 68, 44, f.head, design.look.headWeight);
+  note("businessName", doc.title || "", t.value);
   const titleBase = top + t.size * 0.82 + (logoSize ? Math.max(0, (92 - t.size * 1.45) / 2) : 0);
-  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: design.look.headWeight, fill: c.ink }));
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink }));
   let headBottom = titleBase + t.size * 0.22;
   if (doc.subtitle) {
     parts.push(text(tx, titleBase + 46, ellipsize(doc.subtitle, 26, f.body, 400, maxW), { size: 26, family: f.body, weight: 400, fill: c.muted }));
     headBottom = titleBase + 54;
   }
   headBottom = Math.max(headBottom, logoSize ? top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: x0, y: top, w: L - x0 - 84, h: headBottom - top + 8 }));
   const menuTop = headBottom + 56;
   const footerH = doc.footer ? 62 : 0;
   const colH = H - 64 - footerH - menuTop;
   const avail = L - x0 - 84; const colW = (avail - 80) / 2;
   const shown = itemPhotosShown(doc, design);
   const base = withThumbs(baseStyle(design, f, { name: 36, price: 36, desc: 24, section: 30, itemGap: 20, sectionGap: 46, headGap: 22 }), shown, isPhotoDesign(design));
-  const result = fit(doc.sections, base, [{ cols: 2, colW }], colH, 1.3, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
+  const result = fitC(doc.sections, base, [{ cols: 2, colW }], colH, 1.3, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, 80, c);
   if (doc.footer) {
     parts.push(rect(x0, H - 64 - 40, avail, 2, mix(c.muted, c.paper, 0.7)));
     parts.push(text(x0, H - 64, ellipsize(doc.footer, 22, f.body, 400, avail), { size: 22, family: f.body, weight: 400, fill: c.muted }));
   }
   const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  addRegion(fixedRegion("featuredMedia", { x: L, y: 0, w: W - L, h: 640 }));
   if (title || detail) {
     const fx = L + 56; const fw = W - L - 112;
-    const tl = title ? wrapText(title, 54, f.head, design.look.headWeight, fw, 2) : [];
-    const dl = detail ? wrapText(detail, 28, f.body, 400, fw, 2) : [];
-    const blockH = tl.length * 58 + (dl.length ? 16 + dl.length * 36 : 0);
+    const ts = roleSize("featuredText", 54); const ds = roleSize("featuredText", 28); const kt = ts / 54; const kd = ds / 28;
+    const tw = roleWeight("featuredText", f.head, design.look.headWeight);
+    const tl = title ? wrapText(title, ts, f.head, tw, fw, 2) : [];
+    const dl = detail ? wrapText(detail, ds, f.body, 400, fw, 2) : [];
+    note("featuredText", title, tl); note("featuredText", detail, dl);
+    const blockH = tl.length * 58 * kt + (dl.length ? 16 + dl.length * 36 * kd : 0);
     let y = 640 + (H - 640 - blockH) / 2;
-    tl.forEach((line) => { parts.push(text(fx, y + 46, line, { size: 54, family: f.head, weight: design.look.headWeight, fill: c.panelInk })); y += 58; });
+    tl.forEach((line) => { parts.push(text(fx, y + 46 * kt, line, { size: ts, family: f.head, weight: tw, fill: c.panelInk })); y += 58 * kt; });
     if (dl.length) y += 16;
-    dl.forEach((line) => { parts.push(text(fx, y + 27, line, { size: 28, family: f.body, weight: 400, fill: c.panelInk, opacity: 0.92 })); y += 36; });
+    dl.forEach((line) => { parts.push(text(fx, y + 27 * kd, line, { size: ds, family: f.body, weight: 400, fill: c.panelInk, opacity: 0.92 })); y += 36 * kd; });
+    addRegion(fixedRegion("featuredText", { x: L, y: 640, w: W - L, h: H - 640 }));
   }
   return { dropped: result.dropped, scale: result.scale };
 }
 
 function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
-  const L = 1260; const x0 = 80; const top = 70; const PH = 713;
+  const L = mediaLeft(run?.active ?? null, 1260); const x0 = 80; const top = 70; const PH = 713;
   parts.push(rect(0, 0, W, H, c.paper));
   parts.push(rect(L, 0, W - L, H, c.panel));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(`<image href="${esc(photo)}" x="${L}" y="0" width="${W - L}" height="${PH}" preserveAspectRatio="${aspect(doc)}"/>`);
+    parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: PH }, doc));
     parts.push(`<defs><linearGradient id="dg-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0.55" stop-color="${c.panel}" stop-opacity="0"/><stop offset="1" stop-color="${c.panel}" stop-opacity="1"/></linearGradient></defs>`);
     parts.push(rect(L, 0, W - L, PH, "url(#dg-panel)"));
   }
@@ -638,9 +788,10 @@ function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   const tx = x0 + (logoSize ? logoSize + 26 : 0);
   const maxW = L - x0 - 80 - (logoSize ? logoSize + 26 : 0);
   const upperTitle = (doc.title || "").toUpperCase();
-  const t = fitTitle(upperTitle, maxW, 132, 72, f.head, design.look.headWeight, 0.01);
+  const t = titleFit(upperTitle, maxW, 132, 72, f.head, design.look.headWeight, 0.01, 150);
+  note("businessName", upperTitle, t.value);
   const titleBase = top + t.size * 0.82;
-  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: design.look.headWeight, fill: c.ink, tracking: 0.01 }));
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink, tracking: 0.01 }));
   let headBottom = titleBase + t.size * 0.12;
   if (doc.subtitle) {
     const chipText = ellipsize(doc.subtitle.toUpperCase(), 24, f.body, 800, maxW - 40, 0.08);
@@ -650,13 +801,14 @@ function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
     headBottom = cy + 42;
   }
   headBottom = Math.max(headBottom, logoSize ? top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: x0, y: top, w: L - x0 - 80, h: headBottom - top + 8 }));
   const menuTop = headBottom + 44;
   const footerH = doc.footer ? 46 : 0;
   const colH = H - 56 - footerH - menuTop;
   const avail = L - x0 - 80; const colW = (avail - 64) / 2;
   const shown = itemPhotosShown(doc, design);
   const base = withThumbs(baseStyle(design, f, { name: 38, price: 42, desc: 25, section: 62, itemGap: 22, sectionGap: 40, headGap: 18 }), shown, isPhotoDesign(design));
-  const result = fit(doc.sections, base, [{ cols: 2, colW }], colH, 1.25, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
+  const result = fitC(doc.sections, base, [{ cols: 2, colW }], colH, 1.25, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, 64, c);
   if (doc.footer) parts.push(text(x0, H - 56, ellipsize(doc.footer.toUpperCase(), 22, f.body, 700, avail, 0.06), { size: 22, family: f.body, weight: 700, fill: c.muted, tracking: 0.06 }));
   // Feature panel: big headline, detail, and a price badge taken from the detail text.
@@ -664,13 +816,18 @@ function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   const price = (detail.match(/[$€£]\s?\d+(?:[.,]\d{1,2})?/) || [""])[0];
   const badgeInPanel = Boolean(doc.videoMediaId);
   const fx = L + 56; const fw = W - L - 112 - (badgeInPanel && price ? 210 : 0);
+  addRegion(fixedRegion("featuredMedia", { x: L, y: 0, w: W - L, h: PH }));
   if (title || detail) {
-    const tl = title ? wrapText(title.toUpperCase(), 104, f.head, design.look.headWeight, fw, 2) : [];
-    const dl = detail ? wrapText(detail, 30, f.body, 700, fw, 2) : [];
-    const y = H - 64 - (dl.length ? (dl.length - 1) * 38 : 0);
-    dl.forEach((line, i) => parts.push(text(fx, y + i * 38, line, { size: 30, family: f.body, weight: 700, fill: c.panelInk })));
-    const ty = (dl.length ? y - 30 - 22 : H - 64) - (tl.length - 1) * 94;
-    tl.forEach((line, i) => parts.push(text(fx, ty + i * 94, line, { size: 104, family: f.head, weight: design.look.headWeight, fill: c.panelInk })));
+    const ts = roleSize("featuredText", 104); const ds = roleSize("featuredText", 30); const kt = ts / 104; const kd = ds / 30;
+    const tw = roleWeight("featuredText", f.head, design.look.headWeight);
+    const tl = title ? wrapText(title.toUpperCase(), ts, f.head, tw, fw, 2) : [];
+    const dl = detail ? wrapText(detail, ds, f.body, 700, fw, 2) : [];
+    note("featuredText", title.toUpperCase(), tl); note("featuredText", detail, dl);
+    const y = H - 64 - (dl.length ? (dl.length - 1) * 38 * kd : 0);
+    dl.forEach((line, i) => parts.push(text(fx, y + i * 38 * kd, line, { size: ds, family: f.body, weight: 700, fill: c.panelInk })));
+    const ty = (dl.length ? y - 30 * kd - 22 : H - 64) - (tl.length - 1) * 94 * kt;
+    tl.forEach((line, i) => parts.push(text(fx, ty + i * 94 * kt, line, { size: ts, family: f.head, weight: tw, fill: c.panelInk })));
+    addRegion(fixedRegion("featuredText", { x: L, y: PH, w: W - L, h: H - PH }));
   }
   if (price) {
     const r = 95;
@@ -690,10 +847,13 @@ function list(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desig
   const tx = x0 + (logoSize ? logoSize + 30 : 0);
   const maxW = W - x0 - 80 - (logoSize ? logoSize + 30 : 0);
   const upper = design.look.head === "bebas-neue" || design.look.head === "oswald";
-  const t = fitTitle(upper ? (doc.title || "").toUpperCase() : doc.title || "", maxW, 96, 56, f.head, design.look.headWeight);
+  const listTitle = upper ? (doc.title || "").toUpperCase() : doc.title || "";
+  const t = titleFit(listTitle, maxW, 96, 56, f.head, design.look.headWeight, 0, 110);
+  note("businessName", listTitle, t.value);
+  addRegion(fixedRegion("businessName", { x: 0, y: 0, w: W, h: band }));
   const hasSub = Boolean(doc.subtitle);
   const titleBase = hasSub ? 112 : band / 2 + t.size * 0.34;
-  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: design.look.headWeight, fill: c.panelInk }));
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.panelInk }));
   if (hasSub) parts.push(text(tx, 160, ellipsize(doc.subtitle, 30, f.body, 400, maxW), { size: 30, family: f.body, weight: 400, fill: c.panelInk, opacity: 0.88 }));
   const menuTop = band + 8 + 60;
   const footerH = doc.footer ? 48 : 0;
@@ -701,7 +861,7 @@ function list(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desig
   const avail = W - x0 * 2; const gap = 72; const colW = (avail - gap * 2) / 3;
   const shown = itemPhotosShown(doc, design);
   const base = withThumbs(baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), shown, isPhotoDesign(design));
-  const result = fit(doc.sections, base, [{ cols: 3, colW }], colH, 1.5, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
+  const result = fitC(doc.sections, base, [{ cols: 3, colW }], colH, 1.5, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, gap, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
   return { dropped: result.dropped, scale: result.scale };
@@ -716,10 +876,13 @@ function bandHeader(parts: string[], doc: LayoutDocument, design: MenuDesign, c:
   const tx = x0 + (logoSize ? logoSize + 30 : 0);
   const maxW = W - x0 * 2 - (logoSize ? logoSize + 30 : 0);
   const upper = design.look.head === "bebas-neue" || design.look.head === "oswald";
-  const t = fitTitle(upper ? (doc.title || "").toUpperCase() : doc.title || "", maxW, 88, 52, f.head, design.look.headWeight);
+  const bandTitle = upper ? (doc.title || "").toUpperCase() : doc.title || "";
+  const t = titleFit(bandTitle, maxW, 88, 52, f.head, design.look.headWeight, 0, 100);
+  note("businessName", bandTitle, t.value);
+  addRegion(fixedRegion("businessName", { x: 0, y: 0, w: W, h: band }));
   const hasSub = Boolean(doc.subtitle);
   const titleBase = hasSub ? band * 0.52 : band / 2 + t.size * 0.34;
-  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: design.look.headWeight, fill: c.panelInk }));
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.panelInk }));
   if (hasSub) parts.push(text(tx, band * 0.8, ellipsize(doc.subtitle, 28, f.body, 400, maxW), { size: 28, family: f.body, weight: 400, fill: c.panelInk, opacity: 0.88 }));
   return band + 8;
 }
@@ -757,7 +920,8 @@ function cards(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   const condensed = design.look.head === "bebas-neue" || design.look.head === "oswald";
   const photoOf = itemPhotoResolver(art);
   const multiSection = new Set(all.map((x) => x.section)).size > 1;
-  const nameSize = Math.max(22, Math.min(condensed ? 50 : 38, cardW * (condensed ? 0.1 : 0.075))) * (rows === 3 ? 0.9 : 1);
+  const nameSize0 = Math.max(22, Math.min(condensed ? 50 : 38, cardW * (condensed ? 0.1 : 0.075))) * (rows === 3 ? 0.9 : 1);
+  const nameSize = run?.active ? Math.max(Math.min(READABLE_FLOORS.itemName, nameSize0), nameSize0 * roleScale("itemName")) : nameSize0;
   shownItems.forEach(({ item, section }, i) => {
     const x = x0 + (i % cols) * (cardW + gap);
     const y = top + Math.floor(i / cols) * (cardH + gap);
@@ -779,38 +943,51 @@ function cards(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
     const ink = dark ? c.ink : readableOn(c.ink, cardBg, 4.5).color;
     const muted = readableOn(c.muted, cardBg, 4.5).color;
     const accent = readableOn(c.accent, cardBg, 3).color;
-    const priceSize = nameSize * (condensed ? 1 : 0.95);
-    const priceFam = design.look.tags ? { family: condensed ? f.head : f.body, weight: condensed ? design.look.headWeight : 800 } : { family: circle ? f.head : f.body, weight: circle ? design.look.headWeight : 800 };
+    const priceSize0 = nameSize0 * (condensed ? 1 : 0.95);
+    const priceFloor = run?.active ? Math.min(READABLE_FLOORS.price, priceSize0) : 0;
+    const priceSize = run?.active ? Math.max(priceFloor, priceSize0 * roleScale("price")) : priceSize0;
+    const priceFam0 = design.look.tags ? { family: condensed ? f.head : f.body, weight: condensed ? design.look.headWeight : 800 } : { family: circle ? f.head : f.body, weight: circle ? design.look.headWeight : 800 };
+    const priceFam = { family: priceFam0.family, weight: roleWeight("price", priceFam0.family, priceFam0.weight) };
     const priceW = item.price ? textWidth(item.price, priceSize, priceFam.family, priceFam.weight) + (design.look.tags ? priceSize * 0.64 : 0) : 0;
     // Rectangular cards put the price on the name row (right), so the description has room; round cards centre it below.
     const priceBelow = circle;
     const priceH = item.price && priceBelow ? (design.look.tags ? priceSize * 1.3 : priceSize * 1.1) : 0;
     const room = y + cardH - 14 - priceH - photoBottom;
     let ns = nameSize;
-    const labelSize = Math.max(14, ns * 0.42);
-    const nameFam = condensed ? { family: f.head, weight: design.look.headWeight } : { family: f.body, weight: 800 };
+    // The section label is not a customizable role on cards: it keeps the template size when names are resized.
+    const labelSize = Math.max(14, (run?.active ? nameSize0 : ns) * 0.42);
+    const nameFam0 = condensed ? { family: f.head, weight: design.look.headWeight } : { family: f.body, weight: 800 };
+    const nameFam = { family: nameFam0.family, weight: roleWeight("itemName", nameFam0.family, nameFam0.weight) };
     const nameText = condensed ? item.name.toUpperCase() : item.name;
     const nameW = () => (priceBelow ? tw : Math.max(tw * 0.45, tw - priceW - 14));
     let lines = wrapText(nameText, ns, nameFam.family, nameFam.weight, nameW(), 2);
-    const descSize = Math.max(15, ns * 0.5);
+    const descSize = Math.max(15, ns * 0.5 * (run?.active ? run.active.scale.description / run.active.scale.itemName : 1));
     let desc = item.description ? wrapText(item.description, descSize, f.body, 400, tw, 2) : [];
     const need = () => (multiSection ? labelSize * 1.5 : 0) + lines.length * ns * 1.1 + (desc.length ? 6 + desc.length * descSize * 1.3 : 0);
     if (need() > room && desc.length > 1) desc = wrapText(item.description, descSize, f.body, 400, tw, 1);
     if (need() > room) desc = [];
-    while (need() > room && ns > 18) { ns -= 2; lines = wrapText(nameText, ns, nameFam.family, nameFam.weight, nameW(), 2); }
+    // Customized names stop at the readable floor (or the template's own size if smaller); what still does not fit is reported.
+    const nsMin = run?.active ? Math.max(18, Math.min(READABLE_FLOORS.itemName, nameSize0)) : 18;
+    while (need() > room && ns > nsMin) { ns -= 2; lines = wrapText(nameText, ns, nameFam.family, nameFam.weight, nameW(), 2); }
     let ty = photoBottom;
     if (multiSection && section) {
       parts.push(text(tx, ty + labelSize, ellipsize(section.toUpperCase(), labelSize, f.body, 700, tw, 0.14), { size: labelSize, family: f.body, weight: 700, fill: accent, tracking: 0.14, anchor }));
       ty += labelSize * 1.5;
     }
     const nameTop = ty;
+    if (run) {
+      const at = run.items.get(item);
+      if (at) addRegion(itemRegion(item, at[0], at[1], { x, y, w: cardW, h: cardH }));
+      note("menu", nameText, lines);
+      if (item.description) note("menu", item.description, desc.length ? desc : ["…"]);
+    }
     lines.forEach((line) => { ty += ns * 1.02; parts.push(text(tx, ty, line, { size: ns, family: nameFam.family, weight: nameFam.weight, fill: ink, anchor })); ty += ns * 0.08; });
     if (desc.length) {
       ty += 6;
       desc.forEach((line) => { ty += descSize * 1.05; parts.push(text(tx, ty, line, { size: descSize, family: f.body, weight: 400, fill: muted, anchor })); ty += descSize * 0.25; });
     }
     if (item.price) {
-      const ps = priceBelow ? priceSize : Math.min(priceSize, ns * 1.05);
+      const ps = priceBelow ? priceSize : Math.max(Math.min(priceSize, ns * 1.05), priceFloor);
       const th = ps * 1.25;
       const pw = textWidth(item.price, ps, priceFam.family, priceFam.weight) + (design.look.tags ? ps * 0.64 : 0);
       // Price box: below the text on round cards, at the right of the first name line on rectangular cards.
@@ -842,24 +1019,27 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, top, 96, c.paper);
   const tx = x0 + (logoSize ? logoSize + 26 : 0);
   const maxW = L - x0 - 72 - (logoSize ? logoSize + 26 : 0);
-  const t = fitTitle(doc.title || "", maxW, 78, 48, f.head, design.look.headWeight);
+  const t = titleFit(doc.title || "", maxW, 78, 48, f.head, design.look.headWeight);
+  note("businessName", doc.title || "", t.value);
   const titleBase = top + t.size * 0.84 + (logoSize ? Math.max(0, (96 - t.size * 1.6) / 2) : 0);
-  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: design.look.headWeight, fill: c.ink }));
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink }));
   let headBottom = titleBase + t.size * 0.22;
   if (doc.subtitle) {
     parts.push(text(tx, titleBase + 46, ellipsize(doc.subtitle.toUpperCase(), 22, f.body, 700, maxW, 0.2), { size: 22, family: f.body, weight: 700, fill: c.accent, tracking: 0.2 }));
     headBottom = titleBase + 54;
   }
   headBottom = Math.max(headBottom, logoSize ? top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: x0, y: top, w: L - x0 - 72, h: headBottom - top + 8 }));
   parts.push(rect(x0, headBottom + 34, 160, 2, mix(c.accent, c.paper, 0.6)));
   const menuTop = headBottom + 72;
   const footerH = doc.footer ? 50 : 0;
   const colH = H - 64 - footerH - menuTop;
   const picks = featuredItems(doc);
   const rest = doc.sections.map((section) => ({ ...section, items: section.items.filter((item) => !picks.includes(item)) }));
+  if (run) rest.forEach((section, i) => run!.sections.set(section, i));
   const avail = L - x0 - 72;
   const base = baseStyle(design, f, { name: 34, price: 34, desc: 22, section: 26, itemGap: 20, sectionGap: 38, headGap: 20 });
-  const result = fit(rest, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 56) / 2 }], colH, 1.2, 0.55, 0.92);
+  const result = fitC(rest, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 56) / 2 }], colH, 1.2, 0.55, 0.92);
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 56) / 2, 56, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 22, f.head, 400, avail), { size: 22, family: f.head, weight: 400, fill: c.muted }));
   // Featured dishes: large photo, name, description and price; the photo never covers the text.
@@ -870,6 +1050,8 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   const accent = readableOn(c.accent, c.panel, 3).color;
   picks.forEach((item, i) => {
     const y = pad + i * (cardH + gapY);
+    const at = run?.items.get(item);
+    if (at) addRegion(itemRegion(item, at[0], at[1], { x: L, y, w: W - L, h: cardH }));
     const side = Math.min(cardH, k === 1 ? 520 : 300);
     const px = L + pad;
     photoTile(parts, photoOf(item), px, y + (cardH - side) / 2, side, side, 18, c, initialOf(item.name), c.panel);
@@ -888,15 +1070,30 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
 
 /** The full 1920×1080 board for a design document, plus how the text was fitted. */
 export function designSvgWithReport(doc: LayoutDocument, art?: DesignArt): { svg: string; report: DesignReport } {
+  const active = activeCustom(doc);
+  // A customized board starts from the scale the template itself fits the menu at (see fitC).
+  const s0 = active ? renderDesign(doc, art, null, 1).report.scale : 1;
+  return renderDesign(doc, art, active, s0);
+}
+function renderDesign(doc: LayoutDocument, art: DesignArt | undefined, active: ActiveCustom | null, s0: number): { svg: string; report: DesignReport } {
   const design = designById(doc.design)!;
   const c = designColors(doc, design);
   const f = fonts(doc, design);
   const parts: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`];
   clipSeq = 0;
-  const draw = { showcase, columns, promo, list, cards, featured }[design.composition];
-  const report = draw(parts, doc, design, c, f, art);
-  parts.push("</svg>");
-  return { svg: parts.join(""), report };
+  const sections = new Map<object, number>();
+  const items = new Map<object, [number, number]>();
+  doc.sections.forEach((section, si) => { sections.set(section, si); section.items.forEach((item, ii) => items.set(item, [si, ii])); });
+  const previous = run;
+  run = { active, s0, regions: [], clips: emptyClips(), sections, items, imageSize: art?.imageSize ?? null, doc };
+  try {
+    const draw = { showcase, columns, promo, list, cards, featured }[design.composition];
+    const report = draw(parts, doc, design, c, f, art);
+    parts.push("</svg>");
+    return { svg: parts.join(""), report: { ...report, clips: run.clips, regions: run.regions } };
+  } finally {
+    run = previous;
+  }
 }
 export function designSvg(doc: LayoutDocument, art?: DesignArt): string {
   return designSvgWithReport(doc, art).svg;
