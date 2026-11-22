@@ -19,6 +19,7 @@ export function planStatus(input: { state: string; planName: string; subscriptio
   if (state === "trial_grace") return { label: "Trial ended", tone: "warn", note: null };
   if (state === "grandfathered") return { label: "Active", tone: "ok", note: null };
   if (state === "past_due") return { label: "Past due", tone: "warn", note: "Update your payment method in Manage billing to keep your plan." };
+  if (sub?.status === "paused" && state === "canceled") return { label: "Paused", tone: "warn", note: "Your subscription is paused. Use Manage billing to resume your plan." };
   if (state === "canceled" || state === "expired") return { label: "Not active", tone: "muted", note: null };
   const end = billingDate(sub?.current_period_end ?? null);
   if (sub && end && sub.cancel_at_period_end && (sub.status === "active" || sub.status === "trialing")) {
@@ -34,7 +35,7 @@ export function planStatus(input: { state: string; planName: string; subscriptio
 export function planChangeMode(sub: SubscriptionView): "checkout" | "update" | "portal" {
   if (!sub) return "checkout";
   if (sub.status === "active" || sub.status === "trialing") return "update";
-  if (sub.status === "past_due") return "portal";
+  if (sub.status === "past_due" || sub.status === "paused" || sub.status === "incomplete") return "portal";
   return "checkout";
 }
 
@@ -73,12 +74,16 @@ export function checkoutIsDeferred(input: { state?: string | null; trialEndsAt?:
 export function checkoutNote(
   availability: "loading" | "available" | "unavailable",
   mode: "checkout" | "update" | "portal",
-  opts?: { deferredUntil?: string | null },
+  opts?: { deferredUntil?: string | null; subscriptionStatus?: string | null },
 ): string {
   if (availability === "loading") return "";
   if (availability === "unavailable") return "Online checkout is coming soon. Your free trial includes 5 screens and every feature, with no card needed.";
   if (mode === "update") return "Switching plans changes your current subscription right away; no second subscription is created. Stripe charges the price difference for the rest of this billing period immediately (a downgrade becomes a credit on your next invoice).";
-  if (mode === "portal") return "Your last payment didn't go through. Use Manage billing to update your card or change plans.";
+  if (mode === "portal") {
+    if (opts?.subscriptionStatus === "paused") return "Your subscription is paused. Use Manage billing to resume your plan or update your payment method.";
+    if (opts?.subscriptionStatus === "incomplete") return "Your initial payment is still pending. Use Manage billing to finish payment or manage your subscription.";
+    return "Your last payment didn't go through. Use Manage billing to update your card or change plans.";
+  }
   if (opts?.deferredUntil) {
     return `You'll finish on Stripe's secure checkout. Confirming saves your card and bills on ${opts.deferredUntil}; you will not be charged today. The plan then renews monthly until you cancel. This does not extend your free trial.`;
   }

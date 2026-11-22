@@ -145,7 +145,7 @@ export default function Billing() {
         {(() => {
           const deferred = checkoutIsDeferred({ state: e?.state, trialEndsAt: e?.trial?.ends_at ?? null });
           const until = deferred && e?.trial?.ends_at ? local(e.trial.ends_at) : null;
-          return <p className="text-muted mt-3 text-sm min-h-5" data-testid="checkout-note">{checkoutNote(availability, mode, { deferredUntil: until })}</p>;
+          return <p className="text-muted mt-3 text-sm min-h-5" data-testid="checkout-note">{checkoutNote(availability, mode, { deferredUntil: until, subscriptionStatus: e?.subscription?.status ?? null })}</p>;
         })()}
         <LocalizedBillingDisclosure className="mt-4" />
       </section>

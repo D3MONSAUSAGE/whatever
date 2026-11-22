@@ -201,7 +201,12 @@ export function statusDetailFor(e: EntitlementRow, opts: WarningOptions = {}): {
     const copy = billingWarningCopy("active", locale, { date: e.current_period_end ? utcDate(e.current_period_end) : "" });
     return { kind: copy.kind, message: copy.message };
   }
-  if (e.state === "trial" && pm && e.trial_ends_at) {
+  const hasPendingOrEndedSub =
+    e.subscription_status === "incomplete"
+    || e.subscription_status === "incomplete_expired"
+    || e.subscription_status === "paused"
+    || e.subscription_status === "canceled";
+  if (e.state === "trial" && pm && e.trial_ends_at && !hasPendingOrEndedSub) {
     const copy = billingWarningCopy("trialing", locale, { date: utcDate(e.trial_ends_at), paymentMethod: pm });
     return { kind: copy.kind, message: copy.message };
   }
@@ -210,7 +215,12 @@ export function statusDetailFor(e: EntitlementRow, opts: WarningOptions = {}): {
 
 export function billingStartsAt(e: EntitlementRow, hasPaymentMethod: boolean): string | null {
   if (e.subscription_status === "trialing" && !e.cancel_at_period_end) return e.current_period_end;
-  if (e.plan === "trial" && e.state === "trial" && hasPaymentMethod) return e.trial_ends_at;
+  const hasPendingOrEndedSub =
+    e.subscription_status === "incomplete"
+    || e.subscription_status === "incomplete_expired"
+    || e.subscription_status === "paused"
+    || e.subscription_status === "canceled";
+  if (e.plan === "trial" && e.state === "trial" && hasPaymentMethod && !hasPendingOrEndedSub) return e.trial_ends_at;
   return null;
 }
 

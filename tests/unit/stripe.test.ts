@@ -83,12 +83,18 @@ describe("billing portal and plan changes", () => {
     expect(checkoutBlocked("active")).toBe(true);
     expect(checkoutBlocked("trialing")).toBe(true);
     expect(checkoutBlocked("past_due")).toBe(true);
+    expect(checkoutBlocked("paused")).toBe(true);
+    expect(checkoutBlocked("incomplete")).toBe(true);
+    expect(checkoutBlocked("incomplete_expired")).toBe(false);
     expect(checkoutBlocked("canceled")).toBe(false);
     expect(checkoutBlocked(null)).toBe(false);
     expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("update");
     expect(checkoutAction({ status: "trialing", subscriptionId: "sub_1", currentPriceId: "price_biz", nextPriceId: "price_start" })).toBe("update");
     expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: "price_biz", nextPriceId: "price_biz" })).toBe("same");
     expect(checkoutAction({ status: "past_due", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "paused", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "incomplete", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("portal");
+    expect(checkoutAction({ status: "incomplete_expired", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("checkout");
     expect(checkoutAction({ status: "active", subscriptionId: "sub_1", currentPriceId: null, nextPriceId: "price_biz" })).toBe("portal");
     expect(checkoutAction({ status: "canceled", subscriptionId: "sub_1", currentPriceId: "price_start", nextPriceId: "price_biz" })).toBe("checkout");
     expect(checkoutAction({ status: null, subscriptionId: null, currentPriceId: null, nextPriceId: "price_biz" })).toBe("checkout");
