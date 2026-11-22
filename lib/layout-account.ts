@@ -11,6 +11,9 @@ export type AccountLibraryFile = {
   sizeBytes?: number | null;
   /** Signed URL of the stored video thumbnail, when one exists. */
   thumbnailUrl?: string | null;
+  /** Video conversion state when loaded alongside /api/media or in a fixture. Absent or "ready" = publishable. */
+  processingStatus?: "pending" | "processing" | "ready" | "failed" | null;
+  processingError?: string | null;
 };
 
 /**
@@ -60,6 +63,9 @@ function file(value: unknown): AccountLibraryFile | null {
   if (typeof row.id !== "string" || typeof row.name !== "string") return null;
   if (row.kind !== "image" && row.kind !== "video") return null;
   if (typeof row.mime !== "string") return null;
+  const status = row.processingStatus === "pending" || row.processingStatus === "processing" || row.processingStatus === "ready" || row.processingStatus === "failed"
+    ? row.processingStatus
+    : undefined;
   return {
     id: row.id,
     name: row.name,
@@ -68,6 +74,8 @@ function file(value: unknown): AccountLibraryFile | null {
     url: typeof row.url === "string" ? row.url : null,
     sizeBytes: typeof row.sizeBytes === "number" && Number.isFinite(row.sizeBytes) ? row.sizeBytes : null,
     thumbnailUrl: typeof row.thumbnailUrl === "string" ? row.thumbnailUrl : null,
+    ...(status ? { processingStatus: status } : {}),
+    ...(typeof row.processingError === "string" ? { processingError: row.processingError } : {}),
   };
 }
 
@@ -147,4 +155,45 @@ export function applyLibraryFile(doc: LayoutDocument, entry: AccountLibraryFile 
 export function placeZoneMedia(doc: LayoutDocument, role: "photo" | "video", id: string | null, exclusive: boolean): LayoutDocument {
   if (role === "photo") return { ...doc, imageMediaId: id, videoMediaId: exclusive ? null : doc.videoMediaId };
   return { ...doc, videoMediaId: id, imageMediaId: exclusive ? null : doc.imageMediaId };
+}
+
+/**
+ * Step 3 (Content) single-item featured media selection.
+ * Picks one primary item (photo, video, template sample photo, or none) while preserving
+ * existing saved board fields until the owner changes them.
+ */
+export function selectFeaturedMedia(
+  doc: LayoutDocument,
+  pick: { kind: "image" | "video" | "sample" | "none"; id?: string; stockPhoto?: LayoutDocument["stockPhoto"] },
+  options: { isDesign: boolean; supportsVideo: boolean; exclusive?: boolean },
+): LayoutDocument {
+  if (pick.kind === "none") {
+    const next: LayoutDocument = { ...doc, imageMediaId: null, videoMediaId: null };
+    if (options.isDesign) delete next.stockPhoto;
+    return next;
+  }
+  if (pick.kind === "sample") {
+    const next: LayoutDocument = { ...doc, imageMediaId: null, videoMediaId: null };
+    if (options.isDesign && pick.stockPhoto) next.stockPhoto = pick.stockPhoto;
+    return next;
+  }
+  if (pick.kind === "image") {
+    const id = pick.id ?? null;
+    const base = options.exclusive ? placeZoneMedia(doc, "photo", id, Boolean(id)) : { ...doc, imageMediaId: id, videoMediaId: null };
+    if (options.isDesign) {
+      const next = { ...base };
+      delete next.stockPhoto;
+      return next;
+    }
+    return base;
+  }
+  if (!options.supportsVideo) return doc;
+  const id = pick.id ?? null;
+  const base = options.exclusive ? placeZoneMedia(doc, "video", id, Boolean(id)) : { ...doc, videoMediaId: id, imageMediaId: null };
+  if (options.isDesign) {
+    const next = { ...base };
+    delete next.stockPhoto;
+    return next;
+  }
+  return base;
 }
