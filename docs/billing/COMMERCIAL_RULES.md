@@ -8,7 +8,7 @@ Source of truth: `commercialEntitlement()` in `lib/server/entitlements.ts`, appl
 | Starter / Business / Multi | 1 / 3 / 5 active screens while the Stripe subscription is active. |
 | Canceled at period end | Full access until the paid-through date, then restricted. |
 | Payment failed (past_due) | 7-day grace from the first failure (playback only), then restricted. If Stripe ends the subscription after a failure, both SQL `account_entitlement` and JS `commercialEntitlement` cap playback at `least(grace_ends_at, current_period_end)`; the unpaid period is not given away. |
-| unpaid, incomplete, incomplete_expired, paused, no status | Restricted. |
+| unpaid, incomplete, incomplete_expired, paused, no status | Restricted (`state: "canceled"`, playback off, writes locked). Exception: an incomplete/failed first-payment attempt (`incomplete` / `incomplete_expired`) while still in a valid 14-day free trial keeps `plan = "trial"` and preserves the original 14-day trial and 3-day `trial_grace` without granting any paid entitlements until payment succeeds. `paused` and `incomplete` block duplicate `POST /api/billing/checkout` (`409 subscription_exists`, `action: "portal"` for owners; `403 not_owner` for non-owners). |
 | Complimentary (`comp`) | Active, 5 screens, no expiry, no Stripe. Playback allowed. Only accounts explicitly set to `comp` (service-role `set_account_comp`). Billing reminders and billing emails skip these accounts. |
 | grandfathered, any other plan | Restricted (no free plans). Move these orgs to `trial` before enforcing. Do not treat `comp` as restricted. |
 

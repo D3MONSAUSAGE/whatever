@@ -266,7 +266,11 @@ function subscriptionIdOf(ev: Stripe.Event): string | null {
     // Acacia puts the id on invoice.subscription. Basil moved it under parent.subscription_details.
     return idOf(invoice.subscription) ?? idOf(invoice.parent?.subscription_details?.subscription);
   }
-  if (ev.type === "checkout.session.completed") {
+  if (
+    ev.type === "checkout.session.completed"
+    || ev.type === "checkout.session.async_payment_succeeded"
+    || ev.type === "checkout.session.async_payment_failed"
+  ) {
     const session = ev.data.object as Stripe.Checkout.Session;
     return idOf(session.subscription);
   }
@@ -295,7 +299,14 @@ export function periodEndSeconds(sub: Stripe.Subscription): number | null {
 export function statusFor(ev: Stripe.Event, sub: Stripe.Subscription, nowMs: number): string {
   if (ev.type === "customer.subscription.deleted") return "canceled";
   if (ev.type === "invoice.payment_failed") {
-    if (sub.status === "canceled" || sub.status === "incomplete_expired") return sub.status;
+    if (
+      sub.status === "canceled"
+      || sub.status === "incomplete"
+      || sub.status === "incomplete_expired"
+      || sub.status === "paused"
+    ) {
+      return sub.status;
+    }
     if (sub.status === "trialing" && sub.trial_end && sub.trial_end * 1000 > nowMs) return "trialing";
     return "past_due";
   }
@@ -317,6 +328,8 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
   const now = opts.now ?? Date.now();
   const fetchSubscription = opts.fetchSubscription ?? defaultFetchSubscription;
   const handled = ev.type === "checkout.session.completed"
+    || ev.type === "checkout.session.async_payment_succeeded"
+    || ev.type === "checkout.session.async_payment_failed"
     || ev.type.startsWith("customer.subscription.")
     || ev.type === "invoice.paid"
     || ev.type === "invoice.payment_failed";
@@ -331,66 +344,98 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
         if (ev.type !== "customer.subscription.deleted") throw err;
         sub = ev.data.object as Stripe.Subscription;
       }
-      const accountFromSession = ev.type === "checkout.session.completed"
+      const accountFromSession = (
+        ev.type === "checkout.session.completed"
+        || ev.type === "checkout.session.async_payment_succeeded"
+        || ev.type === "checkout.session.async_payment_failed"
+      )
         ? (ev.data.object as Stripe.Checkout.Session).client_reference_id
         : null;
       const accountId = accountFromSession || sub.metadata?.account_id || null;
       const status = statusFor(ev, sub, now);
       const periodEnd = periodEndSeconds(sub);
       const snap = await loadAccountBillingState(accountId, sub.id);
-      const grace = nextGraceEnd({
-        status,
-        previousStatus: snap.subscription_status,
-        previousGrace: snap.grace_ends_at,
-        now,
-      });
-      const invoiceAmountPaid = ev.type === "invoice.paid"
-        ? (ev.data.object as Stripe.Invoice).amount_paid ?? null
-        : null;
-      const trialCanceledBeforeCharge = nextTrialCanceledBeforeCharge({
-        status,
-        eventType: ev.type,
-        invoiceAmountPaid,
-        subTrialEnd: typeof sub.trial_end === "number" ? sub.trial_end : null,
-        periodEnd,
-        graceEndsAt: grace,
-        previousStatus: snap.subscription_status,
-        previousTrialCanceled: snap.trial_canceled_before_charge,
-      });
-      const patch: Record<string, unknown> = {
-        stripe_subscription_id: sub.id,
-        stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
-        subscription_status: status,
-        current_period_end: ts(periodEnd),
-        cancel_at_period_end: sub.cancel_at_period_end,
-        grace_ends_at: grace,
-        trial_canceled_before_charge: trialCanceledBeforeCharge,
-        billing_event_created: ev.created ?? 0,
-      };
-      const plan = planForPrice(sub.items.data[0]?.price?.id);
-      if (plan) patch.plan = plan;
-      const pm = paymentMethodFromSubscription(sub);
-      if (pm) Object.assign(patch, paymentMethodPatch(pm, now));
-      if (ev.type === "checkout.session.completed" || status === "active" || status === "trialing") {
-        Object.assign(patch, CHECKOUT_CLEAR_PATCH);
-      }
-      const created = ev.created ?? 0;
-      const sameSecond = `and(billing_event_created.eq.${created},subscription_status.not.in.(canceled,incomplete_expired))`;
-      const filter = `billing_event_created.is.null,billing_event_created.lt.${created},${sameSecond}`;
-      async function writePatch(body: Record<string, unknown>) {
-        let q = db().from("accounts").update(body);
-        q = accountId ? q.eq("id", accountId) : q.eq("stripe_subscription_id", sub.id);
-        return q.or(filter);
-      }
-      const written = await writePatch(patch);
-      if (written.error && isMissingSchema(written.error)) {
-        const legacy = { ...patch };
-        for (const key of ["payment_method_brand", "payment_method_last4", "payment_method_synced_at", "checkout_session_id", "checkout_session_price", "checkout_session_expires_at", "trial_canceled_before_charge"]) {
-          delete legacy[key];
+      const isSupersededSubscription =
+        !!snap.stripe_subscription_id
+        && snap.stripe_subscription_id !== sub.id
+        && (
+          snap.subscription_status === "active"
+          || snap.subscription_status === "trialing"
+          || snap.subscription_status === "past_due"
+          || snap.subscription_status === "paused"
+        )
+        && (status === "incomplete" || status === "incomplete_expired" || status === "canceled");
+      if (!isSupersededSubscription) {
+        const grace = nextGraceEnd({
+          status,
+          previousStatus: snap.subscription_status,
+          previousGrace: snap.grace_ends_at,
+          now,
+        });
+        const invoiceAmountPaid = ev.type === "invoice.paid"
+          ? (ev.data.object as Stripe.Invoice).amount_paid ?? null
+          : null;
+        const trialCanceledBeforeCharge = nextTrialCanceledBeforeCharge({
+          status,
+          eventType: ev.type,
+          invoiceAmountPaid,
+          subTrialEnd: typeof sub.trial_end === "number" ? sub.trial_end : null,
+          periodEnd,
+          graceEndsAt: grace,
+          previousStatus: snap.subscription_status,
+          previousTrialCanceled: snap.trial_canceled_before_charge,
+        });
+        const patch: Record<string, unknown> = {
+          stripe_subscription_id: sub.id,
+          stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+          subscription_status: status,
+          current_period_end: ts(periodEnd),
+          cancel_at_period_end: sub.cancel_at_period_end,
+          grace_ends_at: grace,
+          trial_canceled_before_charge: trialCanceledBeforeCharge,
+          billing_event_created: ev.created ?? 0,
+        };
+        const plan = planForPrice(sub.items.data[0]?.price?.id);
+        const allowPlanWrite =
+          status === "active"
+          || status === "trialing"
+          || status === "past_due"
+          || status === "paused"
+          || (status === "canceled" && snap.plan !== "trial");
+        if (plan && allowPlanWrite) patch.plan = plan;
+        const pm = paymentMethodFromSubscription(sub);
+        if (pm) Object.assign(patch, paymentMethodPatch(pm, now));
+        if (
+          ev.type === "checkout.session.completed"
+          || ev.type === "checkout.session.async_payment_succeeded"
+          || ev.type === "checkout.session.async_payment_failed"
+          || status === "active"
+          || status === "trialing"
+        ) {
+          Object.assign(patch, CHECKOUT_CLEAR_PATCH);
         }
-        await must(writePatch(legacy));
-      } else if (written.error) {
-        throw new Error(written.error.message);
+        const created = ev.created ?? 0;
+        const sameSecond = status === "incomplete"
+          ? `and(billing_event_created.eq.${created},or(subscription_status.is.null,subscription_status.eq.incomplete))`
+          : status === "incomplete_expired"
+            ? `and(billing_event_created.eq.${created},or(subscription_status.is.null,subscription_status.in.(incomplete,incomplete_expired)))`
+            : `and(billing_event_created.eq.${created},subscription_status.not.in.(canceled,incomplete_expired))`;
+        const filter = `billing_event_created.is.null,billing_event_created.lt.${created},${sameSecond}`;
+        async function writePatch(body: Record<string, unknown>) {
+          let q = db().from("accounts").update(body);
+          q = accountId ? q.eq("id", accountId) : q.eq("stripe_subscription_id", sub.id);
+          return q.or(filter);
+        }
+        const written = await writePatch(patch);
+        if (written.error && isMissingSchema(written.error)) {
+          const legacy = { ...patch };
+          for (const key of ["payment_method_brand", "payment_method_last4", "payment_method_synced_at", "checkout_session_id", "checkout_session_price", "checkout_session_expires_at", "trial_canceled_before_charge"]) {
+            delete legacy[key];
+          }
+          await must(writePatch(legacy));
+        } else if (written.error) {
+          throw new Error(written.error.message);
+        }
       }
     }
   }
@@ -405,6 +450,8 @@ export async function applyEvent(ev: Stripe.Event, opts: { now?: number; fetchSu
  * kept, so the unpaid period is not played for free until its period end. A paid status clears it.
  */
 async function loadAccountBillingState(accountId: string | null, subscriptionId: string): Promise<{
+  plan: string | null;
+  stripe_subscription_id: string | null;
   subscription_status: string | null;
   grace_ends_at: string | null;
   trial_canceled_before_charge: boolean;
@@ -413,13 +460,21 @@ async function loadAccountBillingState(accountId: string | null, subscriptionId:
     const q = db().from("accounts").select(cols);
     return accountId ? q.eq("id", accountId).maybeSingle() : q.eq("stripe_subscription_id", subscriptionId).maybeSingle();
   };
-  let row = await select("subscription_status, grace_ends_at, trial_canceled_before_charge");
+  let row = await select("plan, stripe_subscription_id, subscription_status, grace_ends_at, trial_canceled_before_charge");
   if (row.error && isMissingSchema(row.error)) {
-    row = await select("subscription_status, grace_ends_at");
+    row = await select("plan, stripe_subscription_id, subscription_status, grace_ends_at");
   }
   if (row.error) throw new Error(row.error.message);
-  const data = row.data as { subscription_status?: unknown; grace_ends_at?: unknown; trial_canceled_before_charge?: unknown } | null;
+  const data = row.data as {
+    plan?: unknown;
+    stripe_subscription_id?: unknown;
+    subscription_status?: unknown;
+    grace_ends_at?: unknown;
+    trial_canceled_before_charge?: unknown;
+  } | null;
   return {
+    plan: data?.plan ? String(data.plan) : null,
+    stripe_subscription_id: data?.stripe_subscription_id ? String(data.stripe_subscription_id) : null,
     subscription_status: data?.subscription_status ? String(data.subscription_status) : null,
     grace_ends_at: data?.grace_ends_at ? String(data.grace_ends_at) : null,
     trial_canceled_before_charge: data?.trial_canceled_before_charge === true,
@@ -476,7 +531,7 @@ async function must(p: PromiseLike<{ error: { message: string } | null }>) {
 }
 
 /** Checkout must not open a second subscription while one of these is on the account. */
-export const BLOCKING_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due"] as const;
+export const BLOCKING_SUBSCRIPTION_STATUSES = ["active", "trialing", "past_due", "paused", "incomplete"] as const;
 
 export function checkoutBlocked(status: string | null | undefined): boolean {
   return BLOCKING_SUBSCRIPTION_STATUSES.includes(status as typeof BLOCKING_SUBSCRIPTION_STATUSES[number]);
@@ -490,7 +545,15 @@ export function checkoutAction(input: {
   nextPriceId: string;
 }): "checkout" | "portal" | "same" | "update" {
   if (!checkoutBlocked(input.status)) return "checkout";
-  if (input.status === "past_due" || !input.subscriptionId || !input.currentPriceId) return "portal";
+  if (
+    input.status === "past_due"
+    || input.status === "paused"
+    || input.status === "incomplete"
+    || !input.subscriptionId
+    || !input.currentPriceId
+  ) {
+    return "portal";
+  }
   if (input.currentPriceId === input.nextPriceId) return "same";
   return "update";
 }

@@ -20,6 +20,11 @@ describe("plan status line", () => {
     expect(planStatus({ state: "active", planName: "Multi-screen", subscription: { ...active, status: "canceled" } }).label).toBe("Ends on Dec 10, 2026");
     expect(planStatus({ state: "trial", planName: "Free trial", subscription: null }).label).toBe("Free trial");
     expect(planStatus({ state: "canceled", planName: "Business", subscription: { ...active, status: "canceled" } }).label).toBe("Not active");
+    expect(planStatus({ state: "canceled", planName: "Business", subscription: { ...active, status: "paused" } })).toEqual({
+      label: "Paused",
+      tone: "warn",
+      note: "Your subscription is paused. Use Manage billing to resume your plan.",
+    });
   });
 });
 
@@ -48,7 +53,12 @@ describe("plan buttons", () => {
     expect(planChangeMode(null)).toBe("checkout");
     expect(planChangeMode(active)).toBe("update");
     expect(planChangeMode({ ...active, status: "past_due" })).toBe("portal");
+    expect(planChangeMode({ ...active, status: "paused" })).toBe("portal");
+    expect(planChangeMode({ ...active, status: "incomplete" })).toBe("portal");
+    expect(planChangeMode({ ...active, status: "incomplete_expired" })).toBe("checkout");
     expect(planChangeMode({ ...active, status: "canceled" })).toBe("checkout");
+    expect(checkoutNote("available", "portal", { subscriptionStatus: "paused" })).toMatch(/paused/i);
+    expect(checkoutNote("available", "portal", { subscriptionStatus: "incomplete" })).toMatch(/initial payment/i);
   });
   it("explains that a switch is charged right away", () => {
     expect(checkoutNote("available", "update")).toMatch(/immediately/);

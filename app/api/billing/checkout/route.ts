@@ -33,13 +33,18 @@ export async function POST(req: Request) {
   if (a.error || !a.data) return fail("Couldn't load your account.", 500);
   if (a.data.owner_user_id !== admin.userId) return json({ error: "Only the account owner can change the plan.", code: "not_owner" }, 403);
   if (checkoutBlocked(a.data.subscription_status)) {
-    if (a.data.subscription_status === "past_due" || !a.data.stripe_subscription_id) {
+    if (
+      a.data.subscription_status === "past_due"
+      || a.data.subscription_status === "paused"
+      || a.data.subscription_status === "incomplete"
+      || !a.data.stripe_subscription_id
+    ) {
       return json({ error: "Use Manage billing to change this plan.", code: "subscription_exists", action: "portal" }, 409);
     }
     const current = await s.subscriptions.retrieve(String(a.data.stripe_subscription_id));
     const item = current.items.data[0];
     const action = checkoutAction({
-      status: a.data.subscription_status,
+      status: current.status || a.data.subscription_status,
       subscriptionId: a.data.stripe_subscription_id,
       currentPriceId: item?.price.id ?? null,
       nextPriceId: price,
