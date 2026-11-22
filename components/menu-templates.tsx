@@ -9,7 +9,7 @@
  */
 import { IconImage } from "@/components/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, authToken, uploadForm, useApi, type DisplayItem } from "@/lib/api";
+import { api, authToken, uploadForm, useApi, type DisplayItem, type MediaItem } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/en";
 import { Dialog } from "@/components/dialog";
@@ -17,7 +17,8 @@ import { useToast } from "@/components/toast";
 import { useRegisterStudioLeave } from "@/components/studio-leave";
 import { fontFaceCss } from "@/lib/board-fonts";
 import { BOARD_H, BOARD_W, MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, templateSpec, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
-import { accountSaveBody, findSameVideo, placeZoneMedia, readAccountStudio, type AccountLibraryFile } from "@/lib/layout-account";
+import { accountSaveBody, findSameVideo, readAccountStudio, selectFeaturedMedia, type AccountLibraryFile } from "@/lib/layout-account";
+import { isProcessingMediaStatus, isReadyMediaStatus } from "@/lib/media-ready";
 import { mediaHits, selectedVideoOption, videoPreview } from "@/lib/board-preview";
 import { ZoneVideo } from "@/components/zone-video";
 import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
@@ -147,6 +148,23 @@ const STYLES = `${FONT_CSS}
 .tpl-lib button { border: 2px solid transparent; padding: 0; border-radius: 9px; overflow: hidden; aspect-ratio: 1; background: #ddd; }
 .tpl-lib button[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(26 92 255 / .25); }
 .tpl-lib img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpl-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-height: 320px; overflow-y: auto; padding: 2px; }
+.tpl-media-card { position: relative; display: grid; grid-template-rows: 76px auto; gap: 6px; padding: 6px; border: 2px solid var(--color-line); border-radius: 12px; background: #fff; text-align: left; min-width: 0; transition: border-color .15s, box-shadow .15s; }
+.tpl-media-card:hover:not(:disabled) { border-color: #9eb8eb; }
+.tpl-media-card[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(26 92 255 / .22); background: #f6f9ff; }
+.tpl-media-card:disabled { opacity: .68; cursor: not-allowed; }
+.tpl-media-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.tpl-media-thumb { position: relative; width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: #101726; display: grid; place-items: center; }
+.tpl-media-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpl-media-video-empty { color: #dbe6ff; font-size: 18px; line-height: 1; }
+.tpl-media-badge { position: absolute; left: 5px; bottom: 5px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 999px; background: rgb(11 18 32 / .84); color: #fff; font-size: 10px; font-weight: 700; line-height: 1.2; }
+.tpl-media-check { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border-radius: 999px; background: var(--color-primary); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; box-shadow: 0 2px 6px rgb(11 18 32 / .28); }
+.tpl-media-meta { min-width: 0; display: grid; gap: 2px; }
+.tpl-media-name { display: block; font-size: 12px; font-weight: 600; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tpl-media-status { display: inline-block; justify-self: start; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
+.tpl-media-status.is-processing { background: #fff4d6; color: #8a5b00; }
+.tpl-media-status.is-failed { background: #fdecea; color: #b8342a; }
+.tpl-none-btn[aria-pressed="true"] { border-color: var(--color-primary); background: #f0f5ff; color: var(--color-primary); font-weight: 700; }
 .tpl-var { border: 2px solid var(--color-line); background: #fff; border-radius: 11px; padding: 6px; display: grid; gap: 6px; text-align: left; font-size: 12px; font-weight: 700; }
 .tpl-var[aria-pressed="true"] { border-color: var(--color-primary); }
 .tpl-sw { display: flex; height: 24px; border-radius: 7px; overflow: hidden; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .08); }
@@ -334,6 +352,7 @@ export function TemplateEditor({
   const [busy, setBusy] = useState<null | "draft" | "publish" | "upload">(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [library, setLibrary] = useState<AccountLibraryFile[]>([]);
+  const [mediaFilter, setMediaFilter] = useState<"all" | "photos" | "videos">("all");
   const [publishOpen, setPublishOpen] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [published, setPublished] = useState(false);
@@ -354,12 +373,39 @@ export function TemplateEditor({
       setLibrary(next);
       return next;
     }
-    const body = readAccountStudio(await api("/api/layout-studio"));
-    const next = body?.library ?? [];
+    const [studioRaw, mediaRaw] = await Promise.all([
+      api("/api/layout-studio"),
+      api<MediaItem[] | { items?: MediaItem[] }>("/api/media").catch(() => null),
+    ]);
+    const body = readAccountStudio(studioRaw);
+    const ready = body?.library ?? [];
+    const mediaRows = Array.isArray(mediaRaw) ? mediaRaw : Array.isArray(mediaRaw?.items) ? mediaRaw.items : [];
+    const seen = new Set(ready.map((f) => f.id));
+    const pendingOrFailed: AccountLibraryFile[] = [];
+    for (const row of mediaRows) {
+      if (row.kind !== "video" || seen.has(row.id) || isReadyMediaStatus(row.processingStatus)) continue;
+      pendingOrFailed.push({
+        id: row.id,
+        name: row.fileName,
+        kind: "video",
+        mime: "video/mp4",
+        url: null,
+        sizeBytes: row.sizeBytes ?? null,
+        thumbnailUrl: row.thumbnailUrl ?? null,
+        processingStatus: row.processingStatus ?? "processing",
+        processingError: row.processingError ?? null,
+      });
+    }
+    const next = [...ready, ...pendingOrFailed];
     setLibrary(next);
     return next;
   }
   useEffect(() => { void reloadLibrary().catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (preview || !library.some((f) => isProcessingMediaStatus(f.processingStatus))) return;
+    const timer = setInterval(() => { void reloadLibrary().catch(() => {}); }, 4000);
+    return () => clearInterval(timer);
+  }, [library, preview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const urlFor = (id: string | null | undefined) => (id ? library.find((f) => f.id === id)?.url ?? null : null);
   // Item photos in the preview use the same signed library URLs the photo picker shows.
@@ -400,16 +446,25 @@ export function TemplateEditor({
   function setSections(fn: (s: LayoutDocument["sections"]) => LayoutDocument["sections"]) { update({ ...doc, sections: fn(doc.sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }))) }); }
 
   const media = engine === "layout" ? layoutMedia(doc.template) : null;
-  /** A board photo or video in a promo/side area replaces the other (one file per area), as before. */
+  const supportsVideo = engine === "design" ? designHasMedia(design) : engine === "layout" ? Boolean(media?.video) : false;
+  /** Selecting featured media picks one primary item (photo, video, sample, or none) and immediately updates the preview. */
   function setBoardPhoto(id: string | null) {
-    if (media?.exclusive) update(placeZoneMedia(doc, "photo", id, Boolean(id)));
-    else patch({ imageMediaId: id });
-    if (id && media?.exclusive && doc.videoMediaId) toast.show(t("ls.imageReplacesVideo"));
+    if (!id) { clearFeaturedMedia(); return; }
+    update(selectFeaturedMedia(doc, { kind: "image", id }, { isDesign, supportsVideo, exclusive: media?.exclusive }));
+    if (media?.exclusive && doc.videoMediaId) toast.show(t("ls.imageReplacesVideo"));
   }
   function setBoardVideo(id: string | null) {
-    if (media?.exclusive) update(placeZoneMedia(doc, "video", id, Boolean(id)));
-    else patch({ videoMediaId: id });
-    if (id && media?.exclusive && doc.imageMediaId) toast.show(t("ls.videoReplaces"));
+    if (!id) { clearFeaturedMedia(); return; }
+    update(selectFeaturedMedia(doc, { kind: "video", id }, { isDesign, supportsVideo, exclusive: media?.exclusive }));
+    if (media?.exclusive && doc.imageMediaId) toast.show(t("ls.videoReplaces"));
+  }
+  function clearFeaturedMedia() {
+    update(selectFeaturedMedia(doc, { kind: "none" }, { isDesign, supportsVideo, exclusive: media?.exclusive }));
+  }
+  function selectSamplePhoto() {
+    if (isDesign && design.stock) {
+      update(selectFeaturedMedia(doc, { kind: "sample", stockPhoto: design.stock }, { isDesign, supportsVideo }));
+    }
   }
 
   async function upload(file: File | undefined, role: "photo" | "logo" | "item", target?: { si: number; ii: number }) {
@@ -445,19 +500,39 @@ export function TemplateEditor({
       const signed = await api<{ mediaId: string; signedUrl: string; token: string }>("/api/media/upload", { method: "POST", body: JSON.stringify({ fileName: file.name, sizeBytes: file.size }) });
       await uploadToSignedUrl(signed.signedUrl, file, (percent) => setProgress(percent >= 99 ? t("ls.processing") : t("ed.uploading")), file.name, signed.token);
       setProgress(t("ls.processing"));
-      await api("/api/media/upload/complete", {
+      const completed = await api<{ id?: string; processingStatus?: string }>("/api/media/upload/complete", {
         method: "POST",
         body: JSON.stringify({ mediaId: signed.mediaId, fileName: file.name, durationMs: prepared.durationMs, width: prepared.width, height: prepared.height, thumbnailBase64: await blobToBase64(prepared.thumbnail) }),
       });
-      await reloadLibrary();
-      setBoardVideo(signed.mediaId);
-      toast.show(t("ls.uploadComplete"));
+      const refreshed = await reloadLibrary();
+      if (completed?.processingStatus === "processing") {
+        if (!refreshed.some((item) => item.id === signed.mediaId)) {
+          setLibrary((prev) => [
+            ...prev,
+            { id: signed.mediaId, name: file.name, kind: "video", mime: file.type || "video/mp4", url: null, sizeBytes: file.size, thumbnailUrl: null, processingStatus: "processing" },
+          ]);
+        }
+        toast.show(t("up.convertingVideo"));
+      } else {
+        setBoardVideo(signed.mediaId);
+        toast.show(t("ls.uploadComplete"));
+      }
     } catch (err) {
       toast.show((err as Error).message || t("tpl.uploadFailed"), true);
     } finally {
       setBusy(null);
       setProgress(null);
     }
+  }
+
+  async function uploadMedia(file: File | undefined) {
+    if (!file || preview) return;
+    if (isImageUploadFile(file)) return upload(file, "photo");
+    if (isVideoUploadFile(file)) {
+      if (!supportsVideo) { toast.show(t("tpl.videoNotSupported"), true); return; }
+      return uploadVideo(file);
+    }
+    toast.show(t(supportsVideo ? "tpl.mediaType" : "tpl.photoType"), true);
   }
 
   async function save(mode: "draft" | "publish", override?: LayoutDocument, displayIds: string[] = []) {
@@ -506,6 +581,10 @@ export function TemplateEditor({
   }
 
   async function publishTo() {
+    if (unreadySelectedVideo) {
+      toast.show(t("tpl.videoUnreadyBlocked"), true);
+      return;
+    }
     const ids = Object.keys(picked).filter((k) => picked[k]);
     if (engine === "classic") {
       // One request: save, re-render and put the board on the ticked screens.
@@ -558,6 +637,14 @@ export function TemplateEditor({
   const images = library.filter((f) => f.kind === "image");
   const videos = library.filter((f) => f.kind === "video");
   const selectedVideo = selectedVideoOption(library, doc.videoMediaId);
+  const selectedVideoFile = doc.videoMediaId ? library.find((f) => f.id === doc.videoMediaId) ?? null : null;
+  const unreadySelectedVideo = Boolean(selectedVideoFile && !isReadyMediaStatus(selectedVideoFile.processingStatus));
+  const visibleMedia = mediaFilter === "photos" ? images : mediaFilter === "videos" ? videos : library;
+  const showSampleCard = Boolean(isDesign && design.stock && mediaFilter !== "videos");
+  const sampleSelected = Boolean(isDesign && design.stock && !doc.imageMediaId && !doc.videoMediaId && doc.stockPhoto === design.stock);
+  const noMediaSelected = !doc.imageMediaId && !doc.videoMediaId && !(isDesign && doc.stockPhoto);
+  const activeVideoId = supportsVideo ? doc.videoMediaId : null;
+  const activePhotoId = activeVideoId ? null : doc.imageMediaId;
   const previewVideo = engine === "classic" ? null : videoPreview(doc, library, art.imageHref);
   const previewHits = engine === "classic" ? [] : mediaHits(doc).map((hit) => ({
     id: hit.id,
@@ -565,14 +652,16 @@ export function TemplateEditor({
     label: hit.id === "video" ? t("tpl.editVideoArea") : t("tpl.editPhotoArea"),
   }));
   function openMediaArea(id: string) {
+    void id;
     setStep(2);
     requestAnimationFrame(() => {
-      const node = document.querySelector<HTMLElement>(id === "video" ? "[data-testid='tpl-video']" : "[data-testid='tpl-board-upload']");
+      const node = document.querySelector<HTMLElement>("[data-testid='tpl-media-upload']")
+        ?? document.querySelector<HTMLElement>("[data-testid='tpl-featured-media']");
       node?.focus();
       node?.scrollIntoView({ block: "nearest" });
     });
   }
-  const stepNames = [t("tpl.step.business"), t("tpl.step.menu"), t("tpl.step.photos"), t("tpl.step.look")];
+  const stepNames = [t("tpl.step.business"), t("tpl.step.menu"), t("tpl.step.content"), t("tpl.step.look")];
   const styleName = engine === "classic" ? t("tpl.classicName") : engine === "layout" ? layoutName(doc.template, t) : design.name[L];
 
   return (
@@ -595,7 +684,7 @@ export function TemplateEditor({
           <button type="button" className="btn btn-quiet" disabled={busy !== null} data-testid="tpl-save-draft"
             onClick={async () => { if (await save("draft")) toast.show(t("tpl.draftSaved")); }}>{busy === "draft" ? t("tpl.saving") : t("ls.saveDraft")}</button>
         )}
-        <button type="button" className="btn btn-primary" disabled={busy !== null} data-testid="tpl-publish" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")}</button>
+        <button type="button" className="btn btn-primary" disabled={busy !== null || unreadySelectedVideo} data-testid="tpl-publish" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")}</button>
       </div>
       {engine === "classic" ? <p className="text-xs text-muted -mt-2 mb-3" data-testid="tpl-classic-note">{t("tpl.classicNote")}</p> : null}
       {progress ? <p className="text-sm text-muted mb-2" role="status">{progress}</p> : null}
@@ -708,8 +797,8 @@ export function TemplateEditor({
           ) : null}
 
           {step === 2 ? (
-            <div className="grid gap-3">
-              <h3 className="font-display font-bold text-lg">{t("tpl.photosTitle")}</h3>
+            <div className="grid gap-3" data-testid="tpl-step-content">
+              <h3 className="font-display font-bold text-lg">{t("tpl.contentTitle")}</h3>
               {unified ? <p className="text-sm text-muted" data-testid="tpl-photos-items">{t("tpl.itemPhotosWhere")}</p> : null}
               {engine === "design" && !designHasMedia(design) ? (
                 <div className="grid gap-2">
@@ -718,43 +807,136 @@ export function TemplateEditor({
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-muted" data-testid="tpl-photo-area">{engine === "classic" ? t("tpl.classicPhotoArea") : media?.photo === "background" ? t("tpl.backgroundPhotoArea") : engine === "layout" ? t("tpl.layoutPhotoArea") : t("tpl.photosLede")}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <label className="btn btn-quiet cursor-pointer">{busy === "upload" ? t("tpl.uploading") : t("tpl.uploadPhoto")}<input type="file" accept={IMAGE_UPLOAD_ACCEPT} className="sr-only" data-testid="tpl-board-upload" onChange={(e) => void upload(e.target.files?.[0], "photo")} /></label>
-                    {isDesign && design.stock ? <button type="button" className="btn btn-quiet" onClick={() => patch({ imageMediaId: null, stockPhoto: design.stock ?? undefined })}>{t("tpl.useSample")}</button> : null}
-                    <button type="button" className="btn btn-quiet" data-testid="tpl-board-none" onClick={() => (isDesign ? patch({ imageMediaId: null, stockPhoto: undefined }) : setBoardPhoto(null))}>{t("tpl.noPhoto")}</button>
-                  </div>
-                  <p className="form-label">{t("tpl.fromMedia")}</p>
-                  {images.length ? (
-                    <div className="tpl-lib">{images.map((f) => (
-                      <button key={f.id} type="button" aria-pressed={doc.imageMediaId === f.id} aria-label={f.name} onClick={() => setBoardPhoto(f.id)}>{f.url ? <img src={f.url} alt="" /> : null}</button>
-                    ))}</div>
-                  ) : <p className="text-sm text-muted">{t("tpl.noMedia")}</p>}
-                  {engine === "classic" ? <p className="text-xs text-muted">{t("tpl.classicNoVideo")}</p>
-                    : engine === "layout" && !media?.video ? <p className="text-xs text-muted">{t("tpl.layoutNoVideo")}</p> : (
-                      <div className="grid gap-1">
-                        <label className="form-label grid gap-1">{t("tpl.video")}
-                          <select className="field" value={doc.videoMediaId ?? ""} onChange={(e) => setBoardVideo(e.target.value || null)} data-testid="tpl-video">
-                            <option value="">{t("tpl.noVideo")}</option>
-                            {selectedVideo && !videos.some((f) => f.id === selectedVideo.id) ? (
-                              <option value={selectedVideo.id}>{selectedVideo.name || t("tpl.videoUnlisted")}</option>
-                            ) : null}
-                            {videos.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                          </select>
-                        </label>
-                        {selectedVideo ? <p className="text-sm" data-testid="tpl-video-name">{selectedVideo.missing ? t("tpl.videoKept", { name: selectedVideo.name || t("tpl.videoUnlisted") }) : t("tpl.videoOnBoard", { name: selectedVideo.name })}</p> : null}
-                        {unified ? <label className="btn btn-quiet cursor-pointer justify-self-start">{t("tpl.uploadVideo")}<input type="file" accept={VIDEO_UPLOAD_ACCEPT} className="sr-only" data-testid="tpl-video-upload" onChange={(e) => void uploadVideo(e.target.files?.[0])} /></label> : null}
-                        <span className="text-xs text-muted font-normal">{media?.exclusive ? t("tpl.videoOrPhoto") : t("tpl.videoNote")}</span>
+                  <div className="grid gap-2.5" data-testid="tpl-featured-media">
+                    <div>
+                      <h4 className="font-semibold text-base" data-testid="tpl-featured-media-heading">{t("tpl.featuredMedia")}</h4>
+                      <p className="text-sm text-muted mt-0.5">{t("tpl.featuredMediaHint")}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className={`btn btn-quiet cursor-pointer ${busy === "upload" ? "pointer-events-none opacity-60" : ""}`} data-testid="tpl-media-upload-label">
+                        {busy === "upload" ? t("tpl.uploading") : t("tpl.uploadMedia")}
+                        <input
+                          type="file"
+                          accept={supportsVideo ? `${IMAGE_UPLOAD_ACCEPT},${VIDEO_UPLOAD_ACCEPT}` : IMAGE_UPLOAD_ACCEPT}
+                          className="sr-only"
+                          disabled={busy !== null}
+                          data-testid="tpl-media-upload"
+                          onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; void uploadMedia(file); }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-quiet tpl-none-btn"
+                        aria-pressed={noMediaSelected}
+                        data-testid="tpl-media-none"
+                        onClick={clearFeaturedMedia}
+                      >
+                        {t("tpl.noFeaturedMedia")}
+                      </button>
+                    </div>
+                    <div className="seg justify-self-start" role="group" aria-label={t("tpl.mediaFilterAria")} data-testid="tpl-media-filters">
+                      <button type="button" aria-pressed={mediaFilter === "all"} data-testid="tpl-filter-all" onClick={() => setMediaFilter("all")}>{t("tpl.filter.all")}</button>
+                      <button type="button" aria-pressed={mediaFilter === "photos"} data-testid="tpl-filter-photos" onClick={() => setMediaFilter("photos")}>{t("tpl.filter.photos")}</button>
+                      <button type="button" aria-pressed={mediaFilter === "videos"} data-testid="tpl-filter-videos" onClick={() => setMediaFilter("videos")}>{t("cp.filter.video")}</button>
+                    </div>
+                    {!supportsVideo && mediaFilter === "videos" ? (
+                      <p className="text-xs text-muted" data-testid="tpl-no-video-note">{engine === "classic" ? t("tpl.classicNoVideo") : t("tpl.layoutNoVideo")}</p>
+                    ) : null}
+                    {unreadySelectedVideo ? (
+                      <p className="note-warn text-sm" role="alert" data-testid="tpl-video-unready">{t("tpl.videoUnreadyBlocked")}</p>
+                    ) : null}
+                    {(visibleMedia.length > 0 || showSampleCard || (activeVideoId && selectedVideo?.missing && mediaFilter !== "photos")) ? (
+                      <div className="tpl-media-grid" data-testid="tpl-media-grid">
+                        {activeVideoId && selectedVideo?.missing && mediaFilter !== "photos" ? (
+                          <button
+                            type="button"
+                            className="tpl-media-card"
+                            aria-pressed={true}
+                            aria-label={selectedVideo.name || t("tpl.videoUnlisted")}
+                            data-testid="tpl-media-unlisted-video"
+                            onClick={() => setBoardVideo(activeVideoId)}
+                          >
+                            <span className="tpl-media-thumb">
+                              <span className="tpl-media-video-empty" aria-hidden="true">▶</span>
+                              <span className="tpl-media-badge" data-testid="tpl-card-video-badge">▶ {t("ls.video")}</span>
+                              <span className="tpl-media-check" aria-hidden="true">✓</span>
+                            </span>
+                            <span className="tpl-media-meta">
+                              <span className="tpl-media-name">{selectedVideo.name || t("tpl.videoUnlisted")}</span>
+                            </span>
+                          </button>
+                        ) : null}
+                        {visibleMedia.map((f) => {
+                          const isVideo = f.kind === "video";
+                          const isProcessing = isProcessingMediaStatus(f.processingStatus);
+                          const isFailed = f.processingStatus === "failed";
+                          const isUnready = !isReadyMediaStatus(f.processingStatus);
+                          const disabled = isUnready || (isVideo && !supportsVideo);
+                          const isSelected = isVideo ? activeVideoId === f.id : activePhotoId === f.id;
+                          const thumbSrc = isVideo ? f.thumbnailUrl : f.url;
+                          return (
+                            <button
+                              key={f.id}
+                              type="button"
+                              className="tpl-media-card"
+                              aria-pressed={isSelected}
+                              aria-label={f.name}
+                              disabled={disabled}
+                              data-testid={`tpl-media-card-${f.id}`}
+                              data-media-kind={f.kind}
+                              onClick={() => (isVideo ? setBoardVideo(f.id) : setBoardPhoto(f.id))}
+                            >
+                              <span className="tpl-media-thumb">
+                                {thumbSrc ? (
+                                  <img src={thumbSrc} alt="" />
+                                ) : isVideo ? (
+                                  <span className="tpl-media-video-empty" aria-hidden="true">▶</span>
+                                ) : null}
+                                {isVideo ? (
+                                  <span className="tpl-media-badge" data-testid="tpl-card-video-badge">▶ {t("ls.video")}</span>
+                                ) : null}
+                                {isSelected ? <span className="tpl-media-check" aria-hidden="true">✓</span> : null}
+                              </span>
+                              <span className="tpl-media-meta">
+                                <span className="tpl-media-name" title={f.name}>{f.name}</span>
+                                {isProcessing ? (
+                                  <span className="tpl-media-status is-processing" data-testid="tpl-card-processing">{t("ml.processing")}</span>
+                                ) : isFailed ? (
+                                  <span className="tpl-media-status is-failed" data-testid="tpl-card-failed">{t("ml.failed")}</span>
+                                ) : null}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        {showSampleCard && design.stock ? (
+                          <button
+                            type="button"
+                            className="tpl-media-card"
+                            aria-pressed={sampleSelected}
+                            aria-label={t("tpl.samplePhoto")}
+                            data-testid="tpl-media-sample"
+                            onClick={selectSamplePhoto}
+                          >
+                            <span className="tpl-media-thumb">
+                              <img src={stockPhotoPath(design.stock)} alt="" />
+                              {sampleSelected ? <span className="tpl-media-check" aria-hidden="true">✓</span> : null}
+                            </span>
+                            <span className="tpl-media-meta">
+                              <span className="tpl-media-name">{t("tpl.samplePhoto")}</span>
+                            </span>
+                          </button>
+                        ) : null}
                       </div>
+                    ) : (
+                      <p className="text-sm text-muted" data-testid="tpl-media-empty">
+                        {mediaFilter === "photos" ? t("tpl.noMedia") : mediaFilter === "videos" ? t("tpl.emptyVideos") : t("tpl.emptyAllMedia")}
+                      </p>
                     )}
-                  {engine === "classic" || (engine === "layout" && !media?.featureText) ? null : (
-                    <>
-                      <h4 className="font-semibold mt-1">{t("tpl.featureTitle")}</h4>
-                      <label className="form-label grid gap-1">{t("tpl.featureHead")}<input className="field" maxLength={40} value={doc.featureTitle} onChange={(e) => patch({ featureTitle: e.target.value })} /></label>
-                      <label className="form-label grid gap-1">{t("tpl.featureDetail")}<input className="field" maxLength={80} value={doc.featureDetail} onChange={(e) => patch({ featureDetail: e.target.value })} /></label>
-                    </>
-                  )}
-                  {unified && engine !== "classic" && doc.imageMediaId ? (
+                    {!supportsVideo && mediaFilter !== "videos" ? (
+                      <p className="text-xs text-muted">{engine === "classic" ? t("tpl.classicNoVideo") : t("tpl.layoutNoVideo")}</p>
+                    ) : null}
+                  </div>
+                  {unified && engine !== "classic" && doc.imageMediaId && !activeVideoId ? (
                     <details className="tpl-adv" data-testid="tpl-photo-advanced">
                       <summary>{t("tpl.advancedOptions")}</summary>
                       <div className="grid gap-2 pt-2">
@@ -771,6 +953,13 @@ export function TemplateEditor({
                       </div>
                     </details>
                   ) : null}
+                  {engine === "classic" || (engine === "layout" && !media?.featureText) ? null : (
+                    <div className="grid gap-3 pt-3 border-t border-line" data-testid="tpl-featured-text">
+                      <h4 className="font-semibold">{t("tpl.featureTitle")}</h4>
+                      <label className="form-label grid gap-1">{t("tpl.featureHead")}<input className="field" maxLength={40} value={doc.featureTitle} onChange={(e) => patch({ featureTitle: e.target.value })} data-testid="tpl-feature-head" /></label>
+                      <label className="form-label grid gap-1">{t("tpl.featureDetail")}<input className="field" maxLength={80} value={doc.featureDetail} onChange={(e) => patch({ featureDetail: e.target.value })} data-testid="tpl-feature-detail" /></label>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -876,7 +1065,7 @@ export function TemplateEditor({
           <div className="flex justify-between gap-2 pt-2 border-t border-line">
             <button type="button" className="btn btn-quiet" disabled={step === 0} onClick={() => setStep((step - 1) as Step)}>← {step > 0 ? stepNames[step - 1] : ""}</button>
             {step < 3 ? <button type="button" className="btn btn-primary" onClick={() => setStep((step + 1) as Step)}>{stepNames[step + 1]} →</button>
-              : <button type="button" className="btn btn-primary" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")} →</button>}
+              : <button type="button" className="btn btn-primary" disabled={busy !== null || unreadySelectedVideo} onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")} →</button>}
           </div>
         </div>
       </div>
@@ -886,6 +1075,7 @@ export function TemplateEditor({
           <div className="grid gap-3" data-testid="tpl-publish-dialog">
             <h3 className="font-display font-bold text-lg">{t("tpl.publishTitle")}</h3>
             {fit.dropped > 0 ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-blocked">{t("tpl.publishBlocked", { n: fit.dropped })}</p> : null}
+            {unreadySelectedVideo ? <p className="note-warn text-sm" role="alert" data-testid="tpl-publish-video-blocked">{t("tpl.videoUnreadyBlocked")}</p> : null}
             <p className="text-sm text-muted">{engine === "classic" ? t("tpl.classicPublishBody") : t("tpl.publishBody")}</p>
             {displays === null ? <p className="text-sm text-muted">{t("common.loading")}</p> : displays.length === 0 ? <p className="text-sm text-muted">{t("tpl.noScreens")}</p> : (
               <ul className="grid gap-2">
