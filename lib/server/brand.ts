@@ -205,10 +205,10 @@ export async function artFor(accountId: string, content: Pick<MenuContent, "useB
 
 /**
  * Item photos for a classic board: only this account's own images (imageBytes checks the account), each reduced
- * before drawing. Nothing is loaded for boards without item photos or with item photos hidden.
+ * before drawing. Nothing is loaded for boards without item photos.
  */
 async function classicItemImages(accountId: string, content: { sections?: MenuContent["sections"]; itemPhotos?: boolean }): Promise<Record<string, string> | null> {
-  if (content.itemPhotos === false || !content.sections) return null;
+  if (!content.sections) return null;
   const ids = [...new Set(content.sections.flatMap((section) => section.items.map((item) => item.imageMediaId)).filter((id): id is string => Boolean(id)))];
   if (!ids.length) return null;
   const { prepareBoardPhoto } = await import("@/lib/server/layout-render");

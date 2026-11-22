@@ -6,6 +6,7 @@ import { MENU_DESIGNS, designById, designDocument, isPhotoDesign, switchDesign }
 import { CARD_CAPACITY, designSvgWithReport, featuredItems, itemPhotosShown } from "@/lib/menu-design-svg";
 import { itemPhotoIds, moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 import { applyLayoutSave, type LibraryFile } from "@/lib/layout-publish";
+import { boardFit } from "@/lib/board-fit";
 import { renderLayoutPng } from "@/lib/server/layout-render";
 import { en } from "@/lib/i18n/en";
 import { es } from "@/lib/i18n/es";
@@ -106,11 +107,12 @@ describe("photos travel with their items", () => {
     // A text-focused template shows the owner's photos as thumbnails instead of silently dropping them.
     expect(itemPhotosShown(textOnly, designById("chalkboard-bistro")!)).toBe(true);
     expect(layoutSvg(textOnly, { itemImages: { [P1]: href, [P2]: href } })).toContain(href);
-    // Hiding them is an explicit owner choice, and the photos stay on their items.
-    const hidden = { ...textOnly, photoStyle: "text" as const };
-    expect(layoutSvg(hidden, { itemImages: { [P1]: href, [P2]: href } })).not.toContain(href);
-    expect(itemPhotoIds(hidden.sections)).toEqual(ids);
-    const back = switchDesign(hidden, designById("cafe-favorites")!);
+    // Deprecated photoStyle: "text" is ignored at render time so existing boards auto-display their photos.
+    const legacyText = { ...textOnly, photoStyle: "text" as const };
+    expect(itemPhotosShown(legacyText, designById("chalkboard-bistro")!)).toBe(true);
+    expect(layoutSvg(legacyText, { itemImages: { [P1]: href, [P2]: href } })).toContain(href);
+    expect(itemPhotoIds(legacyText.sections)).toEqual(ids);
+    const back = switchDesign(legacyText, designById("cafe-favorites")!);
     expect(itemPhotoIds(back.sections)).toEqual(ids);
     expect(layoutSvg(back, { itemImages: { [P1]: href, [P2]: href } })).toContain(href); // cards always show photos
   });
@@ -163,25 +165,32 @@ describe("regression: a photo on Modern Restaurant's Burrata appears on the TV",
     expect(layoutSvg(reopened, { itemImages: { [P1]: href } })).toContain(href);
   });
 
-  it("the server's 1920×1080 PNG draws it", () => {
+  it("the server's 1920×1080 PNG draws it (even if legacy photoStyle: text is stored)", () => {
     const bytes = Buffer.from(PNG, "base64");
     const doc = burrata();
+    const baseline = renderLayoutPng(designDocument(design), null);
     const withPhoto = renderLayoutPng(doc, null, { itemImages: { [P1]: { bytes, mime: "image/png" } } });
-    const hidden = renderLayoutPng({ ...doc, photoStyle: "text" }, null, { itemImages: { [P1]: { bytes, mime: "image/png" } } });
+    const legacyText = renderLayoutPng({ ...doc, photoStyle: "text" }, null, { itemImages: { [P1]: { bytes, mime: "image/png" } } });
     expect(withPhoto.readUInt32BE(16)).toBe(1920);
     expect(withPhoto.readUInt32BE(20)).toBe(1080);
-    expect(sha(withPhoto)).not.toBe(sha(hidden));
+    expect(sha(withPhoto)).not.toBe(sha(baseline));
+    expect(sha(legacyText)).toBe(sha(withPhoto));
   }, 30_000);
 
-  it("an explicit Hide is respected and explained", () => {
+  it("deprecated photoStyle: text is ignored and removing the photo restores the clean text layout", () => {
     const doc = { ...burrata(), photoStyle: "text" as const };
-    expect(itemPhotosShown(doc, design)).toBe(false);
-    expect(layoutSvg(doc, { itemImages: { [P1]: href } })).not.toContain(href);
-    for (const k of ["tpl.photosHiddenNote", "tpl.showItemPhotos", "tpl.photoSavedHidden", "tpl.photoAdded", "tpl.photosShownNote", "tpl.photoWhereThumbs"] as const) {
+    expect(itemPhotosShown(doc, design)).toBe(true);
+    expect(layoutSvg(doc, { itemImages: { [P1]: href } })).toContain(href);
+    const removed = { ...doc, sections: withItemPhoto(doc.sections, 0, 0, null) };
+    expect(itemPhotosShown(removed, design)).toBe(false);
+    expect(layoutSvg(removed, { itemImages: { [P1]: href } })).not.toContain(href);
+    for (const k of ["tpl.photoAdded", "tpl.photosShownNote", "tpl.photoWhereThumbs"] as const) {
       expect(en[k], k).toBeTruthy();
       expect(es[k], k).toBeTruthy();
       expect(es[k], k).not.toBe(en[k]);
     }
+    expect(en["tpl.photosShownNote"]).not.toMatch(/hide/i);
+    expect(es["tpl.photosShownNote"]).not.toMatch(/ocultar/i);
   });
 
   it("every one of the 22 templates shows an owner photo unless hidden", () => {
@@ -216,12 +225,23 @@ describe("rendering item photos (shared SVG: browser preview and TV PNG)", () =>
     expect(missing).toMatch(/font-family="Noto Serif"[^>]*text-anchor="middle">H</); // "H" for Harvest bowl
   });
 
-  it("featured template highlights the items with photos and keeps the rest in the list", () => {
-    const doc = designDocument(designById("featured-dishes")!);
-    const featured = featuredItems(doc).map((i) => i.name);
-    expect(featured).toEqual(["Seared salmon", "Dry-aged ribeye", "Rigatoni al ragù"]);
-    const svg = layoutSvg(doc);
-    for (const s of doc.sections) for (const i of s.items) expect(svg, i.name).toContain(i.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
+  it("featured template highlights owner photos first and renders 4+ owner photos as thumbnails on the left list", () => {
+    const base = designDocument(designById("featured-dishes")!);
+    expect(featuredItems(base).map((i) => i.name)).toEqual(["Seared salmon", "Dry-aged ribeye", "Rigatoni al ragù"]);
+    // Upload 4 owner photos: first 3 spotlight on the right (ahead of stock photos); 4th renders as a thumbnail in the left list.
+    let s = withItemPhoto(base.sections, 0, 0, P1);
+    s = withItemPhoto(s, 0, 1, P2);
+    s = withItemPhoto(s, 0, 2, P1);
+    s = withItemPhoto(s, 1, 3, P2);
+    const four = { ...base, sections: s };
+    expect(featuredItems(four).map((i) => i.name)).toEqual(["Charred octopus", "Burrata", "Garden salad"]);
+    const svg = layoutSvg(four, { itemImages: { [P1]: href, [P2]: href } });
+    const count = (svg.match(new RegExp(href.replace(/[+/]/g, "\\$&"), "g")) ?? []).length;
+    expect(count).toBe(4);
+    for (const sec of four.sections) for (const it of sec.items) expect(svg, it.name).toContain(it.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
+    // Items without photos on taqueria-specials render as clean text without empty/monogram placeholders.
+    const taq = layoutSvg(designDocument(designById("taqueria-specials")!));
+    expect(taq).not.toMatch(/text-anchor="middle">T</);
   });
 
   it("server PNG draws the owner's item photos (account files loaded on the server)", () => {
@@ -251,6 +271,87 @@ describe("rendering item photos (shared SVG: browser preview and TV PNG)", () =>
     const hidden = { ...extreme, photoStyle: "text" as const };
     expect(designSvgWithReport(hidden).report.dropped).toBe(0);
     expect(itemPhotoIds(hidden.sections)).toEqual(itemPhotoIds(full.sections));
+  });
+
+  it("24-item column templates stay publishable: shrink thumbs or fall back without dropping items that fit as text", () => {
+    const typical = (id: string, photos: boolean): LayoutDocument => {
+      const doc = designDocument(designById(id)!);
+      return {
+        ...doc,
+        sections: [0, 1, 2, 3].map((s) => ({
+          name: `Section ${s}`,
+          items: Array.from({ length: 6 }, (_, i) => ({
+            name: `Item ${s}-${i}`,
+            price: "$12.50",
+            description: i % 2 ? "" : "Fresh, made to order",
+            ...(photos ? { imageMediaId: P1 } : {}),
+          })),
+        })),
+      };
+    };
+    for (const id of ["coffee-shop", "bakery", "brunch-house", "espresso-bar"] as const) {
+      const text = typical(id, false);
+      const withPhotos = typical(id, true);
+      expect(designSvgWithReport(text).report.dropped, `${id} text`).toBe(0);
+      const report = designSvgWithReport(withPhotos, { itemImages: { [P1]: href } }).report;
+      expect(report.dropped, `${id} photos dropped`).toBe(0);
+      const fit = boardFit(withPhotos);
+      expect(fit.canPublish, id).toBe(true);
+      expect(fit.droppedItems, id).toBe(0);
+      expect(fit.overflowReasons, id).toEqual([]);
+      expect(fit.safeAction, id).toBeNull();
+      expect(fit.custom.applied, id).toBe(false);
+      expect(fit.canvasWidth).toBe(1920);
+      expect(fit.canvasHeight).toBe(1080);
+      expect(Array.isArray(fit.regions)).toBe(true);
+      expect("videoBox" in fit).toBe(true);
+      expect(typeof fit.photosSuppressed).toBe("boolean");
+      if (report.photosSuppressed) {
+        expect(fit.photosSuppressed, id).toBe(true);
+        expect(layoutSvg(withPhotos, { itemImages: { [P1]: href } }), id).not.toContain(href);
+        expect(fit.suggestions.roomierTemplate, id).toBe("taqueria-specials");
+      } else {
+        expect(fit.photosSuppressed, id).toBe(false);
+        expect(layoutSvg(withPhotos, { itemImages: { [P1]: href } }), id).toContain(href);
+      }
+    }
+    for (const k of ["tpl.photosDontFit"] as const) {
+      expect(en[k]).toBe("Item photos don't fit with this many items. Remove some photos or items, or pick a roomier template.");
+      expect(es[k]).toBeTruthy();
+      expect(es[k]).not.toBe(en[k]);
+    }
+    // A short menu still shows its item photos (the fallback is only when they would drop items).
+    const short = { ...typical("coffee-shop", true), sections: typical("coffee-shop", true).sections.map((s) => ({ ...s, items: s.items.slice(0, 2) })) };
+    expect(designSvgWithReport(short, { itemImages: { [P1]: href } }).report.photosSuppressed).toBeFalsy();
+    expect(layoutSvg(short, { itemImages: { [P1]: href } })).toContain(href);
+    expect(boardFit(short).photosSuppressed).toBe(false);
+    expect(boardFit(short).canPublish).toBe(true);
+
+    // Long names on a crowded columns template: even compact thumbs would drop items that fit as text, so we
+    // fall back to text-only, keep the board publishable, and surface photosSuppressed for the editor notice.
+    const longNames = typical("coffee-shop", true);
+    longNames.sections = longNames.sections.map((sec, s) => ({
+      ...sec,
+      items: sec.items.map((it, i) => ({ ...it, name: `Extra crispy double smash burger with fries ${s}-${i}` })),
+    }));
+    const longText = { ...longNames, sections: longNames.sections.map((sec) => ({ ...sec, items: sec.items.map(({ imageMediaId: _i, ...it }) => it) })) };
+    expect(designSvgWithReport(longText).report.dropped).toBe(0);
+    const longReport = designSvgWithReport(longNames, { itemImages: { [P1]: href } }).report;
+    expect(longReport.dropped).toBe(0);
+    expect(longReport.photosSuppressed).toBe(true);
+    expect(layoutSvg(longNames, { itemImages: { [P1]: href } })).not.toContain(href);
+    const longFit = boardFit(longNames);
+    expect(longFit.photosSuppressed).toBe(true);
+    expect(longFit.canPublish).toBe(true);
+    expect(longFit.droppedItems).toBe(0);
+    expect(longFit.overflowReasons).toEqual([]);
+    expect(longFit.safeAction).toBeNull();
+    expect(longFit.suggestions.roomierTemplate).toBe("taqueria-specials");
+    expect(longFit.custom).toEqual(expect.objectContaining({ applied: false }));
+    expect(longFit.canvasWidth).toBe(1920);
+    expect(longFit.canvasHeight).toBe(1080);
+    expect(Array.isArray(longFit.regions)).toBe(true);
+    expect("videoBox" in longFit).toBe(true);
   });
 });
 
@@ -330,6 +431,11 @@ describe("guided editor wiring and languages", () => {
     expect(s).toContain('data-testid="tpl-item-remove"');
     expect(s).toContain('void upload(e.target.files?.[0], "item", target)');
     expect(s).toContain("disabled={busy !== null || fit.dropped > 0 || czOverflow.length > 0}");
+    expect(s).not.toContain("tpl-photo-style");
+    expect(s).not.toContain("tpl-hide-photos");
+    expect(s).not.toContain("tpl-photos-hidden");
+    expect(s).not.toContain("tpl-show-photos");
+    expect(s).not.toContain("tpl-dialog-hidden");
   });
   it("has 22 templates including the four photo templates", () => {
     expect(MENU_DESIGNS).toHaveLength(22);

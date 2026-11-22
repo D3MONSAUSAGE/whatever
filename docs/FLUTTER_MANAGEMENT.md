@@ -200,7 +200,7 @@ Menus are still images on the TV. The server renders a 1920×1080 PNG and stores
 | --- | --- | --- | --- | --- |
 | Classic full-screen | `content.layoutVersion` absent | `MenuContent` (`lib/menu-templates.ts`): `title, subtitle, footer, sections[{ name, items[{ name, price, description, imageMediaId? }] }], photoMediaId?, useBrand?, headingFont?, bodyFont?, itemPhotos?` | `POST /api/menus`, `PATCH /api/menus/:id` (re-render, swap image on its screens; no draft) | Create, edit, rename, assign |
 | Original layout (7) | `content.layoutVersion === 1`, no `design` | `LayoutDocument` (`lib/layout-studio.ts`): `layoutVersion: 1, template ∈ {two-column, menu-promo-67, two-menu-promo, triple-column, split-50, menu-banner, signature}, split, title, subtitle, footer, sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font, bodyFont?, textColor, backgroundColor, featureTitle, featureDetail, columnWidths, imageFit, imageAnchor`; items may have `imageMediaId` | `POST /api/layout-studio {mode: "draft"\|"publish", menuId, name, document}` | Create, edit, rename, assign via `POST /api/layout-studio` (phone since Android +17). `PATCH /api/menus/:id` with `content` or `template` is still 409 |
-| Professional template (22) | `content.layoutVersion === 1` **and** `content.design` | `LayoutDocument` + `design` (template id), `variant`, `stockPhoto?`, `logoMediaId?`, `photoStyle?: "thumbs"\|"text"`; items may have `imageMediaId` and `stockPhoto` | same as layouts | same as layouts |
+| Professional template (22) | `content.layoutVersion === 1` **and** `content.design` | `LayoutDocument` + `design` (template id), `variant`, `stockPhoto?`, `logoMediaId?`, deprecated `photoStyle?`; items may have `imageMediaId` and `stockPhoto` (item photos auto-display whenever present) | same as layouts | same as layouts |
 
 Rules for clients:
 
@@ -329,9 +329,14 @@ Body `{ document, width?: 480 | 960 | 1920, format?: "png" | "fit" }` (`width` s
   "hiddenSections": 0,     // layouts: sections past the layout's columns (not drawn; publish still allowed)
   "hiddenItems": 0,
   "clippedNames": [],      // layouts: item names shortened with "…"
-  "suggestions": { "roomierTemplate": "diner-classics", "canMergeSections": false }   // the web editor's fix buttons
+  "suggestions": { "roomierTemplate": "diner-classics", "canMergeSections": false },   // the web editor's fix buttons
+  // Additive Guided Customization fields (unchanged): canvasWidth, canvasHeight, videoBox, regions,
+  // overflowReasons, safeAction, custom.
+  "photosSuppressed": false  // additive: true when item photos were omitted so items that fit as text stay on the board
 }
 ```
+
+`photosSuppressed` is additive. It is `true` when even compact item-photo thumbnails would drop items that fit as text-only; the renderer then draws the board as text (no empty placeholders, no silent photo-only drops) and `canPublish` stays `true` as long as those items fit. Show the localized `tpl.photosDontFit` copy in the editor (Menu and Look) when it is true. On `featured-dishes`, `photosSuppressed` hides only the left-list thumbnails; spotlight panel photos still draw. `overflowReasons`, `safeAction`, `custom`, `regions`, `videoBox`, `canvasWidth` and `canvasHeight` are unchanged.
 
 ### Editing flow for the app
 
@@ -440,7 +445,7 @@ Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last s
 | Change | What the app sees | PR |
 | --- | --- | --- |
 | Web menu designer for everyone; most new boards are `layoutVersion: 1` | New board kinds in `GET /api/menus`, content edits 409, draft boards with `playlistId: null` | #148, #151, #153 |
-| Item photos on every board kind | Optional `imageMediaId` on items, `itemPhotos: false`, `photoStyle`; kept when omitted | #149, #151 |
+| Item photos on every board kind | Optional `imageMediaId` on items auto-displays in preview/TV; legacy `itemPhotos`/`photoStyle` accepted on input and ignored at render time | #149, #151, Fix 1 |
 | `PATCH /api/menus/:id {displayIds}` is additive | Existing screens are no longer removed; `replace: true` for the old behaviour | #157 |
 | `DELETE /api/media/:id` checks menus, promotions, Brand Kit logo | New 409 `media_in_use` | #158 |
 | Web-designer board publish swaps the right image | No contract change | #159 |
