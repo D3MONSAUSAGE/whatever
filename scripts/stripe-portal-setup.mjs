@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 // Idempotently creates Pekko's TEST-mode Customer Portal configuration.
-// Usage: STRIPE_TEST_SECRET_KEY=sk_test_... node scripts/stripe-portal-setup.mjs
-// Refuses any key that is not sk_test_. Does not call live Stripe.
+// Usage: STRIPE_TEST_SECRET_KEY=rk_test_... (or sk_test_...) node scripts/stripe-portal-setup.mjs
+// Refuses live keys and refuses to run if STRIPE_LIVE_ENABLED=1. Does not call live Stripe.
 // Safe to re-run: finds the configuration by metadata pekko=billing-safety.
 import Stripe from "stripe";
 
-const key = process.env.STRIPE_TEST_SECRET_KEY || "";
-if (!key.startsWith("sk_test_")) {
-  console.error("Refusing: STRIPE_TEST_SECRET_KEY must be a test key (sk_test_...). Live Stripe is not touched.");
+if (process.env.STRIPE_LIVE_ENABLED === "1") {
+  console.error("Refusing: STRIPE_LIVE_ENABLED=1 is set. Portal test setup only runs in test mode.");
+  process.exit(1);
+}
+const key = (process.env.STRIPE_TEST_SECRET_KEY || "").trim();
+if (!key.startsWith("sk_test_") && !key.startsWith("rk_test_")) {
+  console.error("Refusing: STRIPE_TEST_SECRET_KEY must be a test key (sk_test_... or rk_test_...). Live Stripe is not touched.");
   process.exit(1);
 }
 const stripe = new Stripe(key);
@@ -34,6 +38,7 @@ for (const item of LOOKUPS) {
 const features = {
   payment_method_update: { enabled: true },
   invoice_history: { enabled: true },
+  subscription_pause: { enabled: false },
   subscription_cancel: { enabled: true, mode: "at_period_end", proration_behavior: "none" },
   subscription_update: {
     enabled: true,

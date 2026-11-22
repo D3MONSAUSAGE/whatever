@@ -88,33 +88,90 @@ export function billingEnv(override?: Record<string, string | undefined>) {
   };
 }
 
-/** Live mode only when the flag is exactly "1". Anything else, including "true", stays in test. */
+const PRODUCTION_SUPABASE_HOST = "iybmjtkjfxcqupvhoddh.supabase.co";
+
+export function isTestStripeKey(value: string | undefined): boolean {
+  const cleaned = clean(value);
+  return cleaned.startsWith("sk_test_") || cleaned.startsWith("rk_test_");
+}
+
+export function isLiveStripeKey(value: string | undefined): boolean {
+  return clean(value).startsWith("sk_live_");
+}
+
+export function isProductionSupabaseUrl(value: string | undefined): boolean {
+  const cleaned = clean(value);
+  if (!cleaned) return false;
+  try {
+    return new URL(cleaned).hostname.toLowerCase() === PRODUCTION_SUPABASE_HOST;
+  } catch {
+    return cleaned.toLowerCase().includes(PRODUCTION_SUPABASE_HOST);
+  }
+}
+
+function vercelEnvOf(env?: Record<string, string | undefined>): string {
+  return clean(env ? env.VERCEL_ENV : process.env.VERCEL_ENV);
+}
+
+function supabaseUrlOf(env?: Record<string, string | undefined>): string {
+  return clean(env ? env.NEXT_PUBLIC_SUPABASE_URL : process.env.NEXT_PUBLIC_SUPABASE_URL);
+}
+
+export type ModeBlockReason = "production_flag_off" | "preview_live_forbidden" | "preview_db_not_isolated";
+
+/**
+ * Environment isolation guard:
+ * - Production (VERCEL_ENV=production) stays locked to live and fails closed if STRIPE_LIVE_ENABLED !== "1".
+ * - Preview (VERCEL_ENV=preview) stays locked to test and fails closed if STRIPE_LIVE_ENABLED === "1"
+ *   or if Preview still points to the production Supabase database.
+ */
+export function modeBlockedReason(env?: Record<string, string | undefined>): ModeBlockReason | null {
+  const vEnv = vercelEnvOf(env);
+  const flag = clean(env ? env.STRIPE_LIVE_ENABLED : process.env.STRIPE_LIVE_ENABLED);
+  if (vEnv === "production" && flag !== "1") return "production_flag_off";
+  if (vEnv === "preview") {
+    if (flag === "1") return "preview_live_forbidden";
+    if (isProductionSupabaseUrl(supabaseUrlOf(env))) return "preview_db_not_isolated";
+  }
+  return null;
+}
+
+/**
+ * Live mode only when STRIPE_LIVE_ENABLED is exactly "1".
+ * Production is pinned to live and Preview is pinned to test.
+ */
 export function billingMode(env?: Record<string, string | undefined>): "test" | "live" {
+  const vEnv = vercelEnvOf(env);
+  if (vEnv === "production") return "live";
+  if (vEnv === "preview") return "test";
   const flag = env ? env.STRIPE_LIVE_ENABLED : process.env.STRIPE_LIVE_ENABLED;
   return clean(flag) === "1" ? "live" : "test";
 }
 
 /**
  * The secret for the active mode. Test never reads STRIPE_LIVE_*, and live never
- * reads STRIPE_TEST_*. A live key is refused unless the flag is exactly "1".
+ * reads STRIPE_TEST_*. Fails closed on environment/mode or database-isolation mismatch.
  */
 export function stripeKey(env?: Record<string, string | undefined>): string | null {
+  if (modeBlockedReason(env)) return null;
   const values = billingEnv(env);
   if (billingMode(env) === "live") {
     const live = values.STRIPE_LIVE_SECRET_KEY;
-    return live.startsWith("sk_live_") ? live : null;
+    return isLiveStripeKey(live) ? live : null;
   }
   const test = values.STRIPE_TEST_SECRET_KEY;
-  return test.startsWith("sk_test_") ? test : null;
+  return isTestStripeKey(test) ? test : null;
 }
 
 export function webhookSecret(env?: Record<string, string | undefined>): string {
+  if (modeBlockedReason(env)) return "";
   const values = billingEnv(env);
   return billingMode(env) === "live" ? values.STRIPE_LIVE_WEBHOOK_SECRET : values.STRIPE_WEBHOOK_SECRET;
 }
 
-/** Live mode accepts only livemode events. Test mode refuses them. */
+/** Live mode accepts only livemode events. Test mode refuses them. Blocked environments refuse all events. */
 export function webhookEventAllowed(livemode: boolean, env?: Record<string, string | undefined>): boolean {
+  if (modeBlockedReason(env)) return false;
   return billingMode(env) === "live" ? livemode : !livemode;
 }
 
@@ -162,6 +219,7 @@ export function checkoutSessionRequest(input: {
   origin: string;
   managedPayments: string | undefined;
   secretKey: string | undefined;
+  mode?: "test" | "live";
   trialEnd?: number | null;
   submitMessage?: string | null;
 }):
@@ -188,11 +246,17 @@ export function checkoutSessionRequest(input: {
   const options: Stripe.RequestOptions = { apiVersion: CHECKOUT_API_VERSION };
   const key = clean(input.secretKey);
   const flag = clean(input.managedPayments);
-  if (key.startsWith("sk_test_")) {
+  if (input.mode === "live" && !isLiveStripeKey(key)) {
+    return { ok: false, code: "managed_payments_config", error: "Live Checkout requires an sk_live_ secret key." };
+  }
+  if (input.mode === "test" && !isTestStripeKey(key)) {
+    return { ok: false, code: "managed_payments_config", error: "Test Checkout requires an sk_test_ or rk_test_ key." };
+  }
+  if (isTestStripeKey(key)) {
     params.managed_payments = { enabled: flag === "1" };
     return { ok: true, params, options };
   }
-  if (key.startsWith("sk_live_")) {
+  if (isLiveStripeKey(key)) {
     // Live opt-out only when the flag is exactly "0". Anything else, including unset, is a config error.
     if (flag === "0") {
       params.managed_payments = { enabled: false };
@@ -200,7 +264,7 @@ export function checkoutSessionRequest(input: {
     }
     return { ok: false, code: "managed_payments_config", error: LIVE_MANAGED_PAYMENTS_ERROR };
   }
-  return { ok: true, params, options };
+  return { ok: false, code: "managed_payments_config", error: "Stripe key does not match an allowed test or live key prefix." };
 }
 
 let cached: { key: string; client: Stripe } | null = null;
@@ -229,12 +293,13 @@ export async function readCustomerPaymentMethod(customerId: string): Promise<imp
 }
 
 export function priceFor(plan: PaidPlan, env?: Record<string, string | undefined>): string | null {
+  if (modeBlockedReason(env)) return null;
   const values = billingEnv(env);
   const name = (billingMode(env) === "live" ? LIVE_PRICE_ENV : PRICE_ENV)[plan];
   return values[name] || null;
 }
 export function planForPrice(priceId: string | null | undefined, env?: Record<string, string | undefined>): PaidPlan | null {
-  if (!priceId) return null;
+  if (!priceId || modeBlockedReason(env)) return null;
   const values = billingEnv(env);
   const names = billingMode(env) === "live" ? LIVE_PRICE_ENV : PRICE_ENV;
   return PAID_PLANS.find((p) => values[names[p]] === priceId) ?? null;
@@ -673,24 +738,25 @@ function valueShape(value: string) {
 export function billingDiagnostics(env?: Record<string, string | undefined>) {
   const values = billingEnv(env);
   const live = billingMode(env) === "live";
+  const blockedReason = modeBlockedReason(env);
   const missing: string[] = [];
   const rejected: string[] = [];
   const shapes: Record<string, ReturnType<typeof valueShape>> = {};
   const names = live ? LIVE_BILLING_ENV_NAMES : BILLING_ENV_NAMES;
-  const expectPrefix: Record<string, string> = live
+  const expectPrefix: Record<string, readonly string[]> = live
     ? {
-      STRIPE_LIVE_SECRET_KEY: "sk_live_",
-      STRIPE_LIVE_WEBHOOK_SECRET: "whsec_",
-      STRIPE_LIVE_PRICE_STARTER: "price_",
-      STRIPE_LIVE_PRICE_BUSINESS: "price_",
-      STRIPE_LIVE_PRICE_MULTI: "price_",
+      STRIPE_LIVE_SECRET_KEY: ["sk_live_"],
+      STRIPE_LIVE_WEBHOOK_SECRET: ["whsec_"],
+      STRIPE_LIVE_PRICE_STARTER: ["price_"],
+      STRIPE_LIVE_PRICE_BUSINESS: ["price_"],
+      STRIPE_LIVE_PRICE_MULTI: ["price_"],
     }
     : {
-      STRIPE_TEST_SECRET_KEY: "sk_test_",
-      STRIPE_WEBHOOK_SECRET: "whsec_",
-      STRIPE_PRICE_STARTER: "price_",
-      STRIPE_PRICE_BUSINESS: "price_",
-      STRIPE_PRICE_MULTI: "price_",
+      STRIPE_TEST_SECRET_KEY: ["sk_test_", "rk_test_"],
+      STRIPE_WEBHOOK_SECRET: ["whsec_"],
+      STRIPE_PRICE_STARTER: ["price_"],
+      STRIPE_PRICE_BUSINESS: ["price_"],
+      STRIPE_PRICE_MULTI: ["price_"],
     };
   for (const name of names) {
     const value = values[name];
@@ -698,10 +764,16 @@ export function billingDiagnostics(env?: Record<string, string | undefined>) {
       missing.push(name);
       continue;
     }
-    if (!value.startsWith(expectPrefix[name])) {
+    if (!expectPrefix[name].some((prefix) => value.startsWith(prefix))) {
       rejected.push(name);
       shapes[name] = valueShape(value);
     }
+  }
+  if (blockedReason === "production_flag_off" || blockedReason === "preview_live_forbidden") {
+    rejected.push("STRIPE_LIVE_ENABLED");
+  }
+  if (blockedReason === "preview_db_not_isolated") {
+    rejected.push("NEXT_PUBLIC_SUPABASE_URL");
   }
   const sources = env ? undefined : live
     ? {
@@ -718,8 +790,10 @@ export function billingDiagnostics(env?: Record<string, string | undefined>) {
     };
   return {
     mode: live ? "live" as const : "test" as const,
-    available: checkoutAvailable(values),
-    webhook: !!stripeKey(values) && webhookSecret(values).startsWith("whsec_"),
+    blockedReason,
+    databaseIsolated: blockedReason !== "preview_db_not_isolated",
+    available: checkoutAvailable(env),
+    webhook: !!stripeKey(env) && webhookSecret(env).startsWith("whsec_"),
     missing,
     rejected,
     shapes,
