@@ -5,6 +5,7 @@ import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MAX_MENUS, MENUS_UNAVAILABLE, checkMenuPhoto, dropMenuImage, keepOwnItemPhotos, isMissingSchema, menuView, parseMenuBody, storeMenuImage, type MenuInput, type MenuRow } from "@/lib/server/menus";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { noteMenuSaved } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
     media_id: mediaId, playlist_id: playlistId, updated_at: new Date().toISOString(),
   }).select("id").single();
   if (row.error) return fail("Couldn't create the menu.", 500);
+  // Onboarding v2: the board is saved; stamps "first menu" after the response (never affects this save).
+  noteMenuSaved(req, admin.accountId, input.content);
 
   let published = false;
   if (input.displayIds?.length) {

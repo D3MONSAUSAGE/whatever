@@ -7,7 +7,20 @@ import { computeDashboard, type Snapshot } from "@/lib/server/dev-analytics/metr
 import { parseRange } from "@/lib/server/dev-analytics/range";
 import { loadBilling } from "@/lib/server/dev-analytics/stripe-source";
 
+import type { OnboardingRow } from "@/lib/server/dev-analytics/metrics";
+
 export const runtime = "nodejs";
+
+/** 0036 milestones (step names and times only). Null before the migration, so the section is simply absent. */
+async function loadOnboarding(): Promise<OnboardingRow[] | null> {
+  try {
+    const r = await db().from("accounts").select("id, onboarding_milestones, onboarding_completed_at").limit(20000);
+    if (r.error || !Array.isArray(r.data)) return null;
+    return r.data as OnboardingRow[];
+  } catch {
+    return null;
+  }
+}
 export const dynamic = "force-dynamic";
 
 const DAY = 86_400_000;
@@ -48,9 +61,10 @@ const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Reques
   const includeInternal = url.searchParams.get("include") === "internal";
   const since = new Date(Math.min(range.from.getTime(), now.getTime() - LOOKBACK_DAYS * DAY));
 
-  const [snap, billing] = await Promise.all([
+  const [snap, billing, onboarding] = await Promise.all([
     db().rpc("dev_analytics_snapshot", { p_actor: userId, p_since: since.toISOString() }),
     loadBilling(now.getTime()),
+    loadOnboarding(),
   ]);
   if (snap.error) {
     if (snap.error.code === "42501" || /not_authorized/.test(snap.error.message || "")) return notFound();
@@ -63,6 +77,7 @@ const forDeveloper = withLocalizedErrors(async function forDeveloper(req: Reques
     now,
     includeInternal,
     domains: internalDomains(),
+    onboarding,
   });
   return json(body, 200, { "X-Robots-Tag": "noindex, nofollow" });
 });

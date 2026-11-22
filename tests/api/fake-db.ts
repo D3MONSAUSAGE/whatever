@@ -23,6 +23,9 @@ export type Store = {
   brand_kits: Row[];
   video_conversion_jobs: Row[];
   video_conversion_months: Row[];
+  activity_events: Row[];
+  /** Columns that "don't exist yet" (a migration not applied): selecting or updating them fails with 42703. */
+  missingColumns: Set<string>;
   objects: Map<string, Uint8Array>;
   /** Missing key means "uploaded now". Null means the storage listing has no created_at. */
   objectTimes: Map<string, string | null>;
@@ -33,7 +36,7 @@ const TABLE_NAMES = [
   "accounts", "locations", "media", "displays", "playlists", "playlist_items",
   "pairing_sessions", "rate_limits", "screen_groups", "screen_group_members", "schedules", "promos",
   "display_playback", "display_commands", "menus", "push_devices", "brand_kits",
-  "video_conversion_jobs", "video_conversion_months",
+  "video_conversion_jobs", "video_conversion_months", "activity_events",
 ] as const;
 type TableName = (typeof TABLE_NAMES)[number];
 
@@ -113,6 +116,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     filters: [string, unknown][];
     inFilters: [string, unknown[]][];
     nullFilters: [string, unknown][];
+    notFilters: [string, string, unknown][];
     order?: { col: string; ascending: boolean };
     limit?: number;
     range?: { from: number; to: number };
@@ -125,7 +129,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
   private done: Promise<{ data: unknown; error: { message: string; code?: string } | null }> | null = null;
 
   constructor(private store: Store, private table: TableName) {
-    this.op = { type: "select", filters: [], inFilters: [], nullFilters: [], mode: "many" };
+    this.op = { type: "select", filters: [], inFilters: [], nullFilters: [], notFilters: [], mode: "many" };
   }
 
   select(cols = "*", opts?: { count?: "exact"; head?: boolean }) {
@@ -160,6 +164,11 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
     this.op.inFilters.push([key, values]);
     return this;
   }
+  /** Supports not(col, "is", null) and not(col, "like", "prefix%"). */
+  not(key: string, operator: string, value: unknown) {
+    this.op.notFilters.push([key, operator, value]);
+    return this;
+  }
   order(col: string, opts?: { ascending?: boolean }) {
     this.op.order = { col, ascending: opts?.ascending !== false };
     return this;
@@ -190,10 +199,26 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string; co
 
   private async exec() {
     const rows = this.store[this.table];
+    const touched = [
+      ...(this.op.select ?? "").split(",").map((c) => c.trim()),
+      ...Object.keys(this.op.update ?? {}),
+      ...this.op.filters.map(([k]) => k), ...this.op.nullFilters.map(([k]) => k),
+    ];
+    const missing = touched.find((c) => this.store.missingColumns.has(c));
+    if (missing) return { data: null, error: { message: `column accounts.${missing} does not exist`, code: "42703" } };
+    const notMatch = (row: Row, [key, operator, value]: [string, string, unknown]) => {
+      if (operator === "is") return (row[key] ?? null) !== value;
+      if (operator === "like") {
+        const re = new RegExp(`^${String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*")}$`);
+        return !re.test(String(row[key] ?? ""));
+      }
+      throw new Error(`fake-db: unsupported not(${operator})`);
+    };
     const match = () => rows.filter((row) =>
       this.op.filters.every(([key, value]) => row[key] === value) &&
       this.op.inFilters.every(([key, values]) => values.includes(row[key])) &&
-      this.op.nullFilters.every(([key, value]) => (row[key] ?? null) === value));
+      this.op.nullFilters.every(([key, value]) => (row[key] ?? null) === value) &&
+      this.op.notFilters.every((f) => notMatch(row, f)));
 
     if (this.op.type === "insert") {
       const result = insertRow(this.store, this.table, { ...(this.op.insert ?? {}) });
@@ -265,7 +290,34 @@ function rateLimit(store: Store, key: string, windowSeconds: number, max: number
   return Number(row.count) <= max;
 }
 
+const ONBOARDING_STEPS = ["first_menu", "preview_menu", "customize_menu", "screen", "show_on_tv", "first_update", "playlists", "schedules"];
+const ONBOARDING_REQUIRED = ["first_menu", "preview_menu", "screen", "show_on_tv", "first_update"];
+
+/** Mirrors 0036 onboarding_mark: stamp each allowed step once, log onboarding.<step>, complete on the five required. */
+function onboardingMark(store: Store, args: Record<string, unknown>) {
+  if (store.missingColumns.has("onboarding_milestones")) throw new Error("function public.onboarding_mark does not exist");
+  const account = store.accounts.find((row) => row.id === args.p_account);
+  if (!account) return null;
+  const now = new Date().toISOString();
+  const m = { ...((account.onboarding_milestones as Record<string, string> | undefined) ?? {}) };
+  const source = args.p_source === "android" ? "android" : "web";
+  const kind = args.p_kind === "menu_board" || args.p_kind === "upload" ? args.p_kind : null;
+  for (const step of (args.p_steps as string[] | null) ?? []) {
+    if (!ONBOARDING_STEPS.includes(step) || m[step]) continue;
+    m[step] = now;
+    store.activity_events.push({ id: crypto.randomUUID(), account_id: account.id, at: now, kind: `onboarding.${step}`, subject_id: null,
+      detail: step === "first_menu" && kind ? { source, kind } : { source } });
+  }
+  account.onboarding_milestones = m;
+  if (!account.onboarding_completed_at && ONBOARDING_REQUIRED.every((step) => m[step])) {
+    account.onboarding_completed_at = now;
+    store.activity_events.push({ id: crypto.randomUUID(), account_id: account.id, at: now, kind: "onboarding.completed", subject_id: null, detail: { source } });
+  }
+  return { milestones: m, completed_at: account.onboarding_completed_at ?? null };
+}
+
 function rpc(store: Store, name: string, args: Record<string, unknown>) {
+  if (name === "onboarding_mark") return onboardingMark(store, args);
   if (name === "reserve_video_conversion") {
     const month = String(args.p_month);
     const amount = Number(args.p_reserved_millis);
@@ -1035,6 +1087,8 @@ export function createFakeDb() {
     menus: [],
     push_devices: [], brand_kits: [],
     video_conversion_jobs: [], video_conversion_months: [],
+    activity_events: [],
+    missingColumns: new Set(),
     objects: new Map(),
     objectTimes: new Map(),
     users: new Map(),

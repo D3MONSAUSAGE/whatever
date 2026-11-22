@@ -30,9 +30,8 @@ test("a menu board is made from a template, edited, and scheduled by time of day
     }, { timeout: 15_000 }).toBe(true);
     await admin.from("displays").insert({ account_id: acct!.id, name: "Counter TV", token_hash: `h-${randomUUID()}` });
 
-    // Setup tracker offers the menu board shortcut.
-    await page.getByRole("link", { name: "Make a menu board" }).first().click();
-    await page.waitForURL("**/dashboard/media/menus");
+    // The setup tracker's "Create my menu" shortcut is covered in onboarding.spec.ts.
+    await page.goto("/dashboard/media/menus");
     await page.getByRole("button", { name: "New menu board" }).click();
     const editor = page.getByTestId("menu-editor");
     await editor.getByText("Fresh day").click();

@@ -33,7 +33,8 @@ export type NoteKey =
   | "usersOneOwner"
   | "activeDefinition"
   | "funnelStrict"
-  | "trialAutoStarts";
+  | "trialAutoStarts"
+  | "onboardingBackfill";
 
 export type Note = { key: NoteKey; vars?: Record<string, string | number> };
 
@@ -118,4 +119,23 @@ export type DevAnalytics = {
     notes: Note[];
   };
   review: { candidates: ReviewCandidate[]; insertTemplate: string };
+  /** Menu-first onboarding (0036 milestones) for accounts created in range. Absent before 0036 is applied. */
+  onboarding?: OnboardingFunnel;
+};
+
+export type OnboardingStepKey = "first_menu" | "preview_menu" | "customize_menu" | "screen" | "show_on_tv" | "first_update" | "playlists" | "schedules";
+export type HoursSummary = { accounts: number; medianHours: number | null; p75Hours: number | null };
+export type OnboardingFunnel = {
+  cohort: number;
+  steps: { key: OnboardingStepKey; required: boolean; reached: GroupCount; rate: Rate }[];
+  completed: GroupCount;
+  completedRate: Rate;
+  /** Of accounts with both a first menu and a TV: the share that made the menu first. */
+  contentBeforeTv: Rate;
+  timeToFirstContent: HoursSummary;
+  contentToTv: HoursSummary;
+  /** Paid conversion for menu-first vs TV-first accounts (null under the small-group floor). */
+  paidContentFirst: Rate;
+  paidTvFirst: Rate;
+  notes: Note[];
 };

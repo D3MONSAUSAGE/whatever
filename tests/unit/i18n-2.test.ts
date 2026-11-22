@@ -13,7 +13,7 @@ import { API_MESSAGES_ES, apiMessageEs } from "@/lib/i18n/api-messages";
 import { codeForMessage, localizeError } from "@/lib/server/error-codes";
 import { fail } from "@/lib/server/http";
 import { SetupTracker } from "@/components/setup-tracker";
-import type { OnboardingState } from "@/lib/api";
+import { buildV2State } from "@/lib/onboarding";
 
 const ES_RULES = /\b(tú|tu cuenta|tienes|puedes|quieres|elige|escribe|ingresa)\b|televisor|prueba gratuita|desconectad|programación|Inténtelo|Ingrese/i;
 
@@ -41,7 +41,7 @@ describe("I18N-2: dictionaries", () => {
 
 describe("I18N-2: in-scope screens route their copy through t()", () => {
   const files: Record<string, string[]> = {
-    "components/setup-tracker.tsx": ["Set up your first screen", "Hide setup", "Resume setup", "Business name", "Save location", "Common (US)"],
+    "components/setup-tracker.tsx": ["Get your menu on your TV", "Hide setup", "Resume setup", "Create my menu", "Already have a menu?", "Your first menu is ready", "Optional"],
     "components/displays-screen.tsx": ["Add and manage screens", "Connect TV", "Assign playlist", "Disconnect this screen?", "Publish to selected screens", "Choose a playlist"],
     "components/group-publish.tsx": ["Publish to this group", "Overridden by schedule.", "Publish to these screens"],
     "components/overview-screen.tsx": ["Welcome back!", "Recent Screens", "Media files"],
@@ -59,23 +59,33 @@ describe("I18N-2: in-scope screens route their copy through t()", () => {
     });
   }
   it("English wording is unchanged (spot checks)", () => {
-    expect(en["setup.heading"]).toBe("Set up your first screen");
+    expect(en["setup.v2.heading"]).toBe("Get your menu on your TV");
     expect(en["disp.title"]).toBe("Add and manage screens");
     expect(en["settings.signOutAllBody"]).toBe("This signs you out here and on every phone, tablet, and computer. Your TVs keep playing; they don't use your sign-in.");
     expect(en["del.afterConfirm"]).toBe("after you confirm; you can cancel until then. It can't be undone afterwards.");
   });
-  it("the setup tracker renders in Spanish", () => {
-    const state: OnboardingState = {
-      steps: [{ id: "account", done: true }, { id: "business", done: true }, { id: "location", done: true }, { id: "screen", done: false }, { id: "media", done: false }, { id: "playlist", done: false }, { id: "publish", done: false }, { id: "playing", done: false, confirmed: false }],
-      completed: 3, total: 8, nextStep: "screen", dismissed: false, finished: false, show: true, firstLocationId: null,
-    };
+  it("the setup tracker renders in Spanish (onboarding v2)", () => {
+    const state = buildV2State({
+      milestones: { first_menu: "2026-11-20T10:00:00.000Z" }, live: {}, confirmed: false, dismissed: false, completedAt: null,
+      legacyFinished: false, celebratedAt: null, previewTarget: { kind: "menu_board", menuId: "m1" },
+    });
     const html = renderToStaticMarkup(createElement(LocaleProvider, { initial: "es", children: createElement(SetupTracker, { fixture: state, origin: "https://pekkotv.com" }) }));
-    expect(html).toContain("Configure su primera pantalla");
-    expect(html).toContain("3 de 8 pasos completados.");
-    expect(html).toContain("Vincular una pantalla");
-    expect(html).toContain("Crear un menú digital");
+    expect(html).toContain("Ponga su menú en su TV");
+    expect(html).toContain("1 de 5 pasos completados.");
+    expect(html).toContain("¡Su primer menú está listo!");
+    expect(html).toContain("Ver vista previa");
+    expect(html).toContain("Conectar TV");
+    expect(html).toContain("Opcional");
     expect(html).toContain("pekkotv.com/tv abre el mismo reproductor.");
-    expect(html).not.toMatch(/Set up your first screen|Hide setup|steps done/);
+    expect(html).not.toMatch(/Get your menu|Hide setup|steps done|Optional\b/);
+  });
+  it("a fresh account sees both ways to make a first menu, in Spanish", () => {
+    const state = buildV2State({ milestones: {}, live: {}, confirmed: false, dismissed: false, completedAt: null, legacyFinished: false, celebratedAt: null, previewTarget: null });
+    const html = renderToStaticMarkup(createElement(LocaleProvider, { initial: "es", children: createElement(SetupTracker, { fixture: state, origin: "https://pekkotv.com" }) }));
+    expect(html).toContain("Crear mi menú");
+    expect(html).toContain("¿Ya tiene un menú? Súbalo.");
+    expect(html).toContain('href="/dashboard/media/menus?new=1"');
+    expect(html).not.toContain("¡Su primer menú está listo!");
   });
 });
 
@@ -121,7 +131,8 @@ describe("I18N-2: Spanish for API errors Android can show (codes unchanged)", ()
     "Couldn't load your plan. Try again.", "Saved, but couldn't reload your plan. Refresh to see it.",
     "No attribution to save.", "Not paired.", "Send command \\", "Send { ids: [...] } (up to 100) or { all: true }.",
     "appVersion must be a string of up to 40 characters.", "bad count", "bad index", "bad seq", "bad version",
-    "before must be an ISO date.", "confirmBusiness must be true.", "days must be 7 or 30.", "dismissed must be true or false.",
+    "before must be an ISO date.", "confirmBusiness must be true.", "dismissFirstSuccess must be true.",
+    "recordStep must be preview_menu, customize_menu, playlists or schedules.", "days must be 7 or 30.", "dismissed must be true or false.",
     "emailEnabled must be true or false.", "enabled must be true or false.", "platform must be 'android' or 'ios'.",
     "pushEnabled must be true or false.", "token must be an FCM registration token.", "unauthorized", "unavailable", "…",
   ]);

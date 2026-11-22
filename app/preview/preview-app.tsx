@@ -1,4 +1,5 @@
 "use client";
+import { buildV2State, type OnboardingV2State } from "@/lib/onboarding";
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { DashboardShell } from "@/components/shell";
@@ -197,6 +198,20 @@ const previewNotifications = (): NotificationsFixture => ({
   entitlements: { warning: { message: "Your last payment didn't go through. Update your card to keep 6 screens playing.", action: null }, rollout_notice: null },
 });
 
+/** ?onboarding=fresh|first|tv-first|done-required|dismissed: fixed onboarding v2 states for the Overview checklist. */
+function previewOnboarding(kind: string | null): OnboardingV2State | undefined {
+  const at = "2026-11-20T10:00:00.000Z";
+  const base = { confirmed: false, dismissed: false, completedAt: null, legacyFinished: false, celebratedAt: null, previewTarget: null };
+  switch (kind) {
+    case "fresh": return buildV2State({ ...base, milestones: {}, live: {} });
+    case "first": return buildV2State({ ...base, milestones: { first_menu: at }, live: {}, previewTarget: { kind: "menu_board", menuId: "menu-lunch" } });
+    case "tv-first": return buildV2State({ ...base, milestones: { screen: at }, live: {} });
+    case "dismissed": return buildV2State({ ...base, milestones: { first_menu: at }, live: {}, dismissed: true, celebratedAt: at });
+    case "progress": return buildV2State({ ...base, milestones: { first_menu: at, preview_menu: at, screen: at, show_on_tv: at, schedules: at }, live: {}, confirmed: true, celebratedAt: at, previewTarget: { kind: "menu_board", menuId: "menu-lunch" } });
+    default: return undefined;
+  }
+}
+
 export function PreviewApp() {
   const params = useSearchParams();
   const screen = params.get("screen") || "overview";
@@ -210,8 +225,9 @@ export function PreviewApp() {
     ? { ...foundDisplay, connected: false, online: false, lastSeenAt: new Date().toISOString(), reportedState: "playing" as const, playingAt: new Date().toISOString() }
     : foundDisplay;
   const path = screen === "workspace" ? `/dashboard/screens/${workspaceId}` : previewPath(screen);
-  const overview = empty
-    ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example" }
+  const onboarding = previewOnboarding(params.get("onboarding"));
+  const overview = empty || onboarding
+    ? { displays: [] as typeof displays, mediaCount: 0, playlists: [] as typeof playlists, scheduleCount: 0, origin: "https://seemple.example", onboarding }
     : { displays, mediaCount: media.length, playlists, scheduleCount: 1, origin: "https://seemple.example" };
   return (
     <DashboardShell preview pathOverride={path} notifications={params.get("nc") === "0" ? undefined : previewNotifications()}>

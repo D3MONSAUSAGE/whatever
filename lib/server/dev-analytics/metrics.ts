@@ -1,6 +1,6 @@
 import {
   SMALL_GROUP_MIN, type ChannelKey, type CohortRow, type DevAnalytics, type FunnelStep, type FunnelStepKey,
-  type GroupCount, type Note, type Rate, type RetentionCell,
+  type GroupCount, type Note, type OnboardingFunnel, type OnboardingStepKey, type Rate, type RetentionCell,
 } from "@/lib/dev-analytics";
 import { classifyAccount, INSERT_TEMPLATE, reviewCandidates } from "./exclusions";
 import { addDays, pacificDay, pacificWeekStart, TIME_ZONE, type Range } from "./range";
@@ -108,7 +108,51 @@ export type ComputeInput = {
   now: Date;
   includeInternal: boolean;
   domains: readonly string[];
+  /** accounts.onboarding_milestones (0036), or null when the columns aren't there yet. */
+  onboarding?: OnboardingRow[] | null;
 };
+export type OnboardingRow = { id: string; onboarding_milestones: Record<string, string> | null; onboarding_completed_at: string | null };
+
+const ONBOARDING_STEPS: { key: OnboardingStepKey; required: boolean }[] = [
+  { key: "first_menu", required: true }, { key: "preview_menu", required: true }, { key: "customize_menu", required: false },
+  { key: "screen", required: true }, { key: "show_on_tv", required: true }, { key: "first_update", required: true },
+  { key: "playlists", required: false }, { key: "schedules", required: false },
+];
+
+export function onboardingFunnel(
+  cohort: Pick<SnapAccount, "id" | "created_at">[], rows: OnboardingRow[], paid: (id: string) => boolean,
+): OnboardingFunnel {
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const ms = cohort.map((a) => ({ a, m: (byId.get(a.id)?.onboarding_milestones ?? {}) as Record<string, string>, done: byId.get(a.id)?.onboarding_completed_at ?? null }));
+  const n = cohort.length;
+  const steps = ONBOARDING_STEPS.map(({ key, required }) => {
+    const reached = ms.filter((x) => x.m[key]).length;
+    return { key, required, reached: suppress(reached), rate: rate(reached, n) };
+  });
+  const completed = ms.filter((x) => x.done).length;
+  const both = ms.filter((x) => x.m.first_menu && x.m.screen);
+  const contentFirst = both.filter((x) => t(x.m.first_menu) <= t(x.m.screen));
+  const tvFirst = both.filter((x) => t(x.m.first_menu) > t(x.m.screen));
+  const summary = (h: number[]) => ({
+    accounts: h.length,
+    medianHours: h.length >= SMALL_GROUP_MIN ? quantile(h, 0.5) : null,
+    p75Hours: h.length >= SMALL_GROUP_MIN ? quantile(h, 0.75) : null,
+  });
+  const firstContentHours = ms.filter((x) => x.m.first_menu).map((x) => Math.max(0, (t(x.m.first_menu) - t(x.a.created_at)) / HOUR));
+  const contentToTvHours = ms.filter((x) => x.m.first_menu && x.m.show_on_tv).map((x) => Math.max(0, (t(x.m.show_on_tv) - t(x.m.first_menu)) / HOUR));
+  return {
+    cohort: n,
+    steps,
+    completed: suppress(completed),
+    completedRate: rate(completed, n),
+    contentBeforeTv: rate(contentFirst.length, both.length),
+    timeToFirstContent: summary(firstContentHours),
+    contentToTv: summary(contentToTvHours),
+    paidContentFirst: rate(contentFirst.filter((x) => paid(x.a.id)).length, contentFirst.length),
+    paidTvFirst: rate(tvFirst.filter((x) => paid(x.a.id)).length, tvFirst.length),
+    notes: [{ key: "onboardingBackfill" }, { key: "smallGroups" }],
+  };
+}
 
 export function computeDashboard(input: ComputeInput): DevAnalytics {
   const { snapshot: s, billing, range, now, includeInternal, domains } = input;
@@ -399,5 +443,6 @@ export function computeDashboard(input: ComputeInput): DevAnalytics {
     retention,
     attribution,
     review: { candidates: reviewCandidates(s.accounts, domains), insertTemplate: INSERT_TEMPLATE },
+    ...(input.onboarding ? { onboarding: onboardingFunnel(cohort, input.onboarding, (id) => paidStart.has(id)) } : {}),
   };
 }

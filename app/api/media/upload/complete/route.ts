@@ -19,6 +19,7 @@ import { MAX_CONVERT_EDGE, hevcConversionEnabled, inspectForConversion, startVid
 import { UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { noteUploadSaved } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,6 +138,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
       missing ? 503 : 500,
     );
   }
+  // Onboarding v2: a ready video counts as the first menu. A converting video is picked up once it's ready.
+  noteUploadSaved(req, admin.accountId);
   return json({ id: mediaId }, 201);
 });
 
