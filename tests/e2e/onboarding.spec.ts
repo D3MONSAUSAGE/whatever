@@ -35,6 +35,7 @@ async function fresh(browser: Browser, lang: "en" | "es", vp: (typeof VIEWPORTS)
   const user = { email: `pantalla-e2e-${randomUUID()}@mailinator.com`, password: `Pantalla-${randomUUID()}` };
   created.push(user.email);
   await signUp(page, user);
+  if (admin()) await accountId(user.email);
   return { context, page, user };
 }
 
@@ -43,12 +44,18 @@ async function accountId(email: string) {
   if (!a) throw new Error("SUPABASE_SERVICE_ROLE_KEY is needed to seed a test account's first menu.");
   let id: string | null = null;
   await expect.poll(async () => {
-    const users = await a.auth.admin.listUsers({ perPage: 200 });
-    const u = users.data.users.find((x) => x.email === email);
-    if (!u) return false;
-    id = (await a.from("accounts").select("id").eq("owner_user_id", u.id).maybeSingle()).data?.id ?? null;
-    return Boolean(id);
+    for (let page = 1; page <= 20; page++) {
+      const users = await a.auth.admin.listUsers({ page, perPage: 200 });
+      const u = users.data.users.find((x) => x.email === email);
+      if (u) {
+        id = (await a.from("accounts").select("id").eq("owner_user_id", u.id).maybeSingle()).data?.id ?? null;
+        return Boolean(id);
+      }
+      if (users.data.users.length < 200) break;
+    }
+    return false;
   }, { timeout: 20_000 }).toBe(true);
+  await a.from("analytics_exclusions").upsert({ account_id: id!, reason: "internal", note: "e2e onboarding test" }, { onConflict: "account_id" });
   return { a, id: id! };
 }
 
@@ -83,7 +90,9 @@ for (const lang of ["en", "es"] as const) {
         await expect(card.getByText(c.success)).toBeVisible({ timeout: 15_000 });
         await expect(page.getByTestId("setup-tracker").getByText(c.one)).toBeVisible();
         if (SHOTS) await page.screenshot({ path: `${SHOTS}/e2e-${lang}-${vp.name}-success.png`, fullPage: true });
+        const dismissReq = page.waitForResponse((res) => res.url().includes("/api/onboarding") && res.request().method() === "POST" && res.status() === 200);
         await card.getByRole("button", { name: c.close }).click();
+        await dismissReq;
         await expect(card).toHaveCount(0);
         await page.reload();
         await expect(page.getByTestId("setup-tracker")).toBeVisible();

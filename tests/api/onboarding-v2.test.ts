@@ -70,14 +70,20 @@ describe("GET /api/onboarding (v1, unchanged for Android)", () => {
     expect(body.steps.map((s: { id: string }) => s.id)).toEqual(["account", "business", "location", "screen", "media", "playlist", "publish", "playing"]);
     expect(body).toMatchObject({ completed: 1, total: 8, nextStep: "business", show: true, finished: false, dismissed: false });
   });
-  it("still works before 0036 is applied", async () => {
+  it("still works before 0036 is applied, returning a usable derived v2 payload (no 500)", async () => {
+    await get("/api/onboarding");
+    addMenu(ITEM_BOARD);
+    store.displays.push({ id: crypto.randomUUID(), account_id: account().id, name: "Front", status: "active", content_version: 0, created_at: new Date().toISOString() });
     store.missingColumns = new Set(["onboarding_milestones", "onboarding_completed_at", "first_menu_celebrated_at"]);
     const v1 = await get("/api/onboarding");
     expect(v1.status).toBe(200);
     expect(v1.body.total).toBe(8);
     const v2 = await get("/api/onboarding?v=2");
     expect(v2.status).toBe(200);
-    expect(v2.body.showFirstSuccess).toBe(false);
+    expect(v2.body).toMatchObject({ version: 2, requiredCompleted: 3, requiredTotal: 5, show: true, finished: false, showFirstSuccess: false, completedAt: null });
+    expect(step(v2.body, "first_menu")).toMatchObject({ done: true, doneAt: null });
+    expect(step(v2.body, "preview_menu")).toMatchObject({ done: true, doneAt: null });
+    expect(step(v2.body, "screen")).toMatchObject({ done: true, doneAt: null });
   });
 });
 
