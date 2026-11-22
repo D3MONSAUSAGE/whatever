@@ -336,7 +336,7 @@ Body `{ document, width?: 480 | 960 | 1920, format?: "png" | "fit" }` (`width` s
 }
 ```
 
-`photosSuppressed` is additive. It is `true` when even compact item-photo thumbnails would drop items that fit as text-only; the renderer then draws the board as text (no empty placeholders, no silent photo-only drops) and `canPublish` stays `true` as long as those items fit. Show the localized `tpl.photosDontFit` copy in the editor (Step 2 and Look) when it is true. `overflowReasons`, `safeAction`, `custom`, `regions`, `videoBox`, `canvasWidth` and `canvasHeight` are unchanged.
+`photosSuppressed` is additive. It is `true` when even compact item-photo thumbnails would drop items that fit as text-only; the renderer then draws the board as text (no empty placeholders, no silent photo-only drops) and `canPublish` stays `true` as long as those items fit. Show the localized `tpl.photosDontFit` copy in the editor (Menu and Look) when it is true. On `featured-dishes`, `photosSuppressed` hides only the left-list thumbnails; spotlight panel photos still draw. `overflowReasons`, `safeAction`, `custom`, `regions`, `videoBox`, `canvasWidth` and `canvasHeight` are unchanged.
 
 ### Editing flow for the app
 
