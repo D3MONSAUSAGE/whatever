@@ -7,7 +7,7 @@ import { checkoutSubmitMessage } from "@/lib/server/billing-copy";
 import { entitlementsLocale } from "@/lib/server/locale";
 import { PLANS } from "@/lib/plans";
 import { cappedTrialEndsAt } from "@/lib/server/entitlements";
-import { billingDiagnostics, billingReturnOrigin, checkoutAction, checkoutAvailable, checkoutBlocked, checkoutSessionMatchesCharge, checkoutSessionRequest, checkoutTrialEnd, PAID_PLANS, planChangePaymentFailed, priceFor, stripe, stripeKey, subscriptionPriceChange, type PaidPlan } from "@/lib/server/stripe";
+import { billingDiagnostics, billingMode, billingReturnOrigin, checkoutAction, checkoutAvailable, checkoutBlocked, checkoutSessionMatchesCharge, checkoutSessionRequest, checkoutTrialEnd, PAID_PLANS, planChangePaymentFailed, priceFor, stripe, stripeKey, subscriptionPriceChange, type PaidPlan } from "@/lib/server/stripe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +42,9 @@ export async function POST(req: Request) {
       return json({ error: "Use Manage billing to change this plan.", code: "subscription_exists", action: "portal" }, 409);
     }
     const current = await s.subscriptions.retrieve(String(a.data.stripe_subscription_id));
+    if (typeof current.livemode === "boolean" && current.livemode !== (billingMode() === "live")) {
+      return json({ error: "Checkout isn't available yet.", code: "billing_unavailable" }, 503);
+    }
     const item = current.items.data[0];
     const action = checkoutAction({
       status: current.status || a.data.subscription_status,
@@ -78,6 +81,10 @@ export async function POST(req: Request) {
   if (stored && stored.price === price && !replace) {
     try {
       const existing = await s.checkout.sessions.retrieve(stored.session_id);
+      const existingLive = (existing as { livemode?: boolean }).livemode;
+      if (typeof existingLive === "boolean" && existingLive !== (billingMode() === "live")) {
+        return json({ error: "Couldn't update checkout. Try again.", code: "checkout_conflict" }, 409);
+      }
       if (checkoutSessionMatchesCharge(existing, trialEnd !== null) && existing.url) {
         return json({ url: existing.url, resumed: true });
       }
@@ -118,6 +125,7 @@ export async function POST(req: Request) {
     origin,
     managedPayments: process.env.STRIPE_MANAGED_PAYMENTS,
     secretKey: stripeKey() ?? "",
+    mode: billingMode(),
     trialEnd,
     submitMessage: checkoutSubmitMessage({ deferred: trialEnd !== null, price: planPrice, chargeDate, locale }),
   });
@@ -136,6 +144,8 @@ export async function GET(req: Request) {
   return json({
     available: report.available,
     webhook: report.webhook,
+    blockedReason: report.blockedReason,
+    databaseIsolated: report.databaseIsolated,
     missing: report.missing,
     rejected: report.rejected,
     shapes: report.shapes,

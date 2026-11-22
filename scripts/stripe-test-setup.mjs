@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 // Idempotently creates Pekko's 3 TEST-mode products + monthly USD prices.
-// Usage: STRIPE_TEST_SECRET_KEY=sk_test_... node scripts/stripe-test-setup.mjs
-// Refuses any key that is not sk_test_. Safe to re-run: finds prices by lookup_key.
+// Usage: STRIPE_TEST_SECRET_KEY=rk_test_... (or sk_test_...) node scripts/stripe-test-setup.mjs
+// Refuses live keys and refuses to run if STRIPE_LIVE_ENABLED=1. Safe to re-run: finds prices by lookup_key.
 import Stripe from "stripe";
 
-const key = process.env.STRIPE_TEST_SECRET_KEY || "";
-if (!key.startsWith("sk_test_")) {
-  console.error("Refusing: STRIPE_TEST_SECRET_KEY must be a test key (sk_test_...).");
+if (process.env.STRIPE_LIVE_ENABLED === "1") {
+  console.error("Refusing: STRIPE_LIVE_ENABLED=1 is set. Test setup only runs in test mode.");
+  process.exit(1);
+}
+const key = (process.env.STRIPE_TEST_SECRET_KEY || "").trim();
+if (!key.startsWith("sk_test_") && !key.startsWith("rk_test_")) {
+  console.error("Refusing: STRIPE_TEST_SECRET_KEY must be a test key (sk_test_... or rk_test_...).");
   process.exit(1);
 }
 const stripe = new Stripe(key);
