@@ -1528,6 +1528,7 @@ export const en = {
   "tpl.photosHiddenNote": "Item photos are hidden on this board, so your photos don’t appear on the TV. They’re kept with their items.",
   "tpl.showItemPhotos": "Show item photos",
   "tpl.photosShownNote": "Item photos appear as small thumbnails beside their items on this board.",
+  "tpl.photosDontFit": "Item photos don't fit with this many items. Remove some photos or items, or pick a roomier template.",
   "tpl.photoTip": "Tip: tap the photo square to add a food photo to any item.",
   "tpl.hidden": "Hidden",
   "tpl.hiddenOnBoard": "hidden on the board",

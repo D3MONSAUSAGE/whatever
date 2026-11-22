@@ -329,9 +329,14 @@ Body `{ document, width?: 480 | 960 | 1920, format?: "png" | "fit" }` (`width` s
   "hiddenSections": 0,     // layouts: sections past the layout's columns (not drawn; publish still allowed)
   "hiddenItems": 0,
   "clippedNames": [],      // layouts: item names shortened with "…"
-  "suggestions": { "roomierTemplate": "diner-classics", "canMergeSections": false }   // the web editor's fix buttons
+  "suggestions": { "roomierTemplate": "diner-classics", "canMergeSections": false },   // the web editor's fix buttons
+  // Additive Guided Customization fields (unchanged): canvasWidth, canvasHeight, videoBox, regions,
+  // overflowReasons, safeAction, custom.
+  "photosSuppressed": false  // additive: true when item photos were omitted so items that fit as text stay on the board
 }
 ```
+
+`photosSuppressed` is additive. It is `true` when even compact item-photo thumbnails would drop items that fit as text-only; the renderer then draws the board as text (no empty placeholders, no silent photo-only drops) and `canPublish` stays `true` as long as those items fit. Show the localized `tpl.photosDontFit` copy in the editor (Step 2 and Look) when it is true. `overflowReasons`, `safeAction`, `custom`, `regions`, `videoBox`, `canvasWidth` and `canvasHeight` are unchanged.
 
 ### Editing flow for the app
 

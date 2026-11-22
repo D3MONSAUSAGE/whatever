@@ -67,6 +67,12 @@ export type BoardFit = {
   /** The targeted reset that removes that overflow, or null. */
   safeAction: SafeAction | null;
   custom: CustomEcho;
+  /**
+   * Additive: true when item photos were omitted at render time because even compact thumbnails would drop
+   * items that fit as text-only. canPublish stays true in that case (the board draws as text). Existing
+   * overflowReasons / safeAction / custom / regions / videoBox fields are unchanged.
+   */
+  photosSuppressed: boolean;
 };
 
 type Metrics = { dropped: number; clipped: number; feature: number };
@@ -139,13 +145,15 @@ export function boardFit(doc: LayoutDocument): BoardFit {
     videoBox: mediaVideoBox(doc), regions: report.regions,
     overflowReasons, safeAction: paths ? { kind: "reset_custom" as const, paths } : null,
     custom: customEcho(doc),
+    photosSuppressed: Boolean(report.photosSuppressed),
   };
   if (design) {
     const dropped = report.dropped;
     const roomier = roomierDesignId(doc, design);
+    const offerRoomier = (dropped > 0 || extra.photosSuppressed) && design.id !== roomier;
     return {
       canPublish: dropped === 0 && overflowReasons.length === 0, droppedItems: dropped, hiddenSections: 0, hiddenItems: 0, clippedNames: [],
-      suggestions: { roomierTemplate: dropped > 0 && design.id !== roomier ? roomier : null, canMergeSections: false },
+      suggestions: { roomierTemplate: offerRoomier ? roomier : null, canMergeSections: false },
       ...extra,
     };
   }

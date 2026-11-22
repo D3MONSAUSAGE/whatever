@@ -1516,6 +1516,7 @@ export const es: Record<MessageKey, string> = {
   "tpl.photosHiddenNote": "Las fotos de productos están ocultas en este menú, así que no aparecen en la TV. Se conservan con sus productos.",
   "tpl.showItemPhotos": "Mostrar fotos de productos",
   "tpl.photosShownNote": "Sus fotos aparecen como miniaturas junto a sus productos en este menú.",
+  "tpl.photosDontFit": "Las fotos de productos no caben con tantos productos. Quite algunas fotos o productos, o elija una plantilla más amplia.",
   "tpl.photoTip": "Consejo: toque el cuadro de foto para agregar una foto a cualquier producto.",
   "tpl.hidden": "Oculta",
   "tpl.hiddenOnBoard": "oculta en el menú",

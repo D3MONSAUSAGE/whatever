@@ -256,7 +256,7 @@ const blankItem = () => ({ name: "", price: "", description: "" });
 function itemCount(doc: LayoutDocument) { return doc.sections.reduce((a, s) => a + s.items.length, 0); }
 
 /** What the board can't show, in one shape for every engine. */
-type Fit = { dropped: number; scale: number; hiddenSections: number; clipped: string[] };
+type Fit = { dropped: number; scale: number; hiddenSections: number; clipped: string[]; photosSuppressed?: boolean };
 
 /** Classic boards draw with the classic renderer; the browser gets the same SVG the server rasterises. */
 function classicArt(classic: ClassicSettings, brand: Brand | null, art: Art) {
@@ -435,7 +435,7 @@ export function TemplateEditor({
   const czOverflow = useMemo(() => (engine === "classic" ? [] : customOverflow(doc)), [engine, doc]);
   const czSafe = useMemo(() => (czOverflow.length ? safeResetPaths(doc) : null), [czOverflow, doc]);
   const fit: Fit = useMemo(() => {
-    if (engine === "design") { const r = designSvgWithReport(doc, art).report; return { dropped: r.dropped, scale: r.scale, hiddenSections: 0, clipped: [] }; }
+    if (engine === "design") { const r = designSvgWithReport(doc, art).report; return { dropped: r.dropped, scale: r.scale, hiddenSections: 0, clipped: [], photosSuppressed: r.photosSuppressed }; }
     if (engine === "layout") { const r = layoutReport(doc, art); return { dropped: r.hiddenItems, scale: 1, hiddenSections: r.hiddenSections, clipped: r.clipped }; }
     return { dropped: 0, scale: 1, hiddenSections: 0, clipped: [] };
   }, [engine, doc, art.imageHref, art.logoHref, itemImages]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -646,7 +646,7 @@ export function TemplateEditor({
   const photoTemplate = isDesign && (isPhotoDesign(design) || itemPhotosShown(doc, design));
   // A roomier template that still shows item photos when this one does (shared with the preview API).
   const roomierId = isDesign ? roomierDesignId(doc, design) : null;
-  const roomier = isDesign && fit.dropped > 0 && design.id !== roomierId ? designById(roomierId) : null;
+  const roomier = isDesign && (fit.dropped > 0 || fit.photosSuppressed) && design.id !== roomierId ? designById(roomierId) : null;
   const merged = engine === "layout" && fit.hiddenSections > 0 ? mergeExtraSections(doc) : null;
   const columns = engine === "layout" ? fixedColumns(doc.template) : null;
   const images = library.filter((f) => f.kind === "image");
@@ -747,16 +747,23 @@ export function TemplateEditor({
               ) : null}
             </div>
           ) : null}
+          {fit.photosSuppressed ? (
+            <div className="note-warn text-sm mt-3 grid gap-2" role="status" data-testid="tpl-photos-dont-fit">
+              <p>{t("tpl.photosDontFit")}</p>
+              {roomier ? <div><button type="button" className="btn btn-quiet min-h-9" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier">{t("tpl.useRoomier", { name: roomier.name[L] })}</button></div> : null}
+            </div>
+          ) : null}
           {fit.dropped > 0 ? (
             <div className="note-warn text-sm mt-3 grid gap-2" role="status" data-testid="tpl-dropped">
               <p>{engine === "layout" ? t("tpl.columnsHidden", { n: fit.dropped, cols: columns ?? 0 }) : t(photoTemplate ? "tpl.droppedPhotos" : "tpl.dropped", { n: fit.dropped })}</p>
               <div className="flex flex-wrap gap-2">
                 {merged ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(merged)} data-testid="tpl-merge">{t("tpl.mergeColumns", { n: columns ?? 0 })}</button> : null}
-                {roomier ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
+                {roomier && !fit.photosSuppressed ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
                 {onSplit ? <button type="button" className="btn btn-quiet min-h-9" onClick={splitOverflow} data-testid="tpl-split">{t("tpl.splitBoard", { n: fit.dropped })}</button> : null}
               </div>
             </div>
           )
+            : fit.photosSuppressed ? null
             : fit.scale < 0.72 ? <p className="text-sm mt-3 text-[#7a4a00]" role="status">{t("tpl.tight")}</p>
               : <p className="text-sm mt-3 text-live-ink" role="status">✓ {t(engine !== "classic" && (doc.custom || doc.sections.some((s) => s.headingOverride)) ? "cz.fits" : "tpl.fits")}</p>}
           {fit.clipped.length ? <p className="note-warn text-sm mt-2" role="status" data-testid="tpl-clipped">{t("ls.clippedNames", { names: fit.clipped.map((x) => `“${x}”`).join(", ") })}</p> : null}
@@ -798,7 +805,12 @@ export function TemplateEditor({
             <div className="grid gap-3">
               <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
               {columns ? <p className="text-sm text-muted" data-testid="tpl-columns-note">{t("tpl.columnsNote", { n: columns })}</p> : null}
-              {ownerPhotos && !(isDesign && isPhotoDesign(design)) ? (
+              {fit.photosSuppressed ? (
+                <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-dont-fit-menu">
+                  <p>{t("tpl.photosDontFit")}</p>
+                  {roomier ? <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier-menu">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
+                </div>
+              ) : ownerPhotos && !(isDesign && isPhotoDesign(design)) ? (
                 <p className="text-sm text-live-ink" role="status" data-testid="tpl-photos-shown">✓ {t("tpl.photosShownNote")}</p>
               ) : <p className="text-xs text-muted">{t("tpl.photoTip")}</p>}
               {doc.sections.map((section, si) => (
@@ -1015,6 +1027,12 @@ export function TemplateEditor({
           {step === 3 ? (
             <div className="grid gap-4">
               <h3 className="font-display font-bold text-lg">{t("tpl.lookTitle")}</h3>
+              {fit.photosSuppressed ? (
+                <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-dont-fit-look">
+                  <p>{t("tpl.photosDontFit")}</p>
+                  {roomier ? <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier-look">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
+                </div>
+              ) : null}
               {engine === "design" ? (
                 <div className="grid gap-2">
                   <p className="form-label">{t("tpl.colourStyle")}</p>

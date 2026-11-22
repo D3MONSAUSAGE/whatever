@@ -6,6 +6,7 @@ import { MENU_DESIGNS, designById, designDocument, isPhotoDesign, switchDesign }
 import { CARD_CAPACITY, designSvgWithReport, featuredItems, itemPhotosShown } from "@/lib/menu-design-svg";
 import { itemPhotoIds, moveItem, splitLastItems, withItemPhoto } from "@/lib/menu-item-photos";
 import { applyLayoutSave, type LibraryFile } from "@/lib/layout-publish";
+import { boardFit } from "@/lib/board-fit";
 import { renderLayoutPng } from "@/lib/server/layout-render";
 import { en } from "@/lib/i18n/en";
 import { es } from "@/lib/i18n/es";
@@ -270,6 +271,87 @@ describe("rendering item photos (shared SVG: browser preview and TV PNG)", () =>
     const hidden = { ...extreme, photoStyle: "text" as const };
     expect(designSvgWithReport(hidden).report.dropped).toBe(0);
     expect(itemPhotoIds(hidden.sections)).toEqual(itemPhotoIds(full.sections));
+  });
+
+  it("24-item column templates stay publishable: shrink thumbs or fall back without dropping items that fit as text", () => {
+    const typical = (id: string, photos: boolean): LayoutDocument => {
+      const doc = designDocument(designById(id)!);
+      return {
+        ...doc,
+        sections: [0, 1, 2, 3].map((s) => ({
+          name: `Section ${s}`,
+          items: Array.from({ length: 6 }, (_, i) => ({
+            name: `Item ${s}-${i}`,
+            price: "$12.50",
+            description: i % 2 ? "" : "Fresh, made to order",
+            ...(photos ? { imageMediaId: P1 } : {}),
+          })),
+        })),
+      };
+    };
+    for (const id of ["coffee-shop", "bakery", "brunch-house", "espresso-bar"] as const) {
+      const text = typical(id, false);
+      const withPhotos = typical(id, true);
+      expect(designSvgWithReport(text).report.dropped, `${id} text`).toBe(0);
+      const report = designSvgWithReport(withPhotos, { itemImages: { [P1]: href } }).report;
+      expect(report.dropped, `${id} photos dropped`).toBe(0);
+      const fit = boardFit(withPhotos);
+      expect(fit.canPublish, id).toBe(true);
+      expect(fit.droppedItems, id).toBe(0);
+      expect(fit.overflowReasons, id).toEqual([]);
+      expect(fit.safeAction, id).toBeNull();
+      expect(fit.custom.applied, id).toBe(false);
+      expect(fit.canvasWidth).toBe(1920);
+      expect(fit.canvasHeight).toBe(1080);
+      expect(Array.isArray(fit.regions)).toBe(true);
+      expect("videoBox" in fit).toBe(true);
+      expect(typeof fit.photosSuppressed).toBe("boolean");
+      if (report.photosSuppressed) {
+        expect(fit.photosSuppressed, id).toBe(true);
+        expect(layoutSvg(withPhotos, { itemImages: { [P1]: href } }), id).not.toContain(href);
+        expect(fit.suggestions.roomierTemplate, id).toBe("taqueria-specials");
+      } else {
+        expect(fit.photosSuppressed, id).toBe(false);
+        expect(layoutSvg(withPhotos, { itemImages: { [P1]: href } }), id).toContain(href);
+      }
+    }
+    for (const k of ["tpl.photosDontFit"] as const) {
+      expect(en[k]).toBe("Item photos don't fit with this many items. Remove some photos or items, or pick a roomier template.");
+      expect(es[k]).toBeTruthy();
+      expect(es[k]).not.toBe(en[k]);
+    }
+    // A short menu still shows its item photos (the fallback is only when they would drop items).
+    const short = { ...typical("coffee-shop", true), sections: typical("coffee-shop", true).sections.map((s) => ({ ...s, items: s.items.slice(0, 2) })) };
+    expect(designSvgWithReport(short, { itemImages: { [P1]: href } }).report.photosSuppressed).toBeFalsy();
+    expect(layoutSvg(short, { itemImages: { [P1]: href } })).toContain(href);
+    expect(boardFit(short).photosSuppressed).toBe(false);
+    expect(boardFit(short).canPublish).toBe(true);
+
+    // Long names on a crowded columns template: even compact thumbs would drop items that fit as text, so we
+    // fall back to text-only, keep the board publishable, and surface photosSuppressed for the editor notice.
+    const longNames = typical("coffee-shop", true);
+    longNames.sections = longNames.sections.map((sec, s) => ({
+      ...sec,
+      items: sec.items.map((it, i) => ({ ...it, name: `Extra crispy double smash burger with fries ${s}-${i}` })),
+    }));
+    const longText = { ...longNames, sections: longNames.sections.map((sec) => ({ ...sec, items: sec.items.map(({ imageMediaId: _i, ...it }) => it) })) };
+    expect(designSvgWithReport(longText).report.dropped).toBe(0);
+    const longReport = designSvgWithReport(longNames, { itemImages: { [P1]: href } }).report;
+    expect(longReport.dropped).toBe(0);
+    expect(longReport.photosSuppressed).toBe(true);
+    expect(layoutSvg(longNames, { itemImages: { [P1]: href } })).not.toContain(href);
+    const longFit = boardFit(longNames);
+    expect(longFit.photosSuppressed).toBe(true);
+    expect(longFit.canPublish).toBe(true);
+    expect(longFit.droppedItems).toBe(0);
+    expect(longFit.overflowReasons).toEqual([]);
+    expect(longFit.safeAction).toBeNull();
+    expect(longFit.suggestions.roomierTemplate).toBe("taqueria-specials");
+    expect(longFit.custom).toEqual(expect.objectContaining({ applied: false }));
+    expect(longFit.canvasWidth).toBe(1920);
+    expect(longFit.canvasHeight).toBe(1080);
+    expect(Array.isArray(longFit.regions)).toBe(true);
+    expect("videoBox" in longFit).toBe(true);
   });
 });
 
