@@ -139,7 +139,6 @@ const STYLES = `${FONT_CSS}
 .tpl-item .tpl-photo { grid-row: 1 / 3; grid-column: 1; width: 64px; height: 64px; align-self: start; border-radius: 10px; border: 1px dashed #9aa8bf; background: #f6f8fc; overflow: hidden; padding: 0; font-size: 11px; font-weight: 700; color: #33415a; line-height: 1.2; }
 .tpl-item .tpl-photo { position: relative; }
 .tpl-item .tpl-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tpl-item .tpl-hidden { position: absolute; inset: auto 0 0 0; background: rgb(11 18 32 / .78); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 0; text-align: center; }
 .tpl-item .tpl-photo:has(img) { border-style: solid; border-color: var(--color-line); }
 .tpl-item .desc { grid-column: 2 / 4; }
 .tpl-item .acts { grid-row: 1 / 3; grid-column: 4; display: flex; flex-direction: column; gap: 3px; }
@@ -441,12 +440,9 @@ export function TemplateEditor({
     return { dropped: 0, scale: 1, hiddenSections: 0, clipped: [] };
   }, [engine, doc, art.imageHref, art.logoHref, itemImages]); // eslint-disable-line react-hooks/exhaustive-deps
   const [photoFor, setPhotoFor] = useState<{ si: number; ii: number } | null>(null);
-  /** Card and featured templates always show item photos; every other style can hide them. */
-  const photosAlways = isDesign && (design.composition === "cards" || design.composition === "featured");
   function setItemPhoto(si: number, ii: number, imageMediaId: string | null) {
     update({ ...doc, sections: withItemPhoto(doc.sections, si, ii, imageMediaId) });
-    // Say exactly what happens to the photo: it shows on the board unless the owner chose to hide item photos.
-    if (imageMediaId) toast.show(doc.photoStyle === "text" && !photosAlways ? t("tpl.photoSavedHidden") : t("tpl.photoAdded"));
+    if (imageMediaId) toast.show(t("tpl.photoAdded"));
   }
   function moveItemAt(si: number, ii: number, dir: -1 | 1) { update({ ...doc, sections: moveItem(doc.sections, si, ii, dir) }); }
   /** Move the items that don't fit (the last ones in reading order) to a new board with the same design. */
@@ -647,13 +643,10 @@ export function TemplateEditor({
 
   const n = itemCount(doc);
   const ownerPhotos = hasOwnerItemPhoto(doc);
-  const photosShown = isDesign ? itemPhotosShown(doc, design) : ownerPhotos && doc.photoStyle !== "text";
-  const photosHidden = ownerPhotos && !photosShown;
   const photoTemplate = isDesign && (isPhotoDesign(design) || itemPhotosShown(doc, design));
   // A roomier template that still shows item photos when this one does (shared with the preview API).
   const roomierId = isDesign ? roomierDesignId(doc, design) : null;
   const roomier = isDesign && fit.dropped > 0 && design.id !== roomierId ? designById(roomierId) : null;
-  const canHidePhotos = isDesign && fit.dropped > 0 && !photosAlways && itemPhotosShown(doc, design);
   const merged = engine === "layout" && fit.hiddenSections > 0 ? mergeExtraSections(doc) : null;
   const columns = engine === "layout" ? fixedColumns(doc.template) : null;
   const images = library.filter((f) => f.kind === "image");
@@ -760,7 +753,6 @@ export function TemplateEditor({
               <div className="flex flex-wrap gap-2">
                 {merged ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(merged)} data-testid="tpl-merge">{t("tpl.mergeColumns", { n: columns ?? 0 })}</button> : null}
                 {roomier ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => update(switchDesign(doc, roomier))} data-testid="tpl-roomier">{t("tpl.useRoomier", { name: roomier.name[L] })}</button> : null}
-                {canHidePhotos ? <button type="button" className="btn btn-quiet min-h-9" onClick={() => patch({ photoStyle: "text" })} data-testid="tpl-hide-photos">{t("tpl.itemPhotosHidden")}</button> : null}
                 {onSplit ? <button type="button" className="btn btn-quiet min-h-9" onClick={splitOverflow} data-testid="tpl-split">{t("tpl.splitBoard", { n: fit.dropped })}</button> : null}
               </div>
             </div>
@@ -806,12 +798,7 @@ export function TemplateEditor({
             <div className="grid gap-3">
               <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
               {columns ? <p className="text-sm text-muted" data-testid="tpl-columns-note">{t("tpl.columnsNote", { n: columns })}</p> : null}
-              {photosHidden ? (
-                <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-hidden">
-                  <p>{t("tpl.photosHiddenNote")}</p>
-                  <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => patch({ photoStyle: "thumbs" })} data-testid="tpl-show-photos">{t("tpl.showItemPhotos")}</button>
-                </div>
-              ) : ownerPhotos && !(isDesign && isPhotoDesign(design)) ? (
+              {ownerPhotos && !(isDesign && isPhotoDesign(design)) ? (
                 <p className="text-sm text-live-ink" role="status" data-testid="tpl-photos-shown">✓ {t("tpl.photosShownNote")}</p>
               ) : <p className="text-xs text-muted">{t("tpl.photoTip")}</p>}
               {doc.sections.map((section, si) => (
@@ -827,8 +814,7 @@ export function TemplateEditor({
                   {section.items.map((item, ii) => (
                     <div className="tpl-item" key={ii}>
                       <button type="button" className="tpl-photo" onClick={() => setPhotoFor({ si, ii })} data-testid={`tpl-photo-${si}-${ii}`}
-                        aria-label={`${item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}${item.imageMediaId && photosHidden ? ` (${t("tpl.hiddenOnBoard")})` : ""}`}>
-                        {item.imageMediaId && photosHidden ? <span className="tpl-hidden" aria-hidden>{t("tpl.hidden")}</span> : null}
+                        aria-label={item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}>
                         {item.imageMediaId && urlFor(item.imageMediaId) ? <img src={urlFor(item.imageMediaId)!} alt="" />
                           : item.stockPhoto && isDesign ? <img src={stockPhotoPath(item.stockPhoto)} alt="" />
                             : <span aria-hidden>＋<br />{t("tpl.photo")}</span>}
@@ -1085,16 +1071,6 @@ export function TemplateEditor({
                   </div>
                 </div>
               )}
-              <div className="grid gap-2" data-testid="tpl-photo-style">
-                <p className="form-label">{t("tpl.itemPhotosTitle")}</p>
-                {photosAlways ? <p className="text-sm text-muted">{t("tpl.itemPhotosAlways")}</p> : (
-                  <div className="seg" role="group" aria-label={t("tpl.itemPhotosTitle")}>
-                    <button type="button" aria-pressed={isDesign ? itemPhotosShown(doc, design) : doc.photoStyle !== "text"} onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.itemPhotosThumbs")}</button>
-                    <button type="button" aria-pressed={isDesign ? !itemPhotosShown(doc, design) : doc.photoStyle === "text"} onClick={() => patch({ photoStyle: "text" })}>{t("tpl.itemPhotosHidden")}</button>
-                  </div>
-                )}
-                <p className="text-xs text-muted">{t("tpl.itemPhotosNote")}</p>
-              </div>
               <div className="grid gap-2">
                 <p className="form-label">{t("tpl.kitTitle")}</p>
                 {engine === "classic" ? (
@@ -1203,12 +1179,7 @@ export function TemplateEditor({
                     onClick={() => { setItemPhoto(photoFor.si, photoFor.ii, f.id); setPhotoFor(null); }}>{f.url ? <img src={f.url} alt="" /> : null}</button>
                 ))}</div>
               ) : <p className="text-sm text-muted">{t("tpl.noMedia")}</p>}
-              {doc.photoStyle === "text" && !photosAlways ? (
-                <div className="note-warn text-sm grid gap-2" data-testid="tpl-dialog-hidden">
-                  <p>{t("tpl.photoHiddenHint")}</p>
-                  <button type="button" className="btn btn-quiet min-h-9 justify-self-start" onClick={() => patch({ photoStyle: "thumbs" })}>{t("tpl.showItemPhotos")}</button>
-                </div>
-              ) : <p className="text-xs text-muted" data-testid="tpl-dialog-where">{isDesign && isPhotoDesign(design) ? t("tpl.photoWhereCards") : t("tpl.photoWhereThumbs", { name: label })}</p>}
+              <p className="text-xs text-muted" data-testid="tpl-dialog-where">{isDesign && isPhotoDesign(design) ? t("tpl.photoWhereCards") : t("tpl.photoWhereThumbs", { name: label })}</p>
               <div className="flex justify-end"><button type="button" className="btn btn-quiet" onClick={() => setPhotoFor(null)}>{t("tpl.done")}</button></div>
             </div>
           </Dialog>

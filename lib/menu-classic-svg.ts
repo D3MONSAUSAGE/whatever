@@ -29,9 +29,9 @@ export type MenuArt = {
   itemImages?: Record<string, string>;
 };
 
-/** Item photos show beside their items unless the board hides them. Boards without item photos are unchanged. */
+/** Item photos show automatically beside their items whenever an item has a photo (deprecated `itemPhotos: false` is ignored). */
 export function classicItemPhotosShown(content: MenuContent): boolean {
-  return content.itemPhotos !== false && content.sections.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
+  return content.sections.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
 }
 
 function rgb(hex: string) {

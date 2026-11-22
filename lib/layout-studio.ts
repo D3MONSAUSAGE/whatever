@@ -879,11 +879,11 @@ type Families = { heading: string; body: string };
 type ItemPhotos = { images: Record<string, string>; fill: string; next: () => string };
 
 /**
- * Item photos show on original layouts (no `design`) when an item has an owner photo, unless the board hides them
- * (`photoStyle: "text"`). Boards without item photos draw exactly as before.
+ * Item photos show automatically on original layouts whenever an item has an owner photo.
+ * Deprecated `photoStyle: "text"` is ignored at render time (kept accepted by parseLayout for older clients).
  */
 export function layoutItemPhotosShown(doc: Pick<LayoutDocument, "sections" | "photoStyle">): boolean {
-  return doc.photoStyle !== "text" && doc.sections.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
+  return doc.sections.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
 }
 
 function paintItems(parts: string[], sections: LayoutSection[], x0: number, top: number, width0: number, bottom: number, colors: BoardColors, scale: TypeScale, families: Families, spread = false, unitOverride?: number, minDescSize = 10, photos?: ItemPhotos | null) {
@@ -1020,7 +1020,7 @@ function paintItemsCustom(parts: string[], sections: LayoutSection[], x0: number
       if (thumbs && photos) {
         const boxTop = y - z.name * 0.85;
         const size = Math.round((item.description ? y + descStep + z.desc * 0.25 : y + z.name * 0.3) - boxTop);
-        const tallest = Math.round(section.items.some((it) => it.description) ? z.name * 0.85 + unit * 0.48 + z.desc * 0.25 : z.name * 1.15);
+        const tallest = Math.round(section.items.some((it) => it.description) ? z.name * 0.85 + unit * 0.48 * Math.max(1, z.desc / desc0) + z.desc * 0.25 : z.name * 1.15);
         const shift = tallest + Math.max(12, Math.round(tallest * 0.24));
         x = x0 + shift;
         width = width0 - shift;

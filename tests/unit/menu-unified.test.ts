@@ -114,13 +114,16 @@ describe("Android and other older clients can't erase classic item photos", () =
 });
 
 describe("item photos in every menu style", () => {
-  it("original layouts: boards without item photos (or with them hidden) draw exactly as before", () => {
+  it("original layouts: boards without item photos draw as before, and legacy photoStyle: text auto-shows item photos", () => {
     for (const t of LAYOUTS) {
       const base = sampleLayout(t);
-      const hidden = { ...withLayoutPhoto(base), photoStyle: "text" as const };
-      expect(layoutSvg(hidden, { itemImages: { [P1]: href } }), t).toBe(layoutSvg(base));
-      // A board that never had photos ignores the photo map entirely.
+      // A board that never had photos ignores the photo map and legacy photoStyle: "text" alike.
       expect(layoutSvg(base, { itemImages: { [P1]: href } }), t).toBe(layoutSvg(base));
+      expect(layoutSvg({ ...base, photoStyle: "text" }, { itemImages: { [P1]: href } }), t).toBe(layoutSvg(base));
+      // When an item has an uploaded photo, it displays automatically even if legacy photoStyle: "text" was stored.
+      const legacyTextWithPhoto = { ...withLayoutPhoto(base), photoStyle: "text" as const };
+      expect(layoutSvg(legacyTextWithPhoto, { itemImages: { [P1]: href } }), t).toBe(layoutSvg(withLayoutPhoto(base), { itemImages: { [P1]: href } }));
+      expect(layoutSvg(legacyTextWithPhoto, { itemImages: { [P1]: href } }), t).toContain(href);
     }
   });
 
@@ -144,11 +147,12 @@ describe("item photos in every menu style", () => {
     expect(svg).not.toContain("<image ");
   });
 
-  it("classic boards: unchanged without photos or with photos hidden; thumbnails when shown", () => {
+  it("classic boards: unchanged without photos; thumbnails auto-show even with legacy itemPhotos: false", () => {
     for (const theme of MENU_TEMPLATES.map((m) => m.id)) {
       const base = sampleMenu();
-      expect(menuSvg(theme, { ...withClassicPhoto(base), itemPhotos: false }, { itemImages: { [P1]: href } })).toBe(menuSvg(theme, base));
+      expect(menuSvg(theme, base, { itemImages: { [P1]: href } })).toBe(menuSvg(theme, base));
       const svg = menuSvg(theme, withClassicPhoto(base), { itemImages: { [P1]: href } });
+      expect(menuSvg(theme, { ...withClassicPhoto(base), itemPhotos: false }, { itemImages: { [P1]: href } })).toBe(svg);
       expect(svg).toContain(`<image href="${href}"`);
       expect(svg).toContain('preserveAspectRatio="xMidYMid slice" clip-path="url(#ip0)"');
       const xs = base.sections[0].items.map((it) => textX(svg, it.name));
@@ -166,11 +170,12 @@ describe("item photos in every menu style", () => {
     for (const t of ["two-column", "split-50"] as LayoutTemplate[]) {
       const doc = withLayoutPhoto(sampleLayout(t));
       const a = renderLayoutPng(doc, null, { itemImages: { [P1]: photo } });
-      const b = renderLayoutPng({ ...doc, photoStyle: "text" }, null, { itemImages: { [P1]: photo } });
+      const legacy = renderLayoutPng({ ...doc, photoStyle: "text" }, null, { itemImages: { [P1]: photo } });
+      const basePng = renderLayoutPng(sampleLayout(t));
       expect(a.readUInt32BE(16)).toBe(1920);
       expect(a.readUInt32BE(20)).toBe(1080);
-      expect(sha(a)).not.toBe(sha(b));
-      expect(sha(b)).toBe(sha(renderLayoutPng(sampleLayout(t))));
+      expect(sha(a)).not.toBe(sha(basePng));
+      expect(sha(legacy)).toBe(sha(a));
     }
     const uri = `data:${photo.mime};base64,${photo.bytes.toString("base64")}`;
     const c1 = renderMenuPng("fresh", withClassicPhoto(sampleMenu()), { itemImages: { [P1]: uri } });
@@ -185,7 +190,24 @@ describe("item photos in every menu style", () => {
     expect(parsed.ok && parsed.value.photoStyle).toBe("text");
     expect(parsed.ok && parsed.value.sections[0].items[0].imageMediaId).toBe(P1);
   });
+
+  it("customized layout boards with enlarged description keep thumbnails clear of item text", () => {
+    const base = withLayoutPhoto(sampleLayout("split-50"));
+    const custom = { ...base, custom: { v: 1 as const, roles: { description: { scale: 1.4 } } } };
+    const svg = layoutSvg(custom, { itemImages: { [P1]: href } });
+    const imgMatch = /<image href="data:image\/png[^>]*x="([\d.]+)"[^>]*width="([\d.]+)"/.exec(svg);
+    expect(imgMatch).toBeTruthy();
+    const imgRight = Number(imgMatch![1]) + Number(imgMatch![2]);
+    const itemNameX = textX(svg, custom.sections[0].items[0].name);
+    expect(itemNameX).toBeGreaterThan(imgRight);
+  });
+
+  it("Fix 2: no unnecessary Web designer label in EN/ES copy or board labels", () => {
+    for (const [k, v] of Object.entries(en)) expect(v, `en.${k}`).not.toMatch(/web designer/i);
+    for (const [k, v] of Object.entries(es)) expect(v, `es.${k}`).not.toMatch(/diseñador web|web designer/i);
+  });
 });
+
 
 describe("switching between templates and original layouts", () => {
   it("template → original layout → template keeps content, colours, fonts and every item photo", () => {

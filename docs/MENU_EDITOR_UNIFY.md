@@ -71,7 +71,7 @@ Layout Studio controls move into the steps:
 **Item photos everywhere:**
 - Templates: as today.
 - Original layouts and classic: optional compact thumbnails beside items that have a photo. Drawn only when an item has an owner photo and photos aren't hidden. Text shifts right; sizes follow the existing row height, so nothing overlaps and the layout keeps its identity. A board with no item photos is byte-for-byte unchanged.
-- `photoStyle` ("thumbs"/"text") now also applies to original layouts. Classic boards get an optional `itemPhotos: false` (hide) flag.
+- Item photos auto-display whenever an item has `imageMediaId`; legacy `photoStyle: "text"` and `itemPhotos: false` remain accepted on input for older clients and are ignored at render time.
 
 **Existing boards:** open in the unified editor in their own engine. Nothing is converted. Switching an existing classic board to another design is offered as "start a new board with this content", because classic and layout boards are stored and published differently; the original stays as it is.
 

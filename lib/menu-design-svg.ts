@@ -612,14 +612,13 @@ function fonts(doc: LayoutDocument, design: MenuDesign) {
 function photoHref(doc: LayoutDocument, art?: DesignArt) {
   return safeDesignHref(art?.imageHref) ?? (doc.stockPhoto ? safeDesignHref(art?.stockHref ?? `/menu-templates/${doc.stockPhoto}.jpg`) : null);
 }
-/** Item photos show on card templates always, and on other templates when the owner (or the design) picks thumbnails. */
+/**
+ * Item photos show automatically whenever a dish has one (card/featured/photo-list templates, or any template where
+ * an item has an owner photo). Stored `doc.photoStyle === "text"` is deprecated and ignored at render time so
+ * uploaded photos never stay hidden.
+ */
 export function itemPhotosShown(doc: LayoutDocument, design: MenuDesign): boolean {
-  if (design.composition === "cards" || design.composition === "featured") return true;
-  // An explicit choice on the board wins (Look → Show as thumbnails / Hide).
-  if (doc.photoStyle) return doc.photoStyle === "thumbs";
-  if (design.photoStyle) return design.photoStyle === "thumbs";
-  // Text-focused templates: as soon as the owner adds a photo to an item, show item photos as thumbnails, so an
-  // uploaded photo never silently disappears. Boards without owner photos look exactly as before.
+  if (design.composition === "cards" || design.composition === "featured" || design.photoStyle === "thumbs") return true;
   return hasOwnerItemPhoto(doc);
 }
 export function hasOwnerItemPhoto(doc: LayoutDocument): boolean {
@@ -860,7 +859,7 @@ function list(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desig
   const colH = H - 56 - footerH - menuTop;
   const avail = W - x0 * 2; const gap = 72; const colW = (avail - gap * 2) / 3;
   const shown = itemPhotosShown(doc, design);
-  const base = withThumbs(baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), shown, isPhotoDesign(design));
+  const base = withThumbs(baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), shown, false);
   const result = fitC(doc.sections, base, [{ cols: 3, colW }], colH, 1.5, 0.55, 0.9, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, colW, gap, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
@@ -1005,10 +1004,12 @@ function cards(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   return { dropped: all.length - shownItems.length, scale: rows === 3 ? 0.8 : 1 };
 }
 
-/** Items featured on the right: the ones with photos (up to 3), else the first two. */
+/** Items featured on the right: owner-uploaded photos first, then template sample photos (up to 3), else the first two. */
 export function featuredItems(doc: LayoutDocument): LayoutItem[] {
   const all = flatItems(doc).map((x) => x.item);
-  const withPhotos = all.filter((item) => item.imageMediaId || item.stockPhoto).slice(0, 3);
+  const owner = all.filter((item) => Boolean(item.imageMediaId));
+  const sample = all.filter((item) => !item.imageMediaId && Boolean(item.stockPhoto));
+  const withPhotos = [...owner, ...sample].slice(0, 3);
   return withPhotos.length ? withPhotos : all.slice(0, 2);
 }
 
@@ -1038,8 +1039,9 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   const rest = doc.sections.map((section) => ({ ...section, items: section.items.filter((item) => !picks.includes(item)) }));
   if (run) rest.forEach((section, i) => run!.sections.set(section, i));
   const avail = L - x0 - 72;
-  const base = baseStyle(design, f, { name: 34, price: 34, desc: 22, section: 26, itemGap: 20, sectionGap: 38, headGap: 20 });
-  const result = fitC(rest, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 56) / 2 }], colH, 1.2, 0.55, 0.92);
+  const restHasOwnerPhoto = rest.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
+  const base = withThumbs(baseStyle(design, f, { name: 34, price: 34, desc: 22, section: 26, itemGap: 20, sectionGap: 38, headGap: 20 }), restHasOwnerPhoto, false);
+  const result = fitC(rest, base, [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 56) / 2 }], colH, 1.2, 0.55, 0.92, restHasOwnerPhoto ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 56) / 2, 56, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 22, f.head, 400, avail), { size: 22, family: f.head, weight: 400, fill: c.muted }));
   // Featured dishes: large photo, name, description and price; the photo never covers the text.

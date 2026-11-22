@@ -1527,7 +1527,7 @@ export const en = {
   "tpl.photoSavedHidden": "Photo saved with the item, but item photos are hidden on this board. Choose “Show item photos” to see it.",
   "tpl.photosHiddenNote": "Item photos are hidden on this board, so your photos don’t appear on the TV. They’re kept with their items.",
   "tpl.showItemPhotos": "Show item photos",
-  "tpl.photosShownNote": "Item photos appear as small thumbnails beside their items on this template. You can hide them in Look.",
+  "tpl.photosShownNote": "Item photos appear as small thumbnails beside their items on this board.",
   "tpl.photoTip": "Tip: tap the photo square to add a food photo to any item.",
   "tpl.hidden": "Hidden",
   "tpl.hiddenOnBoard": "hidden on the board",
