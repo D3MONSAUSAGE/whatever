@@ -61,7 +61,29 @@ describe("custom: parsing and clamping", () => {
     const viaParse = parseLayout({ ...doc, custom: { v: 1, textScale: "huge" } });
     expect(viaParse).toEqual({ ok: false, error: "Check the look settings." });
     expect(parseLayout({ ...doc, sections: [{ ...doc.sections[0], headingOverride: { weight: "black" } }] }).ok).toBe(false);
-    expect(parseLayout({ ...doc, sections: [{ ...doc.sections[0], id: "bad id!" }] }).ok).toBe(false);
+  });
+
+  it("drops an invalid section or item id and keeps the rest of the board", () => {
+    const raw = {
+      ...doc,
+      sections: [{
+        ...doc.sections[0],
+        id: "bad id!",
+        items: [
+          { ...doc.sections[0].items[0], id: "ok-id" },
+          { ...doc.sections[0].items[1], id: "also bad" },
+          ...doc.sections[0].items.slice(2),
+        ],
+      }, { ...doc.sections[1], id: "starters" }, ...doc.sections.slice(2)],
+    };
+    const r = parseLayout(raw);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.sections[0].id).toBeUndefined();
+    expect(r.value.sections[0].items[0].id).toBe("ok-id");
+    expect(r.value.sections[0].items[1].id).toBeUndefined();
+    expect(r.value.sections[1].id).toBe("starters");
+    expect(r.value.sections[0].items[0].name).toBe(doc.sections[0].items[0].name);
   });
 
   it("keeps unknown keys at every level and round-trips through save and reopen", () => {

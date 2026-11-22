@@ -323,10 +323,9 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     }
     const sectionExtras: Partial<LayoutSection> = {};
-    if (sec.id != null) {
-      if (!clientId(sec.id)) return { ok: false, error: "Check your sections." };
-      sectionExtras.id = sec.id as string;
-    }
+    // Optional client ids are kept only when valid (same as item photos). An invalid id is dropped, not a 400.
+    if (clientId(sec.id)) sectionExtras.id = sec.id as string;
+
     if (sec.headingOverride != null) {
       const override = parseHeadingOverride(sec.headingOverride);
       if (!override.ok) return override;
@@ -345,8 +344,7 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       // Item photos are optional and only kept when valid, so items without them parse exactly as before.
       const photo = typeof row.imageMediaId === "string" && UUID.test(row.imageMediaId) ? { imageMediaId: row.imageMediaId.toLowerCase() } : {};
       const stock = isStockPhoto(row.stockPhoto) ? { stockPhoto: row.stockPhoto } : {};
-      if (row.id != null && !clientId(row.id)) return { ok: false, error: "Check your items." };
-      const itemId = row.id != null ? { id: row.id as string } : {};
+      const itemId = clientId(row.id) ? { id: row.id as string } : {};
       items.push({ name: itemName, price: price ?? "", description: description ?? "", ...photo, ...stock, ...itemId });
     }
     if (items.length > MENU_LIMITS.itemsPerSection) return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
