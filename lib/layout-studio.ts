@@ -5,6 +5,10 @@ import { MENU_LIMITS } from "@/lib/menu-templates";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
 import { isDesignId, isStockPhoto, type StockPhotoId } from "@/lib/menu-designs";
 import { designSvg, designSvgWithReport, designVideoBox, safeDesignHref, type DesignArt } from "@/lib/menu-design-svg";
+import {
+  activeCustom, emptyClips, fixedRegion, focusPlacement, itemRegion, parseCustom, parseHeadingOverride, sectionHeadingStyle, sectionRegion, snapWeight,
+  LAYOUT_MEDIA, READABLE_FLOORS, type ActiveCustom, type BoardRegion, type ClipArea, type LayoutCustom, type RoleKey, type RoleTypography,
+} from "@/lib/board-custom";
 
 export { MENU_LIMITS };
 
@@ -20,8 +24,16 @@ export type LayoutItem = {
   imageMediaId?: string;
   /** Sample photo from a photo template, used until the owner adds their own. */
   stockPhoto?: StockPhotoId;
+  /** Optional stable id from a client ([A-Za-z0-9_-], up to 40). Used for preview region ids; never drawn. */
+  id?: string;
 };
-export type LayoutSection = { name: string; items: LayoutItem[] };
+export type LayoutSection = {
+  name: string; items: LayoutItem[];
+  /** Optional stable id from a client ([A-Za-z0-9_-], up to 40). Used for preview region ids; never drawn. */
+  id?: string;
+  /** "This section only" heading size/weight (lib/board-custom.ts). Wins over custom.roles.sectionHeading. */
+  headingOverride?: RoleTypography;
+};
 
 export type BoardPalette = "classic" | "fresh" | "bold";
 export type TypeScale = "room" | "counter";
@@ -80,6 +92,11 @@ export type LayoutDocument = {
    * on the items). Absent = the design's own default. Card templates always show item photos.
    */
   photoStyle?: "thumbs" | "text";
+  /**
+   * Guided customization (lib/board-custom.ts). Absent on every board made before it, which draw exactly as before.
+   * Reset = delete the key. v > 1 is preserved but not applied.
+   */
+  custom?: LayoutCustom;
 };
 
 export type LayoutFrame = {
@@ -242,11 +259,20 @@ export function promoBandHeight(doc: { template: LayoutTemplate; featureTitle?: 
 /** The rectangle the video and its fallback photo share. The promo band stays below it. */
 export function mediaVideoBox(doc: LayoutDocument): ZoneBox | null {
   if (doc.design && isDesignId(doc.design)) return designVideoBox(doc);
-  const frame = frameFor(doc.template, doc.split, doc.columnWidths);
+  const frame = frameFor(doc.template, effectiveSplit(doc), doc.columnWidths);
   if (!frame.video) return null;
   const band = promoBandHeight(doc);
   if (band <= 0 || band >= frame.video.h - 80) return frame.video;
   return { x: frame.video.x, y: frame.video.y, w: frame.video.w, h: frame.video.h - band };
+}
+
+/** The split an original layout draws with: the owner's featured media size when set (kept in sync on save), else `split`. */
+export function effectiveSplit(doc: LayoutDocument): number {
+  const media = LAYOUT_MEDIA[doc.template];
+  if (!media || (doc.design && isDesignId(doc.design))) return doc.split;
+  const active = activeCustom(doc);
+  if (!active || active.mediaSize == null) return doc.split;
+  return Math.round(media.toSplit(Math.min(media.max, Math.max(media.min, active.mediaSize))) * 10000) / 10000;
 }
 
 export function boxesOverlap(a: ZoneBox, b: ZoneBox) {
@@ -296,6 +322,15 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
     if (!Array.isArray(sec.items) || sec.items.length > MENU_LIMITS.itemsPerSection * 3) {
       return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     }
+    const sectionExtras: Partial<LayoutSection> = {};
+    // Optional client ids are kept only when valid (same as item photos). An invalid id is dropped, not a 400.
+    if (clientId(sec.id)) sectionExtras.id = sec.id as string;
+
+    if (sec.headingOverride != null) {
+      const override = parseHeadingOverride(sec.headingOverride);
+      if (!override.ok) return override;
+      if (override.value) sectionExtras.headingOverride = override.value;
+    }
     const items: LayoutItem[] = [];
     for (const item of sec.items) {
       if (!item || typeof item !== "object") return { ok: false, error: "Check your items." };
@@ -309,11 +344,12 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       // Item photos are optional and only kept when valid, so items without them parse exactly as before.
       const photo = typeof row.imageMediaId === "string" && UUID.test(row.imageMediaId) ? { imageMediaId: row.imageMediaId.toLowerCase() } : {};
       const stock = isStockPhoto(row.stockPhoto) ? { stockPhoto: row.stockPhoto } : {};
-      items.push({ name: itemName, price: price ?? "", description: description ?? "", ...photo, ...stock });
+      const itemId = clientId(row.id) ? { id: row.id as string } : {};
+      items.push({ name: itemName, price: price ?? "", description: description ?? "", ...photo, ...stock, ...itemId });
     }
     if (items.length > MENU_LIMITS.itemsPerSection) return { ok: false, error: `Use up to ${MENU_LIMITS.itemsPerSection} items per section.` };
     total += items.length;
-    if (name || items.length) sections.push({ name: name ?? "", items });
+    if (name || items.length) sections.push({ name: name ?? "", items, ...sectionExtras });
   }
   if (sections.length > MENU_LIMITS.sections) return { ok: false, error: `Use up to ${MENU_LIMITS.sections} sections.` };
   if (total > MENU_LIMITS.items) return { ok: false, error: `Use up to ${MENU_LIMITS.items} items.` };
@@ -343,10 +379,17 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   if (raw.accentColor && !accentColor) return { ok: false, error: "Use a color like #ffd34d." };
   if (raw.textColor && !textColor) return { ok: false, error: "Use a color like #112233." };
   if (raw.backgroundColor && !backgroundColor) return { ok: false, error: "Use a color like #f6f9fe." };
+  const design = designFields(raw);
+  const custom = parseCustom(raw.custom, { template: raw.template, design: design.design });
+  if (!custom.ok) return custom;
+  // Original layouts: a customized media size is the split older apps already understand, so both stay in sync.
+  const layoutMedia = !design.design ? LAYOUT_MEDIA[raw.template] : undefined;
+  const syncedSplit = layoutMedia && custom.value && custom.value.v === 1 && typeof custom.value.mediaSize === "number"
+    ? Math.round(layoutMedia.toSplit(custom.value.mediaSize) * 10000) / 10000 : split;
   return {
     ok: true,
     value: {
-      layoutVersion: 1, template: raw.template, split, title: title ?? "", subtitle: subtitle ?? "", footer: footer ?? "",
+      layoutVersion: 1, template: raw.template, split: syncedSplit, title: title ?? "", subtitle: subtitle ?? "", footer: footer ?? "",
       sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font,
       ...(bodyFont ? { bodyFont } : {}),
       textColor, backgroundColor,
@@ -354,9 +397,14 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       columnWidths, imageFit, imageAnchor,
       // Item photo display applies to every board (templates and original layouts). Absent = shown when present.
       ...(raw.photoStyle === "thumbs" || raw.photoStyle === "text" ? { photoStyle: raw.photoStyle } : {}),
-      ...designFields(raw),
+      ...design,
+      ...(custom.value ? { custom: custom.value } : {}),
     },
   };
+}
+
+function clientId(value: unknown): boolean {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(value);
 }
 
 /** Premium template fields. Only added when present and valid, so older documents parse exactly as before. */
@@ -689,6 +737,37 @@ function measure(value: string, size: number, family = "Inter") {
  */
 let clippedItemNames: string[] | null = null;
 
+/**
+ * Guided customization on original layouts. `active` is null for uncustomized boards, which keep every expression
+ * exactly as before; regions, clip counts and dropped items are only recorded, never drawn.
+ */
+type LayoutRun = {
+  active: ActiveCustom | null;
+  regions: BoardRegion[];
+  clips: Record<ClipArea, number>;
+  items: Map<object, [number, number]>;
+  dropped: number;
+  doc: LayoutDocument;
+};
+let lrun: LayoutRun | null = null;
+function lnote(area: ClipArea, original: string, drawn: string) {
+  if (lrun && drawn.endsWith("…") && !original.trim().endsWith("…")) lrun.clips[area] += 1;
+}
+function lregion(region: BoardRegion | null) { if (lrun && region) lrun.regions.push(region); }
+function lroleSize(role: RoleKey, def: number) {
+  if (!lrun?.active) return def;
+  return Math.round(Math.max(Math.min(READABLE_FLOORS[role], def), def * lrun.active.scale[role]));
+}
+function lroleWeight(role: RoleKey, family: string, def: number) {
+  const choice = lrun?.active?.weight[role];
+  return choice ? snapWeight(family, choice) : def;
+}
+function sectionIndexOf(section: LayoutSection): number | null {
+  const first = section.items[0];
+  const at = first && lrun ? lrun.items.get(first) : undefined;
+  return at ? at[0] : null;
+}
+
 function fitWidth(value: string, size: number, max: number, family = "Inter") {
   if (measure(value, size, family) <= max) return value;
   const chars = [...value];
@@ -808,6 +887,7 @@ export function layoutItemPhotosShown(doc: Pick<LayoutDocument, "sections" | "ph
 }
 
 function paintItems(parts: string[], sections: LayoutSection[], x0: number, top: number, width0: number, bottom: number, colors: BoardColors, scale: TypeScale, families: Families, spread = false, unitOverride?: number, minDescSize = 10, photos?: ItemPhotos | null) {
+  if (lrun?.active) return paintItemsCustom(parts, sections, x0, top, width0, bottom, colors, scale, families, spread, unitOverride, minDescSize, photos, lrun.active);
   const family = families.heading;
   const body = families.body;
   const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
@@ -822,11 +902,17 @@ function paintItems(parts: string[], sections: LayoutSection[], x0: number, top:
     let width = width0;
     if (section.name) {
       y += unit * 0.72;
-      parts.push(`<text x="${x0}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(fitWidth(section.name.toUpperCase(), nameSize - 6, width0, family))}</text>`);
+      const si = sectionIndexOf(section);
+      if (si != null && lrun) lregion(sectionRegion(lrun.doc.sections[si] ?? section, si, { x: x0, y: y - Math.max(18, nameSize - 6), w: width0, h: Math.max(18, nameSize - 6) * 1.25 }));
+      const heading = fitWidth(section.name.toUpperCase(), nameSize - 6, width0, family);
+      lnote("menu", section.name.toUpperCase(), heading);
+      parts.push(`<text x="${x0}" y="${y.toFixed(1)}" font-family="${family}" font-size="${Math.max(18, nameSize - 6)}" font-weight="800" fill="${colors.section}">${esc(heading)}</text>`);
       y += unit * 0.28;
     }
     for (const item of section.items) {
       y += unit * 0.78;
+      const at = lrun?.items.get(item);
+      if (at) lregion(itemRegion(item, at[0], at[1], { x: x0, y: y - nameSize, w: width0, h: nameSize * 1.3 + (item.description ? unit * 0.48 : 0) }));
       if (thumbs && photos) {
         const boxTop = y - nameSize * 0.85;
         const size = Math.round((item.description ? y + unit * 0.48 + descSize * 0.25 : y + nameSize * 0.3) - boxTop);
@@ -848,6 +934,7 @@ function paintItems(parts: string[], sections: LayoutSection[], x0: number, top:
       const priceW = price ? measure(price, nameSize, body) + (colors.priceBg ? 28 : 0) : 0;
       const name = fitWidth(item.name, nameSize, Math.max(40, width - priceW - 24), body);
       if (clippedItemNames && name !== item.name) clippedItemNames.push(item.name);
+      lnote("menu", item.name, name);
       if (price && colors.priceBg) {
         parts.push(`<rect x="${(x + width - priceW).toFixed(1)}" y="${(y - nameSize).toFixed(1)}" width="${priceW.toFixed(1)}" height="${(nameSize * 1.35).toFixed(1)}" rx="8" fill="${colors.priceBg}"/>`);
       }
@@ -855,10 +942,115 @@ function paintItems(parts: string[], sections: LayoutSection[], x0: number, top:
       parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${nameSize}" font-weight="700" fill="${colors.ink}">${esc(name)}</text>`);
       if (item.description) {
         y += unit * 0.48;
-        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${descSize}" fill="${colors.muted}">${esc(fitWidth(item.description, descSize, width, body))}</text>`);
+        const desc = fitWidth(item.description, descSize, width, body);
+        lnote("menu", item.description, desc);
+        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${descSize}" fill="${colors.muted}">${esc(desc)}</text>`);
       }
     }
     y += unit * 0.2;
+  }
+}
+
+/**
+ * paintItems for a customized board: the owner's role sizes, weights, spacing and section heading overrides.
+ * Sizes start at the template's own (× the owner's multipliers) and shrink together only while every role stays at
+ * or above min(readable floor, the template's own size). Items that still do not fit are left off and counted
+ * (the board then reports overflow and publishing waits), never squeezed into unreadable text.
+ */
+function paintItemsCustom(parts: string[], sections: LayoutSection[], x0: number, top: number, width0: number, bottom: number, colors: BoardColors, scale: TypeScale, families: Families, spread: boolean, unitOverride: number | undefined, minDescSize: number, photos: ItemPhotos | null | undefined, a: ActiveCustom) {
+  const family = families.heading;
+  const body = families.body;
+  const unit = unitOverride ?? itemUnit(sections, top, bottom, scale, spread);
+  const name0 = Math.round(Math.min(40, Math.max(12, unit * 0.5)));
+  const desc0 = Math.max(minDescSize, Math.round(name0 * 0.55));
+  const sec0 = Math.max(18, name0 - 6);
+  const secK = (section: LayoutSection) => sectionHeadingStyle(a, section).scale;
+  const lowest = (role: RoleKey, def: number, k: number) => (k > 0 ? Math.min(READABLE_FLOORS[role], def) / (def * k) : 0);
+  const minHead = Math.min(a.scale.sectionHeading, ...sections.filter((s) => s.name).map(secK));
+  const gMin = Math.max(lowest("itemName", name0, a.scale.itemName), lowest("price", name0, a.scale.price), lowest("description", desc0, a.scale.description), lowest("sectionHeading", sec0, minHead));
+  const sizes = (g: number) => ({
+    name: Math.round(name0 * a.scale.itemName * g), price: Math.round(name0 * a.scale.price * g), desc: Math.round(desc0 * a.scale.description * g),
+  });
+  const height = (g: number) => {
+    const z = sizes(g);
+    let h = 0;
+    for (const section of sections) {
+      const sz = sec0 * secK(section) * g;
+      if (section.name) h += (unit * 0.72 * a.sectionGap + unit * 0.28) * Math.max(1, sz / sec0);
+      for (const item of section.items) {
+        h += unit * 0.78 * a.itemGap * Math.max(1, Math.max(z.name, z.price) / name0);
+        if (item.description) h += unit * 0.48 * Math.max(1, z.desc / desc0);
+      }
+      h += unit * 0.2 * a.sectionGap;
+    }
+    return h;
+  };
+  let g = 1;
+  while (g - 0.02 >= gMin - 1e-6 && top + height(g) > bottom) g -= 0.02;
+  if (g < gMin) g = gMin;
+  const z = sizes(g);
+  const nameW = lroleWeight("itemName", body, 700);
+  const priceW = lroleWeight("price", body, 700);
+  const descWeight = a.weight.description ? ` font-weight="${snapWeight(body, a.weight.description)}"` : "";
+  let y = top;
+  for (const section of sections) {
+    const thumbs = Boolean(photos) && section.items.some((item) => Boolean(item.imageMediaId));
+    let x = x0;
+    let width = width0;
+    if (section.name) {
+      const hs = sectionHeadingStyle(a, section);
+      const sz = Math.round(sec0 * hs.scale * g);
+      const grow = Math.max(1, sz / sec0);
+      y += unit * 0.72 * a.sectionGap * grow;
+      if (y > bottom) { if (lrun) lrun.dropped += section.items.length; continue; }
+      const si = sectionIndexOf(section);
+      if (si != null && lrun) lregion(sectionRegion(lrun.doc.sections[si] ?? section, si, { x: x0, y: y - sz, w: width0, h: sz * 1.25 }));
+      const heading = fitWidth(section.name.toUpperCase(), sz, width0, family);
+      lnote("menu", section.name.toUpperCase(), heading);
+      parts.push(`<text x="${x0}" y="${y.toFixed(1)}" font-family="${family}" font-size="${sz}" font-weight="${hs.weight ? snapWeight(family, hs.weight) : 800}" fill="${colors.section}">${esc(heading)}</text>`);
+      y += unit * 0.28 * grow;
+    }
+    for (const item of section.items) {
+      const step = unit * 0.78 * a.itemGap * Math.max(1, Math.max(z.name, z.price) / name0);
+      const descStep = item.description ? unit * 0.48 * Math.max(1, z.desc / desc0) : 0;
+      if (y + step + descStep > bottom + 2) { if (lrun) lrun.dropped += 1; continue; }
+      y += step;
+      const at = lrun?.items.get(item);
+      if (at) lregion(itemRegion(item, at[0], at[1], { x: x0, y: y - z.name, w: width0, h: z.name * 1.3 + descStep }));
+      if (thumbs && photos) {
+        const boxTop = y - z.name * 0.85;
+        const size = Math.round((item.description ? y + descStep + z.desc * 0.25 : y + z.name * 0.3) - boxTop);
+        const tallest = Math.round(section.items.some((it) => it.description) ? z.name * 0.85 + unit * 0.48 + z.desc * 0.25 : z.name * 1.15);
+        const shift = tallest + Math.max(12, Math.round(tallest * 0.24));
+        x = x0 + shift;
+        width = width0 - shift;
+        if (item.imageMediaId) {
+          const r = Math.round(size * 0.18);
+          const id = photos.next();
+          const href = safeDesignHref(photos.images[item.imageMediaId]);
+          parts.push(`<clipPath id="${id}"><rect x="${x0}" y="${boxTop.toFixed(1)}" width="${size}" height="${size}" rx="${r}"/></clipPath>`);
+          parts.push(`<rect x="${x0}" y="${boxTop.toFixed(1)}" width="${size}" height="${size}" rx="${r}" fill="${photos.fill}"/>`);
+          if (href) parts.push(`<image href="${esc(href)}" x="${x0}" y="${boxTop.toFixed(1)}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`);
+        }
+      }
+      const price = item.price || "";
+      const pw = price ? measure(price, z.price, body) + (colors.priceBg ? 28 : 0) : 0;
+      const name = fitWidth(item.name, z.name, Math.max(40, width - pw - 24), body);
+      if (clippedItemNames && name !== item.name) clippedItemNames.push(item.name);
+      lnote("menu", item.name, name);
+      if (price && colors.priceBg) {
+        parts.push(`<rect x="${(x + width - pw).toFixed(1)}" y="${(y - z.price).toFixed(1)}" width="${pw.toFixed(1)}" height="${(z.price * 1.35).toFixed(1)}" rx="8" fill="${colors.priceBg}"/>`);
+      }
+      if (price) parts.push(`<text x="${(x + width - (colors.priceBg ? 12 : 0)).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="end" font-family="${body}" font-size="${z.price}" font-weight="${priceW}" fill="${colors.price}">${esc(price)}</text>`);
+      parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${z.name}" font-weight="${nameW}" fill="${colors.ink}">${esc(name)}</text>`);
+      if (item.description) {
+        y += descStep;
+        const desc = fitWidth(item.description, z.desc, width, body);
+        lnote("menu", item.description, desc);
+        parts.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${body}" font-size="${z.desc}"${descWeight} fill="${colors.muted}">${esc(desc)}</text>`);
+      }
+    }
+    y += unit * 0.2 * a.sectionGap;
   }
 }
 
@@ -908,9 +1100,52 @@ export function layoutSvgWithClips(doc: LayoutDocument, art?: LayoutArt): { svg:
   }
 }
 
+export type LayoutRenderReport = { dropped: number; clips: Record<ClipArea, number>; regions: BoardRegion[]; clipped: string[] };
+
+/** Any board (template or original layout) with what it left off, shortened and where its parts are (canvas px). */
+export function boardSvgWithReport(doc: LayoutDocument, art?: LayoutArt): { svg: string; report: LayoutRenderReport } {
+  if (doc.design && isDesignId(doc.design)) {
+    const { svg, report } = designSvgWithReport(doc, art);
+    return { svg, report: { dropped: report.dropped, clips: report.clips ?? emptyClips(), regions: report.regions ?? [], clipped: [] } };
+  }
+  const sink: string[] = [];
+  const previous = { lrun, clippedItemNames };
+  const items = new Map<object, [number, number]>();
+  doc.sections.forEach((section, si) => section.items.forEach((item, ii) => items.set(item, [si, ii])));
+  lrun = { active: activeCustom(doc), regions: [], clips: emptyClips(), items, dropped: 0, doc };
+  clippedItemNames = sink;
+  try {
+    const svg = layoutSvgInner(doc, art);
+    return { svg, report: { dropped: lrun.dropped, clips: lrun.clips, regions: lrun.regions, clipped: [...new Set(sink)] } };
+  } finally {
+    lrun = previous.lrun;
+    clippedItemNames = previous.clippedItemNames;
+  }
+}
+
 export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   if (doc.design && isDesignId(doc.design)) return designSvg(doc, art);
-  const frame = frameFor(doc.template, doc.split, doc.columnWidths);
+  if (lrun) return layoutSvgInner(doc, art);
+  const items = new Map<object, [number, number]>();
+  const active = activeCustom(doc);
+  if (!active) return layoutSvgInner(doc, art);
+  doc.sections.forEach((section, si) => section.items.forEach((item, ii) => items.set(item, [si, ii])));
+  lrun = { active, regions: [], clips: emptyClips(), items, dropped: 0, doc };
+  try { return layoutSvgInner(doc, art); } finally { lrun = null; }
+}
+
+/** The featured/background photo of an original layout: template placement, or the owner's focal point. */
+function layoutPhoto(href: string, box: ZoneBox, doc: LayoutDocument, art?: LayoutArt) {
+  const focus = lrun?.active?.focus;
+  if (!focus || doc.imageFit === "contain") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${imageAspect(doc)}"/>`;
+  const place = focusPlacement(box, focus, art?.imageSize);
+  if (place.kind === "anchor") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${place.aspect}"/>`;
+  const r = (v: number) => (Math.round(v * 10) / 10).toString();
+  return `<clipPath id="lfp"><rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"/></clipPath><image href="${esc(href)}" x="${r(place.x)}" y="${r(place.y)}" width="${r(place.w)}" height="${r(place.h)}" preserveAspectRatio="none" clip-path="url(#lfp)"/>`;
+}
+
+function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
+  const frame = frameFor(doc.template, effectiveSplit(doc), doc.columnWidths);
   const colors = colorsFor(doc);
   const family = fontFamily(doc.font);
   const bodyFamily = fontFamily(doc.bodyFont ?? doc.font);
@@ -928,7 +1163,7 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
   const media = mediaVideoBox(doc) ?? feature;
   if (doc.template === "triple-column" || doc.template === "two-column") {
     if (href) {
-      parts.push(`<image href="${esc(href)}" x="0" y="0" width="${BOARD_W}" height="${BOARD_H}" preserveAspectRatio="${imageAspect(doc)}"/>`);
+      parts.push(layoutPhoto(href, { x: 0, y: 0, w: BOARD_W, h: BOARD_H }, doc, art));
       parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${BOARD_H}" fill="${colors.paper}" fill-opacity="0.9"/>`);
     } else {
       frame.columns.forEach((column) => {
@@ -937,14 +1172,14 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     }
   } else if (href && doc.template !== "menu-banner") {
     const box = doc.template === "signature" ? frame.feature : media;
-    parts.push(`<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${imageAspect(doc)}"/>`);
+    parts.push(layoutPhoto(href, box, doc, art));
   }
   if (doc.template === "signature") {
     // Opaque card over the full-bleed background. Text stays on this card, not on the photo.
     parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${BOARD_H - 96}" fill="${colors.paper}"/>`);
   } else if (doc.template === "menu-banner") {
     parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
-    if (href) parts.push(`<image href="${esc(href)}" x="${feature.x}" y="${feature.y}" width="${feature.w}" height="${feature.h}" preserveAspectRatio="${imageAspect(doc)}"/>`);
+    if (href) parts.push(layoutPhoto(href, feature, doc, art));
   } else if (doc.template !== "triple-column" && doc.template !== "two-column") {
     parts.push(`<rect x="${frame.menu.x}" y="${frame.menu.y}" width="${frame.menu.w}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
   }
@@ -959,11 +1194,16 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
       : doc.template === "triple-column" || doc.template === "two-column"
         ? { x: 48, y: colors.band ? 156 : 72, w: frame.columns[0].w - 80, bottom: BOARD_H - 64 }
         : { x: frame.menu.x + 48, y: colors.band ? 168 : 88, w: frame.menu.w - 96, bottom: BOARD_H - 72 };
-  let titleSize = 64;
-  while (titleSize > 34 && measure(doc.title || "Menu", titleSize, family) > menu.w) titleSize -= 2;
+  const kTitle = lrun?.active ? lrun.active.scale.businessName : 1;
+  const titleMin = lrun?.active ? Math.max(34, Math.round(34 * kTitle)) : 34;
+  let titleSize = lrun?.active ? Math.max(titleMin, Math.round(Math.min(colors.band && doc.template !== "signature" ? 84 : 96, 64 * kTitle) / 2) * 2) : 64;
+  while (titleSize > titleMin && measure(doc.title || "Menu", titleSize, family) > menu.w) titleSize -= 2;
   const title = fitWidth(doc.title || "Menu", titleSize, menu.w, family);
+  lnote("businessName", doc.title || "Menu", title);
   const titleFill = colors.band && doc.template !== "signature" ? colors.featureInk : colors.ink;
-  parts.push(`<text x="${menu.x}" y="${colors.band && doc.template !== "signature" ? 86 : menu.y}" font-family="${family}" font-size="${titleSize}" font-weight="800" fill="${titleFill}">${esc(title)}</text>`);
+  const titleY = colors.band && doc.template !== "signature" ? 86 : menu.y;
+  lregion(fixedRegion("businessName", colors.band && doc.template !== "signature" ? { x: 0, y: 0, w: doc.template === "menu-banner" || doc.template === "triple-column" || doc.template === "two-column" ? BOARD_W : frame.menu.w, h: 132 } : { x: menu.x, y: menu.y - titleSize, w: menu.w, h: titleSize * 1.2 + (doc.subtitle ? 50 : 0) }));
+  parts.push(`<text x="${menu.x}" y="${titleY}" font-family="${family}" font-size="${titleSize}" font-weight="${lroleWeight("businessName", family, 800)}" fill="${titleFill}">${esc(title)}</text>`);
   if (doc.subtitle) {
     const onBand = Boolean(colors.band && doc.template !== "signature");
     parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${bodyFamily}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w, bodyFamily))}</text>`);
@@ -1011,11 +1251,12 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const footerY = doc.template === "signature" ? BOARD_H - 78 : BOARD_H - 40;
     parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${bodyFamily}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w, bodyFamily))}</text>`);
   }
+  if (frame.video || doc.template === "signature") lregion(fixedRegion("featuredMedia", media));
   if (doc.template === "menu-banner") {
     const head = doc.featureTitle || "Today";
     const detail = doc.featureDetail || "";
     const hx = 72;
-    const headSize = Math.max(28, Math.min(44, Math.round(feature.h * 0.28)));
+    const headSize = lroleSize("featuredText", Math.max(28, Math.min(44, Math.round(feature.h * 0.28))));
     const headY = feature.y + Math.round(feature.h * (detail ? 0.46 : 0.62));
     if (!href) {
       parts.push(`<rect x="${feature.x}" y="${feature.y}" width="10" height="${feature.h}" fill="${colors.featureInk}"/>`);
@@ -1035,8 +1276,13 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
     const title = (doc.featureTitle || "").trim();
     const detail = (doc.featureDetail || "").trim();
     parts.push(`<rect x="${feature.x}" y="${bandY}" width="${feature.w}" height="${band}" fill="${colors.feature}"/>`);
-    if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="40" font-weight="800" fill="${colors.featureInk}">${esc(fitWidth(title, 40, feature.w - 80, family))}</text>`);
-    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${bodyFamily}" font-size="22" fill="${colors.featureInk}">${esc(fitWidth(detail, 22, feature.w - 80, bodyFamily))}</text>`);
+    lregion(fixedRegion("featuredText", { x: feature.x, y: bandY, w: feature.w, h: band }));
+    const ts = lroleSize("featuredText", 40); const ds = lroleSize("featuredText", 22);
+    const tshown = fitWidth(title, ts, feature.w - 80, family); const dshown = fitWidth(detail, ds, feature.w - 80, bodyFamily);
+    if (title) lnote("featuredText", title, tshown);
+    if (detail) lnote("featuredText", detail, dshown);
+    if (title) parts.push(`<text x="${hx}" y="${bandY + 62}" font-family="${family}" font-size="${ts}" font-weight="${lroleWeight("featuredText", family, 800)}" fill="${colors.featureInk}">${esc(tshown)}</text>`);
+    if (detail) parts.push(`<text x="${hx}" y="${bandY + 122}" font-family="${bodyFamily}" font-size="${ds}" fill="${colors.featureInk}">${esc(dshown)}</text>`);
   } else if (feature.h >= 280 && doc.template !== "triple-column" && doc.template !== "two-column" && ((doc.featureTitle || "").trim() || (doc.featureDetail || "").trim())) {
     const head = (doc.featureTitle || "").trim();
     const hx = feature.x + 48;

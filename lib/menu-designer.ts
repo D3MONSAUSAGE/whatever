@@ -18,6 +18,7 @@ import {
   type LayoutDocument, type LayoutSection, type LayoutTemplate,
 } from "@/lib/layout-studio";
 import { MENU_DESIGNS, designById, isPhotoDesign, type DesignBusiness, type DesignStyle, type MenuDesign } from "@/lib/menu-designs";
+import { normalizeCustomFor } from "@/lib/board-custom";
 
 export type Engine = "design" | "layout" | "classic";
 
@@ -143,7 +144,8 @@ export function switchToLayout(doc: LayoutDocument, template: LayoutTemplate): L
   delete next.logoMediaId;
   // Template sample photos on items aren't drawn by original layouts; the owner's own item photos are.
   next.sections = doc.sections.map((section) => ({ ...section, items: section.items.map(({ stockPhoto: _s, ...item }) => { void _s; return item; }) }));
-  return next;
+  // Customization carries over; the featured media size is clamped to this layout (and its split synced) or dropped.
+  return normalizeCustomFor(next);
 }
 
 /** A new original-layout board with its sample content and the account's Brand Kit (as the old editor did). */

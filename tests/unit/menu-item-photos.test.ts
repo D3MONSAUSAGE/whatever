@@ -329,7 +329,7 @@ describe("guided editor wiring and languages", () => {
     expect(s).toContain('data-testid="tpl-item-upload"');
     expect(s).toContain('data-testid="tpl-item-remove"');
     expect(s).toContain('void upload(e.target.files?.[0], "item", target)');
-    expect(s).toContain("disabled={busy !== null || fit.dropped > 0}");
+    expect(s).toContain("disabled={busy !== null || fit.dropped > 0 || czOverflow.length > 0}");
   });
   it("has 22 templates including the four photo templates", () => {
     expect(MENU_DESIGNS).toHaveLength(22);
