@@ -16,7 +16,7 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
   const before = params.get("before");
   if (before && Number.isNaN(Date.parse(before))) return fail("before must be an ISO date.", 400);
   let q = db().from("activity_events").select("at, kind, subject_id, subject_name, detail")
-    .eq("account_id", admin.accountId).not("kind", "like", "commercial.%").order("at", { ascending: false }).limit(limit + 1);
+    .eq("account_id", admin.accountId).not("kind", "like", "commercial.%").not("kind", "like", "onboarding.%").order("at", { ascending: false }).limit(limit + 1);
   if (before) q = q.lt("at", new Date(before).toISOString());
   const r = await q;
   if (r.error) return analyticsFail({ missing: isMissingSchema(r.error) });

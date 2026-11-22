@@ -10,6 +10,7 @@ import { normalizeFileName, uploadSizeError } from "@/lib/server/validate";
 import { enforceLimit, fail, json } from "@/lib/server/http";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { isReadyMediaStatus } from "@/lib/media-ready";
+import { noteUploadSaved } from "@/lib/server/onboarding-hooks";
 
 const MEDIA_COLUMNS = "id, file_name, storage_path, size_bytes, created_at";
 const MEDIA_COLUMNS_VIDEO = `${MEDIA_COLUMNS}, kind, duration_ms, width, height, thumbnail_path, source_media_id, slide_index, processing_status, processing_error`;
@@ -247,5 +248,7 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
     await db().storage.from(BUCKET).remove([path]);
     return fail("Upload failed. Try again.", 500);
   }
+  // Onboarding v2: a finished upload counts as the first menu (stamped after the response).
+  noteUploadSaved(req, admin.accountId, fileName);
   return json({ id }, 201);
 });

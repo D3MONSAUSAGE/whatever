@@ -2,7 +2,7 @@
 import { onlineNow } from "@/lib/sync-line";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useApi, type OnboardingState, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
+import { useApi, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { WaveBackdrop } from "@/components/brand";
 import { IconCalendar, IconCard, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
 import { OfflineAttention, offlineScreens, onlineHint } from "@/components/tv";
@@ -11,6 +11,7 @@ import { useT } from "@/lib/i18n/client";
 import type { T } from "@/lib/i18n";
 import { LoadState, Stat } from "@/components/ui";
 import { SetupTracker } from "@/components/setup-tracker";
+import { buildV2State, type OnboardingV2State } from "@/lib/onboarding";
 
 export type OverviewFixture = {
   displays: DisplayItem[];
@@ -18,6 +19,8 @@ export type OverviewFixture = {
   playlists: PlaylistSummary[];
   origin?: string;
   scheduleCount?: number;
+  /** Preview only: a fixed onboarding state (otherwise worked out from the fixture data). */
+  onboarding?: OnboardingV2State;
 };
 
 export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
@@ -70,6 +73,7 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
           scheduleError={fixture ? null : schedulesLive.error}
           origin={origin}
           fixture={!!fixture}
+          onboarding={fixture?.onboarding}
         />
       )}
     </section>
@@ -85,6 +89,7 @@ function OverviewBody({
   scheduleError,
   origin,
   fixture,
+  onboarding,
 }: {
   displayData: DisplayItem[];
   mediaCount: number;
@@ -94,13 +99,14 @@ function OverviewBody({
   scheduleError: string | null;
   origin: string;
   fixture: boolean;
+  onboarding?: OnboardingV2State;
 }) {
   const t = useT();
   const hint = onlineHint(t);
   const online = displayData.filter(onlineNow).length;
   const offline = offlineScreens(displayData).length;
   const published = displayData.some((item) => item.media || item.playlist);
-  const setupFixture: OnboardingState | undefined = fixture ? fixtureSetup(displayData, mediaCount, playlistCount ?? 0, published) : undefined;
+  const setupFixture: OnboardingV2State | undefined = fixture ? onboarding ?? fixtureSetup(displayData, mediaCount, playlistCount ?? 0, published) : undefined;
   const recent = displayData.slice().sort((a, b) => {
     const at = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
     const bt = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
@@ -197,19 +203,11 @@ export default function Overview() {
 }
 
 /** Preview only: the same steps the server derives, worked out from fixture data. */
-function fixtureSetup(displays: DisplayItem[], media: number, playlists: number, published: boolean): OnboardingState {
-  const playing = displays.some((d) => d.online && (d.media || d.playlist));
-  const steps: OnboardingState["steps"] = [
-    { id: "account", done: true },
-    { id: "business", done: displays.length > 0 },
-    { id: "location", done: displays.length > 0 },
-    { id: "screen", done: displays.length > 0 },
-    { id: "media", done: media > 0 },
-    { id: "playlist", done: playlists > 0 },
-    { id: "publish", done: published },
-    { id: "playing", done: playing, confirmed: false },
-  ];
-  const completed = steps.filter((x) => x.done).length;
-  const finished = completed === steps.length;
-  return { steps, completed, total: steps.length, nextStep: steps.find((x) => !x.done)?.id ?? null, dismissed: false, finished, show: !finished, firstLocationId: null };
+function fixtureSetup(displays: DisplayItem[], media: number, playlists: number, published: boolean): OnboardingV2State {
+  const confirmed = displays.some((d) => d.online && (d.media || d.playlist));
+  return buildV2State({
+    milestones: {},
+    live: { first_menu: media > 0, preview_menu: media > 0, screen: displays.length > 0, show_on_tv: published, playlists: playlists > 0 },
+    confirmed, dismissed: false, completedAt: null, legacyFinished: false, celebratedAt: "fixture", previewTarget: null,
+  });
 }

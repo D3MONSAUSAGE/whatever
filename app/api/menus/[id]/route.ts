@@ -10,6 +10,7 @@ import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPL
 import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, keepOwnItemPhotos, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { PUBLISH_SCREEN_LIMIT, screensForMenuPublish } from "@/lib/server/menu-screens";
+import { noteMenuSaved } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,6 +100,8 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
   const result = await rerenderMenu(admin.accountId, row, parsed.value);
   if (!("ok" in result)) return fail(result.error, result.status);
   const { mediaId, playlistId } = result;
+  // Onboarding v2: the board is saved; stamps "first menu" after the response (never affects this save).
+  noteMenuSaved(req, admin.accountId, parsed.value.content ?? row.content);
 
   let published: boolean | undefined;
   if (targets && playlistId) {

@@ -5,6 +5,7 @@ import { withLocalizedErrors } from "@/lib/server/locale";
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { boardFit } from "@/lib/board-fit";
 import { loadBoardArt } from "@/lib/server/layout-boards";
+import { noteOnboarding } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   }
   const limited = await enforceLimit(`menu-preview:${admin.userId}`, 60, 60, "Too many previews. Wait a minute.");
   if (limited) return limited;
+  // Onboarding v2: the app asked for the board's TV preview image (format "fit" alone doesn't count).
+  noteOnboarding(req, admin.accountId, ["preview_menu"]);
   const fit = boardFit(doc);
   const requested = Number(body.width);
   const width = WIDTHS.find((w) => w >= requested) ?? 960;

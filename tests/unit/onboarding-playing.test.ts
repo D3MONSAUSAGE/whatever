@@ -42,7 +42,7 @@ describe("onboarding step 8 (Check it's playing)", () => {
     // Nothing on the client remembers or overrides step state.
     const tracker = readFileSync("components/setup-tracker.tsx", "utf8");
     expect(tracker).not.toMatch(/localStorage|sessionStorage/);
-    expect(tracker).toContain('useApi<OnboardingState>(fixture ? null : "/api/onboarding"');
+    expect(tracker).toContain('useApi<OnboardingV2State>(fixture ? null : "/api/onboarding?v=2"');
   });
 
   it("only treats a painted confirmation as evidence (report_playing runs after the player paints content)", () => {

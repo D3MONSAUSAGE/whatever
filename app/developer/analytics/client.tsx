@@ -10,7 +10,7 @@ import { BarRows, ColumnChart, Legend, LineChart, Meter, ORDINAL_BLUE, NEUTRAL, 
 import { currentLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
-import { RANGE_PRESETS, type DevAnalytics, type GroupCount, type Note, type NoteKey, type Rate, type RangePreset } from "@/lib/dev-analytics";
+import { RANGE_PRESETS, type DevAnalytics, type GroupCount, type Note, type NoteKey, type OnboardingFunnel, type Rate, type RangePreset } from "@/lib/dev-analytics";
 import "@/components/site/marketing/marketing.css";
 import "@/components/developer/console.css";
 
@@ -305,6 +305,39 @@ function noteDate(notes: Note[], key: NoteKey): string | null {
   return typeof d === "string" ? d.slice(0, 10) : null;
 }
 
+type HoursFmt = (x: { accounts: number; medianHours: number | null; p75Hours: number | null }) => string;
+
+/** Menu-first onboarding (0036 milestones), aggregates only. */
+function OnboardingPanel({ ob, hours, hoursHint }: { ob: OnboardingFunnel; hours: HoursFmt; hoursHint: HoursFmt }) {
+  const t = useT();
+  const f = useFormat();
+  return (
+    <Panel title={t("dev.ob.title")} sub={t("dev.ob.cohort", { n: f.num(ob.cohort) })}>
+      <div className="dc-grid-2" data-testid="dev-onboarding">
+        <div>
+          <BarRows
+            hiddenText={t("dev.hidden")}
+            max={ob.cohort || undefined}
+            rows={[
+              ...ob.steps.map((s) => ({ key: s.key, label: t(`dev.ob.${s.key}` as MessageKey), value: s.reached, display: f.num(s.reached ?? 0), note: f.pct(s.rate) })),
+              { key: "completed", label: t("dev.ob.completed"), value: ob.completed, display: f.num(ob.completed ?? 0), note: f.pct(ob.completedRate) },
+            ]}
+          />
+        </div>
+        <div>
+          <div className="dc-kpis dc-kpis-2">
+            <Kpi label={`${t("dev.ob.timeToContent")} · ${t("dc.act.median")}`} value={hours(ob.timeToFirstContent)} hint={hoursHint(ob.timeToFirstContent)} />
+            <Kpi label={`${t("dev.ob.contentToTv")} · ${t("dc.act.median")}`} value={hours(ob.contentToTv)} hint={hoursHint(ob.contentToTv)} />
+            <Kpi label={t("dev.ob.contentBeforeTv")} value={ob.contentBeforeTv === null ? t("dev.hidden") : f.pct(ob.contentBeforeTv)} />
+            <Kpi label={t("dev.ob.paidContentFirst")} value={ob.paidContentFirst === null ? t("dev.hidden") : f.pct(ob.paidContentFirst)} hint={`${t("dev.ob.paidTvFirst")}: ${ob.paidTvFirst === null ? t("dev.hidden") : f.pct(ob.paidTvFirst)}`} />
+          </div>
+        </div>
+      </div>
+      <Notes notes={ob.notes} />
+    </Panel>
+  );
+}
+
 export function Dashboard({ data }: { data: DevAnalytics }) {
   const t = useT();
   const f = useFormat();
@@ -425,6 +458,7 @@ export function Dashboard({ data }: { data: DevAnalytics }) {
             </div>
           </div>
         </Panel>
+        {data.onboarding ? <OnboardingPanel ob={data.onboarding} hours={hours} hoursHint={hoursHint} /> : null}
       </Section>
 
       {/* ───────── Revenue ───────── */}

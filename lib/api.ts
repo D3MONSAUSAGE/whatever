@@ -223,6 +223,8 @@ export type OnboardingState = {
   completed: number; total: number; nextStep: OnboardingStepId | null;
   dismissed: boolean; finished: boolean; show: boolean; firstLocationId: string | null;
 };
+// Menu-first onboarding (GET /api/onboarding?v=2). The v1 type above stays for the Android contract.
+export type { OnboardingV2State, OnboardingV2Step, V2StepId as OnboardingV2StepId, PreviewTarget } from "@/lib/onboarding";
 
 export type AnalyticsSummary = {
   screens: { total: number; online: number; offline: number; neverConnected: number };

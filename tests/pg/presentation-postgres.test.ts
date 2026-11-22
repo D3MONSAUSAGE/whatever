@@ -45,7 +45,7 @@ describe.skipIf(!databaseUrl)("presentation groups on PostgreSQL", () => {
     await client.connect();
     await client.query(`
       create schema if not exists auth;
-      create table if not exists auth.users (id uuid primary key);
+      create table if not exists auth.users (id uuid primary key, email text);
       create or replace function auth.uid() returns uuid language sql as $$ select null::uuid $$;
       create schema if not exists storage;
       create table if not exists storage.buckets (

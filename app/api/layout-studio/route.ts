@@ -4,6 +4,7 @@ import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
 import { loadLayoutStudio, saveLayoutForAccount } from "@/lib/server/layout-boards";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { noteMenuSaved } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,8 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
       document: body.document,
     });
     if ("error" in saved && saved.status !== 200) return fail(saved.error, saved.status);
+    // Onboarding v2: draft or publish both count once saved; stamps after the response, never affects the save.
+    noteMenuSaved(req, admin.accountId, body.document);
     return json({ menuId: saved.menuId, swapped: saved.swapped });
   } catch (err) {
     console.error("layout-studio save failed", err instanceof Error ? err.message : "unknown");

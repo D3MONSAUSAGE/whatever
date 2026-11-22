@@ -1,4 +1,5 @@
 "use client";
+import { recordOnboardingStep } from "@/lib/onboarding-client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, timeAgo, useApi, type DisplayItem, type MediaItem } from "@/lib/api";
@@ -207,6 +208,7 @@ export function MenuBoards({
     if ((templatesOn === null || unifiedFlag === null) && !fixture) return; // wait for the flags so a board opens in the right editor
     const next = templateView(menu) ?? openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
     if (next) setView(next);
+    if (next && !fixture) recordOnboardingStep("preview_menu"); // onboarding v2: opening a saved board counts as previewing it
     setPendingBoardId(null);
   }, [menus.data, pendingBoardId, initialSearch, templatesOn, unifiedFlag]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -231,6 +233,7 @@ export function MenuBoards({
     const next = templateView(menu) ?? openClassified(menu, parseUnifiedSearch(initialSearch ?? {}).screenId);
     if (next) setView(next);
     else toast.show(t("mb.cantOpen"), true);
+    if (next && !fixture) recordOnboardingStep("preview_menu"); // onboarding v2: opening a saved board counts as previewing it
   }
 
   async function remove(menu: MenuBoard) {
