@@ -21,7 +21,7 @@ import {
 } from "@/lib/board-custom";
 
 /** Bump when the rendered look of existing templates changes without their definitions changing (renderer fixes). */
-export const CATALOG_RENDER_REVISION = 1;
+export const CATALOG_RENDER_REVISION = 2; // 2: vertical (9:16) drawing and thumbnail `orientation=portrait` (landscape pixels unchanged).
 /** The response shape. Bump only on a breaking change; additive fields keep the same schema number. */
 export const CATALOG_SCHEMA = 1;
 

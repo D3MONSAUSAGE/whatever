@@ -2979,4 +2979,18 @@ export const es: Record<MessageKey, string> = {
   "dacct.note.displayedSince": "Las confirmaciones de TV se registran desde el {date}. Una TV vinculada antes que no confirmó desde entonces aparece como desconocida.",
   "dacct.note.attributionSince": "Los orígenes del registro se capturan desde el {date}. Las cuentas anteriores aparecen como no registradas.",
   "dacct.error": "No se pudieron cargar las cuentas.",
+  // Vertical (9:16) boards and screen orientation (t413u).
+  "tpl.orientation": "Formato de pantalla",
+  "tpl.orientationHorizontal": "Horizontal (16:9)",
+  "tpl.orientationVertical": "Vertical (9:16)",
+  "tpl.orientationHelp": "Los menús verticales son para TV montadas de lado. Al cambiar, se conservan todos los productos, precios, fotos, videos y ajustes.",
+  "tpl.mismatchVerticalOnHorizontal": "TV horizontal: este menú vertical se verá centrado con espacio vacío a los lados. No se estirará.",
+  "tpl.mismatchHorizontalOnVertical": "TV vertical: este menú horizontal se verá centrado con espacio vacío arriba y abajo. No se estirará.",
+  "scr.orientation": "Cómo está montada esta TV",
+  "scr.orientationHorizontal": "Horizontal",
+  "scr.orientationVertical": "Vertical (de lado)",
+  "scr.orientationHelp": "Esto solo le indica a Pekko qué menús encajan en esta TV, para avisarle si no coinciden. Pekko no puede girar la TV. Para usarla en vertical, monte la TV de lado y active la rotación o el modo vertical en los ajustes de la propia TV (Samsung, LG y Android TV lo llaman de forma distinta). Algunos dispositivos, como Fire TV y muchas configuraciones de Chromecast, no pueden mostrar una imagen vertical.",
+  "scr.orientationSaved": "Guardado. No cambió nada en esta pantalla.",
+  "scr.viewportStillHorizontal": "Esta pantalla está configurada como vertical, pero la TV envía una imagen horizontal ({w} × {h}). Active la rotación en los ajustes de la TV.",
+  "scr.viewportStillVertical": "Esta pantalla está configurada como horizontal, pero la TV envía una imagen vertical ({w} × {h}).",
 };

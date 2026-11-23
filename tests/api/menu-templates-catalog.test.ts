@@ -173,6 +173,34 @@ describe("GET /api/menu-templates/thumbnail/[id]", () => {
     expect(res.status).toBe(200);
   }, 120000);
 
+  it("draws the vertical (9:16) sample with orientation=portrait; landscape URLs are unchanged", async () => {
+    const v = catalogVersion();
+    const tall = await thumb(`/api/menu-templates/thumbnail/modern-restaurant?v=${v}&w=640&orientation=portrait`);
+    expect(tall.status).toBe(200);
+    const bytes = new Uint8Array(await tall.arrayBuffer());
+    expect(new DataView(bytes.buffer).getUint32(16)).toBe(640);
+    expect(new DataView(bytes.buffer).getUint32(20)).toBe(1138);
+    const classic = await thumb(`/api/menu-templates/thumbnail/full-screen?v=${v}&w=320&orientation=portrait`);
+    expect(classic.status).toBe(200);
+    expect(new DataView((await classic.arrayBuffer())).getUint32(20)).toBe(569);
+    // Widths snap to the 1080-wide canvas at most; the parameter is part of the canonical URL.
+    const big = await thumb(`/api/menu-templates/thumbnail/two-column?orientation=portrait&w=1920`);
+    expect(big.status).toBe(308);
+    expect(big.headers.get("location")).toBe(`/api/menu-templates/thumbnail/two-column?v=${v}&w=1080&orientation=portrait`);
+    expect((await thumb(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640&orientation=sideways`)).status).toBe(404);
+    // orientation=landscape is a no-op: it lands on the normal landscape thumbnail.
+    const wide = await thumb(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640&orientation=landscape`);
+    expect(wide.status).toBe(308);
+    expect(wide.headers.get("location")).toBe(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640`);
+    const followed = await thumb(wide.headers.get("location")!);
+    expect(followed.status).toBe(200);
+    const wideBytes = new Uint8Array(await followed.arrayBuffer());
+    expect(new DataView(wideBytes.buffer).getUint32(20)).toBe(360);
+    // The catalog's own thumbnail paths stay landscape.
+    const { body } = await catalog();
+    expect(body.entries.every((e) => !e.thumbnailPath.includes("orientation"))).toBe(true);
+  }, 60000);
+
   it("redirects non-canonical URLs and refuses unknown ids and variants", async () => {
     const v = catalogVersion();
     const stale = await thumb("/api/menu-templates/thumbnail/trattoria?v=old&w=500");
@@ -209,6 +237,20 @@ describe("POST /api/layout-studio/preview", () => {
     expect(store.menus.length).toBe(menus);
     expect(store.media.length).toBe(media);
   }, 30000);
+
+  it("width is the PNG width for vertical boards; 1080 and up draws the native 1080×1920", async () => {
+    const tall = { ...designDocument(MENU_DESIGNS[0]), orientation: "portrait" };
+    const size = async (width: number) => {
+      const res = await preview(tall, { width });
+      expect(res.status).toBe(200);
+      const view = new DataView(new Uint8Array(await res.arrayBuffer()).buffer);
+      return [view.getUint32(16), view.getUint32(20)];
+    };
+    expect(await size(960)).toEqual([960, 1707]);
+    expect(await size(1920)).toEqual([1080, 1920]);
+    const wide = await preview(designDocument(MENU_DESIGNS[0]), { width: 1920 });
+    expect(new DataView(new Uint8Array(await wide.arrayBuffer()).buffer).getUint32(20)).toBe(1080);
+  }, 60000);
 
   it("reports the same fit publish enforces", async () => {
     const doc = designDocument(MENU_DESIGNS.find((d) => d.id === "modern-restaurant")!);

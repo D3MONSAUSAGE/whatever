@@ -16,7 +16,7 @@ import { Dialog } from "@/components/dialog";
 import { useToast } from "@/components/toast";
 import { useRegisterStudioLeave } from "@/components/studio-leave";
 import { fontFaceCss } from "@/lib/board-fonts";
-import { BOARD_H, BOARD_W, MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
+import { MENU_LIMITS, layoutSvg, parseLayout, sampleLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
 import { accountSaveBody, findSameVideo, readAccountStudio, selectFeaturedMedia, type AccountLibraryFile } from "@/lib/layout-account";
 import { isProcessingMediaStatus, isReadyMediaStatus } from "@/lib/media-ready";
 import { mediaHits, selectedVideoOption, videoPreview } from "@/lib/board-preview";
@@ -24,6 +24,7 @@ import { ZoneVideo } from "@/components/zone-video";
 import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
 import { ColorField } from "@/components/color-field";
 import { menuSvg } from "@/lib/menu-classic-svg";
+import { boardCanvas, orientationOf, type BoardOrientation } from "@/lib/board-orientation";
 import { parseMenuContent, sampleMenu } from "@/lib/menu-templates";
 import { seedClassicMenu } from "@/lib/brand-kit";
 import { blobToBase64, prepareVideo, uploadToSignedUrl } from "@/lib/prepare-video";
@@ -93,13 +94,17 @@ type Art = { imageHref: string | null; logoHref: string | null; itemImages?: Rec
 export function DesignBoard({ doc, art, label, className = "" }: { doc: LayoutDocument; art: Art; label?: string; className?: string }) {
   const svg = useMemo(() => designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages }).svg, [doc, art.imageHref, art.logoHref, art.itemImages]);
   return (
-    <div className={`tpl-board ${className}`} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}
+    <div className={`tpl-board ${orientationOf(doc) === "portrait" ? "is-portrait " : ""}${className}`} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}
       dangerouslySetInnerHTML={{ __html: svg }} />
   );
 }
 
 const STYLES = `${FONT_CSS}
 .tpl-board { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; }
+.tpl-board.is-portrait { aspect-ratio: 9 / 16; width: min(100%, calc(75dvh * 9 / 16)); margin-inline: auto; }
+.tpl-orient { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tpl-orient button { display: flex; align-items: center; gap: 10px; text-align: start; }
+.tpl-orient .tpl-orient-shape { flex: none; border: 2px solid currentColor; border-radius: 3px; opacity: .7; }
 .tpl-board-svg, .tpl-board-svg > svg, .tpl-board > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .tpl-zone-hit { position: absolute; z-index: 3; padding: 0; cursor: pointer; background: transparent; border: 2px solid transparent; }
 .tpl-zone-hit:hover, .tpl-zone-hit:focus-visible { border-color: var(--color-primary); outline: none; }
@@ -277,6 +282,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
   onHit?: (id: string) => void;
 }) {
   const t = useT();
+  const canvas = boardCanvas(orientationOf(doc));
   const svg = useMemo(() => {
     if (engine === "classic" && classic) {
       const { template, content } = toClassic(doc, classic);
@@ -286,7 +292,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
     return designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages, ...(art.imageSize ? { imageSize: art.imageSize } : {}) }).svg;
   }, [engine, doc, classic, art.imageHref, art.logoHref, art.itemImages, art.imageSize, brand]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className={`tpl-board ${className}`} role={label && !hits?.length ? "img" : undefined} aria-label={label && !hits?.length ? label : undefined}>
+    <div className={`tpl-board ${orientationOf(doc) === "portrait" ? "is-portrait " : ""}${className}`} data-orientation={orientationOf(doc)} role={label && !hits?.length ? "img" : undefined} aria-label={label && !hits?.length ? label : undefined}>
       <div className="tpl-board-svg" aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
       {video ? (
         <ZoneVideo
@@ -296,6 +302,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
           fileName={video.fileName}
           label={video.fileName ? t("tpl.videoOnBoard", { name: video.fileName }) : t("tpl.videoUnlisted")}
           fallbackLabel={t("tpl.videoUnlisted")}
+          canvas={canvas}
         />
       ) : null}
       {(hits ?? []).map((hit) => (
@@ -307,10 +314,10 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
           aria-label={hit.label}
           onClick={() => onHit?.(hit.id)}
           style={{
-            left: `${(hit.box.x / BOARD_W) * 100}%`,
-            top: `${(hit.box.y / BOARD_H) * 100}%`,
-            width: `${(hit.box.w / BOARD_W) * 100}%`,
-            height: `${(hit.box.h / BOARD_H) * 100}%`,
+            left: `${(hit.box.x / canvas.width) * 100}%`,
+            top: `${(hit.box.y / canvas.height) * 100}%`,
+            width: `${(hit.box.w / canvas.width) * 100}%`,
+            height: `${(hit.box.h / canvas.height) * 100}%`,
           }}
         >
           <span>{hit.label}</span>
@@ -459,6 +466,14 @@ export function TemplateEditor({
   const colors = useMemo(() => designColors(doc, design), [doc, design]);
 
   function update(next: LayoutDocument) { setDoc(next); setDirty(true); }
+  /** Horizontal ⇄ vertical: only the canvas changes; every word, price, photo, video and setting stays in the board. */
+  function setOrientation(value: BoardOrientation) {
+    if (orientationOf(doc) === value) return;
+    const next: LayoutDocument = { ...doc };
+    if (value === "portrait") next.orientation = "portrait";
+    else delete next.orientation;
+    update(next);
+  }
   function patch(p: Partial<LayoutDocument>) { update({ ...doc, ...p }); }
   function patchClassic(p: Partial<ClassicSettings>) { if (classic) { setClassic({ ...classic, ...p }); setDirty(true); } }
   function setSections(fn: (s: LayoutDocument["sections"]) => LayoutDocument["sections"]) { update({ ...doc, sections: fn(doc.sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }))) }); }
@@ -719,7 +734,8 @@ export function TemplateEditor({
         <span className={`badge ${published ? "badge-live" : ""}`} data-testid="tpl-status">{published ? t("tpl.statusLive") : dirty ? t("tpl.statusUnsaved") : t("tpl.statusSaved")}</span>
         {unified ? <span className="text-xs text-muted" data-testid="tpl-design-name">{styleName}</span> : null}
         <span className="flex-1" />
-        {unified ? null : (
+        {/* The advanced (layout studio) editor is 16:9 only; vertical boards stay in this editor. */}
+        {unified || orientationOf(doc) === "portrait" ? null : (
           <button type="button" className="btn btn-quiet" disabled={busy !== null} onClick={async () => {
             const id = menuId ?? (await save("draft"));
             if (id) onAdvanced(id);
@@ -736,7 +752,7 @@ export function TemplateEditor({
       <h2 id="tpl-editor-title" className="sr-only">{t("tpl.editorTitle")}</h2>
       <div className="tpl-grid">
         <div className="tpl-preview">
-          <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{previewVideo ? t("tpl.previewCapVideo") : t("tpl.previewCap")}</span><span>1920 × 1080</span></p>
+          <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{previewVideo ? t("tpl.previewCapVideo") : t("tpl.previewCap")}</span><span data-testid="tpl-canvas-size">{orientationOf(doc) === "portrait" ? "1080 × 1920" : "1920 × 1080"}</span></p>
           <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={previewHits} onHit={onPreviewHit} />
           {czOverflow.length ? (
             <div className="note-warn text-sm mt-3 grid gap-2" role="alert" data-testid="tpl-cz-overflow">
@@ -1027,6 +1043,19 @@ export function TemplateEditor({
           {step === 3 ? (
             <div className="grid gap-4">
               <h3 className="font-display font-bold text-lg">{t("tpl.lookTitle")}</h3>
+              <div className="grid gap-2" data-testid="tpl-orientation">
+                <p className="form-label" id="tpl-orient-label">{t("tpl.orientation")}</p>
+                <div className="tpl-orient" role="group" aria-labelledby="tpl-orient-label">
+                  {(["landscape", "portrait"] as const).map((value) => (
+                    <button key={value} type="button" className="tpl-var" aria-pressed={orientationOf(doc) === value} data-testid={`tpl-orientation-${value}`}
+                      onClick={() => setOrientation(value)}>
+                      <span className="tpl-orient-shape" aria-hidden style={value === "portrait" ? { width: 14, height: 24 } : { width: 26, height: 15 }} />
+                      <span>{t(value === "portrait" ? "tpl.orientationVertical" : "tpl.orientationHorizontal")}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">{t("tpl.orientationHelp")}</p>
+              </div>
               {fit.photosSuppressed ? (
                 <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-dont-fit-look">
                   <p>{t("tpl.photosDontFit")}</p>
@@ -1154,7 +1183,11 @@ export function TemplateEditor({
                   <li key={d.id}>
                     <label className="flex items-center gap-3 p-3 rounded-xl border border-line min-h-11">
                       <input type="checkbox" className="size-5" checked={!!picked[d.id]} onChange={(e) => setPicked({ ...picked, [d.id]: e.target.checked })} />
-                      <span className="flex-1 min-w-0"><span className="font-semibold block break-words">{d.name}</span></span>
+                      <span className="flex-1 min-w-0"><span className="font-semibold block break-words">{d.name}</span>
+                        {(d.orientation === "portrait") !== (orientationOf(doc) === "portrait") ? (
+                          <span className="block text-xs text-muted" data-testid="tpl-publish-mismatch">{t(orientationOf(doc) === "portrait" ? "tpl.mismatchVerticalOnHorizontal" : "tpl.mismatchHorizontalOnVertical")}</span>
+                        ) : null}
+                      </span>
                       <span className={`badge ${d.online ? "badge-live" : ""}`}>{d.online ? t("tpl.online") : t("tpl.offline")}</span>
                     </label>
                   </li>

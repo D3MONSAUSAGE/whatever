@@ -1,3 +1,4 @@
+import { orientationOf } from "@/lib/board-orientation";
 import { parseLayout, sampleLayout, type LayoutDocument } from "@/lib/layout-studio";
 
 /** A library file the account editor may attach. The server still checks ownership on save. */
@@ -53,7 +54,9 @@ export function accountSaveBody(input: {
     mode: input.mode,
     menuId: input.menuId,
     name: input.name.slice(0, 80),
-    document: input.document,
+    // The web editor always says which orientation it means (an explicit "landscape" turns a vertical board back);
+    // the server keeps the stored orientation only for clients that leave the key out.
+    document: { ...input.document, orientation: orientationOf(input.document) },
   };
 }
 

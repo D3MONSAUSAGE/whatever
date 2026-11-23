@@ -4,6 +4,7 @@ import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { boardFit } from "@/lib/board-fit";
+import { boardCanvas, orientationOf } from "@/lib/board-orientation";
 import { loadBoardArt } from "@/lib/server/layout-boards";
 import { noteOnboarding } from "@/lib/server/onboarding-hooks";
 
@@ -41,7 +42,10 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   const width = WIDTHS.find((w) => w >= requested) ?? 960;
   const { renderLayoutPng } = await import("@/lib/server/layout-render");
   const { photo, logo, itemImages } = await loadBoardArt(admin.accountId, doc);
-  const png = renderLayoutPng(doc, photo, { logo, itemImages, width: width === 1920 ? undefined : width });
+  // `width` is the PNG width; the height follows the board's shape. At or above the canvas width (1920 landscape,
+  // 1080 vertical) the board is drawn at its native size, never upscaled.
+  const nativeWidth = boardCanvas(orientationOf(doc)).width;
+  const png = renderLayoutPng(doc, photo, { logo, itemImages, width: width >= nativeWidth ? undefined : width });
   return new Response(new Uint8Array(png), {
     status: 200,
     headers: {

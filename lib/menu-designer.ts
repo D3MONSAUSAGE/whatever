@@ -11,6 +11,7 @@
  * classic-only settings; `fromClassic` / `toClassic` convert losslessly, so opening and saving a classic board
  * without edits stores exactly what was there.
  */
+import { orientationOf } from "@/lib/board-orientation";
 import { BOARD_FONTS, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
 import { MENU_LIMITS, isMenuTemplate, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import {
@@ -58,6 +59,7 @@ export function fromClassic(theme: unknown, content: MenuContent): { doc: Layout
     featureTitle: "",
     featureDetail: "",
     palette: classic.theme,
+    ...(orientationOf(content) === "portrait" ? { orientation: "portrait" as const } : {}),
     font: classic.headingFont ?? "inter",
     ...(classic.bodyFont ? { bodyFont: classic.bodyFont } : {}),
     ...(content.itemPhotos === false ? { photoStyle: "text" as const } : {}),
@@ -86,6 +88,7 @@ export function toClassic(doc: LayoutDocument, classic: ClassicSettings): { temp
     ...(headingFont && isBoardFont(headingFont) ? { headingFont } : {}),
     ...(bodyFont && isBoardFont(bodyFont) ? { bodyFont } : {}),
     ...(doc.photoStyle === "text" ? { itemPhotos: false } : {}),
+    ...(doc.orientation === "portrait" ? { orientation: "portrait" as const } : {}),
   };
   return { template: classic.theme, content };
 }
@@ -94,6 +97,8 @@ export function toClassic(doc: LayoutDocument, classic: ClassicSettings): { temp
 export function classicSaveContent(content: MenuContent): Record<string, unknown> {
   return {
     ...content,
+    // Explicit, so switching a vertical board back to horizontal is saved (the server keeps it when omitted).
+    orientation: orientationOf(content),
     itemPhotos: content.itemPhotos === false ? false : true,
     sections: content.sections.map((section) => ({ ...section, items: section.items.map((item) => ({ ...item, imageMediaId: item.imageMediaId ?? null })) })),
   };

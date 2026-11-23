@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
 import { OfflineAlert, ScreenCard, onlineHint } from "@/components/tv";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { OrientationChoice } from "@/components/screen-orientation";
+import type { BoardOrientation } from "@/lib/board-orientation";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { IconTv } from "@/components/icons";
@@ -218,6 +220,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
 function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[]; onPaired: (warning?: string, id?: string) => void; onSubmitting?: () => void; onError: (message: string) => void }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [orientation, setOrientation] = useState<BoardOrientation>("landscape");
   const [busy, setBusy] = useState(false);
   const t = useT();
   const requiredMsg = useRequiredMessage();
@@ -226,11 +229,12 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
     setBusy(true);
     onSubmitting?.();
     try {
-      const paired = await api<{ id?: string; nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify({ code, name }) });
+      const paired = await api<{ id?: string; nameWarning?: string; suggestedName?: string }>("/api/displays/pair", { method: "POST", body: JSON.stringify(orientation === "portrait" ? { code, name, orientation } : { code, name }) });
       // The server warning is English; show the same check in the UI language (I18N-2).
       const local = screenNameWarning(name, names, t);
       setCode("");
       setName("");
+      setOrientation("landscape");
       onPaired(paired.nameWarning ? t("disp.suggested", { warning: local?.nameWarning ?? paired.nameWarning, name: paired.suggestedName ?? local?.suggestedName ?? "" }) : undefined, typeof paired.id === "string" ? paired.id : undefined);
     } catch (err) {
       onError((err as Error).message);
@@ -256,6 +260,7 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
           value={name} onChange={(event) => setName(event.target.value)} aria-label={t("disp.tvName")} />
         <button className="btn btn-primary" disabled={busy}>{busy ? t("disp.connectingShort") : t("disp.connectTv")}</button>
       </div>
+      <div className="mt-3"><OrientationChoice name="pair" value={orientation} onChange={setOrientation} disabled={busy} /></div>
       {screenNameWarning(name, names, t) ? (
         <p role="status" className="text-sm mt-3">{screenNameWarning(name, names, t)?.nameWarning}</p>
       ) : null}

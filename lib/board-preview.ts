@@ -3,7 +3,10 @@
  * which photo/video areas can be tapped. Pure helpers shared by the editor and tests.
  * The published PNG and the TV composition are unchanged.
  */
-import { BOARD_H, BOARD_W, mediaVideoBox, type LayoutDocument, type ZoneBox } from "@/lib/layout-studio";
+import { mediaVideoBox, type LayoutDocument, type ZoneBox } from "@/lib/layout-studio";
+import { boardCanvas, LANDSCAPE_CANVAS, orientationOf } from "@/lib/board-orientation";
+
+type Canvas = { width: number; height: number };
 
 export type PreviewMedia = {
   id: string;
@@ -32,10 +35,10 @@ export type SelectedVideo = {
 
 export type MediaHit = { id: "photo" | "video"; box: ZoneBox };
 
-function isPlayableBox(box: ZoneBox) {
+function isPlayableBox(box: ZoneBox, canvas: Canvas) {
   if (box.w < 1 || box.h < 1) return false;
   // A full-board box would cover the menu. The player also rejects it.
-  if (box.w >= BOARD_W && box.h >= BOARD_H) return false;
+  if (box.w >= canvas.width && box.h >= canvas.height) return false;
   return true;
 }
 
@@ -47,7 +50,7 @@ export function videoPreview(
 ): VideoPreview | null {
   if (!doc.videoMediaId) return null;
   const box = mediaVideoBox(doc);
-  if (!box || !isPlayableBox(box)) return null;
+  if (!box || !isPlayableBox(box, boardCanvas(orientationOf(doc)))) return null;
   const file = (library ?? []).find((item) => item.id === doc.videoMediaId);
   const src = file?.kind === "video" && file.url ? file.url : null;
   const thumb = file?.kind === "video" && file.thumbnailUrl ? file.thumbnailUrl : null;
@@ -79,11 +82,11 @@ export function selectedVideoOption(
  */
 export function mediaHits(doc: LayoutDocument): MediaHit[] {
   const box = mediaVideoBox(doc);
-  if (!box || !isPlayableBox(box)) return [];
+  if (!box || !isPlayableBox(box, boardCanvas(orientationOf(doc)))) return [];
   return [{ id: doc.videoMediaId ? "video" : "photo", box }];
 }
 
-export function boxStyle(box: ZoneBox, units: "px" | "percent"): {
+export function boxStyle(box: ZoneBox, units: "px" | "percent", canvas: Canvas = LANDSCAPE_CANVAS): {
   position: "absolute";
   left: number | string;
   top: number | string;
@@ -97,10 +100,10 @@ export function boxStyle(box: ZoneBox, units: "px" | "percent"): {
   }
   return {
     position: "absolute",
-    left: `${(box.x / BOARD_W) * 100}%`,
-    top: `${(box.y / BOARD_H) * 100}%`,
-    width: `${(box.w / BOARD_W) * 100}%`,
-    height: `${(box.h / BOARD_H) * 100}%`,
+    left: `${(box.x / canvas.width) * 100}%`,
+    top: `${(box.y / canvas.height) * 100}%`,
+    width: `${(box.w / canvas.width) * 100}%`,
+    height: `${(box.h / canvas.height) * 100}%`,
     objectFit: "cover",
     pointerEvents: "none",
   };

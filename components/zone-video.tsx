@@ -16,6 +16,7 @@ export function ZoneVideo({
   units = "percent",
   label,
   fallbackLabel = "Video",
+  canvas,
 }: {
   box: ZoneBox;
   src: string | null;
@@ -25,10 +26,12 @@ export function ZoneVideo({
   /** Accessible name for the fallback poster (e.g. "Video poster: promo.mp4"). */
   label?: string;
   fallbackLabel?: string;
+  /** Board canvas the box is in (1920×1080 unless the board is vertical). */
+  canvas?: { width: number; height: number };
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [src]);
-  const style = boxStyle(box, units);
+  const style = boxStyle(box, units, canvas);
   const play = Boolean(src) && !failed;
   const caption = (fileName ?? "").trim();
   return (

@@ -9,13 +9,24 @@ import { FONT_METRICS } from "@/lib/board-font-metrics";
 import { boardFont, type BoardFontId } from "@/lib/board-fonts";
 import { designById, designVariant, isPhotoDesign, type MenuDesign } from "@/lib/menu-designs";
 import type { LayoutDocument, LayoutItem, LayoutSection, ZoneBox } from "@/lib/layout-studio";
+import { boardCanvas, orientationOf } from "@/lib/board-orientation";
 import {
-  activeCustom, emptyClips, fixedRegion, focusPlacement, itemRegion, sectionHeadingStyle, sectionRegion, snapWeight, READABLE_FLOORS,
+  activeCustom, emptyClips, fixedRegion, setRegionCanvas, focusPlacement, itemRegion, sectionHeadingStyle, sectionRegion, snapWeight, READABLE_FLOORS,
   type ActiveCustom, type BoardRegion, type ClipArea, type RoleKey,
 } from "@/lib/board-custom";
 
-const W = 1920;
-const H = 1080;
+// Canvas of the board being drawn: 1920×1080, or 1080×1920 for a vertical board (set per render, like `run`).
+let W = 1920;
+let H = 1080;
+function isPortrait() { return H > W; }
+/** Run `draw` with the canvas of this document's orientation, restoring the previous one afterwards. */
+function onCanvas<T>(doc: LayoutDocument, draw: () => T): T {
+  const prev = [W, H];
+  const canvas = boardCanvas(orientationOf(doc));
+  W = canvas.width; H = canvas.height;
+  const prevRegions = setRegionCanvas(canvas);
+  try { return draw(); } finally { W = prev[0]; H = prev[1]; setRegionCanvas(prevRegions); }
+}
 
 /* ---------------- colour and readability ---------------- */
 
@@ -215,6 +226,10 @@ function roleSize(role: RoleKey, def: number) {
 /** Left edge of the photo/video column: the template's, or the owner's featured media size. */
 function mediaLeft(active: ActiveCustom | null, def: number) {
   return active && active.mediaSize != null ? Math.round(W * (1 - active.mediaSize)) : def;
+}
+/** Vertical boards: height of the photo/video band, the template's share of the board or the owner's media size. */
+function mediaBand(active: ActiveCustom | null, defFraction: number) {
+  return Math.round(H * (active && active.mediaSize != null ? active.mediaSize : defFraction));
 }
 function customStyle(st: Style): Style {
   const a = run?.active;
@@ -686,6 +701,7 @@ function fitPhotos(
 export function designVideoBox(doc: LayoutDocument): ZoneBox | null {
   const design = designById(doc.design);
   if (!design) return null;
+  if (orientationOf(doc) === "portrait") return onCanvas(doc, () => portraitVideoBox(doc, design));
   // The owner's featured media size moves the video exactly as it moves the photo (same mediaLeft as the renderer).
   const active = activeCustom(doc);
   if (design.composition === "showcase") {
@@ -698,7 +714,28 @@ export function designVideoBox(doc: LayoutDocument): ZoneBox | null {
   return null;
 }
 
+/** Vertical boards: the media band sits at the bottom, full width (same band the renderer paints). */
+function portraitVideoBox(doc: LayoutDocument, design: MenuDesign): ZoneBox | null {
+  const active = activeCustom(doc);
+  if (design.composition === "showcase") {
+    const band = (doc.featureTitle || doc.featureDetail || "").trim() ? 200 : 0;
+    const MB = mediaBand(active, SHOWCASE_MEDIA);
+    return { x: 0, y: H - MB, w: W, h: MB - band };
+  }
+  if (design.composition === "columns") { const MB = mediaBand(active, COLUMNS_MEDIA); return { x: 0, y: H - COLUMNS_PANEL - MB, w: W, h: MB }; }
+  if (design.composition === "promo") { const PB = mediaBand(active, PROMO_MEDIA); return { x: 0, y: H - PROMO_PANEL - PB, w: W, h: PB }; }
+  return null;
+}
+const SHOWCASE_MEDIA = 780 / 1920;
+const COLUMNS_MEDIA = 576 / 1920;
+const COLUMNS_PANEL = 240;
+// Vertical promo: a slightly shorter photo band than the horizontal column share, so the menu keeps its room.
+const PROMO_MEDIA = 0.28;
+const PROMO_PANEL = 270;
+const FEATURED_PANEL = 0.4;
+
 function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return showcasePortrait(parts, doc, design, c, f, art);
   const L = mediaLeft(run?.active ?? null, 1140); const x0 = 90; const top = 92;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
@@ -755,6 +792,7 @@ function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
 }
 
 function columns(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return columnsPortrait(parts, doc, design, c, f, art);
   const L = mediaLeft(run?.active ?? null, 1344); const x0 = 84; const top = 80;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
@@ -806,6 +844,7 @@ function columns(parts: string[], doc: LayoutDocument, design: MenuDesign, c: De
 }
 
 function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return promoPortrait(parts, doc, design, c, f, art);
   const L = mediaLeft(run?.active ?? null, 1260); const x0 = 80; const top = 70; const PH = 713;
   parts.push(rect(0, 0, W, H, c.paper));
   parts.push(rect(L, 0, W - L, H, c.panel));
@@ -888,10 +927,12 @@ function list(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desig
   const menuTop = band + 8 + 60;
   const footerH = doc.footer ? 48 : 0;
   const colH = H - 56 - footerH - menuTop;
-  const avail = W - x0 * 2; const gap = 72; const colW = (avail - gap * 2) / 3;
+  const avail = W - x0 * 2; const gap = isPortrait() ? 56 : 72; const colW = (avail - gap * 2) / 3;
   const shown = itemPhotosShown(doc, design);
-  const result = fitPhotos(doc.sections, baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), [{ cols: 3, colW }], colH, 1.5, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
-  paintColumns(parts, result, x0, menuTop, colW, gap, c);
+  // Vertical boards: one full-width column, or two across the 1080px width for long menus (never three skinny ones).
+  const options = isPortrait() ? [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - gap) / 2 }] : [{ cols: 3, colW }];
+  const result = fitPhotos(doc.sections, baseStyle(design, f, { name: 36, price: design.look.tags ? 38 : 36, desc: 24, section: design.look.head === "bebas-neue" ? 56 : 32, itemGap: 20, sectionGap: 44, headGap: 22 }), options, colH, 1.5, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
+  paintColumns(parts, result, x0, menuTop, isPortrait() ? (result.cols === 1 ? avail : (avail - gap) / 2) : colW, gap, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
   return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
@@ -923,6 +964,15 @@ function flatItems(doc: LayoutDocument): Flat[] {
 /** Card grid capacity: photo cards stay legible up to 15 per screen. */
 export const CARD_CAPACITY = 15;
 function cardGrid(count: number): [number, number] {
+  if (isPortrait()) {
+    // Vertical boards: at most three cards across, more rows.
+    if (count <= 2) return [1, Math.max(1, count)];
+    if (count <= 4) return [2, 2];
+    if (count <= 6) return [2, 3];
+    if (count <= 9) return [3, 3];
+    if (count <= 12) return [3, 4];
+    return [3, 5];
+  }
   if (count <= 3) return [Math.max(1, count), 1];
   if (count === 4) return [4, 1];
   if (count <= 6) return [3, 2];
@@ -1021,7 +1071,8 @@ function cards(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
       const pw = textWidth(item.price, ps, priceFam.family, priceFam.weight) + (design.look.tags ? ps * 0.64 : 0);
       // Price box: below the text on round cards, at the right of the first name line on rectangular cards.
       const px = priceBelow ? x + (cardW - pw) / 2 : x + cardW - 20 - pw;
-      const pyTop = priceBelow ? y + cardH - 18 - th : nameTop + (ns * 1.1 - th) / 2;
+      // Vertical boards have tall cards: a round card's price sits right under its text instead of at the card's foot.
+      const pyTop = priceBelow ? (isPortrait() ? Math.min(y + cardH - 18 - th, ty + 14) : y + cardH - 18 - th) : nameTop + (ns * 1.1 - th) / 2;
       if (design.look.tags) {
         parts.push(rect(px, pyTop, pw, th, c.tag, `rx="${n(ps * 0.22)}"`));
         parts.push(text(px + pw / 2, pyTop + th / 2 + ps * 0.36, item.price, { size: ps, family: priceFam.family, weight: priceFam.weight, fill: c.tagInk, anchor: "middle" }));
@@ -1044,6 +1095,7 @@ export function featuredItems(doc: LayoutDocument): LayoutItem[] {
 }
 
 function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return featuredPortrait(parts, doc, design, c, f, art);
   const L = 1100; const x0 = 84; const top = 84;
   parts.push(rect(0, 0, W, H, c.paper));
   parts.push(rect(L, 0, W - L, H, c.panel));
@@ -1074,19 +1126,26 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 56) / 2, 56, c);
   if (doc.footer) parts.push(text(x0, H - 52, ellipsize(doc.footer, 22, f.head, 400, avail), { size: 22, family: f.head, weight: 400, fill: c.muted }));
   // Featured dishes: large photo, name, description and price; the photo never covers the text.
+  featuredCards(parts, picks, { x: L, y: 0, w: W - L, h: H }, design, c, f, art);
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+/** The featured dish cards, stacked in the panel box (right column on horizontal boards, bottom band on vertical). */
+function featuredCards(parts: string[], picks: LayoutItem[], panel: { x: number; y: number; w: number; h: number }, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined) {
+  const L = panel.x; const R = panel.x + panel.w;
   const pad = 56; const k = picks.length; const gapY = 34;
-  const cardH = (H - pad * 2 - (k - 1) * gapY) / Math.max(1, k);
+  const cardH = (panel.h - pad * 2 - (k - 1) * gapY) / Math.max(1, k);
   const photoOf = itemPhotoResolver(art);
   const ink = c.panelInk;
   const accent = readableOn(c.accent, c.panel, 3).color;
   picks.forEach((item, i) => {
-    const y = pad + i * (cardH + gapY);
+    const y = panel.y + pad + i * (cardH + gapY);
     const at = run?.items.get(item);
-    if (at) addRegion(itemRegion(item, at[0], at[1], { x: L, y, w: W - L, h: cardH }));
+    if (at) addRegion(itemRegion(item, at[0], at[1], { x: L, y, w: panel.w, h: cardH }));
     const side = Math.min(cardH, k === 1 ? 520 : 300);
     const px = L + pad;
     photoTile(parts, photoOf(item), px, y + (cardH - side) / 2, side, side, 18, c, initialOf(item.name), c.panel);
-    const fx = px + side + 36; const fw = W - pad - fx;
+    const fx = px + side + 36; const fw = R - pad - fx;
     const ns = k === 1 ? 52 : 40;
     const lines = wrapText(item.name, ns, f.head, design.look.headWeight, fw, 2);
     const desc = item.description ? wrapText(item.description, 22, f.body, 400, fw, k === 3 ? 2 : 3) : [];
@@ -1096,10 +1155,188 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
     if (desc.length) { ty += 10; desc.forEach((line) => { ty += 24; parts.push(text(fx, ty, line, { size: 22, family: f.body, weight: 400, fill: ink, opacity: 0.85 })); ty += 6; }); }
     if (item.price) { ty += 48; parts.push(text(fx, ty, item.price, { size: 36, family: f.body, weight: 800, fill: accent })); }
   });
+}
+
+/* ---------------- vertical (9:16) compositions ----------------
+ * The same template, fonts, colours, sizes and fitting on a 1080×1920 canvas. Only the arrangement changes: the
+ * right-hand photo/video/feature column becomes a full-width band at the bottom, and the menu uses the full width
+ * above it (one column, or two when that fits more). Horizontal boards never reach these functions.
+ */
+
+/** Business name (with logo and subtitle) across the top, as the template draws it. Returns the header's bottom. */
+function portraitHeader(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined,
+  o: { x0: number; top: number; logo: number; start: number; min: number; upper?: boolean; tracking?: number; cap?: number; sub: "accent" | "muted" | "chip" }) {
+  const logoSize = logo(parts, safeDesignHref(art?.logoHref), o.x0, o.top, o.logo, c.paper);
+  const tx = o.x0 + (logoSize ? logoSize + 26 : 0);
+  const maxW = W - o.x0 * 2 - (logoSize ? logoSize + 26 : 0);
+  const value = o.upper ? (doc.title || "").toUpperCase() : doc.title || "";
+  const t = titleFit(value, maxW, o.start, o.min, f.head, design.look.headWeight, o.tracking ?? 0, o.cap ?? Infinity);
+  note("businessName", value, t.value);
+  const titleBase = o.top + t.size * 0.84 + (logoSize ? Math.max(0, (o.logo - t.size * 1.6) / 2) : 0);
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink, ...(o.tracking ? { tracking: o.tracking } : {}) }));
+  let headBottom = titleBase + t.size * 0.22;
+  if (doc.subtitle) {
+    if (o.sub === "chip") {
+      const chipText = ellipsize(doc.subtitle.toUpperCase(), 24, f.body, 800, maxW - 40, 0.08);
+      const cw = textWidth(chipText, 24, f.body, 800, 0.08) + 28;
+      const cy = titleBase + 22;
+      parts.push(`<g transform="translate(${n(tx)} ${n(cy)}) skewX(-8)">${rect(0, 0, cw, 42, c.accent)}${text(14, 30, chipText, { size: 24, family: f.body, weight: 800, fill: bestInk(c.accent), tracking: 0.08 })}</g>`);
+      headBottom = cy + 42;
+    } else if (o.sub === "accent") {
+      parts.push(text(tx, titleBase + 50, ellipsize(doc.subtitle.toUpperCase(), 24, f.body, 700, maxW, 0.22), { size: 24, family: f.body, weight: 700, fill: c.accent, tracking: 0.22 }));
+      headBottom = titleBase + 58;
+    } else {
+      parts.push(text(tx, titleBase + 46, ellipsize(doc.subtitle, 26, f.body, 400, maxW), { size: 26, family: f.body, weight: 400, fill: c.muted }));
+      headBottom = titleBase + 54;
+    }
+  }
+  headBottom = Math.max(headBottom, logoSize ? o.top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: o.x0, y: o.top, w: W - o.x0 * 2, h: headBottom - o.top + 8 }));
+  return headBottom;
+}
+
+/** Menu in the area above the band: one column, or two when that fits more (the fitter picks, nothing is dropped silently). */
+function portraitMenu(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined,
+  sections: LayoutSection[], box: { x0: number; top: number; bottom: number }, sizes: Parameters<typeof baseStyle>[2], gap: number, maxScale: number, photos: { want: boolean; placeholders: boolean }) {
+  const avail = W - box.x0 * 2;
+  const colW2 = (avail - gap) / 2;
+  const result = fitPhotos(sections, baseStyle(design, f, sizes), [{ cols: 1, colW: avail }, { cols: 2, colW: colW2 }], box.bottom - box.top, maxScale, 0.55, 0.9, photos.want, photos.placeholders, photos.want ? itemPhotoResolver(art) : undefined);
+  paintColumns(parts, result, box.x0, box.top, result.cols === 1 ? avail : colW2, gap, c);
+  return result;
+}
+
+function showcasePortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  const MB = mediaBand(run?.active ?? null, SHOWCASE_MEDIA); const T = H - MB; const x0 = 72; const top = 84;
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) {
+    parts.push(photoImage(photo, { x: 0, y: T, w: W, h: MB }, doc));
+    parts.push(`<defs><linearGradient id="dg-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.44" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.86" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="1" stop-color="${c.paper}" stop-opacity="0.98"/></linearGradient></defs>`);
+    parts.push(rect(0, T, W, MB, "url(#dg-fade)"));
+  } else {
+    parts.push(rect(0, T, W, MB, c.panel));
+  }
+  const headBottom = portraitHeader(parts, doc, design, c, f, art, { x0, top, logo: 104, start: 86, min: 52, sub: "accent" });
+  parts.push(rect(x0, headBottom + 40, 180, 2, mix(c.accent, c.paper, 0.6)));
+  const menuTop = headBottom + 84;
+  const footerH = doc.footer ? 52 : 0;
+  const shown = itemPhotosShown(doc, design);
+  const result = portraitMenu(parts, doc, design, c, f, art, doc.sections, { x0, top: menuTop, bottom: T - 56 - footerH }, { name: 38, price: 38, desc: 25, section: 30, itemGap: 22, sectionGap: 44, headGap: 24 }, 64, 1.25, { want: shown, placeholders: isPhotoDesign(design) });
+  if (doc.footer) parts.push(text(x0, T - 44, ellipsize(doc.footer, 24, f.head, 400, W - x0 * 2), { size: 24, family: f.head, weight: 400, fill: c.muted }));
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: T, w: W, h: MB - (title || detail ? 200 : 0) }));
+  if (title || detail) {
+    const fx = 64; const fw = W - 128;
+    const ink = photo ? c.ink : c.panelInk;
+    const ds = roleSize("featuredText", 40); const ts = roleSize("featuredText", 22); const dw = roleWeight("featuredText", f.head, 400);
+    const lines = detail ? wrapText(detail, ds, f.head, dw, fw, 2) : [];
+    note("featuredText", detail, lines);
+    const y = H - 60 - (lines.length - 1) * (50 * ds / 40);
+    lines.forEach((line, i) => parts.push(text(fx, y + i * (50 * ds / 40), line, { size: ds, family: f.head, weight: dw, fill: ink })));
+    const label = title ? ellipsize(title.toUpperCase(), ts, f.body, 700, fw, 0.24) : "";
+    note("featuredText", title.toUpperCase(), label);
+    if (title) parts.push(text(fx, (lines.length ? y : H - 60) - (lines.length ? 64 * ds / 40 : 0), label, { size: ts, family: f.body, weight: 700, fill: photo ? c.accent : c.panelInk, tracking: 0.24 }));
+    addRegion(fixedRegion("featuredText", { x: 0, y: H - 200, w: W, h: 200 }));
+  }
   return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
 
-/** The full 1920×1080 board for a design document, plus how the text was fitted. */
+function columnsPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  const MB = mediaBand(run?.active ?? null, COLUMNS_MEDIA); const PT = H - COLUMNS_PANEL; const T = PT - MB; const x0 = 72; const top = 80;
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) parts.push(photoImage(photo, { x: 0, y: T, w: W, h: MB }, doc));
+  else parts.push(rect(0, T, W, MB, mix(c.panel, c.paper, 0.6)));
+  parts.push(rect(0, PT, W, COLUMNS_PANEL, c.panel));
+  const headBottom = portraitHeader(parts, doc, design, c, f, art, { x0, top, logo: 92, start: 68, min: 44, sub: "muted" });
+  const menuTop = headBottom + 56;
+  const footerH = doc.footer ? 62 : 0;
+  const shown = itemPhotosShown(doc, design);
+  const result = portraitMenu(parts, doc, design, c, f, art, doc.sections, { x0, top: menuTop, bottom: T - 48 - footerH }, { name: 36, price: 36, desc: 24, section: 30, itemGap: 20, sectionGap: 46, headGap: 22 }, 64, 1.3, { want: shown, placeholders: isPhotoDesign(design) });
+  if (doc.footer) {
+    parts.push(rect(x0, T - 48 - 40, W - x0 * 2, 2, mix(c.muted, c.paper, 0.7)));
+    parts.push(text(x0, T - 48, ellipsize(doc.footer, 22, f.body, 400, W - x0 * 2), { size: 22, family: f.body, weight: 400, fill: c.muted }));
+  }
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: T, w: W, h: MB }));
+  if (title || detail) {
+    const fx = 56; const fw = W - 112;
+    const ts = roleSize("featuredText", 54); const ds = roleSize("featuredText", 28); const kt = ts / 54; const kd = ds / 28;
+    const tw = roleWeight("featuredText", f.head, design.look.headWeight);
+    const tl = title ? wrapText(title, ts, f.head, tw, fw, 2) : [];
+    const dl = detail ? wrapText(detail, ds, f.body, 400, fw, 2) : [];
+    note("featuredText", title, tl); note("featuredText", detail, dl);
+    const blockH = tl.length * 58 * kt + (dl.length ? 16 + dl.length * 36 * kd : 0);
+    let y = PT + (COLUMNS_PANEL - blockH) / 2;
+    tl.forEach((line) => { parts.push(text(fx, y + 46 * kt, line, { size: ts, family: f.head, weight: tw, fill: c.panelInk })); y += 58 * kt; });
+    if (dl.length) y += 16;
+    dl.forEach((line) => { parts.push(text(fx, y + 27 * kd, line, { size: ds, family: f.body, weight: 400, fill: c.panelInk, opacity: 0.92 })); y += 36 * kd; });
+    addRegion(fixedRegion("featuredText", { x: 0, y: PT, w: W, h: COLUMNS_PANEL }));
+  }
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+function promoPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  const PB = mediaBand(run?.active ?? null, PROMO_MEDIA); const PT = H - PROMO_PANEL; const T = PT - PB; const x0 = 72; const top = 70;
+  parts.push(rect(0, 0, W, H, c.paper));
+  parts.push(rect(0, T, W, H - T, c.panel));
+  const photo = photoHref(doc, art);
+  if (photo) {
+    parts.push(photoImage(photo, { x: 0, y: T, w: W, h: PB }, doc));
+    parts.push(`<defs><linearGradient id="dg-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0.55" stop-color="${c.panel}" stop-opacity="0"/><stop offset="1" stop-color="${c.panel}" stop-opacity="1"/></linearGradient></defs>`);
+    parts.push(rect(0, T, W, PB, "url(#dg-panel)"));
+  }
+  const headBottom = portraitHeader(parts, doc, design, c, f, art, { x0, top, logo: 110, start: 132, min: 72, upper: true, tracking: 0.01, cap: 150, sub: "chip" });
+  const menuTop = headBottom + 44;
+  const footerH = doc.footer ? 46 : 0;
+  const shown = itemPhotosShown(doc, design);
+  const result = portraitMenu(parts, doc, design, c, f, art, doc.sections, { x0, top: menuTop, bottom: T - 40 - footerH }, { name: 38, price: 42, desc: 25, section: 62, itemGap: 22, sectionGap: 40, headGap: 18 }, 64, 1.25, { want: shown, placeholders: isPhotoDesign(design) });
+  if (doc.footer) parts.push(text(x0, T - 40, ellipsize(doc.footer.toUpperCase(), 22, f.body, 700, W - x0 * 2, 0.06), { size: 22, family: f.body, weight: 700, fill: c.muted, tracking: 0.06 }));
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  const price = (detail.match(/[$€£]\s?\d+(?:[.,]\d{1,2})?/) || [""])[0];
+  const badgeInPanel = Boolean(doc.videoMediaId);
+  const fx = 56; const fw = W - 112 - (badgeInPanel && price ? 210 : 0);
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: T, w: W, h: PB }));
+  if (title || detail) {
+    const ts = roleSize("featuredText", 104); const ds = roleSize("featuredText", 30); const kt = ts / 104; const kd = ds / 30;
+    const tw = roleWeight("featuredText", f.head, design.look.headWeight);
+    const tl = title ? wrapText(title.toUpperCase(), ts, f.head, tw, fw, 2) : [];
+    const dl = detail ? wrapText(detail, ds, f.body, 700, fw, 2) : [];
+    note("featuredText", title.toUpperCase(), tl); note("featuredText", detail, dl);
+    const y = H - 56 - (dl.length ? (dl.length - 1) * 38 * kd : 0);
+    dl.forEach((line, i) => parts.push(text(fx, y + i * 38 * kd, line, { size: ds, family: f.body, weight: 700, fill: c.panelInk })));
+    const ty = (dl.length ? y - 30 * kd - 22 : H - 56) - (tl.length - 1) * 94 * kt;
+    tl.forEach((line, i) => parts.push(text(fx, ty + i * 94 * kt, line, { size: ts, family: f.head, weight: tw, fill: c.panelInk })));
+    addRegion(fixedRegion("featuredText", { x: 0, y: PT, w: W, h: PROMO_PANEL }));
+  }
+  if (price) {
+    const r = 95;
+    const cx = W - 46 - r; const cy = badgeInPanel ? PT + 10 + r : T + 46 + r;
+    const size = Math.min(58, (r * 1.55 * 1000) / Math.max(1, textWidth(price, 1000, f.head, design.look.headWeight)));
+    parts.push(`<g transform="rotate(-10 ${n(cx)} ${n(cy)})"><circle cx="${n(cx)}" cy="${n(cy + 8)}" r="${r}" fill="#000000" fill-opacity="0.28"/><circle cx="${n(cx)}" cy="${n(cy)}" r="${r}" fill="${c.tag}"/>${text(cx, cy + size * 0.36, price, { size, family: f.head, weight: design.look.headWeight, fill: c.tagInk, anchor: "middle" })}</g>`);
+  }
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+function featuredPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined): DesignReport {
+  const picks = featuredItems(doc);
+  const FP = Math.round(H * FEATURED_PANEL * (picks.length >= 3 ? 1 : picks.length === 2 ? 0.8 : 0.6)); const T = H - FP; const x0 = 72; const top = 84;
+  parts.push(rect(0, 0, W, H, c.paper));
+  parts.push(rect(0, T, W, FP, c.panel));
+  const headBottom = portraitHeader(parts, doc, design, c, f, art, { x0, top, logo: 96, start: 78, min: 48, sub: "accent" });
+  parts.push(rect(x0, headBottom + 34, 160, 2, mix(c.accent, c.paper, 0.6)));
+  const menuTop = headBottom + 72;
+  const footerH = doc.footer ? 50 : 0;
+  const rest = doc.sections.map((section) => ({ ...section, items: section.items.filter((item) => !picks.includes(item)) }));
+  if (run) rest.forEach((section, i) => run!.sections.set(section, i));
+  const restHasOwnerPhoto = rest.some((section) => section.items.some((item) => Boolean(item.imageMediaId)));
+  const result = portraitMenu(parts, doc, design, c, f, art, rest, { x0, top: menuTop, bottom: T - 48 - footerH }, { name: 34, price: 34, desc: 22, section: 26, itemGap: 20, sectionGap: 38, headGap: 20 }, 56, 1.2, { want: restHasOwnerPhoto, placeholders: false });
+  if (doc.footer) parts.push(text(x0, T - 44, ellipsize(doc.footer, 22, f.head, 400, W - x0 * 2), { size: 22, family: f.head, weight: 400, fill: c.muted }));
+  featuredCards(parts, picks, { x: 0, y: T, w: W, h: FP }, design, c, f, art);
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+/** The full board (1920×1080, or 1080×1920 when vertical) for a design document, plus how the text was fitted. */
 export function designSvgWithReport(doc: LayoutDocument, art?: DesignArt): { svg: string; report: DesignReport } {
   const active = activeCustom(doc);
   // A customized board starts from the scale the template itself fits the menu at (see fitC).
@@ -1107,6 +1344,9 @@ export function designSvgWithReport(doc: LayoutDocument, art?: DesignArt): { svg
   return renderDesign(doc, art, active, s0);
 }
 function renderDesign(doc: LayoutDocument, art: DesignArt | undefined, active: ActiveCustom | null, s0: number): { svg: string; report: DesignReport } {
+  return onCanvas(doc, () => renderDesignOn(doc, art, active, s0));
+}
+function renderDesignOn(doc: LayoutDocument, art: DesignArt | undefined, active: ActiveCustom | null, s0: number): { svg: string; report: DesignReport } {
   const design = designById(doc.design)!;
   const c = designColors(doc, design);
   const f = fonts(doc, design);

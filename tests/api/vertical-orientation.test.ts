@@ -168,7 +168,11 @@ describe("layout studio saves", () => {
     expect(contentOf(id).orientation).toBe("portrait");
     const { orientation: _o, ...withoutKey } = portraitDoc();
     void _o;
-    const res = await studio(accountSaveBody({ mode: "draft", menuId: id, name: "Tall board", document: { ...withoutKey, title: "Renamed title" } }), true);
+    // The web editor now always sends the key (PR B); an API client that omits it must still keep the board vertical.
+    const body = accountSaveBody({ mode: "draft", menuId: id, name: "Tall board", document: { ...withoutKey, title: "Renamed title" } }) as { document: Record<string, unknown> };
+    delete body.document.orientation;
+    expect(JSON.stringify(body)).not.toContain("orientation");
+    const res = await studio(body, true);
     expect(res.status).toBe(200);
     expect(contentOf(id).orientation).toBe("portrait");
     expect(contentOf(id).title).toBe("Renamed title");
