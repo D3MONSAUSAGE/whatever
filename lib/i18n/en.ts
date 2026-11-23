@@ -531,6 +531,7 @@ export const en = {
   "apiError.pairing_code_invalid": "Enter the 6-digit code shown on the TV.",
   "apiError.screen_name_required": "Give this TV a name, like “Front counter”.",
   "apiError.pairing_code_not_found": "That code doesn't match a TV. Check the screen — codes expire after 10 minutes.",
+  "apiError.orientation_unsupported": "This menu board is vertical. Edit it at pekkotv.com, or update the app to change it here.",
   "apiError.display_not_found": "That screen is not in this account.",
   "apiError.rate_limited_15m": "Too many attempts. Wait 15 minutes, then try again.",
   "apiError.plan_check_unavailable": "Couldn't check your plan. Try again.",

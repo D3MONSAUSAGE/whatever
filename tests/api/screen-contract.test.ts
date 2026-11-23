@@ -67,8 +67,11 @@ describe("screen API contract", () => {
     expect(Object.keys(row).sort()).toEqual([
       "acknowledgedAt", "activeSchedules", "boardPreviewUrl", "connected", "contentVersion",
       "currentSchedule", "entitled", "id", "lastSeenAt", "location", "media", "name", "nextChange",
-      "online", "playerError", "playingAt", "playlist", "reportedState",
+      "online", "orientation", "playerError", "playingAt", "playlist", "reportedState", "reportedViewport",
     ]);
+    // Vertical boards (0037): additive; existing screens read landscape and no viewport until a player reports one.
+    expect(row.orientation).toBe("landscape");
+    expect(row.reportedViewport).toBeNull();
     expect(kind(row.id)).toBe("string");
     expect(row.id).toBe(id);
     expect(kind(row.name)).toBe("string");

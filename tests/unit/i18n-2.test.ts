@@ -130,7 +130,7 @@ describe("I18N-2: Spanish for API errors Android can show (codes unchanged)", ()
     "Couldn't deliver alert pushes.", "Couldn't run account deletions.", "Couldn't run billing reminders.",
     "Couldn't load your plan. Try again.", "Saved, but couldn't reload your plan. Refresh to see it.",
     "No attribution to save.", "Not paired.", "Send command \\", "Send { ids: [...] } (up to 100) or { all: true }.",
-    "appVersion must be a string of up to 40 characters.", "bad count", "bad index", "bad seq", "bad version",
+    "appVersion must be a string of up to 40 characters.", "bad count", "bad index", "bad seq", "bad version", "bad viewport",
     "before must be an ISO date.", "confirmBusiness must be true.", "dismissFirstSuccess must be true.",
     "recordStep must be preview_menu, customize_menu, playlists or schedules.", "days must be 7 or 30.", "dismissed must be true or false.",
     "emailEnabled must be true or false.", "enabled must be true or false.", "platform must be 'android' or 'ios'.",

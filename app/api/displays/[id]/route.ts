@@ -7,6 +7,9 @@ import { fail, json, readJson } from "@/lib/server/http";
 import { GET as listDisplays } from "../route";
 import { screenNameWarning } from "@/lib/screen-names";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { isBoardOrientation } from "@/lib/board-orientation";
+
+const ORIENTATION_NOT_READY = "Screen orientation isn't available yet. Try again after the next update.";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,8 +27,9 @@ export const GET = withLocalizedErrors(async function GET(req: Request, { params
   return json(row);
 });
 
-// Rename ({ name }), move or clear a location ({ locationId }, null clears),
-// or publish ({ mediaId }, null clears the screen). A body with mediaId ignores the rest.
+// Rename ({ name }), move or clear a location ({ locationId }, null clears), set how the TV is set up
+// ({ orientation: "landscape" | "portrait" }; never rotates the TV), or publish ({ mediaId }, null clears the screen).
+// A body with mediaId ignores the rest. Fields not sent are left as they are.
 export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { params }: Ctx) {
   const admin = await requireAdmin(req);
   if (admin instanceof Response) return admin;
@@ -57,7 +61,24 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
 
   const hasName = typeof body.name === "string";
   const hasLocation = "locationId" in body;
-  if (!hasName && !hasLocation) return fail("Nothing to update.", 400);
+  // Vertical boards (0037): written only when sent, so older clients that PATCH { name } keep it.
+  const hasOrientation = "orientation" in body;
+  if (!hasName && !hasLocation && !hasOrientation) return fail("Nothing to update.", 400);
+  if (hasOrientation) {
+    if (!isBoardOrientation(body.orientation)) return fail("Choose horizontal or vertical.", 400);
+    // Refuse a bad rename before writing anything, so { name: "", orientation } changes nothing.
+    if (hasName && !String(body.name).trim()) return fail("Name can't be empty.", 400);
+    const changed = await db()
+      .from("displays")
+      .update({ orientation: body.orientation })
+      .eq("id", id)
+      .eq("account_id", admin.accountId)
+      .eq("status", "active")
+      .select("id")
+      .maybeSingle();
+    if (changed.error) return isMissingSchema(changed.error) ? fail(ORIENTATION_NOT_READY, 503) : fail("Couldn't update the screen. Try again.", 500);
+    if (!changed.data) return fail("Display not found.", 404);
+  }
 
   if (hasLocation) {
     if (body.locationId === null) {

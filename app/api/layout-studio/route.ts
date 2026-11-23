@@ -4,6 +4,7 @@ import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { layoutStudioEnabled } from "@/lib/layout-studio";
 import { loadLayoutStudio, saveLayoutForAccount } from "@/lib/server/layout-boards";
 import { withLocalizedErrors } from "@/lib/server/locale";
+import { clientSupportsOrientation } from "@/lib/board-orientation";
 import { noteMenuSaved } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
@@ -38,8 +39,9 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
       name: typeof body.name === "string" ? body.name : undefined,
       mode,
       document: body.document,
+      orientationCapable: clientSupportsOrientation(req),
     });
-    if ("error" in saved && saved.status !== 200) return fail(saved.error, saved.status);
+    if ("error" in saved && saved.status !== 200) return fail(saved.error, saved.status, "code" in saved ? saved.code : undefined);
     // Onboarding v2: draft or publish both count once saved; stamps after the response, never affects the save.
     noteMenuSaved(req, admin.accountId, body.document);
     return json({ menuId: saved.menuId, swapped: saved.swapped });

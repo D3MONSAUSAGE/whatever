@@ -1,6 +1,7 @@
 import { BUCKET, db } from "./supabase";
 import { isMissingSchema } from "./schema";
 import { isUuid } from "./crypto";
+import { pngSize } from "@/lib/board-orientation";
 import { normalizePlaylistName } from "./validate";
 import { renderMenuPng } from "./menu-render";
 import { artFor, checkArtMedia } from "./brand";
@@ -49,7 +50,7 @@ export async function storeMenuImage(accountId: string, name: string, template: 
   return storeRenderedImage(accountId, `${name.slice(0, 70)} (menu).png`, bytes);
 }
 
-/** Store a rendered 1920×1080 PNG as a normal media row. Returns the media id. */
+/** Store a rendered board PNG (1920×1080, or 1080×1920 for a vertical board) as a normal media row. Returns the media id. */
 export async function storeRenderedImage(accountId: string, fileName: string, bytes: Uint8Array) {
   const id = crypto.randomUUID();
   const path = `${accountId}/${id}.png`;
@@ -63,7 +64,9 @@ export async function storeRenderedImage(accountId: string, fileName: string, by
     return null;
   }
   // Newer schemas record kind and size; ignore if those columns are absent.
-  await db().from("media").update({ kind: "image", width: 1920, height: 1080 }).eq("id", id).eq("account_id", accountId).then(() => null, () => null);
+  // The real PNG size, so a vertical board is never recorded as a landscape image (t413u).
+  const size = pngSize(bytes) ?? { width: 1920, height: 1080 };
+  await db().from("media").update({ kind: "image", width: size.width, height: size.height }).eq("id", id).eq("account_id", accountId).then(() => null, () => null);
   return id;
 }
 

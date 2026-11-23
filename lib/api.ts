@@ -146,6 +146,9 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   headers.set("Authorization", `Bearer ${token}`);
   // I18N-1: error text in the chosen UI language (the account's saved locale wins on the server).
   if (!headers.has("Accept-Language")) headers.set("Accept-Language", currentLocale());
+  // Vertical boards (t413u): this web app can edit portrait boards; older clients without this header get 409 on
+  // content saves to a vertical board (lib/board-orientation.ts).
+  if (!headers.has("X-Pekko-Client-Caps")) headers.set("X-Pekko-Client-Caps", "orientation");
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   const res = await fetch(path, { ...init, headers });

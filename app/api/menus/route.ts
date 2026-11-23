@@ -3,6 +3,8 @@ import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
+import { keepStoredOrientation } from "@/lib/menu-templates";
+import { clientSupportsOrientation, resolveSavedOrientation } from "@/lib/board-orientation";
 import { MAX_MENUS, MENUS_UNAVAILABLE, checkMenuPhoto, dropMenuImage, keepOwnItemPhotos, isMissingSchema, menuView, parseMenuBody, storeMenuImage, type MenuInput, type MenuRow } from "@/lib/server/menus";
 import { withLocalizedErrors } from "@/lib/server/locale";
 import { noteMenuSaved } from "@/lib/server/onboarding-hooks";
@@ -28,9 +30,13 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   if (admin instanceof Response) return admin;
   const writeBlocked = await rejectSubscriptionWrite(admin.accountId, req);
   if (writeBlocked) return writeBlocked;
-  const parsed = parseMenuBody(await readJson(req));
+  const body = await readJson(req);
+  const parsed = parseMenuBody(body);
   if (!parsed.ok) return fail(parsed.error, 400);
   const input = parsed.value as MenuInput;
+  // Vertical boards (t413u): only a portrait-capable client creates a vertical board; older clients create landscape.
+  const orientation = resolveSavedOrientation({ incoming: body.content, stored: null, capable: clientSupportsOrientation(req) });
+  if (orientation.ok) input.content = keepStoredOrientation(input.content, orientation.orientation);
 
   const count = await db().from("menus").select("id").eq("account_id", admin.accountId);
   if (count.error) {

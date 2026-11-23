@@ -12,6 +12,7 @@ import { PLAN_CHECK_RETRY_AFTER_SECONDS, PLAN_CHECK_UNAVAILABLE_CODE } from "@/l
 import { normalizeDisplayName, normalizePairingCode } from "@/lib/server/validate";
 import { screenNameWarning } from "@/lib/screen-names";
 import { allow, clientIp, fail, json, readJson } from "@/lib/server/http";
+import { isBoardOrientation } from "@/lib/board-orientation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,10 @@ export const POST = withLocalizedErrors(async (req: Request) => {
   const name = normalizeDisplayName(body.name);
   if (!code) return fail("Enter the 6-digit code shown on the TV.", 400);
   if (!name) return fail("Give this TV a name, like “Front counter”.", 400);
+  // Optional (0037): absent or null keeps the default; anything other than horizontal/vertical is refused before a code attempt.
+  if (body.orientation !== undefined && body.orientation !== null && !isBoardOrientation(body.orientation)) {
+    return fail("Choose horizontal or vertical.", 400);
+  }
 
   // Count only real code attempts, so a blank form doesn't burn the budget.
   const okUser = await allow(`pair-claim:user:${admin.userId}`, PAIR_CLAIM_WINDOW_SECONDS, PAIR_CLAIM_MAX_PER_USER);
@@ -79,6 +84,11 @@ export const POST = withLocalizedErrors(async (req: Request) => {
   if (error) return fail("Couldn't connect the TV. Try again.", 500);
   if (!displayId) {
     return fail("That code doesn't match a TV. Check the screen — codes expire after 10 minutes.", 404);
+  }
+  // Vertical boards (0037): optional; { code, name } alone keeps the column default ('landscape'). Never fails the pairing.
+  if (body.orientation === "portrait") {
+    await db().from("displays").update({ orientation: "portrait" }).eq("id", String(displayId)).eq("account_id", admin.accountId)
+      .then(() => null, () => null);
   }
   const existing = await db().from("displays").select("id, name").eq("account_id", admin.accountId).eq("status", "active");
   const names = (existing.data ?? [])

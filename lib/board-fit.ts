@@ -1,4 +1,5 @@
-import { mediaVideoBox, boardSvgWithReport, BOARD_W, BOARD_H, type LayoutDocument, type ZoneBox } from "@/lib/layout-studio";
+import { boardCanvas, orientationOf } from "@/lib/board-orientation";
+import { mediaVideoBox, boardSvgWithReport, type LayoutDocument, type ZoneBox } from "@/lib/layout-studio";
 import { designById, isDesignId, isPhotoDesign, type MenuDesign } from "@/lib/menu-designs";
 import { itemPhotosShown } from "@/lib/menu-design-svg";
 import { layoutReport, mergeExtraSections } from "@/lib/menu-designer";
@@ -141,7 +142,8 @@ export function boardFit(doc: LayoutDocument): BoardFit {
   const overflowReasons = customOverflow(doc);
   const paths = overflowReasons.length ? safeResetPaths(doc) : null;
   const extra = {
-    canvasWidth: BOARD_W, canvasHeight: BOARD_H,
+    // Vertical boards (t413u) are 1080×1920; every other board keeps 1920×1080.
+    canvasWidth: boardCanvas(orientationOf(doc)).width, canvasHeight: boardCanvas(orientationOf(doc)).height,
     videoBox: mediaVideoBox(doc), regions: report.regions,
     overflowReasons, safeAction: paths ? { kind: "reset_custom" as const, paths } : null,
     custom: customEcho(doc),
