@@ -1613,6 +1613,8 @@ export const es: Record<MessageKey, string> = {
   "tpl.previewCap": "Vista previa en vivo · exactamente lo que muestra la pantalla",
   "tpl.previewCapVideo": "Vista previa en vivo · en la TV este video se reproduce sin sonido en esta área. La imagen fija es el respaldo.",
   "tpl.previewAria": "Vista previa en TV de {name}",
+  "tpl.expandPreview": "Ampliar vista previa",
+  "tpl.closePreview": "Cerrar vista previa",
   "tpl.dropped": "{n} productos no caben en la pantalla. Quite algunos o elija una plantilla con más espacio, como Taquería o Clásicos de cafetería.",
   "tpl.tight": "Este menú es largo, así que la plantilla redujo el texto. Se sigue leyendo desde el otro lado del local.",
   "tpl.fits": "Cabe en la pantalla. La plantilla define el tamaño del texto y el espacio.",

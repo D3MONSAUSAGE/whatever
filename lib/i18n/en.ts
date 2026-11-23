@@ -1625,6 +1625,8 @@ export const en = {
   "tpl.previewCap": "Live TV preview · exactly what the screen shows",
   "tpl.previewCapVideo": "Live preview · the TV plays this video, muted, in this area. The still is the fallback.",
   "tpl.previewAria": "TV preview of {name}",
+  "tpl.expandPreview": "Expand preview",
+  "tpl.closePreview": "Close preview",
   "tpl.dropped": "{n} items don’t fit on the screen. Remove some items or pick a template with more room, like Taquería or Diner Classics.",
   "tpl.tight": "This menu is long, so the template made the text smaller. It still reads from across the room.",
   "tpl.fits": "Fits the screen. Text size and spacing are set by the template.",
