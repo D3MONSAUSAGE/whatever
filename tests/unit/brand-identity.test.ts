@@ -23,7 +23,7 @@ import { hasUnsavedEdits } from "@/lib/menu-board-unify";
 // Updated intentionally (per-item photos PR): apply-to-all now skips Layout Studio/template boards, which the
 // classic renderer would overwrite. Classic menus and promos are re-rendered exactly as before.
 const APPLY_SHA = "0bf1c0742f26751981549cfdbc270f372b34de1e73616ad90518a649ec721274";
-const PLAYER_SHA = "1ddaf5a3c5e93ad32f03614a4f7d7f43239a660fa0788c9151d26ba04ee46c3e"; // watchdog: do not treat a paused/hidden video as unplayable
+const PLAYER_SHA = "7ba8493b6afcaf44f876eff817266b373cb96deeb05104926e7c2fc34c002786"; // PR C: vertical (9:16) framing, pairing code fit, viewport report
 
 const stored: BrandRecord = {
   primaryColor: "#c8102e",

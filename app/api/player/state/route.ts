@@ -202,6 +202,8 @@ export async function POST(req: Request) {
   const body = await readJson(req);
   // Vertical boards (0037): { viewport: { width, height } } reports the TV browser's CSS viewport. Informational only;
   // it never changes playback. Before 0037 it is accepted and ignored.
+  // NOTE: returns early once viewport is saved, so callers (public/player.html) MUST send { viewport } in its own POST
+  // and never combine it with playing, acknowledged, playback or error in one request.
   if (body.viewport && typeof body.viewport === "object") {
     const vp = body.viewport as { width?: unknown; height?: unknown };
     const width = Math.round(Number(vp.width));

@@ -468,9 +468,9 @@ Full contract: [`docs/vertical/API_CONTRACT.md`](vertical/API_CONTRACT.md). What
 | Setup step 8 stays done after a TV confirmed content | Same `GET /api/onboarding` shape | #147 |
 | `GET /api/health` returns `commit` | Additive | #153 |
 | Menu designer API: catalog, public thumbnails, switch, preview + fit | New routes only | #162 |
-| Additive `playerBuild` on `GET /api/player/state` | Current value `2026-11-20.2`. Older clients can ignore it. The phone does not call this route | #163 |
+| Additive `playerBuild` on `GET /api/player/state` | Current value `2026-11-22.1` (was `2026-11-20.2`). Older clients can ignore it. The phone does not call this route | #163 |
 
-No route was removed or renamed, and no response field was removed. `GET /api/player/state` now includes an additive `playerBuild` field (PR #163; current value `2026-11-20.2`). Older clients can ignore it. The phone does not call `/api/player/*`.
+No route was removed or renamed, and no response field was removed. `GET /api/player/state` now includes an additive `playerBuild` field (PR #163; current value `2026-11-22.1`). Older clients can ignore it. The phone does not call `/api/player/*`.
 
 ## Flags in production
 

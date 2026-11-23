@@ -312,7 +312,9 @@ describe("player composition contract", () => {
     expect(player).toContain("if (zoneVideo(item)) {");
     expect(player).toContain("placeZoneVideo(item, versionOrNull, token, function () {");
     expect(player).toContain("else if (degraded === false) clearReportedError();");
-    expect(player).toContain("box.x + box.w > 1920");
+    // PR C: the bounds are the composition's canvas (1920x1080 unless the board says 1080x1920).
+    expect(player).toContain("box.x + box.w > cv.w");
+    expect(player).toContain("return { w: 1920, h: 1080 };");
     expect(player).toContain("1919x1080 at 0,0 still passes");
     expect(clientAcceptsZoneBox({ x: 0, y: 0, w: 1919, h: 1080 })).toBe(true);
     expect(clientAcceptsZoneBox({ x: 0, y: 0, w: 1920, h: 1080 })).toBe(false);
@@ -481,7 +483,7 @@ describe("player composition contract", () => {
       expect(sized.columns[0].w).toBeGreaterThan(sized.columns[1].w);
       expect(sized.video).toBeNull();
     }
-    expect(player).toContain("function boardFrame()");
+    expect(player).toContain("function boardFrame(canvas)"); // PR C: framed at the composition's canvas
     expect(player).toContain("layer.style.backgroundSize");
     const phone = containedBoard(400, 985);
     expect(phone.left).toBe(0);

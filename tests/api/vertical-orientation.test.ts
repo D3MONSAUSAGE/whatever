@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as me } from "@/app/api/me/route";
 import { POST as studioPost } from "@/app/api/layout-studio/route";
@@ -341,6 +342,13 @@ describe("player", () => {
     expect(await (await state(wide.token)).json()).not.toHaveProperty("displayOrientation");
     const tall = await tokenScreen("portrait");
     expect(await (await state(tall.token)).json()).toMatchObject({ displayOrientation: "portrait" });
+  });
+
+  it("player.html sends viewport in its own POST without playing or acknowledged (early-return guard)", () => {
+    const html = readFileSync("public/player.html", "utf8");
+    const fn = html.slice(html.indexOf("function reportViewport()"), html.indexOf("function hideOrientHint()"));
+    expect(fn).toContain("request('POST', '/api/player/state', { viewport: vp }");
+    expect(fn).not.toMatch(/playing|acknowledged|playback|error/);
   });
 
   it("stores the reported viewport and rejects nonsense", async () => {
