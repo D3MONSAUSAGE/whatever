@@ -94,10 +94,10 @@ export const COMPOSITION_LAYOUT: Record<DesignComposition, { template: LayoutTem
   cards: { template: "triple-column", split: 1 / 3, columnWidths: null },
   featured: { template: "triple-column", split: 1 / 3, columnWidths: null },
   // Service templates draw their own frame; this geometry is only what the Advanced editor's layout fields hold.
-  showcaseLeft: { template: "split-50", split: 1 - 760 / 1920, columnWidths: null },
+  showcaseLeft: { template: "split-50", split: 0.6, columnWidths: null },
   editorial: { template: "split-50", split: 1 - 840 / 1920, columnWidths: null },
   spotlight: { template: "triple-column", split: 1 / 3, columnWidths: null },
-  timetable: { template: "split-50", split: 760 / 1920, columnWidths: null },
+  timetable: { template: "split-50", split: 0.4, columnWidths: null },
 };
 
 const i = (name: string, price: string, description = "", stockPhoto?: StockPhotoId) => ({ name, price, description, ...(stockPhoto ? { stockPhoto } : {}) });
@@ -582,7 +582,7 @@ export const MENU_DESIGNS: MenuDesign[] = [
     look: { head: "cormorant-garamond", headWeight: 600, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.25, rule: true, accentPrices: true },
     variants: [
       v("noir", "Noir & brass", "Negro y latón", "#100f0e", "#f1e9dc", "#9c9183", "#c8a46e", "#1b1a18"),
-      v("bone", "Bone & ink", "Hueso y tinta", "#ece6dc", "#1d1a16", "#6b6257", "#8a6a3d", "#d9d0c2"),
+      v("bone", "Bone & ink", "Hueso y tinta", "#ece6dc", "#1d1a16", "#6b6257", "#7d5f35", "#d9d0c2"),
       v("oxblood", "Oxblood", "Burdeos", "#1f100f", "#f3e7d7", "#b39d8a", "#d6a877", "#2c1715"),
     ],
     stock: "barbershave",

@@ -223,7 +223,7 @@ const STYLES = `${FONT_CSS}
 .tpl-adv > summary { cursor: pointer; font-weight: 700; font-size: 14px; min-height: 28px; display: flex; align-items: center; }
 `;
 
-const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets"];
+const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness"];
 const STYLE_IDS: (DesignStyle | "all")[] = ["all", "dark", "light", "bold"];
 
 /* ------------------------------------------------------------------ gallery ------------------------------------------------------------------ */
@@ -699,6 +699,8 @@ export function TemplateEditor({
   const roomier = isDesign && (fit.dropped > 0 || fit.photosSuppressed) && design.id !== roomierId ? designById(roomierId) : null;
   const merged = engine === "layout" && fit.hiddenSections > 0 ? mergeExtraSections(doc) : null;
   const columns = engine === "layout" ? fixedColumns(doc.template) : null;
+  // Schedule templates (Modern Gym) keep each class time in the item's price field: label it "Time".
+  const timeFirst = isDesign && design.composition === "timetable";
   const images = library.filter((f) => f.kind === "image");
   const videos = library.filter((f) => f.kind === "video");
   const selectedVideo = selectedVideoOption(library, doc.videoMediaId);
@@ -859,6 +861,8 @@ export function TemplateEditor({
             <div className="grid gap-3">
               <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
               {columns ? <p className="text-sm text-muted" data-testid="tpl-columns-note">{t("tpl.columnsNote", { n: columns })}</p> : null}
+              {timeFirst ? <p className="text-sm text-muted" data-testid="tpl-time-note">{t("tpl.timeNote")}</p> : null}
+              {isDesign && design.composition === "spotlight" ? <p className="text-sm text-muted" data-testid="tpl-spotlight-note">{t("tpl.spotlightNote")}</p> : null}
               {fit.photosSuppressed ? (
                 <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-dont-fit-menu">
                   <p>{t("tpl.photosDontFit")}</p>
@@ -887,7 +891,7 @@ export function TemplateEditor({
                       </button>
                       <input className="field" aria-label={t("tpl.itemName", { n: ii + 1 })} placeholder={t("tpl.item")} maxLength={MENU_LIMITS.itemName} value={item.name}
                         onChange={(e) => setSections((s) => { s[si].items[ii].name = e.target.value; return s; })} data-testid={`tpl-item-${si}-${ii}`} />
-                      <input className="field text-right" aria-label={t("tpl.itemPrice", { n: ii + 1 })} placeholder={t("tpl.price")} maxLength={MENU_LIMITS.price} value={item.price}
+                      <input className="field text-right" aria-label={timeFirst ? t("tpl.itemTime", { n: ii + 1 }) : t("tpl.itemPrice", { n: ii + 1 })} placeholder={timeFirst ? t("tpl.time") : t("tpl.price")} maxLength={MENU_LIMITS.price} value={item.price}
                         onChange={(e) => setSections((s) => { s[si].items[ii].price = e.target.value; return s; })} />
                       <div className="acts">
                         <button type="button" className="tpl-ib" aria-label={t("tpl.moveItemUp", { n: ii + 1 })} disabled={ii === 0 && si === 0} onClick={() => moveItemAt(si, ii, -1)}>↑</button>

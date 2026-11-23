@@ -1299,13 +1299,14 @@ function showcaseLeft(parts: string[], doc: LayoutDocument, design: MenuDesign, 
   const footerH = doc.footer ? 110 : 0;
   const colH = H - 64 - footerH - menuTop;
   const avail = x1 - x0; const gap = 80; const colW = (avail - gap) / 2;
-  const result = fitC(doc.sections, serviceStyle(f, design, { name: 42, price: 44, desc: 22, section: 20 }), [{ cols: 2, colW }, { cols: 1, colW: avail }], colH, 1.15, 0.55, 0.9);
+  const shown = itemPhotosShown(doc, design);
+  const result = fitPhotos(doc.sections, serviceStyle(f, design, { name: 42, price: 44, desc: 22, section: 22 }), [{ cols: 2, colW }, { cols: 1, colW: avail }], colH, 1.15, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : colW, gap, c);
   if (doc.footer) {
     parts.push(rect(x0, H - 122, avail, 1.5, mix(c.muted, c.paper, 0.7)));
     parts.push(text(x0, H - 76, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
   }
-  return { dropped: result.dropped, scale: result.scale };
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
 
 /** Product rows: name and detail on the left, a large serif price on the right, a hairline between rows. */
@@ -1330,9 +1331,10 @@ function paintRows(parts: string[], result: FitResult, x0: number, top: number, 
       for (const item of sec.items) {
         if (!first) parts.push(rect(x, y - st.itemGap * 0.5, colW, 1.5, divider));
         first = false;
+        itemArea(item, x, y, colW, item.h - st.itemGap);
+        if (sec.thumbs) { paintThumbItem(parts, item, x, y, colW, st, c); y += item.h; continue; }
         const lineH = st.name.size * 1.17;
         const base = y + st.name.size * 0.86;
-        itemArea(item, x, y, colW, item.h - st.itemGap);
         item.lines.forEach((line, li) => parts.push(text(x, base + li * lineH, line, { size: st.name.size, family: st.name.family, weight: st.name.weight, fill: c.ink })));
         if (item.price) parts.push(text(x + colW, base + st.price.size * 0.12, item.price, { size: st.price.size, family: st.price.family, weight: st.price.weight, fill: c.ink, anchor: "end" }));
         let dy = y + item.lines.length * lineH;
@@ -1413,10 +1415,11 @@ function editorialColumn(parts: string[], doc: LayoutDocument, design: MenuDesig
   const footerH = doc.footer ? 52 : 0;
   // The last row's trailing gap needs no room above the footer.
   const colH = o.bottom - footerH - menuTop + 30;
-  const result = fitC(doc.sections, rowStyle(f, { name: 36, price: 50, desc: 24, section: 20, gap: 30 }), [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 72) / 2 }], colH, 1.1, 0.55, 0.9);
+  const shown = itemPhotosShown(doc, design);
+  const result = fitPhotos(doc.sections, rowStyle(f, { name: 36, price: 50, desc: 24, section: 20, gap: 30 }), [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 72) / 2 }], colH, 1.1, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
   paintRows(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 72) / 2, 72, c, mix(c.muted, c.paper, 0.72));
   if (doc.footer) parts.push(text(x0, o.bottom, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
-  return { dropped: result.dropped, scale: result.scale };
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
 
 /** The hero product is the first item; the rest are its notes. */
@@ -1444,9 +1447,9 @@ function spotlight(parts: string[], doc: LayoutDocument, design: MenuDesign, c: 
   else parts.push(rect(PX, 0, PW, H, mix(c.panel, c.paper, 0.55)));
   addRegion(fixedRegion("featuredMedia", { x: PX, y: 0, w: PW, h: H }));
   const { hero, rest } = spotlightSplit(doc);
-  spotlightStory(parts, doc, design, c, f, hero, { x0: 96, w: PX - 96 - 56, top: 150, bottom: H - 58, headline: 118, price: 150 });
+  spotlightStory(parts, doc, design, c, f, hero, { x0: 96, w: PX - 96 - 56, top: 150, bottom: H - 58, headline: 118, price: 150, art });
   const rx = PX + PW + 80; const rw = W - 96 - rx;
-  const result = spotlightNotes(parts, doc, c, f, rest, { x: rx, w: rw, top: 150, bottom: H - 120 });
+  const result = spotlightNotes(parts, doc, c, f, rest, { x: rx, w: rw, top: 150, bottom: H - 120 }, art);
   if (doc.title) {
     const t = titleFit(doc.title, rw, 30, 22, f.head, design.look.headWeight);
     note("businessName", doc.title, t.value);
@@ -1459,7 +1462,7 @@ function spotlight(parts: string[], doc: LayoutDocument, design: MenuDesign, c: 
 
 /** Eyebrow (subtitle), headline (feature title), hero name, details, big price and the offer line (feature detail). */
 function spotlightStory(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, hero: { item: LayoutItem; si: number; ii: number } | null,
-  o: { x0: number; w: number; top: number; bottom: number; headline: number; price: number }) {
+  o: { x0: number; w: number; top: number; bottom: number; headline: number; price: number; art?: DesignArt }) {
   const { x0, w } = o;
   let y = o.top;
   if (doc.subtitle) {
@@ -1475,9 +1478,15 @@ function spotlightStory(parts: string[], doc: LayoutDocument, design: MenuDesign
     const { item } = hero;
     const top = y;
     const ns = roleSize("itemName", 38); const nw = roleWeight("itemName", f.body, 700);
-    const names = wrapText(item.name, ns, f.body, nw, w, 2);
+    // An owner's photo on the hero product shows as a tile beside its name.
+    const ownPhoto = item.imageMediaId ? itemPhotoResolver(o.art)(item) : null;
+    const tile = item.imageMediaId ? Math.round(ns * 2.6) : 0;
+    if (tile) photoTile(parts, ownPhoto, x0, y, tile, tile, tile * 0.16, c, initialOf(item.name), c.paper);
+    const nx = x0 + (tile ? tile + 24 : 0);
+    const names = wrapText(item.name, ns, f.body, nw, w - (tile ? tile + 24 : 0), 2);
     note("menu", item.name, names);
-    names.forEach((line) => { parts.push(text(x0, y + ns * 0.86, line, { size: ns, family: f.body, weight: nw, fill: c.ink })); y += ns * 1.2; });
+    names.forEach((line) => { parts.push(text(nx, y + ns * 0.86, line, { size: ns, family: f.body, weight: nw, fill: c.ink })); y += ns * 1.2; });
+    if (tile) y = Math.max(y, top + tile);
     if (item.description) {
       const ds = roleSize("description", 28); const dw = roleWeight("description", f.body, 400);
       const desc = wrapText(item.description, ds, f.body, dw, w, 3);
@@ -1501,14 +1510,17 @@ function spotlightStory(parts: string[], doc: LayoutDocument, design: MenuDesign
     y += 20;
     lines.forEach((line) => { parts.push(text(x0, y + 22, line, { size: 26, family: f.body, weight: 700, fill: c.accent })); y += 34; });
   }
+  return y;
 }
 
 /** The notes column: section name as a tracked heading, rows with a hairline above each. */
-function spotlightNotes(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, rest: LayoutSection[], o: { x: number; w: number; top: number; bottom: number }) {
-  const st = rowStyle(f, { name: 36, price: 30, desc: 25, section: 21, gap: 70 });
+function spotlightNotes(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, rest: LayoutSection[], o: { x: number; w: number; top: number; bottom: number; cols?: number; gap?: number; dry?: boolean }, art?: DesignArt) {
+  const st = rowStyle(f, { name: 36, price: 30, desc: 25, section: 23, gap: 70 });
   const styled: Style = { ...st, price: { family: f.body, weight: 700, size: 30 }, headGap: 40 };
-  const result = fitC(rest, styled, [{ cols: 1, colW: o.w }], o.bottom - o.top, 1.1, 0.55, 0.9);
-  paintRows(parts, result, o.x, o.top, o.w, 0, c, mix(c.muted, c.paper, 0.72));
+  const shown = hasOwnerItemPhoto({ ...doc, sections: rest });
+  const cols = o.cols ?? 1; const gap = o.gap ?? 0; const colW = (o.w - gap * (cols - 1)) / cols;
+  const result = fitPhotos(rest, styled, [{ cols, colW }], o.bottom - o.top, 1.1, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
+  if (!o.dry) paintRows(parts, result, o.x, o.top, colW, gap, c, mix(c.muted, c.paper, 0.72));
   return result;
 }
 
@@ -1528,9 +1540,9 @@ function timetable(parts: string[], doc: LayoutDocument, design: MenuDesign, c: 
   const x0 = 96;
   const head = timetableHeader(parts, doc, design, c, f, art, { x0, top: 70, maxW: (offer ? W - 96 - 400 - 60 : W - 96) - x0 });
   const rowW = Math.min(PX - x0 + 240, (offer ? W - 96 - 400 - 60 : W - 96) - x0);
-  const result = timetableRows(parts, doc, c, f, { x0, w: rowW, top: head + 70, bottom: H - (doc.footer ? 118 : 64) });
+  const result = timetableRows(parts, doc, c, f, { x0, w: rowW, top: head + 70, bottom: H - (doc.footer ? 118 : 64), art });
   if (doc.footer) parts.push(text(x0, H - 62, ellipsize(doc.footer, 24, f.body, 400, rowW), { size: 24, family: f.body, weight: 400, fill: c.muted }));
-  return { dropped: result.dropped, scale: result.scale };
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
 
 /** Wordmark (title, capitals) with the accent bar and the tracked subtitle. Returns the header's bottom. */
@@ -1556,7 +1568,7 @@ function timetableHeader(parts: string[], doc: LayoutDocument, design: MenuDesig
 }
 
 /** Time-first rows: the item's price field holds the time (any short text works). */
-function timetableRows(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, o: { x0: number; w: number; top: number; bottom: number }) {
+function timetableRows(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, o: { x0: number; w: number; top: number; bottom: number; art?: DesignArt }) {
   const times = new Map<LayoutItem, string>();
   const shadow = doc.sections.map((section, si) => {
     const s: LayoutSection = { ...section, items: section.items.map((item, ii) => {
@@ -1578,7 +1590,8 @@ function timetableRows(parts: string[], doc: LayoutDocument, c: DesignColors, f:
   // The time column is sized by the widest time at the design size (scaled with the rows).
   const widest = Math.max(0, ...[...times.values()].map((t) => textWidth(t, base.price.size, base.price.family, base.price.weight)));
   const timeCol = Math.max(150, widest + 44);
-  const result = fitC(shadow, base, [{ cols: 1, colW: o.w - timeCol }], o.bottom - o.top, 1.1, 0.55, 0.9);
+  const shown = hasOwnerItemPhoto(doc);
+  const result = fitPhotos(shadow, base, [{ cols: 1, colW: o.w - timeCol }], o.bottom - o.top, 1.1, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(o.art) : undefined);
   const st = result.style;
   const k = st.name.size / base.name.size;
   let y = o.top;
@@ -1596,8 +1609,13 @@ function timetableRows(parts: string[], doc: LayoutDocument, c: DesignColors, f:
         const shown = ellipsize(time, ts, st.price.family, st.price.weight, timeCol * k - 20);
         parts.push(text(o.x0, nameBase + ts * 0.18, shown, { size: ts, family: st.price.family, weight: st.price.weight, fill: c.accent, tracking: 0.01 }));
       }
-      const nx = o.x0 + timeCol * k;
+      let nx = o.x0 + timeCol * k;
       itemArea(item, o.x0, y, o.w, item.h - st.itemGap);
+      if (sec.thumbs) {
+        // An owner's class photo sits between the time and the class name.
+        if (item.photo) photoTile(parts, item.photo, nx, y, st.thumb, st.thumb, st.thumb * 0.16, c, item.initial ?? "", c.paper);
+        nx += st.thumb + st.thumb * 0.22;
+      }
       item.lines.forEach((line, li) => parts.push(text(nx, nameBase + li * lineH, line, { size: st.name.size, family: st.name.family, weight: st.name.weight, fill: c.ink, tracking: 0.02 })));
       let dy = y + item.lines.length * lineH;
       if (item.desc.length) {
@@ -1706,13 +1724,14 @@ function showcaseLeftPortrait(parts: string[], doc: LayoutDocument, design: Menu
   const menuTop = headBottom + 80;
   const footerH = doc.footer ? 110 : 0;
   const avail = x1 - x0; const gap = 64; const colW = (avail - gap) / 2;
-  const result = fitC(doc.sections, serviceStyle(f, design, { name: 42, price: 44, desc: 22, section: 20 }), [{ cols: 1, colW: avail }, { cols: 2, colW }], H - 64 - footerH - menuTop, 1.15, 0.55, 0.9);
+  const shown = itemPhotosShown(doc, design);
+  const result = fitPhotos(doc.sections, serviceStyle(f, design, { name: 42, price: 44, desc: 22, section: 22 }), [{ cols: 1, colW: avail }, { cols: 2, colW }], H - 64 - footerH - menuTop, 1.15, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
   paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : colW, gap, c);
   if (doc.footer) {
     parts.push(rect(x0, H - 122, avail, 1.5, mix(c.muted, c.paper, 0.7)));
     parts.push(text(x0, H - 76, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
   }
-  return { dropped: result.dropped, scale: result.scale };
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
 
 function editorialPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
@@ -1738,16 +1757,28 @@ function spotlightPortrait(parts: string[], doc: LayoutDocument, design: MenuDes
   const head = editorialHeadline(parts, doc.featureTitle || "", x0, y + 6, x1 - x0, hs, Math.max(56, hs * 0.5), f, hw, c, "featuredText");
   addRegion(fixedRegion("featuredText", { x: x0, y: 110, w: x1 - x0, h: Math.max(10, head.bottom - 110) }));
   const bandY = Math.round((head.lines.length ? head.bottom : y) + 56);
-  const BH = mediaBand(run?.active ?? null, SP_BAND);
+  const { hero, rest } = spotlightSplit(doc);
+  const colW = (x1 - x0 - 64) / 2;
+  // The product photo keeps its full band unless the notes need the room: then it gives up height (never items).
+  const bands = [mediaBand(run?.active ?? null, SP_BAND), Math.round(H * 0.28), Math.round(H * 0.22)];
+  let BH = bands[0]; let best = Infinity;
+  for (const band of bands) {
+    const dropped = spotlightNotes(parts, doc, c, f, rest, { x: x0 + colW + 64, w: colW, top: bandY + band + 64, bottom: H - 130, dry: true }, art).dropped;
+    if (dropped < best) { best = dropped; BH = band; }
+    if (dropped === 0) break;
+  }
   const photo = photoHref(doc, art);
   if (photo) parts.push(photoImage(photo, { x: 0, y: bandY, w: W, h: BH }, doc));
   else parts.push(rect(0, bandY, W, BH, mix(c.panel, c.paper, 0.55)));
   addRegion(fixedRegion("featuredMedia", { x: 0, y: bandY, w: W, h: BH }));
-  const { hero, rest } = spotlightSplit(doc);
-  const colW = (x1 - x0 - 64) / 2;
   const belowTop = bandY + BH + 64;
-  spotlightStory(parts, { ...doc, subtitle: "", featureTitle: "" }, design, c, f, hero, { x0, w: colW, top: belowTop, bottom: H - 120, headline: 0, price: 120 });
-  const result = spotlightNotes(parts, doc, c, f, rest, { x: x0 + colW + 64, w: colW, top: belowTop, bottom: H - 130 });
+  const storyBottom = spotlightStory(parts, { ...doc, subtitle: "", featureTitle: "" }, design, c, f, hero, { x0, w: colW, top: belowTop, bottom: H - 120, headline: 0, price: 120, art });
+  // Notes beside the story; when they would still hide items there, they run in two full-width columns under it.
+  const beside = { x: x0 + colW + 64, w: colW, top: belowTop, bottom: H - 130 };
+  const under = { x: x0, w: x1 - x0, top: storyBottom + 56, bottom: H - 130, cols: 2, gap: 64 };
+  const sideFit = spotlightNotes(parts, doc, c, f, rest, { ...beside, dry: true }, art);
+  const underFit = sideFit.dropped > 0 ? spotlightNotes(parts, doc, c, f, rest, { ...under, dry: true }, art) : null;
+  const result = spotlightNotes(parts, doc, c, f, rest, underFit && underFit.dropped < sideFit.dropped ? under : beside, art);
   if (doc.title) {
     const t = titleFit(doc.title, colW, 30, 22, f.head, design.look.headWeight);
     note("businessName", doc.title, t.value);
@@ -1764,7 +1795,7 @@ function timetablePortrait(parts: string[], doc: LayoutDocument, design: MenuDes
   const photo = photoHref(doc, art);
   if (photo) {
     parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc));
-    parts.push(`<defs><linearGradient id="dg-ttp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.paper}" stop-opacity="0.92"/><stop offset="0.22" stop-color="${c.paper}" stop-opacity="0.75"/><stop offset="0.42" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.7" stop-color="${c.paper}" stop-opacity="0"/><stop offset="1" stop-color="${c.paper}" stop-opacity="1"/></linearGradient></defs>`);
+    parts.push(`<defs><linearGradient id="dg-ttp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="0.3" stop-color="${c.paper}" stop-opacity="0.88"/><stop offset="0.5" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.7" stop-color="${c.paper}" stop-opacity="0"/><stop offset="1" stop-color="${c.paper}" stop-opacity="1"/></linearGradient></defs>`);
     parts.push(rect(0, 0, W, MB, "url(#dg-ttp)"));
   }
   const x0 = 72;
@@ -1772,7 +1803,7 @@ function timetablePortrait(parts: string[], doc: LayoutDocument, design: MenuDes
   timetableHeader(parts, doc, design, c, f, art, { x0, top: 60, maxW: W - 72 - x0 });
   // On a tall screen the offer runs as a full-width strip under the photo, so the athlete stays clear.
   const stripH = offerStrip(parts, doc, c, f, { x: 0, y: MB, w: W, h: 168 });
-  const result = timetableRows(parts, doc, c, f, { x0, w: W - x0 * 2, top: MB + stripH + 56, bottom: H - (doc.footer ? 118 : 64) });
+  const result = timetableRows(parts, doc, c, f, { x0, w: W - x0 * 2, top: MB + stripH + 56, bottom: H - (doc.footer ? 118 : 64), art });
   if (doc.footer) parts.push(text(x0, H - 62, ellipsize(doc.footer, 24, f.body, 400, W - x0 * 2), { size: 24, family: f.body, weight: 400, fill: c.muted }));
   return { dropped: result.dropped, scale: result.scale };
 }

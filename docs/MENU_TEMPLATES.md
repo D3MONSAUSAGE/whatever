@@ -1,6 +1,6 @@
 # Premium menu templates
 
-A gallery of 18 professionally designed menu boards, plus a guided editor (Business → Menu → Photos → Look) shown when an owner clicks **New menu board**. It is behind a rollout flag.
+A gallery of professionally designed menu boards (26 templates), plus a guided editor (Business → Menu → Photos → Look) shown when an owner clicks **New menu board**. It is behind a rollout flag.
 
 ## How it works
 
@@ -83,3 +83,51 @@ From Unsplash under the [Unsplash License](https://unsplash.com/license): free f
 salmon 1467003909585-2f8a72700288 · pasta 1621996346565-e3dbc646d9a9 · parfait 1488477181946-6428a0291777 · smoothie 1505252585461-04db1eb84625 · cinnamon 1509365465985-25d11c17e812 · bowl 1512621776951-a57141f2eefd · sandwich 1528735602780-2552fd46c7af · salad 1540189549336-e6e99c3679fe · donuts 1551024601-bec78aea704b · tacos 1565299585323-38d6b0865b47 · carnitas 1599974579688-8dbdd335c77f · streettacos 1551504734-5ee1c4a1479b · wings 1567620832903-9fc6debc209f · macarons 1569864358642-9d1684040f43 · cake 1578985545062-69928b1d9587 · chicken 1598103442097-8b74394b95c6 · muffins 1607958996333-41aef7caefaa · quesadilla 1618040996337-56904b7850b9 · burrito 1626700051175-6818013e1d4f.
 
 Photos showing third-party brands (bottles, newspaper mastheads) were rejected.
+
+## Service templates (salons, retail, fitness)
+
+Four approved premium templates (26 templates in total; the original 22 are unchanged and still pinned by `tests/fixtures/design-svg-baseline.json`):
+
+| Template | Business | Composition | Fonts | Colour styles |
+| --- | --- | --- | --- | --- |
+| Luxury Barbershop ("Noir & Co.") | Salons & barbers | `showcaseLeft`: full-height photo on the left, signature service over the photo, two-column service list | Cormorant Garamond / Inter | Noir, Bone & ink, Oxblood |
+| Boutique Promotion ("Linden", Atelier) | Retail | `editorial`: photo left, two-line headline (second line italic), offer bar, product rows | Playfair Display / Inter | Stone, Sage, Noir |
+| Product Spotlight ("Linden", Spotlight) | Retail | `spotlight`: story column, centre photo, highlights column | Playfair Display / Inter | Stone, Sage, Noir |
+| Modern Gym ("Forge") | Gyms & fitness | `timetable`: wordmark, time-first class schedule, photo fading into the page, offer block | Bebas Neue / Inter | Volt, Signal, Ice |
+
+Content rules:
+
+- **Product Spotlight** features the first named item (its name, description and price). The other items are listed as highlights; their prices are optional.
+- **Modern Gym** reads each class's time from the item's price field. The editor labels that field "Time" for this template.
+- Owner item photos, Brand Kit colours, text size and the photo-size slider work like on the other templates. The product column on Spotlight has a fixed size.
+
+Vertical (1080×1920) boards: each template has its own tall composition. Nothing is stretched or cropped from the 16:9 drawing.
+- Barbershop: photo band on top with the signature service, menu below.
+- Atelier: photo band, then headline, offer and rows.
+- Spotlight: headline, a photo band sized to the content, then story and highlights side by side, or stacked when that fits more.
+- Forge: wordmark over a faded photo, a full-width offer strip, then the schedule.
+
+These tall versions are new composition work. They were not part of the approved 16:9 concepts. A muted video plays only in the photo area (Spotlight's tall version has no video area).
+
+### Fonts
+
+Cormorant Garamond (Medium, SemiBold, Bold, Medium Italic) and Playfair Display (Regular, Bold, Italic) are the official, unmodified Google Fonts files under the SIL Open Font License 1.1 (`assets/fonts/*-OFL.txt`). Playfair Display has a Reserved Font Name, so the files must not be subset or modified.
+
+The new faces are available to template boards only:
+- Brand Kit and classic boards (the Android contract) keep the original six faces (`CLASSIC_FONT_IDS`).
+- Offering them in the Brand Kit needs a migration of the `brand_kits` font check constraint (0026). That migration has not been written and needs approval.
+
+### Service sample photos
+
+Unsplash License, ids as above: barbershave 1503951914875-452162b0f3f1 · knitwear 1558769132-cb1aea458c5e · amberoil 1608571423902-eed4a5ad8108 · deadlift 1605296867304-46d5465a13f1.
+
+`tests/unit/service-templates.test.ts` covers all colour styles in both shapes:
+- validity, fit and clipping;
+- contrast;
+- a 20 px minimum text size;
+- italics;
+- the time and spotlight rules;
+- customization;
+- font boundaries.
+
+The rendered SVGs are pinned in `tests/fixtures/service-svg-baseline.json`. Regenerate with `UPDATE_SERVICE_BASELINE=1` after an approved visual change.

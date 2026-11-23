@@ -52,11 +52,19 @@ describe("existing boards are untouched", () => {
 });
 
 describe("template library", () => {
-  it("has 22 templates (18 + 4 photo templates) across business types and styles, including the three approved designs", () => {
-    expect(MENU_DESIGNS.length).toBe(22);
+  it("has 26 templates (18 + 4 photo + 4 service templates) across business types and styles, including the approved designs", () => {
+    expect(MENU_DESIGNS.length).toBe(26);
+    // The approved service templates (salon, retail, fitness), in every approved colour style.
+    expect(MENU_DESIGNS.slice(22).map((d) => [d.id, d.business, d.variants.map((v) => v.id)])).toEqual([
+      ["luxury-barbershop", "salon", ["noir", "bone", "oxblood"]],
+      ["boutique-promotion", "retail", ["stone", "sage", "noir"]],
+      ["product-spotlight", "retail", ["stone", "sage", "noir"]],
+      ["modern-gym", "fitness", ["volt", "signal", "ice"]],
+    ]);
     expect(new Set(MENU_DESIGNS.map((d) => d.id)).size).toBe(MENU_DESIGNS.length);
     for (const id of ["modern-restaurant", "coffee-shop", "bold-fast-casual"]) expect(designById(id), id).not.toBeNull();
     for (const business of ["restaurant", "cafe", "fast", "bar", "sweets"] as const) expect(filterDesigns(business, "all").length, business).toBeGreaterThanOrEqual(2);
+    for (const business of ["salon", "retail", "fitness"] as const) expect(filterDesigns(business, "all").length, business).toBeGreaterThanOrEqual(1);
     for (const style of ["dark", "light", "bold"] as const) expect(filterDesigns("all", style).length, style).toBeGreaterThanOrEqual(4);
     expect(filterDesigns("cafe", "light").every((d) => d.business === "cafe" && d.style === "light")).toBe(true);
   });
@@ -75,8 +83,9 @@ describe("template library", () => {
       expect(doc.sections.length).toBeLessThanOrEqual(MENU_LIMITS.sections);
       if (design.stock) expect(STOCK_PHOTOS).toContain(design.stock);
       expect(design.variants.length).toBeGreaterThanOrEqual(2);
-      // Realistic content: every template ships with real items and prices, no placeholders.
-      expect(items).toBeGreaterThanOrEqual(8);
+      // Realistic content, no placeholders: menus ship 8+ items; service boards ship their approved, shorter lists.
+      const service = ["salon", "retail", "fitness"].includes(design.business);
+      expect(items, design.id).toBeGreaterThanOrEqual(service ? 4 : 8);
       expect(JSON.stringify(doc)).not.toMatch(/lorem|placeholder|item name/i);
     }
     const scratch = parseLayout(scratchDocument());
@@ -251,9 +260,16 @@ describe("server-rendered TV image", () => {
       if (!designHasMedia(design)) { expect(comp).toBeNull(); continue; }
       expect(comp?.video?.box, design.id).toBeTruthy();
       const box = comp!.video!.box;
-      const menuRight = { showcase: 1140, columns: 1344, promo: 1260, list: 1920, cards: 1920, featured: 1920 }[design.composition];
-      expect(box.x, design.id).toBeGreaterThanOrEqual(menuRight);
-      expect(box.x + box.w).toBeLessThanOrEqual(1920);
+      // The video must stay inside the photo area of each composition (text never sits under it).
+      const photoArea: Record<string, [number, number]> = {
+        showcase: [1140, 1920], columns: [1344, 1920], promo: [1260, 1920], list: [1920, 1920], cards: [1920, 1920], featured: [1920, 1920],
+        showcaseLeft: [0, 760], editorial: [0, 840], spotlight: [650, 1270], timetable: [760, 1920],
+      };
+      const [from, to] = photoArea[design.composition];
+      expect(box.x, design.id).toBeGreaterThanOrEqual(from);
+      expect(box.x + box.w, design.id).toBeLessThanOrEqual(to);
+      // Forge's offer block sits on the photo's top right: the video starts below it.
+      if (design.composition === "timetable") expect(box.y, design.id).toBeGreaterThanOrEqual(96 + 300);
       expect(box.y + box.h).toBeLessThanOrEqual(1080);
     }
   });
