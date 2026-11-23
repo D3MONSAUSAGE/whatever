@@ -68,6 +68,7 @@ for (const [label, canvas] of [["no canvas fields", null], ["canvasWidth/canvasH
   const vps = tv.S.posts.filter((b) => b && b.viewport);
   check("the viewport is reported once, in a request of its own", vps.length === 1 && Object.keys(vps[0]).join() === "viewport" && vps[0].viewport.width === 1280 && vps[0].viewport.height === 720, JSON.stringify(vps));
   check("no other report carries the viewport", tv.S.posts.filter((b) => b && !b.viewport).every((b) => !("viewport" in b)));
+  check("viewport POST never combines playing, acknowledged, playback or error", vps.every((b) => !("playing" in b) && !("acknowledged" in b) && !("playback" in b) && !("error" in b)));
   check("playback is still acknowledged (playing) alongside the viewport report", tv.S.playing.indexOf(1) !== -1);
   tv.window.innerWidth = 1080; tv.window.innerHeight = 1920;
   tv.fire("window", "resize");

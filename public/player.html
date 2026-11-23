@@ -32,8 +32,8 @@
   /* Rotation guidance on a screen set up as vertical whose TV still shows a horizontal picture.
      Never covers more than a strip at the top and goes away on its own; playback continues underneath. */
   .orient { position: absolute; left: 0; right: 0; top: 0; z-index: 2400000; display: none;
-    text-align: center; font-size: 20px; font-size: 2.4vh; padding: 1.4vh 3vh; color: #fff;
-    background: rgba(0, 0, 0, 0.6); pointer-events: none; }
+    text-align: center; font-size: 16px; font-size: 1.8vh; line-height: 1.25; padding: 0.75vh 2vw; color: #fff;
+    background: rgba(0, 0, 0, 0.72); pointer-events: none; }
   .orient.on { display: block; }
   .status { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2500000; display: none;
     text-align: center; font-size: 22px; font-size: 2.6vh; padding: 1.6vh 0; color: #fff;
@@ -647,8 +647,8 @@
     orientHintShown = true;
     es = String((typeof navigator !== 'undefined' && navigator && navigator.language) || '').toLowerCase().indexOf('es') === 0;
     h.textContent = es
-      ? 'Esta pantalla está configurada como vertical en Pekko, pero esta TV muestra una imagen horizontal. Active la rotación o el modo vertical en los ajustes de la TV. Pekko no puede girar la TV.'
-      : 'This screen is set to vertical in Pekko, but this TV is showing a horizontal picture. Turn on rotation or portrait mode in the TV\'s own settings. Pekko can\'t rotate the TV.';
+      ? 'Esta pantalla es vertical en Pekko, pero la TV está horizontal. Active la rotación en los ajustes de la TV — Pekko no puede girar la TV.'
+      : 'This screen is set to vertical in Pekko, but the TV is horizontal. Turn on rotation in the TV\'s settings — Pekko can\'t rotate the TV.';
     h.className = 'orient on';
     clearTimeout(orientHintTimer);
     orientHintTimer = setTimeout(hideOrientHint, ORIENT_HINT_MS);
