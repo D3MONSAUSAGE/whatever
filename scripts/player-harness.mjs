@@ -24,9 +24,9 @@ export function createPlayer(options = {}) {
 
   const els = {};
   const ids = ["a", "b", "pair", "empty", "connecting", "paused", "paused-title", "paused-msg", "pair-label", "code", "status",
-    "manual", "manual-pos", "prev", "next", "unpair", "unpair-yes", "unpair-no", "unpair-msg"];
+    "manual", "manual-pos", "prev", "next", "unpair", "unpair-yes", "unpair-no", "unpair-msg", "orient"];
   for (const id of ids) {
-    const base = id === "status" ? "status" : id === "manual" ? "manual" : id === "unpair" ? "unpair" : id.length === 1 ? "layer"
+    const base = id === "orient" ? "orient" : id === "status" ? "status" : id === "manual" ? "manual" : id === "unpair" ? "unpair" : id.length === 1 ? "layer"
       : ["pair", "empty", "connecting", "paused"].includes(id) ? "screen" : "";
     els[id] = { id, className: base, style: {}, innerHTML: "", textContent: "", setAttribute() {}, getAttribute() { return null; }, focus() {} };
   }
@@ -84,7 +84,7 @@ export function createPlayer(options = {}) {
   const winListeners = {};
   const docListeners = {};
   const window_ = {
-    innerWidth: 1280, innerHeight: 720,
+    innerWidth: options.innerWidth || 1280, innerHeight: options.innerHeight || 720,
     localStorage: { getItem: (k) => storage[k] ?? null, setItem: (k, v) => { storage[k] = String(v); }, removeItem: (k) => { delete storage[k]; } },
     addEventListener: (e, f) => { (winListeners[e] = winListeners[e] || []).push(f); },
     location: { hostname: "pekkotv.com", pathname: "/player", reload() { stats.reloads++; } },
@@ -106,7 +106,7 @@ export function createPlayer(options = {}) {
   const S = {
     online: true, token: "tok".repeat(10), version: 1, url: null, playlist: null, stateCalls: 0, errorLog: [], playing: [],
     status: null, // force a status for GET /api/player/state (e.g. 401, 503)
-    latency: 300, playerBuild: undefined,
+    latency: 300, playerBuild: undefined, displayOrientation: undefined, posts: [],
     linkTtlMs: 0, // when set, a media URL whose sig= is older than this fails like an expired signed link
   };
   function server(method, url, body, headers) {
@@ -116,6 +116,8 @@ export function createPlayer(options = {}) {
     if (url.startsWith("/api/player/state") && method === "POST") {
       if (body && body.playing) S.playing.push(body.playing.version);
       if (body && body.error) S.errorLog.push(body.error);
+      S.posts.push(body);
+      if (body && body.viewport && S.viewportStatus) return [S.viewportStatus, { error: "unavailable" }];
       return [200, { ok: true }];
     }
     if (url.startsWith("/api/player/state")) {
@@ -126,6 +128,7 @@ export function createPlayer(options = {}) {
       const refresh = url.includes("refresh=1");
       const extra = { pollMs: 10000, commands: [] };
       if (S.playerBuild !== undefined) extra.playerBuild = S.playerBuild;
+      if (S.displayOrientation !== undefined) extra.displayOrientation = S.displayOrientation;
       if (v !== "" && Number(v) === S.version && !refresh) return [200, { version: S.version, unchanged: true, ...extra }];
       if (S.playlist) {
         const items = S.playlist.items.map((it) => ({ ...it, url: it.url + (it.url.includes("?") ? "&" : "?") + "sig=" + now }));
@@ -210,7 +213,7 @@ export function createPlayer(options = {}) {
     for (const fn of list || []) { try { fn({ key: "" }); } catch (e) { errors.push(String(e)); } }
   }
   return {
-    S, els, storage, stats, errors,
+    S, els, storage, stats, errors, window: window_,
     boot, run, fire, screen, shown, visible, name,
     get now() { return now; },
     get timers() { return timers.length; },

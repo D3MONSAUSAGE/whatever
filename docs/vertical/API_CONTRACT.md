@@ -60,3 +60,9 @@ Assigning a vertical board to a horizontal screen (or the reverse) is allowed. C
 - `displayOrientation: "portrait"` is added only for screens set up as vertical; landscape payloads are byte-identical to before.
 - Playlist item `composition` adds `canvasWidth`/`canvasHeight` (1920×1080 or 1080×1920); older players ignore them.
 - `POST { viewport: { width, height } }` (integers 1..20000) records the viewport. Informational only; never blocks playback. Before 0037 it is accepted and ignored. Invalid → 400 `bad viewport`.
+
+## TV player (PR C, `PLAYER_BUILD` 2026-11-22.1)
+- Zone-video boards are framed at the composition's canvas (`canvasWidth/canvasHeight` 1080×1920 → vertical; anything else → 1920×1080, as before) with contain: never stretched. Landscape framing is unchanged.
+- The pairing code is `min(22vh, 18vw)` (a media query, so old TV browsers apply it); 16:9 screens keep 22vh.
+- The player reports its CSS viewport with `POST /api/player/state` `{ viewport: { width, height } }` **in a request of its own** (the handler reads only the viewport from such a body), after a good state answer and when the size changes; at most 3 tries per size.
+- When `displayOrientation: "portrait"` and the viewport is clearly horizontal (width > 1.1 × height), a strip at the top says to turn on rotation in the TV's settings (Pekko can't rotate the TV), once per page load for 45 s. EN, or ES when the TV browser's language is Spanish. Playback is never blocked.

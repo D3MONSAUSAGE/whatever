@@ -26,6 +26,15 @@
   .code { font-size: 170px; font-size: 22vh; font-weight: bold; letter-spacing: 0.06em;
     line-height: 1.1; margin: 3vh 0; color: #fff; }
   .muted { font-size: 24px; font-size: 3vh; color: #87918d; line-height: 1.4; }
+  /* Vertical (9:16) screens: the code is min(22vh, 18vw) so all six digits fit the narrow width.
+     A media query (not min()) so old TV browsers apply it too; 16:9 and wider keep 22vh exactly. */
+  @media (max-aspect-ratio: 11/9) { .code { font-size: 18vw; } }
+  /* Rotation guidance on a screen set up as vertical whose TV still shows a horizontal picture.
+     Never covers more than a strip at the top and goes away on its own; playback continues underneath. */
+  .orient { position: absolute; left: 0; right: 0; top: 0; z-index: 2400000; display: none;
+    text-align: center; font-size: 20px; font-size: 2.4vh; padding: 1.4vh 3vh; color: #fff;
+    background: rgba(0, 0, 0, 0.6); pointer-events: none; }
+  .orient.on { display: block; }
   .status { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2500000; display: none;
     text-align: center; font-size: 22px; font-size: 2.6vh; padding: 1.6vh 0; color: #fff;
     background: rgba(0, 0, 0, 0.55); }
@@ -91,6 +100,7 @@
   </div>
 </div>
 <div id="status" class="status"></div>
+<div id="orient" class="orient" aria-live="polite"></div>
 <div id="unpair" class="unpair" role="dialog" aria-modal="true" aria-labelledby="unpair-title"><div class="box">
   <div id="unpair-title" class="title">Unpair this TV?</div>
   <div id="unpair-msg" class="muted">This TV stops showing your content and shows a new pairing code. The screen and its content stay in your Pekko account.</div>
@@ -105,7 +115,7 @@
   var TOKEN_KEY = 'pantalla_display_token';
   var STATE_MS = 10000, PAIR_MS = 3000, RETRY_MS = 5000, LOAD_TIMEOUT_MS = 60000;
   // Must match lib/player-build.ts. A running TV that sees a newer build from the server reloads itself once.
-  var PLAYER_BUILD = '2026-11-20.2';
+  var PLAYER_BUILD = '2026-11-22.1';
   // A slide image that has not answered in this time is skipped (a stalled connection may never error).
   var SLIDE_LOAD_MS = 30000;
   // A video that says it is playing but whose clock never moves is treated as stalled after this.
@@ -599,6 +609,57 @@
     if (!token || !reportedError) return;
     reportedError = false;
     request('POST', '/api/player/state', { error: '' }, token, function () {});
+  }
+  // Vertical boards (0037). The TV browser's viewport goes to the server in a request of its own: the server
+  // reads only the viewport from such a body. Sent after a good answer and when the size changes, at most
+  // three tries per size. Informational only: nothing here changes or waits for playback.
+  var viewportKey = '', viewportTries = 0, viewportDone = false, viewportBusy = false, viewportTimer = null;
+  var displayVertical = false, orientHintShown = false, orientHintTimer = null, ORIENT_HINT_MS = 45000;
+  function currentViewport() {
+    var w = Math.round(window.innerWidth || 0), h = Math.round(window.innerHeight || 0);
+    return w > 0 && h > 0 ? { width: w, height: h } : null;
+  }
+  function reportViewport() {
+    var token = getToken(), vp = currentViewport(), key;
+    if (!token || !vp) return;
+    key = vp.width + 'x' + vp.height;
+    if (key !== viewportKey) { viewportKey = key; viewportTries = 0; viewportDone = false; }
+    if (viewportDone || viewportBusy || viewportTries >= 3) return;
+    viewportTries += 1;
+    viewportBusy = true;
+    request('POST', '/api/player/state', { viewport: vp }, token, function (status) {
+      viewportBusy = false;
+      if (status === 200 && viewportKey === key) viewportDone = true;
+    });
+  }
+  function hideOrientHint() {
+    var h = el('orient');
+    clearTimeout(orientHintTimer);
+    if (h) h.className = 'orient';
+  }
+  // Shown only when it is certain: the owner set this screen up as vertical and the browser's picture is clearly
+  // horizontal, so the TV's own rotation setting is off. Once per page load, a strip at the top, gone in 45 s.
+  function updateOrientHint() {
+    var h = el('orient'), vp = currentViewport(), es;
+    if (!h) return;
+    if (!displayVertical || !vp || vp.width <= vp.height * 1.1 || mode !== 'playing') { hideOrientHint(); return; }
+    if (orientHintShown) return;
+    orientHintShown = true;
+    es = String((typeof navigator !== 'undefined' && navigator && navigator.language) || '').toLowerCase().indexOf('es') === 0;
+    h.textContent = es
+      ? 'Esta pantalla está configurada como vertical en Pekko, pero esta TV muestra una imagen horizontal. Active la rotación o el modo vertical en los ajustes de la TV. Pekko no puede girar la TV.'
+      : 'This screen is set to vertical in Pekko, but this TV is showing a horizontal picture. Turn on rotation or portrait mode in the TV\'s own settings. Pekko can\'t rotate the TV.';
+    h.className = 'orient on';
+    clearTimeout(orientHintTimer);
+    orientHintTimer = setTimeout(hideOrientHint, ORIENT_HINT_MS);
+  }
+  function viewportChanged() {
+    clearTimeout(viewportTimer);
+    viewportTimer = setTimeout(function () {
+      if (mode !== 'playing') return;
+      reportViewport();
+      updateOrientHint();
+    }, 2000);
   }
   function itemKey(item) {
     if (!item) return '';
@@ -1117,8 +1178,14 @@
     row.groupCount = typeof it.groupCount === 'number' ? it.groupCount : 0;
     return row;
   }
+  // The board's own size. Vertical boards say 1080x1920; anything else (including players' older payloads
+  // without the fields) is the 1920x1080 board, exactly as before.
+  function boardCanvas(c) {
+    if (c && c.canvasWidth === 1080 && c.canvasHeight === 1920) return { w: 1080, h: 1920 };
+    return { w: 1920, h: 1080 };
+  }
   function zoneVideo(item) {
-    var c, video, box;
+    var c, video, box, cv;
     c = item && item.composition;
     if (!c || c.layoutVersion !== 1) return null;
     video = c.video;
@@ -1126,11 +1193,12 @@
     if (!video || !video.url || !box) return null;
     if (typeof box.x !== 'number' || typeof box.y !== 'number' || typeof box.w !== 'number' || typeof box.h !== 'number') return null;
     if (box.w < 1 || box.h < 1) return null;
-    // Inside the 1920x1080 board, and not the entire board. 1919x1080 at 0,0 still passes.
-    // This does not know a template's menu rectangle. The server sends frame.video.
+    // Inside the board (1920x1080, or 1080x1920 for a vertical board), and not the entire board.
+    // 1919x1080 at 0,0 still passes. This does not know a template's menu rectangle. The server sends frame.video.
+    cv = boardCanvas(c);
     if (box.x < 0 || box.y < 0) return null;
-    if (box.x + box.w > 1920 || box.y + box.h > 1080) return null;
-    if (box.w >= 1920 && box.h >= 1080) return null;
+    if (box.x + box.w > cv.w || box.y + box.h > cv.h) return null;
+    if (box.w >= cv.w && box.h >= cv.h) return null;
     return video;
   }
   function copyComposition(row, it) {
@@ -1141,6 +1209,8 @@
       fallbackUrl: (it.composition && it.composition.fallbackUrl) || row.url,
       video: { mediaId: video.mediaId || '', url: video.url, box: { x: video.box.x, y: video.box.y, w: video.box.w, h: video.box.h } }
     };
+    // Only a vertical board carries its canvas; a landscape row stays exactly as before.
+    if (boardCanvas(it.composition).h === 1920) { row.composition.canvasWidth = 1080; row.composition.canvasHeight = 1920; }
     return row;
   }
   function zoneOpen() {
@@ -1172,19 +1242,22 @@
     for (i = 0; i < playlist.items.length; i++) delete playlist.items[i].composition;
     if (shownVersion === null && hasImage) ackShown(null, false);
   }
-  function boardFrame() {
+  // Contain the board's real canvas in the screen (never stretched): a vertical board on a horizontal TV
+  // gets empty space at the sides, a horizontal board on a vertical TV above and below.
+  function boardFrame(canvas) {
     var sw = window.innerWidth || 1280, sh = window.innerHeight || 720, scale, w, h;
+    var cw = canvas && canvas.w ? canvas.w : 1920, ch = canvas && canvas.h ? canvas.h : 1080;
     if (!sw) sw = 1280;
     if (!sh) sh = 720;
-    scale = Math.min(sw / 1920, sh / 1080);
-    w = 1920 * scale;
-    h = 1080 * scale;
+    scale = Math.min(sw / cw, sh / ch);
+    w = cw * scale;
+    h = ch * scale;
     return { scale: scale, left: (sw - w) / 2, top: (sh - h) / 2, width: w, height: h };
   }
   // The still and the zone share this frame. Keyword contain leaves an SVG tile at the
   // upper left, so a board sets an explicit size and position instead.
   function fitBoardStill() {
-    var frame = boardFrame(), i, layer;
+    var frame = boardFrame(zoneFit && zoneFit.canvas), i, layer;
     for (i = 0; i < layers.length; i++) {
       layer = layers[i];
       if (layer.className.indexOf('on') === -1) continue;
@@ -1203,7 +1276,7 @@
   function applyZoneFit() {
     var frame, box, v;
     if (!zoneFit) return;
-    frame = boardFrame();
+    frame = boardFrame(zoneFit.canvas);
     box = zoneFit.box;
     v = zoneFit.el;
     fitBoardStill();
@@ -1254,7 +1327,7 @@
     try { v.setAttribute('playsinline', 'playsinline'); } catch (ePlay) {}
     try { v.setAttribute('webkit-playsinline', 'webkit-playsinline'); } catch (eWeb) {}
     v.setAttribute('data-zone', '1');
-    zoneFit = { el: v, box: box };
+    zoneFit = { el: v, box: box, canvas: boardCanvas(item.composition) };
     applyZoneFit();
     var settled = false;
     function frameReady() { return v.videoWidth > 0 && v.currentTime > 0; }
@@ -1356,6 +1429,7 @@
   // ---- pairing
   function startPairing() {
     var g = enter('pairing');
+    hideOrientHint();
     stopPlaylist();
     stableSrc = {};
     badSkips = {};
@@ -1448,12 +1522,14 @@
           if (until > 0 && until < wait) wait = Math.max(1000, until);
         }
         if (data.layoutStudio === false) dropZoneCompositions();
+        displayVertical = data.displayOrientation === 'portrait';
         if (!data.unchanged) { rememberState(data); apply(data); }
         checkStuck();
         maybeUpdatePlayer(data.playerBuild);
         applyRemoteCommands(data.commands);
         schedulePlaybackReport();
         confirmPlaying(); // retries a confirmation that failed while offline
+        try { reportViewport(); updateOrientHint(); } catch (eView) {} // guidance only; never affects playback
       } else if (!hasImage && shownVersion === null) {
         setStatus('');
         showScreen('connecting'); // nothing on screen yet
@@ -1617,7 +1693,7 @@
   document.addEventListener('visibilitychange', onPageVisible);
   window.addEventListener('pageshow', onPageVisible);
   window.addEventListener('focus', onPageVisible);
-  window.addEventListener('resize', function () { if (zoneFit) applyZoneFit(); });
+  window.addEventListener('resize', function () { if (zoneFit) applyZoneFit(); viewportChanged(); });
 
   function publishedBoard() {
     var raw, data, svg, box, url;

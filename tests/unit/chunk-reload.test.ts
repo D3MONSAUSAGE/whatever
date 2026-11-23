@@ -70,7 +70,7 @@ describe("R14-01 wiring", () => {
     expect(readFileSync("app/global-error.tsx", "utf8")).toContain("reloadOnceOnChunkErrorInBrowser(error)");
     expect(readFileSync("app/layout.tsx", "utf8")).not.toContain("ChunkReloadGuard");
     const sha = createHash("sha256").update(readFileSync("public/player.html")).digest("hex");
-    expect(sha).toBe("1ddaf5a3c5e93ad32f03614a4f7d7f43239a660fa0788c9151d26ba04ee46c3e");
+    expect(sha).toBe("ceff42b5a134e9b7dd7ded940e8cbb1c2721800ec60541d35622b81e8fea5989");
     expect(readFileSync("public/player.html", "utf8")).not.toMatch(/pekko_chunk_reload/);
   });
   it("global error page is self-contained (no dictionary import)", () => {
