@@ -182,7 +182,38 @@ const STYLES = `${FONT_CSS}
 .tpl-ck.adj { background: #fff6e5; color: #7a4a00; }
 .tpl-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1100px) { .tpl-grid { grid-template-columns: minmax(360px, 420px) minmax(0, 1fr); align-items: start; } .tpl-preview { position: sticky; top: 72px; grid-column: 2; grid-row: 1; } .tpl-form { grid-column: 1; grid-row: 1; } }
-@media (max-width: 1099px) { .tpl-preview { position: sticky; top: 56px; z-index: 5; background: var(--color-paper, #f1f4fa); padding-bottom: 10px; } }
+/* Expand preview is mobile-only, so the desktop layout stays unchanged. */
+.tpl-expand-preview { display: none; }
+@media (max-width: 1099px) {
+  .tpl-preview { position: sticky; top: 56px; z-index: 5; background: var(--color-paper, #f1f4fa); padding-bottom: 10px; }
+  /* Portrait: a width-from-height 9:16 box, capped so Step 4 controls stay reachable.
+     Static (not sticky) so the preview cannot cover the form as the page scrolls.
+     svh accounts for iOS Safari toolbars; dvh/vh are fallbacks. */
+  .tpl-preview.is-portrait { position: static; z-index: auto; }
+  .tpl-preview.is-portrait .tpl-board.is-portrait {
+    width: min(100%, calc(50vh * 9 / 16));
+    width: min(100%, calc(50dvh * 9 / 16));
+    width: min(100%, calc(50svh * 9 / 16));
+    max-height: 50vh;
+    max-height: 50dvh;
+    max-height: 50svh;
+    aspect-ratio: 9 / 16;
+    margin-inline: auto;
+  }
+  .tpl-preview.is-portrait .tpl-expand-preview { display: inline-flex; align-self: center; }
+}
+.tpl-preview-overlay { background: transparent; box-shadow: none; width: max-content; max-width: calc(100vw - 24px); padding: 0; }
+.tpl-preview-overlay-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+.tpl-preview-overlay .tpl-board.is-portrait {
+  width: min(calc(100vw - 24px), calc((100vh - 6rem) * 9 / 16));
+  width: min(calc(100vw - 24px), calc((100dvh - 6rem) * 9 / 16));
+  width: min(calc(100vw - 24px), calc((100svh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * 9 / 16));
+  max-height: calc(100vh - 6rem);
+  max-height: calc(100dvh - 6rem);
+  max-height: calc(100svh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  aspect-ratio: 9 / 16;
+  margin-inline: auto;
+}
 @media (prefers-reduced-motion: reduce) { .tpl-card { transition: none; } .tpl-card:hover { transform: none; } }
 .tpl-board > svg { font-family: Inter, sans-serif; }
 .tpl-col { flex: none; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #0a5c3e; background: #e6f6ee; border-radius: 6px; padding: 3px 7px; }
@@ -365,6 +396,7 @@ export function TemplateEditor({
   const [library, setLibrary] = useState<AccountLibraryFile[]>([]);
   const [mediaFilter, setMediaFilter] = useState<"all" | "photos" | "videos">("all");
   const [publishOpen, setPublishOpen] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [published, setPublished] = useState(false);
   const dirtyRef = useRef(dirty);
@@ -471,7 +503,10 @@ export function TemplateEditor({
     if (orientationOf(doc) === value) return;
     const next: LayoutDocument = { ...doc };
     if (value === "portrait") next.orientation = "portrait";
-    else delete next.orientation;
+    else {
+      delete next.orientation;
+      setPreviewExpanded(false);
+    }
     update(next);
   }
   function patch(p: Partial<LayoutDocument>) { update({ ...doc, ...p }); }
@@ -751,9 +786,12 @@ export function TemplateEditor({
       {progress ? <p className="text-sm text-muted mb-2" role="status">{progress}</p> : null}
       <h2 id="tpl-editor-title" className="sr-only">{t("tpl.editorTitle")}</h2>
       <div className="tpl-grid">
-        <div className="tpl-preview">
+        <div className={`tpl-preview${orientationOf(doc) === "portrait" ? " is-portrait" : ""}`} data-testid="tpl-preview">
           <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{previewVideo ? t("tpl.previewCapVideo") : t("tpl.previewCap")}</span><span data-testid="tpl-canvas-size">{orientationOf(doc) === "portrait" ? "1080 × 1920" : "1920 × 1080"}</span></p>
           <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={previewHits} onHit={onPreviewHit} />
+          {orientationOf(doc) === "portrait" ? (
+            <button type="button" className="btn btn-quiet min-h-9 tpl-expand-preview mt-2" data-testid="tpl-expand-preview" onClick={() => setPreviewExpanded(true)}>{t("tpl.expandPreview")}</button>
+          ) : null}
           {czOverflow.length ? (
             <div className="note-warn text-sm mt-3 grid gap-2" role="alert" data-testid="tpl-cz-overflow">
               {czOverflow.map((reason) => <p key={reason}>{t(`cz.overflow.${reason}` as MessageKey)}</p>)}
@@ -1163,6 +1201,15 @@ export function TemplateEditor({
           </div>
         </div>
       </div>
+
+      {previewExpanded && orientationOf(doc) === "portrait" ? (
+        <Dialog label={t("tpl.previewAria", { name })} onClose={() => setPreviewExpanded(false)} variant="center" tone="dark" testId="tpl-preview-overlay" className="tpl-preview-overlay">
+          <div className="tpl-preview-overlay-inner">
+            <button type="button" className="btn btn-quiet bg-white min-h-10" data-testid="tpl-preview-close" onClick={() => setPreviewExpanded(false)}>{t("tpl.closePreview")}</button>
+            <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} />
+          </div>
+        </Dialog>
+      ) : null}
 
       {publishOpen ? (
         <Dialog label={t("tpl.publishTitle")} onClose={() => setPublishOpen(false)} className="bg-paper w-full max-w-lg rounded-2xl p-5" variant="center">
