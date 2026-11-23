@@ -454,6 +454,7 @@ Full contract: [`docs/vertical/API_CONTRACT.md`](vertical/API_CONTRACT.md). What
 - **Media sizes are accurate.** A rendered vertical board is stored as a 1080×1920 image (`media.width/height`). Previews keep `w` as the PNG width (portrait `w=960` → 960×1707).
 - **Screens.** The screen row adds `orientation` (`"landscape"` | `"portrait"`) and `reportedViewport` (`{ width, height, at }` or null). `PATCH /api/displays/:id` with `{ orientation }` alone is valid and partial; invalid values are 400. `POST /api/displays/pair` stays `{ code, name }` (horizontal by default) and accepts an optional `orientation`. Reconnecting never resets it. Copy must make clear the owner rotates/mounts the TV; Pekko can't rotate it.
 - **Mismatch.** Assigning a vertical board to a horizontal screen (or the reverse) is allowed. Show a non-blocking warning; the TV letterboxes, never stretches.
+- **Vertical drawing (PR B).** Every existing template and layout draws on 1080×1920 (photo/video areas become a bottom band, columns stack). Horizontal boards draw exactly as before. Catalog thumbnails: add `orientation=portrait` to a thumbnail path for the 9:16 sample (widths 320/640/960/1080; other values 404). The catalog `version` changed with this release (`CATALOG_RENDER_REVISION` 2), so cached thumbnail URLs redirect once.
 
 ## Changes since Android +14 (web PRs #148–#163)
 

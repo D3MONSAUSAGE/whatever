@@ -2,13 +2,13 @@
 
 import { boardFont, FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type BoardFontId } from "@/lib/board-fonts";
 import { MENU_LIMITS } from "@/lib/menu-templates";
-import { boardCanvas, orientationField, orientationOf } from "@/lib/board-orientation";
+import { boardCanvas, LANDSCAPE_CANVAS, orientationField, orientationOf, PORTRAIT_CANVAS, type BoardOrientation } from "@/lib/board-orientation";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
 import { isDesignId, isStockPhoto, type StockPhotoId } from "@/lib/menu-designs";
 import { designSvg, designSvgWithReport, designVideoBox, safeDesignHref, type DesignArt } from "@/lib/menu-design-svg";
 import {
   activeCustom, emptyClips, fixedRegion, focusPlacement, itemRegion, parseCustom, parseHeadingOverride, sectionHeadingStyle, sectionRegion, snapWeight,
-  LAYOUT_MEDIA, READABLE_FLOORS, type ActiveCustom, type BoardRegion, type ClipArea, type LayoutCustom, type RoleKey, type RoleTypography,
+  LAYOUT_MEDIA, READABLE_FLOORS, setRegionCanvas, type ActiveCustom, type BoardRegion, type ClipArea, type LayoutCustom, type RoleKey, type RoleTypography,
 } from "@/lib/board-custom";
 
 export { MENU_LIMITS };
@@ -200,8 +200,9 @@ function box(x: number, y: number, w: number, h: number): ZoneBox {
 }
 
 /** Integer boxes for one template. Menu columns plus one feature box cover the board. */
-export function frameFor(template: LayoutTemplate, split: number, columnWidths?: [number, number, number] | null): LayoutFrame {
+export function frameFor(template: LayoutTemplate, split: number, columnWidths?: [number, number, number] | null, orientation?: BoardOrientation): LayoutFrame {
   const ratio = clampSplit(template, split);
+  if (orientation === "portrait") return portraitFrame(template, ratio, columnWidths);
   if (template === "menu-banner") {
     const banner = Math.round(BOARD_H * ratio);
     const menu = box(0, 0, BOARD_W, BOARD_H - banner);
@@ -253,6 +254,49 @@ export function frameFor(template: LayoutTemplate, split: number, columnWidths?:
   return { template, split: ratio, menu, feature, video: feature, columns: [menu] };
 }
 
+/**
+ * Vertical (1080×1920) frames. Side-by-side layouts stack instead: the menu on top, the photo/video/promo below
+ * (`split` is then the menu's share of the height). Triple column stacks its three sections; two columns stay side by side.
+ */
+function portraitFrame(template: LayoutTemplate, ratio: number, columnWidths?: [number, number, number] | null): LayoutFrame {
+  const { width: cw, height: ch } = PORTRAIT_CANVAS;
+  if (template === "menu-banner") {
+    const banner = Math.round(ch * ratio);
+    const menu = box(0, 0, cw, ch - banner);
+    const feature = box(0, ch - banner, cw, banner);
+    return { template, split: ratio, menu, feature, video: feature, columns: [menu] };
+  }
+  if (template === "signature") {
+    const card = Math.round(ch * ratio);
+    const menu = box(0, 0, cw, card);
+    return { template, split: ratio, menu, feature: box(0, 0, cw, ch), video: box(0, card, cw, ch - card), columns: [menu] };
+  }
+  if (template === "triple-column") {
+    const first = Math.round(ch / 3);
+    const second = Math.round(ch / 3);
+    const columns = [box(0, 0, cw, first), box(0, first, cw, second), box(0, first + second, cw, ch - first - second)];
+    return { template, split: ratio, menu: box(0, 0, cw, ch), feature: columns[2], video: null, columns };
+  }
+  if (template === "two-menu-promo") {
+    const widths = normalizedColumns(columnWidths) ?? ([0.35, 0.35, 0.30] as [number, number, number]);
+    const promo = Math.round(ch * widths[2]);
+    const half = Math.round((ch - promo) / 2);
+    // The two menus stack full width (no shortened names in 540px columns); the promo is the bottom band.
+    const columns = [box(0, 0, cw, half), box(0, half, cw, ch - promo - half), box(0, ch - promo, cw, promo)];
+    const feature = columns[2];
+    return { template, split: ratio, menu: box(0, 0, cw, ch - promo), feature, video: feature, columns };
+  }
+  if (template === "two-column") {
+    const half = Math.round(ch / 2);
+    const columns = [box(0, 0, cw, half), box(0, half, cw, ch - half)];
+    return { template, split: ratio, menu: box(0, 0, cw, ch), feature: columns[1], video: null, columns };
+  }
+  const top = Math.round(ch * ratio);
+  const menu = box(0, 0, cw, top);
+  const feature = box(0, top, cw, ch - top);
+  return { template, split: ratio, menu, feature, video: feature, columns: [menu] };
+}
+
 /** Bottom promo band on Menu and promotion and Split showcase. Empty copy gets no band. */
 export const PROMO_BAND = 170;
 
@@ -265,7 +309,7 @@ export function promoBandHeight(doc: { template: LayoutTemplate; featureTitle?: 
 /** The rectangle the video and its fallback photo share. The promo band stays below it. */
 export function mediaVideoBox(doc: LayoutDocument): ZoneBox | null {
   if (doc.design && isDesignId(doc.design)) return designVideoBox(doc);
-  const frame = frameFor(doc.template, effectiveSplit(doc), doc.columnWidths);
+  const frame = frameFor(doc.template, effectiveSplit(doc), doc.columnWidths, orientationOf(doc));
   if (!frame.video) return null;
   const band = promoBandHeight(doc);
   if (band <= 0 || band >= frame.video.h - 80) return frame.video;
@@ -286,10 +330,10 @@ export function boxesOverlap(a: ZoneBox, b: ZoneBox) {
 }
 
 /** The player's numeric guard. A 1919×1080 box at 0,0 passes. Menu overlap is not checked here. */
-export function clientAcceptsZoneBox(box: ZoneBox) {
+export function clientAcceptsZoneBox(box: ZoneBox, canvas: { width: number; height: number } = LANDSCAPE_CANVAS) {
   if (box.w < 1 || box.h < 1 || box.x < 0 || box.y < 0) return false;
-  if (box.x + box.w > BOARD_W || box.y + box.h > BOARD_H) return false;
-  if (box.w >= BOARD_W && box.h >= BOARD_H) return false;
+  if (box.x + box.w > canvas.width || box.y + box.h > canvas.height) return false;
+  if (box.w >= canvas.width && box.h >= canvas.height) return false;
   return true;
 }
 
@@ -823,18 +867,18 @@ function colorsFor(doc: LayoutDocument): BoardColors {
 }
 
 /** One 1920×1080 board, contained and centered in the screen. The still and the zone use this same frame. */
-export function containedBoard(screenW: number, screenH: number) {
+export function containedBoard(screenW: number, screenH: number, canvas: { width: number; height: number } = LANDSCAPE_CANVAS) {
   const sw = screenW > 0 ? screenW : 1280;
   const sh = screenH > 0 ? screenH : 720;
-  const scale = Math.min(sw / BOARD_W, sh / BOARD_H);
-  const width = BOARD_W * scale;
-  const height = BOARD_H * scale;
+  const scale = Math.min(sw / canvas.width, sh / canvas.height);
+  const width = canvas.width * scale;
+  const height = canvas.height * scale;
   return { scale, left: (sw - width) / 2, top: (sh - height) / 2, width, height };
 }
 
 /** Zone box in screen pixels. It stays inside containedBoard and does not use the clip's own aspect. */
-export function zoneOnBoard(screenW: number, screenH: number, box: ZoneBox) {
-  const frame = containedBoard(screenW, screenH);
+export function zoneOnBoard(screenW: number, screenH: number, box: ZoneBox, canvas: { width: number; height: number } = LANDSCAPE_CANVAS) {
+  const frame = containedBoard(screenW, screenH, canvas);
   return {
     left: frame.left + box.x * frame.scale,
     top: frame.top + box.y * frame.scale,
@@ -844,13 +888,13 @@ export function zoneOnBoard(screenW: number, screenH: number, box: ZoneBox) {
 }
 
 /** CSS for the one video element. Contain letterboxes inside the server box. It does not cover the menu. */
-export function zoneVideoStyle(box: ZoneBox) {
+export function zoneVideoStyle(box: ZoneBox, canvas: { width: number; height: number } = LANDSCAPE_CANVAS) {
   return {
     position: "absolute" as const,
-    left: `${(box.x / BOARD_W) * 100}%`,
-    top: `${(box.y / BOARD_H) * 100}%`,
-    width: `${(box.w / BOARD_W) * 100}%`,
-    height: `${(box.h / BOARD_H) * 100}%`,
+    left: `${(box.x / canvas.width) * 100}%`,
+    top: `${(box.y / canvas.height) * 100}%`,
+    width: `${(box.w / canvas.width) * 100}%`,
+    height: `${(box.h / canvas.height) * 100}%`,
     objectFit: "cover" as const,
     background: "transparent",
   };
@@ -1156,7 +1200,15 @@ function layoutPhoto(href: string, box: ZoneBox, doc: LayoutDocument, art?: Layo
 }
 
 function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
-  const frame = frameFor(doc.template, effectiveSplit(doc), doc.columnWidths);
+  const previous = setRegionCanvas(boardCanvas(orientationOf(doc)));
+  try { return layoutSvgOnCanvas(doc, art); } finally { setRegionCanvas(previous); }
+}
+
+function layoutSvgOnCanvas(doc: LayoutDocument, art?: LayoutArt): string {
+  const portrait = orientationOf(doc) === "portrait";
+  // Canvas: 1920×1080 (every existing board), or 1080×1920 for a vertical board.
+  const { width: BOARD_W, height: BOARD_H } = boardCanvas(orientationOf(doc));
+  const frame = frameFor(doc.template, effectiveSplit(doc), doc.columnWidths, orientationOf(doc));
   const colors = colorsFor(doc);
   const family = fontFamily(doc.font);
   const bodyFamily = fontFamily(doc.bodyFont ?? doc.font);
@@ -1187,7 +1239,7 @@ function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
   }
   if (doc.template === "signature") {
     // Opaque card over the full-bleed background. Text stays on this card, not on the photo.
-    parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${BOARD_H - 96}" fill="${colors.paper}"/>`);
+    parts.push(`<rect x="48" y="48" width="${frame.menu.w - 96}" height="${frame.menu.h - 96}" fill="${colors.paper}"/>`);
   } else if (doc.template === "menu-banner") {
     parts.push(`<rect x="0" y="0" width="${BOARD_W}" height="${frame.menu.h}" fill="${colors.paper}"/>`);
     if (href) parts.push(layoutPhoto(href, feature, doc, art));
@@ -1199,12 +1251,12 @@ function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<rect x="0" y="0" width="${bandW}" height="132" fill="${colors.band}"/>`);
   }
   const menu = doc.template === "signature"
-    ? { x: 88, y: 110, w: frame.menu.w - 176, bottom: BOARD_H - 110 }
+    ? { x: 88, y: 110, w: frame.menu.w - 176, bottom: frame.menu.h - 110 }
     : doc.template === "menu-banner"
       ? { x: 72, y: colors.band ? 156 : 72, w: BOARD_W - 144, bottom: frame.menu.h - 72 }
       : doc.template === "triple-column" || doc.template === "two-column"
         ? { x: 48, y: colors.band ? 156 : 72, w: frame.columns[0].w - 80, bottom: BOARD_H - 64 }
-        : { x: frame.menu.x + 48, y: colors.band ? 168 : 88, w: frame.menu.w - 96, bottom: BOARD_H - 72 };
+        : { x: frame.menu.x + 48, y: colors.band ? 168 : 88, w: frame.menu.w - 96, bottom: frame.menu.h - 72 };
   const kTitle = lrun?.active ? lrun.active.scale.businessName : 1;
   const titleMin = lrun?.active ? Math.max(34, Math.round(34 * kTitle)) : 34;
   let titleSize = lrun?.active ? Math.max(titleMin, Math.round(Math.min(colors.band && doc.template !== "signature" ? 84 : 96, 64 * kTitle) / 2) * 2) : 64;
@@ -1220,7 +1272,27 @@ function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
     parts.push(`<text x="${menu.x}" y="${onBand ? 118 : menu.y + 40}" font-family="${bodyFamily}" font-size="22" fill="${onBand ? colors.featureInk : colors.muted}">${esc(fitWidth(doc.subtitle, 22, menu.w, bodyFamily))}</text>`);
   }
   const textTop = colors.band && doc.template !== "signature" ? 180 : menu.y + (doc.subtitle ? 72 : 36);
-  if (doc.template === "triple-column" || doc.template === "two-column") {
+  if (portrait && (doc.template === "triple-column" || doc.template === "two-column" || doc.template === "two-menu-promo")) {
+    // Vertical: the fixed menu columns stack full width, each row sized to its content, under one header
+    // (two menus + promo keep the promo band at the bottom).
+    const count = doc.template === "triple-column" ? 3 : 2;
+    const rowsTop = doc.template === "two-menu-promo" ? textTop : 176;
+    const rowsBottom = doc.template === "two-menu-promo" ? frame.menu.h - 64 : BOARD_H - 64; const rowGap = 40;
+    const shown = Array.from({ length: count }, (_, i) => i).map((index) => (doc.sections[index] && sectionShows(doc.sections[index]) ? doc.sections[index] : null));
+    const weight = (section: LayoutSection | null) => (section ? (section.name ? 1.35 : 0) + section.items.filter((item) => item.name.trim()).length + 0.5 : 0);
+    const total = shown.reduce((sum, section) => sum + weight(section), 0) || 1;
+    const usable = rowsBottom - rowsTop - rowGap * (shown.filter(Boolean).length - 1);
+    const rows: { section: LayoutSection; top: number; bottom: number }[] = [];
+    let y = rowsTop;
+    for (const section of shown) {
+      if (!section) continue;
+      const h = usable * (weight(section) / total);
+      rows.push({ section, top: y, bottom: y + h });
+      y += h + rowGap;
+    }
+    const shared = Math.min(...rows.map((row) => itemUnit([row.section], row.top, row.bottom, doc.typeScale)));
+    rows.forEach((row) => paintItems(parts, [row.section], 72, row.top, BOARD_W - 144, row.bottom, colors, doc.typeScale, families, false, shared, 10, photos));
+  } else if (doc.template === "triple-column" || doc.template === "two-column") {
     const textTop = 176;
     const textBottom = BOARD_H - 64;
     const shared = Math.min(...frame.columns.map((_, index) => itemUnit(doc.sections[index] && sectionShows(doc.sections[index]) ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
@@ -1231,7 +1303,7 @@ function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
       paintItems(parts, [section], column.x + 36, textTop, column.w - 72, textBottom, colors, doc.typeScale, families, false, shared, 10, photos);
     });
   } else if (doc.template === "two-menu-promo") {
-    const textBottom = BOARD_H - 64;
+    const textBottom = frame.menu.h - 64;
     const menuColumns = frame.columns.slice(0, 2);
     const shared = Math.min(...menuColumns.map((_, index) => itemUnit(doc.sections[index] && sectionShows(doc.sections[index]) ? [doc.sections[index]] : [], textTop, textBottom, doc.typeScale)));
     menuColumns.forEach((column, index) => {
@@ -1259,7 +1331,7 @@ function layoutSvgInner(doc: LayoutDocument, art?: LayoutArt): string {
   if (doc.footer && doc.template === "menu-banner") {
     parts.push(`<text x="72" y="${frame.menu.h - 28}" font-family="${bodyFamily}" font-size="28" font-weight="700" fill="${colors.ink}">${esc(fitWidth(doc.footer, 28, BOARD_W - 144, bodyFamily))}</text>`);
   } else if (doc.footer) {
-    const footerY = doc.template === "signature" ? BOARD_H - 78 : BOARD_H - 40;
+    const footerY = doc.template === "signature" ? frame.menu.h - 78 : frame.menu.h - 40;
     parts.push(`<text x="${menu.x}" y="${footerY}" font-family="${bodyFamily}" font-size="22" fill="${colors.muted}">${esc(fitWidth(doc.footer, 22, menu.w, bodyFamily))}</text>`);
   }
   if (frame.video || doc.template === "signature") lregion(fixedRegion("featuredMedia", media));

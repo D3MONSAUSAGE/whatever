@@ -36,7 +36,9 @@ describe("I18N-1 dictionaries", () => {
     // R12-06: "Happy hour" is now "Hora feliz" in Spanish, so ptpl.happy.name left this list.
     expect(same.sort()).toEqual(["auth.legalNav", "footer.legal", "lang.en", "lang.es", "site.popular", "kind.video", "tv.hours", "tv.min", "cp.filter.video", "cp.type.video", "ls.video", "zone.banner", "zone.video", "ml.videos", "ml.video", "pe.video",
       // Home page template chips: business types spelled the same in Spanish.
-      "home2.chip.bar", "home2.chip.brunch", "home2.chip.cafe", "home2.chip.tacos"].sort());
+      "home2.chip.bar", "home2.chip.brunch", "home2.chip.cafe", "home2.chip.tacos",
+      // Vertical boards: "Horizontal (16:9)" / "Vertical (9:16)" are spelled the same in Spanish.
+      "scr.orientationHorizontal", "tpl.orientationHorizontal", "tpl.orientationVertical"].sort());
   });
 
   it("uses formal usted (no tú forms) and never translates Pekko", () => {

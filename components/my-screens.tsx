@@ -14,6 +14,7 @@ import { EmptyState, LimitNote, LoadState, PageHeader, Stat, atLimit, useRequire
 import { AssignedThumb } from "@/components/assigned-thumb";
 import { ScreenActions, type ScreenLibrary } from "@/components/screen-actions";
 import { ReconnectTv } from "@/components/reconnect-tv";
+import { ScreenOrientation } from "@/components/screen-orientation";
 import { useConfirm } from "@/components/confirm";
 import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
@@ -197,6 +198,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
           ) : null}
           <ScreenActions display={display} preview={Boolean(fixture)} library={library} initialPanel={initialPanel} onChanged={() => displays.reload()} />
           <ReconnectTv display={display} preview={Boolean(fixture)} onConnected={() => { void displays.reload?.(); }} onMessage={(text, error) => toast.show(text, error)} />
+          <ScreenOrientation display={display} preview={Boolean(fixture)} onChanged={() => { void displays.reload?.(); }} onMessage={(text, error) => toast.show(text, error)} />
         </article>
         {confirm.node}
         {toast.node}

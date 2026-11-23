@@ -3,7 +3,7 @@
   "public/player.html": "1ddaf5a3c5e93ad32f03614a4f7d7f43239a660fa0788c9151d26ba04ee46c3e",
   "lib/server/layout-render.ts": "a3c05b8a0b4ea0a137dc38a537bc7425fe056493ab3b6e9abd192f25a15f0309",
   "lib/server/menu-render.ts": "041e0cb69f1d0f7e987546edc4310287ec064b45607beabf64d7be2f93a30528",
-  "lib/menu-classic-svg.ts": "4fef7f61e041e3bd970e440719d3e4a84d77366a79307f57807f8c1bcf01ea24",
+  "lib/menu-classic-svg.ts": "dced4568e6f84da8642750fa7678592afa6b7b08a1cfe76fc06c515133396682",
   "lib/server/promo-render.ts": "b217d94de7cbcb7d765b15cae1c651cae48c7fffe74819211f4030a6daf0a24f"
  },
  "outputs": {

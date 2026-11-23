@@ -43,8 +43,8 @@ Spanish (`Accept-Language: es` or the account locale):
 
 ## Rendered media
 - Board renders are stored with their real PNG size in `media.width/height` (1920×1080 or 1080×1920).
-- `POST /api/layout-studio/preview` / `/api/menus/preview`: `w` stays the PNG **width**; height follows the board's aspect (portrait `w=960` → 960×1707; `w>=1080` → native 1080×1920). (Portrait drawing lands in PR B.)
-- `GET /api/menu-templates/thumbnail/:id?orientation=portrait` ships in **PR B** with the portrait renderer and a `CATALOG_RENDER_REVISION` bump (thumbnails are CDN-cached immutably for a year, so the parameter must not exist before portrait drawing does).
+- `POST /api/layout-studio/preview` / `/api/menus/preview`: `w` stays the PNG **width**; height follows the board's aspect (portrait `w=960` → 960×1707; `w>=1080` → native 1080×1920). Portrait drawing shipped in PR B.
+- `GET /api/menu-templates/thumbnail/:id?orientation=portrait` (PR B): 9:16 sample, widths 320|640|960|1080; any other `orientation` value is 404; ships with the portrait renderer and a `CATALOG_RENDER_REVISION` bump (thumbnails are CDN-cached immutably for a year, so the parameter must not exist before portrait drawing does).
 
 ## Screens (`displays.orientation`, migration 0037)
 - `GET /api/displays` and `GET /api/displays/:id` add `orientation: "landscape" | "portrait"` and `reportedViewport: { width, height, at } | null` (the TV browser's last reported CSS viewport).

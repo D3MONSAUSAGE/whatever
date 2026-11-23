@@ -12,6 +12,7 @@ import {
   type FontWeightChoice, type LayoutCustom, type RoleKey, type RoleTypography, type TextSizePreset,
 } from "@/lib/board-custom";
 import type { LayoutDocument } from "@/lib/layout-studio";
+import { orientationOf } from "@/lib/board-orientation";
 
 export type HeadingScope = "all" | number;
 
@@ -121,7 +122,7 @@ export function CustomizeLook({ doc, update, hasPhoto, open, onOpen, scope, onSc
       {spec.media && media != null ? (
         <div className="grid gap-1">
           <label className="text-sm font-semibold grid gap-1">
-            <span className="flex justify-between gap-2"><span>{spec.media.axis === "height" ? t("cz.mediaSizeHeight") : t("cz.mediaSize")}</span><span className="text-muted font-normal">{t("cz.mediaValue", { n: pct(media) })}</span></span>
+            <span className="flex justify-between gap-2"><span>{spec.media.axis === "height" || orientationOf(doc) === "portrait" ? t("cz.mediaSizeHeight") : t("cz.mediaSize")}</span><span className="text-muted font-normal">{t("cz.mediaValue", { n: pct(media) })}</span></span>
             <input type="range" min={spec.media.min} max={spec.media.max} step={0.01} value={media} data-testid="tpl-cz-media"
               onChange={(e) => update(withCustom(doc, (c) => { c.mediaSize = Number(e.target.value); }))} />
           </label>

@@ -2991,6 +2991,20 @@ export const en = {
   "dacct.note.displayedSince": "TV confirmations are recorded from {date}. A TV paired earlier that never confirmed since shows as unknown.",
   "dacct.note.attributionSince": "Sign-up sources are captured from {date}. Older accounts show as not tracked.",
   "dacct.error": "Couldn't load accounts.",
+  // Vertical (9:16) boards and screen orientation (t413u).
+  "tpl.orientation": "Screen shape",
+  "tpl.orientationHorizontal": "Horizontal (16:9)",
+  "tpl.orientationVertical": "Vertical (9:16)",
+  "tpl.orientationHelp": "Vertical boards are for TVs mounted on their side. Switching keeps every item, price, photo, video and setting.",
+  "tpl.mismatchVerticalOnHorizontal": "Horizontal TV: this vertical board will show centered with empty space at the sides. It won't be stretched.",
+  "tpl.mismatchHorizontalOnVertical": "Vertical TV: this horizontal board will show centered with empty space above and below. It won't be stretched.",
+  "scr.orientation": "How this TV is mounted",
+  "scr.orientationHorizontal": "Horizontal",
+  "scr.orientationVertical": "Vertical (on its side)",
+  "scr.orientationHelp": "This only tells Pekko which boards fit this TV, so it can warn you about a mismatch. Pekko can't rotate the TV. For vertical, mount the TV on its side and turn on rotation or portrait mode in the TV's own settings (Samsung, LG and Android TV each name it differently). Some devices, like Fire TV and many Chromecast setups, can't show a vertical picture.",
+  "scr.orientationSaved": "Saved. Nothing on this screen changed.",
+  "scr.viewportStillHorizontal": "This screen is set to vertical, but the TV is sending a horizontal picture ({w} × {h}). Turn on rotation in the TV's settings.",
+  "scr.viewportStillVertical": "This screen is set to horizontal, but the TV is sending a vertical picture ({w} × {h}).",
 } as const;
 
 export type MessageKey = keyof typeof en;

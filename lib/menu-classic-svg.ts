@@ -9,6 +9,8 @@ import { safeDesignHref } from "@/lib/menu-design-svg";
 
 export const MENU_WIDTH = 1920;
 export const MENU_HEIGHT = 1080;
+export const PORTRAIT_MENU_WIDTH = 1080;
+export const PORTRAIT_MENU_HEIGHT = 1920;
 
 type Theme = {
   bg: string; bg2: string; band: string | null; title: string; subtitle: string;
@@ -130,6 +132,16 @@ export function columnsFor(sections: MenuSection[], singleUpTo = 9): MenuSection
 }
 
 /**
+ * Vertical boards: one full-width column while items stay at a comfortable size, two columns across the 1080px width
+ * when the menu is long (the same balanced split as horizontal boards). Nothing is ever left off.
+ */
+function portraitColumns(sections: MenuSection[], height: number): MenuSection[][] {
+  const total = sections.reduce((n, s) => n + units(s), 0);
+  if (height / Math.max(1, total) >= 64 || sections.length === 0) return [sections];
+  return columnsFor(sections, 0);
+}
+
+/**
  * E6-F1: per-board fonts. Boards without headingFont/bodyFont get no font-family attribute at all,
  * so their SVG (and PNG) is byte-for-byte what it was. Width estimates scale for wider faces.
  */
@@ -147,15 +159,24 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
   const f = faces(content);
   const hf = f.heading.attr, bf = f.body.attr;
   const hs = f.heading.scale, bs = f.body.scale;
-  const H = MENU_HEIGHT, pad = 96;
-  const photoW = art.photo ? Math.round(MENU_WIDTH * 0.38) : 0;
-  const W = MENU_WIDTH - photoW; // content area; the photo fills the right side
-  const logoBox = art.logo ? (art.photo ? { w: 220, h: 100 } : { w: 300, h: 120 }) : null;
+  // Vertical (9:16) boards draw on a 1080×1920 canvas: the photo becomes a full-width band at the bottom instead of
+  // the right-hand 38% column, and the menu uses the full width. Horizontal boards take exactly the original path.
+  const portrait = content.orientation === "portrait";
+  const canvasW = portrait ? PORTRAIT_MENU_WIDTH : MENU_WIDTH;
+  const canvasH = portrait ? PORTRAIT_MENU_HEIGHT : MENU_HEIGHT;
+  const photoBand = portrait && art.photo ? Math.round(canvasH * 0.3) : 0;
+  const H = canvasH - photoBand, pad = portrait ? 72 : 96;
+  const photoW = art.photo && !portrait ? Math.round(MENU_WIDTH * 0.38) : 0;
+  const W = canvasW - photoW; // content area; the photo fills the right side (or the bottom band when vertical)
+  const logoBox = art.logo ? (art.photo || portrait ? { w: 220, h: 100 } : { w: 300, h: 120 }) : null;
   const out: string[] = [];
-  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${MENU_WIDTH}" height="${H}" viewBox="0 0 ${MENU_WIDTH} ${H}">`);
+  out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}" viewBox="0 0 ${canvasW} ${canvasH}">`);
   out.push(`<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.bg}"/><stop offset="1" stop-color="${t.bg2}"/></linearGradient></defs>`);
-  out.push(`<rect width="${MENU_WIDTH}" height="${H}" fill="url(#g)"/>`);
-  if (art.photo) {
+  out.push(`<rect width="${canvasW}" height="${canvasH}" fill="url(#g)"/>`);
+  if (art.photo && portrait) {
+    out.push(`<clipPath id="photo"><rect x="0" y="${H}" width="${canvasW}" height="${photoBand}"/></clipPath>`);
+    out.push(`<image href="${esc(art.photo)}" x="0" y="${H}" width="${canvasW}" height="${photoBand}" preserveAspectRatio="xMidYMid slice" clip-path="url(#photo)"/>`);
+  } else if (art.photo) {
     out.push(`<clipPath id="photo"><rect x="${W}" y="0" width="${photoW}" height="${H}"/></clipPath>`);
     out.push(`<image href="${esc(art.photo)}" x="${W}" y="0" width="${photoW}" height="${H}" preserveAspectRatio="xMidYMid slice" clip-path="url(#photo)"/>`);
   }
@@ -181,8 +202,10 @@ export function menuSvg(template: MenuTemplate, content: MenuContent, art: MenuA
 
   const top = headerH + 70;
   const bottom = H - (content.footer ? 120 : 70);
-  const cols = columnsFor(shownSections(content.sections), art.photo ? 11 : 9); // QA B1-04: no headings for empty sections
-  const gap = 120;
+  const cols = portrait
+    ? portraitColumns(shownSections(content.sections), bottom - top)
+    : columnsFor(shownSections(content.sections), art.photo ? 11 : 9); // QA B1-04: no headings for empty sections
+  const gap = portrait ? 64 : 120;
   const colW = (W - 2 * pad - gap * (cols.length - 1)) / cols.length;
   const maxUnits = Math.max(1, ...cols.map((c) => c.reduce((n, s) => n + units(s), 0)));
   const u = Math.min(cols.length === 1 ? 92 : 86, (bottom - top) / maxUnits);

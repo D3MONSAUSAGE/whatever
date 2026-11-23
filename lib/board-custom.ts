@@ -403,9 +403,17 @@ export function fixedRegion(kind: "featuredMedia" | "businessName" | "featuredTe
   const path = kind === "featuredMedia" ? "custom.mediaSize" : kind === "businessName" ? "custom.roles.businessName" : "custom.roles.featuredText";
   return { id: kind, target: { kind, path } as RegionTarget, box: roundBox(box) };
 }
+/** Canvas regions are clamped to: 1920×1080, or 1080×1920 while a vertical board is being drawn. */
+let regionCanvas = { width: 1920, height: 1080 };
+/** Sets the canvas regions are clamped to; returns the previous one so the caller can restore it. */
+export function setRegionCanvas(canvas: { width: number; height: number }) {
+  const previous = regionCanvas;
+  regionCanvas = { width: canvas.width, height: canvas.height };
+  return previous;
+}
 export function roundBox(b: Box): Box {
   const x = Math.max(0, Math.round(b.x)); const y = Math.max(0, Math.round(b.y));
-  return { x, y, w: Math.max(1, Math.min(1920 - x, Math.round(b.w))), h: Math.max(1, Math.min(1080 - y, Math.round(b.h))) };
+  return { x, y, w: Math.max(1, Math.min(regionCanvas.width - x, Math.round(b.w))), h: Math.max(1, Math.min(regionCanvas.height - y, Math.round(b.h))) };
 }
 
 /** Image box for a photo with a focal point: explicit placement when the photo's size is known, else the nearest anchor. */

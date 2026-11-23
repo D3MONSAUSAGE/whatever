@@ -52,6 +52,10 @@ export type DisplayItem = {
   playingAt?: string | null;
   nextChange?: { at: string; label: string; kind: "schedule" | "assignment" } | null;
   boardPreviewUrl?: string | null;
+  /** 0037: how the TV is mounted (set by the owner; Pekko never rotates the TV). */
+  orientation?: "landscape" | "portrait";
+  /** The viewport the TV browser last reported; null until a player that reports it runs. Warnings only. */
+  reportedViewport?: { width: number; height: number; at: string | null } | null;
 };
 
 export type ScheduleSummary = { id: string; name: string; playlistId: string; playlistName: string; target: "display" | "group"; priority: number };

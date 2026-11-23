@@ -223,7 +223,10 @@ export function PreviewApp() {
   // E5-F2: ?unpaired=1 shows the screen right after its TV was unpaired (last heartbeat and playback still recent).
   const workspaceDisplay = params.get("unpaired") === "1"
     ? { ...foundDisplay, connected: false, online: false, lastSeenAt: new Date().toISOString(), reportedState: "playing" as const, playingAt: new Date().toISOString() }
-    : foundDisplay;
+    : params.get("orientation") === "portrait"
+      // Vertical screen whose TV still reports a horizontal picture (shows the setting and the mismatch hint).
+      ? { ...foundDisplay, orientation: "portrait" as const, reportedViewport: { width: 1920, height: 1080, at: new Date().toISOString() } }
+      : foundDisplay;
   const path = screen === "workspace" ? `/dashboard/screens/${workspaceId}` : previewPath(screen);
   const onboarding = previewOnboarding(params.get("onboarding"));
   const overview = empty || onboarding
