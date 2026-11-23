@@ -35,10 +35,10 @@ export const GET = withLocalizedErrors(async function GET(req: Request, ctx: { p
   const variantParam = url.searchParams.get("variant");
   if (variantParam !== null && (!design || !design.variants.some((v) => v.id === variantParam))) return notFound();
   const variant = design && variantParam && variantParam !== design.variants[0]?.id ? variantParam : null;
-  // `orientation=portrait` draws the same sample board on the vertical 1080×1920 canvas. Anything else is a 404,
-  // and landscape stays the canonical URL without the parameter (unchanged images).
+  // `orientation=portrait` draws the same sample board on the vertical 1080×1920 canvas. `orientation=landscape` is a
+  // harmless no-op: it redirects to the normal (parameter-free) landscape URL. Any other value is a 404.
   const orientationParam = url.searchParams.get("orientation");
-  if (orientationParam !== null && orientationParam !== "portrait") return notFound();
+  if (orientationParam !== null && orientationParam !== "portrait" && orientationParam !== "landscape") return notFound();
   const portrait = orientationParam === "portrait";
   const width = snapWidth(url.searchParams.get("w"), portrait ? PORTRAIT_THUMBNAIL_WIDTHS : THUMBNAIL_WIDTHS);
   const version = catalogVersion();

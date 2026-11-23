@@ -26,4 +26,4 @@ the editor's Horizontal/Vertical choice, the screen orientation setting, and non
   Pekko can't rotate the TV. A hint appears when the TV reports a picture of the other shape.
 - Publish dialog: per-screen hint when the board and the screen differ ("will show centered with empty space; it won't be
   stretched"). Never blocks publishing.
-- Thumbnails: `?orientation=portrait`; `CATALOG_RENDER_REVISION` 1 → 2 (catalog version changes; landscape pixels identical).
+- Thumbnails: `?orientation=portrait` (`orientation=landscape` is a no-op redirect to the normal thumbnail); `CATALOG_RENDER_REVISION` 1 → 2 (catalog version changes; landscape pixels identical).

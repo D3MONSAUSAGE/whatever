@@ -188,7 +188,14 @@ describe("GET /api/menu-templates/thumbnail/[id]", () => {
     expect(big.status).toBe(308);
     expect(big.headers.get("location")).toBe(`/api/menu-templates/thumbnail/two-column?v=${v}&w=1080&orientation=portrait`);
     expect((await thumb(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640&orientation=sideways`)).status).toBe(404);
-    expect((await thumb(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640&orientation=landscape`)).status).toBe(404);
+    // orientation=landscape is a no-op: it lands on the normal landscape thumbnail.
+    const wide = await thumb(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640&orientation=landscape`);
+    expect(wide.status).toBe(308);
+    expect(wide.headers.get("location")).toBe(`/api/menu-templates/thumbnail/two-column?v=${v}&w=640`);
+    const followed = await thumb(wide.headers.get("location")!);
+    expect(followed.status).toBe(200);
+    const wideBytes = new Uint8Array(await followed.arrayBuffer());
+    expect(new DataView(wideBytes.buffer).getUint32(20)).toBe(360);
     // The catalog's own thumbnail paths stay landscape.
     const { body } = await catalog();
     expect(body.entries.every((e) => !e.thumbnailPath.includes("orientation"))).toBe(true);
