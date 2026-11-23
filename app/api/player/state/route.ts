@@ -31,7 +31,13 @@ function pollFor(mode: "auto" | "manual" | null, commands: { seq: number }[]): n
   return playerPollMs();
 }
 
-async function displaySync(displayId: string) {
+async function displaySync(displayId: string): Promise<{ confirmedVersion: unknown; confirmedAt: unknown; orientation?: "landscape" | "portrait" }> {
+  // 0037: also the screen's configured orientation (setup guidance on the TV only).
+  const withOrientation = await db().from("displays").select("confirmed_version, confirmed_at, acknowledged_at, orientation").eq("id", displayId).maybeSingle();
+  if (!withOrientation.error && withOrientation.data) {
+    const d = withOrientation.data;
+    return { confirmedVersion: d.confirmed_version, confirmedAt: d.acknowledged_at || d.confirmed_at, orientation: d.orientation === "portrait" ? "portrait" : "landscape" };
+  }
   const rich = await db().from("displays").select("confirmed_version, confirmed_at, acknowledged_at").eq("id", displayId).maybeSingle();
   if (!rich.error && rich.data) {
     return { confirmedVersion: rich.data.confirmed_version, confirmedAt: rich.data.acknowledged_at || rich.data.confirmed_at };
@@ -68,6 +74,8 @@ type PlaylistItem = {
   composition?: {
     layoutVersion: 1;
     fallbackUrl: string;
+    canvasWidth: number;
+    canvasHeight: number;
     video?: { mediaId: string; url: string; box: { x: number; y: number; w: number; h: number } };
   };
 };
@@ -119,6 +127,7 @@ export async function GET(req: Request) {
     catchupMs?: number;
     catchupForMs?: number;
     playerBuild: string;
+    displayOrientation?: "landscape" | "portrait";
   } = {
     pollMs: pollFor(modeHint, commands),
     commands,
@@ -127,6 +136,9 @@ export async function GET(req: Request) {
     // The current TV player build; an older page still running on a TV reloads itself once (public/player.html).
     playerBuild: PLAYER_BUILD,
     ...catchupPoll(version, sync.confirmedVersion, sync.confirmedAt),
+    // Additive (0037): sent only for screens set up as vertical, so every landscape payload stays byte-identical.
+    // Guidance only; older players ignore it.
+    ...(sync.orientation === "portrait" ? { displayOrientation: "portrait" as const } : {}),
   };
   if (schedule.kind === "on" && schedule.nextTransitionAt) extra.nextTransitionAt = schedule.nextTransitionAt;
   const overrideId = schedule.kind === "on" ? schedule.overridePlaylistId : null;
@@ -188,6 +200,24 @@ export async function POST(req: Request) {
   const token = req.headers.get("x-display-token") || "";
   if (token.length < 20 || token.length > 200) return fail("unauthorized", 401);
   const body = await readJson(req);
+  // Vertical boards (0037): { viewport: { width, height } } reports the TV browser's CSS viewport. Informational only;
+  // it never changes playback. Before 0037 it is accepted and ignored.
+  if (body.viewport && typeof body.viewport === "object") {
+    const vp = body.viewport as { width?: unknown; height?: unknown };
+    const width = Math.round(Number(vp.width));
+    const height = Math.round(Number(vp.height));
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1 || width > 20000 || height > 20000) return fail("bad viewport", 400);
+    const saved = await db()
+      .from("displays")
+      .update({ player_viewport_width: width, player_viewport_height: height, player_viewport_at: new Date().toISOString() })
+      .eq("token_hash", sha256(token))
+      .eq("status", "active")
+      .select("id")
+      .maybeSingle();
+    if (saved.error) return isMissingSchema(saved.error) ? json({ ok: true }) : fail("unavailable", 503);
+    if (!saved.data) return fail("unauthorized", 401);
+    return json({ ok: true });
+  }
   // M8 proof of play: { playing: { version } } is sent once after the TV paints new content.
   if (body.acknowledged && typeof body.acknowledged === "object") {
     const version = Number((body.acknowledged as { version?: unknown }).version);

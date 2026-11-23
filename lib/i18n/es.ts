@@ -523,6 +523,7 @@ export const es: Record<MessageKey, string> = {
   "apiError.pairing_code_invalid": "Escriba el código de 6 dígitos que aparece en la TV.",
   "apiError.screen_name_required": "Póngale un nombre a esta TV, como “Mostrador”.",
   "apiError.pairing_code_not_found": "Ese código no corresponde a ninguna TV. Revise la pantalla: los códigos vencen a los 10 minutos.",
+  "apiError.orientation_unsupported": "Este menú es vertical. Edítelo en pekkotv.com, o actualice la aplicación para cambiarlo aquí.",
   "apiError.display_not_found": "Esa pantalla no está en esta cuenta.",
   "apiError.rate_limited_15m": "Demasiados intentos. Espere 15 minutos e intente de nuevo.",
   "apiError.plan_check_unavailable": "No se pudo verificar su plan. Intente de nuevo.",

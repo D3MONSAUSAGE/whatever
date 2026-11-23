@@ -440,6 +440,21 @@ The TV reports a playback error with `POST /api/player/state` and header `X-Disp
 
 Offline playback is inside the TV page: Cache Storage `seemple-media-v1`, last saved playlist, images only (`public/player.html` `playSaved`, `public/player-sw.js`). There is no management API for an offline pack. A phone that cannot reach the API shows its own network error. It does not cache the screen's media as a second player.
 
+## Vertical (9:16) menu boards
+
+Full contract: [`docs/vertical/API_CONTRACT.md`](vertical/API_CONTRACT.md). What the app must know:
+
+- **Capability header.** Send `X-Pekko-Client-Caps: orientation` only from the build that can show and keep vertical boards. It is the only signal (not the User-Agent, not `X-Pekko-Client`). Without it the app is treated as an older client.
+- **Board orientation** is `orientation: "portrait"` inside the board document (`LayoutDocument` / `MenuContent`). Absent means horizontal. Keep the key when re-saving; omitting it on an existing board keeps the stored value. Unknown values are ignored (never a 400). Sending `"landscape"` from a capable build turns a vertical board horizontal, so only send it when the owner chose that.
+- **Changing orientation is for capable clients only.** New boards from older builds are always horizontal. Content saves from older builds to a vertical board (`POST /api/layout-studio` draft or publish with that `menuId`, classic `PATCH /api/menus/:id` with `content` or `template`) return **409** and change nothing, so no board is ever silently made horizontal:
+  - `{ "error": "This menu board is vertical. Edit it at pekkotv.com, or update the app to change it here.", "code": "orientation_unsupported" }`
+  - ES: `Este menú es vertical. Edítelo en pekkotv.com, o actualice la aplicación para cambiarlo aquí.`
+  - Rename, screen assignment (`displayIds`, `POST /api/layout-studio/assign`), delete and previews never return this 409.
+- **Catalog seeds stay horizontal.** `fit` from `POST /api/menu-templates/switch` adds `canvasWidth`/`canvasHeight` (1920×1080 or 1080×1920).
+- **Media sizes are accurate.** A rendered vertical board is stored as a 1080×1920 image (`media.width/height`). Previews keep `w` as the PNG width (portrait `w=960` → 960×1707).
+- **Screens.** The screen row adds `orientation` (`"landscape"` | `"portrait"`) and `reportedViewport` (`{ width, height, at }` or null). `PATCH /api/displays/:id` with `{ orientation }` alone is valid and partial; invalid values are 400. `POST /api/displays/pair` stays `{ code, name }` (horizontal by default) and accepts an optional `orientation`. Reconnecting never resets it. Copy must make clear the owner rotates/mounts the TV; Pekko can't rotate it.
+- **Mismatch.** Assigning a vertical board to a horizontal screen (or the reverse) is allowed. Show a non-blocking warning; the TV letterboxes, never stretches.
+
 ## Changes since Android +14 (web PRs #148–#163)
 
 | Change | What the app sees | PR |

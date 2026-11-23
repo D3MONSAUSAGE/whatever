@@ -7,6 +7,9 @@
 export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
   // Screens, pairing, groups
   "A group with that name already exists.": "Ya existe un grupo con ese nombre.",
+  "Choose horizontal or vertical.": "Elija horizontal o vertical.",
+  "Screen orientation isn't available yet. Try again after the next update.": "La orientación de la pantalla aún no está disponible. Intente de nuevo después de la próxima actualización.",
+  "Couldn't update the screen. Try again.": "No se pudo actualizar la pantalla. Intente de nuevo.",
   "Choose at least one TV.": "Elija al menos una TV.",
   "Choose at least one screen.": "Elija al menos una pantalla.",
   "Choose fewer screens. Fifty is the limit for one publish.": "Elija menos pantallas. El límite es de cincuenta por publicación.",

@@ -4,7 +4,8 @@ import { rejectSubscriptionWrite } from "@/lib/server/subscription-write";
 import { db } from "@/lib/server/supabase";
 import { isUuid } from "@/lib/server/crypto";
 import { enforceLimit, fail, json, readJson } from "@/lib/server/http";
-import { keepStoredFonts, keepStoredItemPhotos } from "@/lib/menu-templates";
+import { keepStoredFonts, keepStoredItemPhotos, keepStoredOrientation } from "@/lib/menu-templates";
+import { clientSupportsOrientation, ORIENTATION_UNSUPPORTED_CODE, ORIENTATION_UNSUPPORTED_MESSAGE, resolveSavedOrientation } from "@/lib/board-orientation";
 import { parseLayout } from "@/lib/layout-studio";
 import { PUBLISH_MAX_PER_USER, PUBLISH_RATE_MESSAGE, PUBLISH_WINDOW_SECONDS, UPLOAD_MAX_PER_USER, UPLOAD_RATE_MESSAGE, UPLOAD_WINDOW_SECONDS } from "@/lib/server/limits";
 import { MENUS_UNAVAILABLE, checkMenuPhoto, isMissingSchema, keepOwnItemPhotos, menuView, parseMenuBody, rerenderMenu, type MenuRow } from "@/lib/server/menus";
@@ -87,6 +88,13 @@ export const PATCH = withLocalizedErrors(async function PATCH(req: Request, { pa
       kept = await publishTo(admin.accountId, row.playlist_id, targets);
     }
     return json({ id, mediaId: row.media_id, playlistId: row.playlist_id, published: kept });
+  }
+  // Vertical boards (t413u): an older client may not save content to a portrait board (rename and screens still work),
+  // and content sent without `orientation` keeps the stored one.
+  if (parsed.value.content !== undefined || parsed.value.template !== undefined) {
+    const orientation = resolveSavedOrientation({ incoming: body.content, stored: row.content ?? {}, capable: clientSupportsOrientation(req) });
+    if (!orientation.ok) return fail(ORIENTATION_UNSUPPORTED_MESSAGE, 409, ORIENTATION_UNSUPPORTED_CODE);
+    if (parsed.value.content) parsed.value.content = keepStoredOrientation(parsed.value.content, orientation.orientation);
   }
   // E6: clients that don't know about fonts (Android +13) must not strip them on edit.
   if (parsed.value.content) parsed.value.content = keepStoredFonts(body.content, parsed.value.content, row.content);

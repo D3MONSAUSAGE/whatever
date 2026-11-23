@@ -2,6 +2,7 @@
 
 import { boardFont, FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type BoardFontId } from "@/lib/board-fonts";
 import { MENU_LIMITS } from "@/lib/menu-templates";
+import { boardCanvas, orientationField, orientationOf } from "@/lib/board-orientation";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
 import { isDesignId, isStockPhoto, type StockPhotoId } from "@/lib/menu-designs";
 import { designSvg, designSvgWithReport, designVideoBox, safeDesignHref, type DesignArt } from "@/lib/menu-design-svg";
@@ -41,6 +42,11 @@ export type BoardFont = BoardFontId;
 
 export type LayoutDocument = {
   layoutVersion: 1;
+  /**
+   * Vertical boards (t413u): "portrait" draws at 1080×1920. Absent = landscape 1920×1080, exactly as before; only
+   * "portrait" is ever stored (lib/board-orientation.ts).
+   */
+  orientation?: "portrait";
   template: LayoutTemplate;
   split: number;
   title: string;
@@ -399,6 +405,7 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       ...(raw.photoStyle === "thumbs" || raw.photoStyle === "text" ? { photoStyle: raw.photoStyle } : {}),
       ...design,
       ...(custom.value ? { custom: custom.value } : {}),
+      ...orientationField(orientationOf(raw)),
     },
   };
 }
@@ -685,7 +692,8 @@ export function paintAfterVideoFailed(stillOnScreen: boolean): { phase: PaintPha
 }
 
 export type CompositionVideo = { mediaId: string; url: string; box: ZoneBox };
-export type PlayerComposition = { layoutVersion: 1; fallbackUrl: string; video?: CompositionVideo };
+/** canvasWidth/canvasHeight (additive, vertical boards): the board's own size; the video box is in these px. */
+export type PlayerComposition = { layoutVersion: 1; fallbackUrl: string; canvasWidth: number; canvasHeight: number; video?: CompositionVideo };
 
 /** Additive player field. Omitted entirely when there is no video to play. */
 export function playerComposition(doc: LayoutDocument, fallbackUrl: string, videoUrl: string | null): PlayerComposition | null {
@@ -693,9 +701,12 @@ export function playerComposition(doc: LayoutDocument, fallbackUrl: string, vide
   // The box always comes from the template and its proportions. A box on the document is ignored.
   const box = mediaVideoBox(doc);
   if (!box) return null;
+  const canvas = boardCanvas(orientationOf(doc));
   return {
     layoutVersion: 1,
     fallbackUrl,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
     video: { mediaId: doc.videoMediaId, url: videoUrl, box },
   };
 }

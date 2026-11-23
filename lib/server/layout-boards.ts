@@ -4,6 +4,7 @@ import { applyLayoutSave, extraImageIds, type LibraryFile } from "@/lib/layout-p
 import { imageBytes } from "@/lib/server/brand";
 import { UNREADY_MEDIA_MESSAGE } from "@/lib/server/media-ready-guard";
 import { BUCKET, db } from "@/lib/server/supabase";
+import { ORIENTATION_UNSUPPORTED_CODE, ORIENTATION_UNSUPPORTED_MESSAGE, resolveSavedOrientation } from "@/lib/board-orientation";
 function libraryKind(kind: unknown, mime: string): "image" | "video" | null {
   if (kind === "video") return "video";
   if (kind === "presentation") return null;
@@ -96,6 +97,8 @@ export async function saveLayoutForAccount(accountId: string, body: {
   name?: string;
   mode: "draft" | "publish";
   document: unknown;
+  /** The client sent `X-Pekko-Client-Caps: orientation` (lib/board-orientation.ts). Absent = older client. */
+  orientationCapable?: boolean;
 }) {
   if (!layoutStudioEnabled()) return { status: 404 as const, error: "Not found" };
   if (body.mode !== "draft" && body.mode !== "publish") return { status: 400 as const, error: "Choose draft or publish." };
@@ -120,18 +123,27 @@ export async function saveLayoutForAccount(accountId: string, body: {
   let previousMediaId: string | null = null;
   let playlistId: string | null = null;
   let menuId = body.menuId || null;
+  let storedContent: unknown = null;
   if (menuId) {
-    const row = await db().from("menus").select("id, media_id, playlist_id").eq("id", menuId).eq("account_id", accountId).maybeSingle();
+    const row = await db().from("menus").select("id, media_id, playlist_id, content").eq("id", menuId).eq("account_id", accountId).maybeSingle();
     if (row.error) return { status: 500 as const, error: "Couldn't open that menu." };
     if (!row.data) return { status: 404 as const, error: "That menu isn't in this account." };
     previousMediaId = row.data.media_id ? String(row.data.media_id) : null;
     playlistId = row.data.playlist_id ? String(row.data.playlist_id) : null;
+    storedContent = row.data.content ?? null;
   }
+  // Vertical boards (t413u): an older client may not save content to a portrait board, and a client that omits
+  // `orientation` keeps the stored one, so nothing can silently turn a vertical board horizontal.
+  const orientation = resolveSavedOrientation({ incoming: body.document, stored: menuId ? storedContent ?? {} : null, capable: Boolean(body.orientationCapable) });
+  if (!orientation.ok) return { status: 409 as const, error: ORIENTATION_UNSUPPORTED_MESSAGE, code: ORIENTATION_UNSUPPORTED_CODE };
+  const document = body.document && typeof body.document === "object" && !Array.isArray(body.document)
+    ? { ...(body.document as Record<string, unknown>), orientation: orientation.orientation }
+    : body.document;
   const saved = await applyLayoutSave({
     enabled: true,
     accountId,
     mode: body.mode,
-    document: body.document,
+    document,
     files,
     previousMediaId,
   }, {

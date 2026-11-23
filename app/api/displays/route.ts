@@ -35,6 +35,10 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
     assigned_playlist_id?: string | null;
     player_error?: string | null;
     player_error_at?: string | null;
+    orientation?: string | null;
+    player_viewport_width?: number | null;
+    player_viewport_height?: number | null;
+    player_viewport_at?: string | null;
     media: MediaJoin | MediaJoin[] | null;
   };
   let list = (rows ?? []) as unknown as Row[];
@@ -110,6 +114,12 @@ export const GET = withLocalizedErrors(async function GET(req: Request) {
         }),
         nextChange: scheduleInfo.get(d.id)?.nextChange ?? null,
         boardPreviewUrl: d.assigned_playlist_id ? boardPreview.get(d.assigned_playlist_id) ?? null : null,
+        // Additive (vertical boards, 0037): how the owner says this TV is set up ('landscape' before 0037), and the
+        // viewport the TV browser last reported (null until a player that reports it runs). Warnings only.
+        orientation: d.orientation === "portrait" ? "portrait" : "landscape",
+        reportedViewport: typeof d.player_viewport_width === "number" && typeof d.player_viewport_height === "number"
+          ? { width: d.player_viewport_width, height: d.player_viewport_height, at: d.player_viewport_at ?? null }
+          : null,
       };
     });
   if (!page) return json(out);
@@ -120,6 +130,8 @@ async function loadDisplayRows(accountId: string) {
   const media = "media:assigned_media_id (id, file_name, storage_path)";
   const base = `id, name, location_id, token_hash, last_seen_at, content_version, created_at, ${media}`;
   const attempts = [
+    // 0037 (vertical boards): screen orientation and the TV's reported viewport.
+    { columns: `${base}, confirmed_version, confirmed_at, acknowledged_version, acknowledged_at, assigned_playlist_id, player_error, player_error_at, orientation, player_viewport_width, player_viewport_height, player_viewport_at`, playlistColumn: true },
     { columns: `${base}, confirmed_version, confirmed_at, acknowledged_version, acknowledged_at, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
     { columns: `${base}, confirmed_version, confirmed_at, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },
     { columns: `${base}, assigned_playlist_id, player_error, player_error_at`, playlistColumn: true },

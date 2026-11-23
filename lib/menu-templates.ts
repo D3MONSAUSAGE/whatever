@@ -1,5 +1,6 @@
 /** Shared (client + server) menu-board definitions and validation. */
 import { FONT_CHOICE_ERROR, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
+import { orientationField, orientationOf, type BoardOrientation } from "@/lib/board-orientation";
 
 export type MenuTemplate = "classic" | "fresh" | "bold";
 export type MenuItem = {
@@ -17,6 +18,8 @@ export type MenuContent = {
   headingFont?: BoardFontId; bodyFont?: BoardFontId;
   /** Item photos show as thumbnails beside their items unless this is false (hidden; the photos stay on the items). */
   itemPhotos?: boolean;
+  /** Vertical boards (t413u): "portrait" draws at 1080×1920. Absent = landscape, exactly as before. */
+  orientation?: "portrait";
 };
 
 export const MENU_TEMPLATES: { id: MenuTemplate; name: string; blurb: string; swatch: [string, string] }[] = [
@@ -116,7 +119,7 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
   }
   if (raw.itemPhotos != null && typeof raw.itemPhotos !== "boolean") return { ok: false, error: "Item photos has to be true or false." };
   const itemPhotos = raw.itemPhotos === false ? { itemPhotos: false } : {};
-  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand, ...fonts, ...itemPhotos } };
+  return { ok: true, value: { title: title!, subtitle: subtitle!, footer: footer!, sections, photoMediaId, useBrand, ...fonts, ...itemPhotos, ...orientationField(orientationOf(raw)) } };
 }
 
 /**
@@ -206,4 +209,15 @@ export function sampleMenu(): MenuContent {
       ] },
     ],
   };
+}
+
+/**
+ * PATCH merge for orientation (t413u): content sent without the `orientation` key keeps the stored orientation, so an
+ * older client can never turn a vertical board horizontal. The route refuses content saves to portrait boards from
+ * clients without the orientation capability before this runs (lib/board-orientation.ts).
+ */
+export function keepStoredOrientation(parsed: MenuContent, orientation: BoardOrientation): MenuContent {
+  const next: MenuContent = { ...parsed };
+  delete next.orientation;
+  return orientation === "portrait" ? { ...next, orientation: "portrait" } : next;
 }
