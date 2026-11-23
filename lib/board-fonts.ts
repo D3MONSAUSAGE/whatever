@@ -7,10 +7,19 @@
  * Inter and Noto Serif are unchanged, so existing boards render byte-for-byte as before.
  * New faces apply only when an owner picks them for a board or in Brand Kit (new content).
  */
-export const BOARD_FONT_IDS = ["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"] as const;
+export const BOARD_FONT_IDS = ["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster", "cormorant-garamond", "playfair-display"] as const;
 export type BoardFontId = (typeof BOARD_FONT_IDS)[number];
+/**
+ * Faces for Brand Kit and classic full-screen menus: the six the database (brand_kits check constraint) and the
+ * Android classic-menu contract know. Template and layout boards (`layoutVersion: 1`, web-edited) may use every board font.
+ */
+export const CLASSIC_FONT_IDS = ["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"] as const satisfies readonly BoardFontId[];
+export function isClassicFont(value: unknown): value is (typeof CLASSIC_FONT_IDS)[number] {
+  return typeof value === "string" && (CLASSIC_FONT_IDS as readonly string[]).includes(value);
+}
 
-type FaceFile = { name: string; file: string; weight: number };
+/** `italic` faces are drawn only where a template asks for italics; they never count as a weight choice. */
+type FaceFile = { name: string; file: string; weight: number; italic?: boolean };
 type FontSpec = {
   id: BoardFontId;
   family: string;
@@ -51,7 +60,24 @@ export const BOARD_FONTS: readonly FontSpec[] = [
   { id: "lobster", family: "Lobster", label: "Lobster", hint: "Friendly script", widthScale: 1, files: [
     { name: "lobster", file: "Lobster-Regular.ttf", weight: 400 },
   ] },
+  // Premium service templates (Noir & Co., Linden). Official Google Fonts static TTFs, unmodified (SIL OFL 1.1).
+  { id: "cormorant-garamond", family: "Cormorant Garamond", label: "Cormorant Garamond", hint: "Refined, high-contrast serif", widthScale: 1, files: [
+    { name: "cormorant-garamond-medium", file: "CormorantGaramond-Medium.ttf", weight: 500 },
+    { name: "cormorant-garamond-semibold", file: "CormorantGaramond-SemiBold.ttf", weight: 600 },
+    { name: "cormorant-garamond-bold", file: "CormorantGaramond-Bold.ttf", weight: 700 },
+    { name: "cormorant-garamond-italic", file: "CormorantGaramond-MediumItalic.ttf", weight: 500, italic: true },
+  ] },
+  { id: "playfair-display", family: "Playfair Display", label: "Playfair Display", hint: "Editorial display serif", widthScale: 1, files: [
+    { name: "playfair-display", file: "PlayfairDisplay-Regular.ttf", weight: 400 },
+    { name: "playfair-display-bold", file: "PlayfairDisplay-Bold.ttf", weight: 700 },
+    { name: "playfair-display-italic", file: "PlayfairDisplay-Italic.ttf", weight: 400, italic: true },
+  ] },
 ];
+
+/** Upright faces of a font: the weights an owner can pick (italics are template-only). */
+export function uprightFaces(font: FontSpec): FaceFile[] {
+  return font.files.filter((face) => !face.italic);
+}
 
 export function isBoardFont(value: unknown): value is BoardFontId {
   return typeof value === "string" && (BOARD_FONT_IDS as readonly string[]).includes(value);
@@ -82,11 +108,15 @@ export function widthScaleForFamily(family: string): number {
 export function fontFaceCss(ids: readonly BoardFontId[] = BOARD_FONT_IDS): string {
   return BOARD_FONTS.filter((font) => ids.includes(font.id)).flatMap((font) => {
     const family = font.family.includes(" ") ? `"${font.family}"` : font.family;
+    const upright = uprightFaces(font).length;
     return font.files.map((face) => {
-      const weight = font.files.length === 1 ? "100 900" : String(face.weight);
-      return `@font-face { font-family: ${family}; src: url("/layout-studio/media/font/${face.name}") format("truetype"); font-weight: ${weight}; font-style: normal; font-display: swap; }`;
+      const weight = upright === 1 && !face.italic ? "100 900" : String(face.weight);
+      return `@font-face { font-family: ${family}; src: url("/layout-studio/media/font/${face.name}") format("truetype"); font-weight: ${weight}; font-style: ${face.italic ? "italic" : "normal"}; font-display: swap; }`;
     });
   }).join("\n");
 }
 
-export const FONT_CHOICE_ERROR = `Choose one of: ${BOARD_FONTS.map((font) => font.label).join(", ")}.`;
+/** Brand Kit and classic menus (unchanged wording: the six classic faces). */
+export const FONT_CHOICE_ERROR = `Choose one of: ${BOARD_FONTS.filter((font) => isClassicFont(font.id)).map((font) => font.label).join(", ")}.`;
+/** Template and layout boards: every board font. */
+export const BOARD_FONT_CHOICE_ERROR = `Choose one of: ${BOARD_FONTS.map((font) => font.label).join(", ")}.`;

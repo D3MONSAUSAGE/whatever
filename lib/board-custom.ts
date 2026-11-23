@@ -13,7 +13,7 @@
  *
  * Client-safe: no server imports.
  */
-import { BOARD_FONTS, type BoardFontId } from "@/lib/board-fonts";
+import { BOARD_FONTS, uprightFaces, type BoardFontId } from "@/lib/board-fonts";
 import { designById, isDesignId, type DesignComposition } from "@/lib/menu-designs";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
@@ -134,11 +134,11 @@ export function customizationSpec(doc: Pick<LayoutDocument, "design" | "template
 /** Weights each bundled font ships, as weight choices a client may offer (others snap to these). */
 export function fontWeightChoices(font: BoardFontId): FontWeightChoice[] {
   const spec = BOARD_FONTS.find((f) => f.id === font);
-  const shipped = spec ? spec.files.map((f) => f.weight) : [400];
+  const shipped = spec ? uprightFaces(spec).map((f) => f.weight) : [400];
   return WEIGHT_CHOICES.filter((choice) => shipped.includes(WEIGHT_VALUE[choice]));
 }
 export function fontWeightsByFont(): Record<BoardFontId, { choices: FontWeightChoice[]; weights: number[] }> {
-  return Object.fromEntries(BOARD_FONTS.map((f) => [f.id, { choices: fontWeightChoices(f.id), weights: f.files.map((x) => x.weight) }])) as Record<BoardFontId, { choices: FontWeightChoice[]; weights: number[] }>;
+  return Object.fromEntries(BOARD_FONTS.map((f) => [f.id, { choices: fontWeightChoices(f.id), weights: uprightFaces(f).map((x) => x.weight) }])) as Record<BoardFontId, { choices: FontWeightChoice[]; weights: number[] }>;
 }
 function snapWeightTo(shipped: number[], weight: number): number {
   let best = shipped[0] ?? 400; let gap = Infinity;
@@ -152,7 +152,7 @@ function snapWeightTo(shipped: number[], weight: number): number {
 /** The weight actually drawn for a choice in a family (render-time snap to shipped faces). */
 export function snapWeight(family: string, choice: FontWeightChoice): number {
   const spec = BOARD_FONTS.find((f) => f.family === family);
-  return snapWeightTo(spec ? spec.files.map((f) => f.weight) : [400, 700], WEIGHT_VALUE[choice]);
+  return snapWeightTo(spec ? uprightFaces(spec).map((f) => f.weight) : [400, 700], WEIGHT_VALUE[choice]);
 }
 
 /* ---------------- parsing (server and clients) ---------------- */

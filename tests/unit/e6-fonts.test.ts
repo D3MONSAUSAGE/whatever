@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { BOARD_FONT_IDS, BOARD_FONTS, FONT_FILES, boardFont, fontFaceCss, isBoardFont, widthScaleForFamily } from "@/lib/board-fonts";
+import { BOARD_FONT_IDS, BOARD_FONTS, CLASSIC_FONT_IDS, FONT_FILES, boardFont, fontFaceCss, isBoardFont, widthScaleForFamily } from "@/lib/board-fonts";
 import { layoutSvg, parseLayout, sampleLayout, seedBrand, type LayoutTemplate } from "@/lib/layout-studio";
 import { isBrandFont, parseOptionalFont, fontFamilyName } from "@/lib/brand-kit";
 import { renderLayoutPng } from "@/lib/server/layout-render";
@@ -43,9 +43,11 @@ const GOLDEN: Record<string, string> = {
 
 describe("E6: more fonts for boards and Brand Kit", () => {
   it("adds four self-hosted OFL faces; Inter and Noto Serif unchanged", () => {
-    expect(BOARD_FONT_IDS).toEqual(["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"]);
+    expect(BOARD_FONT_IDS).toEqual(["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster", "cormorant-garamond", "playfair-display"]);
+    // Brand Kit and classic menus keep the six faces the database and the Android app know.
+    expect(CLASSIC_FONT_IDS).toEqual(["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"]);
     for (const font of BOARD_FONTS) for (const face of font.files) expect(existsSync(`assets/fonts/${face.file}`)).toBe(true);
-    for (const lic of ["Oswald-OFL.txt", "Montserrat-OFL.txt", "BebasNeue-OFL.txt", "Lobster-OFL.txt", "NotoSerif-OFL.txt"]) {
+    for (const lic of ["Oswald-OFL.txt", "Montserrat-OFL.txt", "BebasNeue-OFL.txt", "Lobster-OFL.txt", "NotoSerif-OFL.txt", "CormorantGaramond-OFL.txt", "PlayfairDisplay-OFL.txt"]) {
       expect(readFileSync(`assets/fonts/${lic}`, "utf8")).toMatch(/SIL Open Font License, Version 1\.1/);
     }
     expect(FONT_FILES).toMatchObject({ inter: "Inter-Regular.ttf", "inter-bold": "Inter-Bold.ttf", "inter-extrabold": "Inter-ExtraBold.ttf", "noto-serif": "NotoSerif-Regular.ttf", "noto-serif-bold": "NotoSerif-Bold.ttf" });
@@ -84,11 +86,12 @@ describe("E6: more fonts for boards and Brand Kit", () => {
     for (const id of BOARD_FONT_IDS) {
       const parsed = parseLayout({ ...sampleLayout(), font: id });
       expect(parsed.ok && parsed.value.font).toBe(id);
-      expect(isBrandFont(id)).toBe(true);
-      expect(parseOptionalFont(id, "heading")).toEqual({ ok: true, value: id });
+      const classic = (CLASSIC_FONT_IDS as readonly string[]).includes(id);
+      expect(isBrandFont(id)).toBe(classic);
+      expect(parseOptionalFont(id, "heading")).toEqual(classic ? { ok: true, value: id } : { ok: false, error: "Choose one of: Inter, Noto Serif, Oswald, Montserrat, Bebas Neue, Lobster for the heading." });
     }
     const bad = parseLayout({ ...sampleLayout(), font: "comic-sans" });
-    expect(bad).toEqual({ ok: false, error: "Choose one of: Inter, Noto Serif, Oswald, Montserrat, Bebas Neue, Lobster." });
+    expect(bad).toEqual({ ok: false, error: "Choose one of: Inter, Noto Serif, Oswald, Montserrat, Bebas Neue, Lobster, Cormorant Garamond, Playfair Display." });
     expect(parseOptionalFont("papyrus", "heading")).toEqual({ ok: false, error: "Choose one of: Inter, Noto Serif, Oswald, Montserrat, Bebas Neue, Lobster for the heading." });
     expect(isBoardFont("__proto__")).toBe(false);
     expect(fontFamilyName("bebas-neue")).toBe("Bebas Neue");
@@ -112,7 +115,8 @@ describe("E6: more fonts for boards and Brand Kit", () => {
     const files = readdirSync("supabase/migrations").filter((f) => /brand_kit_fonts_e6/.test(f));
     expect(files).toEqual(["0026_brand_kit_fonts_e6.sql"]);
     const sql = readFileSync(`supabase/migrations/${files[0]}`, "utf8");
-    const list = BOARD_FONT_IDS.map((id) => `'${id}'`).join(", ");
+    // The Brand Kit list must equal what the database allows (board-only fonts are not in it).
+    const list = CLASSIC_FONT_IDS.map((id) => `'${id}'`).join(", ");
     expect(sql).toContain(`heading_font is null or heading_font in (${list})`);
     expect(sql).toContain(`body_font is null or body_font in (${list})`);
     expect(sql).not.toMatch(/\b(update|delete|truncate|drop table|drop column)\b/i);

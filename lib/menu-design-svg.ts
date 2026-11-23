@@ -92,8 +92,11 @@ export function designColors(doc: LayoutDocument, design: MenuDesign): DesignCol
 
 /* ---------------- text measurement from the font files ---------------- */
 
-function metricsFor(family: string, weight: number) {
-  const keys = Object.keys(FONT_METRICS).filter((k) => k.startsWith(`${family}|`));
+function metricsFor(family: string, weight: number, italic = false) {
+  // Italic faces are keyed "Family|weight|i"; a family without italics measures with its upright faces.
+  const all = Object.keys(FONT_METRICS).filter((k) => k.startsWith(`${family}|`));
+  const italics = all.filter((k) => k.endsWith("|i"));
+  const keys = italic && italics.length ? italics : all.filter((k) => !k.endsWith("|i"));
   if (!keys.length) return FONT_METRICS["Inter|400"];
   let best = keys[0]; let gap = Infinity;
   for (const key of keys) {
@@ -103,27 +106,27 @@ function metricsFor(family: string, weight: number) {
   }
   return FONT_METRICS[best];
 }
-export function textWidth(value: string, size: number, family: string, weight: number, tracking = 0) {
-  const m = metricsFor(family, weight);
+export function textWidth(value: string, size: number, family: string, weight: number, tracking = 0, italic = false) {
+  const m = metricsFor(family, weight, italic);
   let units = 0; let count = 0;
   for (const ch of value) { units += m[ch] ?? m.n ?? 550; count += 1; }
   return (units * size) / 1000 + tracking * size * count;
 }
-function ellipsize(value: string, size: number, family: string, weight: number, max: number, tracking = 0) {
-  if (textWidth(value, size, family, weight, tracking) <= max) return value;
+function ellipsize(value: string, size: number, family: string, weight: number, max: number, tracking = 0, italic = false) {
+  if (textWidth(value, size, family, weight, tracking, italic) <= max) return value;
   const chars = [...value];
-  while (chars.length > 1 && textWidth(`${chars.join("").trimEnd()}…`, size, family, weight, tracking) > max) chars.pop();
+  while (chars.length > 1 && textWidth(`${chars.join("").trimEnd()}…`, size, family, weight, tracking, italic) > max) chars.pop();
   return `${chars.join("").trimEnd()}…`;
 }
 /** Greedy word wrap into at most maxLines; the last line ends in "…" only when the text truly does not fit. */
-export function wrapText(value: string, size: number, family: string, weight: number, max: number, maxLines: number, tracking = 0): string[] {
+export function wrapText(value: string, size: number, family: string, weight: number, max: number, maxLines: number, tracking = 0, italic = false): string[] {
   const words = value.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
   for (let index = 0; index < words.length; index++) {
     const word = words[index];
     const next = line ? `${line} ${word}` : word;
-    if (textWidth(next, size, family, weight, tracking) <= max || !line) {
+    if (textWidth(next, size, family, weight, tracking, italic) <= max || !line) {
       line = next;
       continue;
     }
@@ -135,7 +138,7 @@ export function wrapText(value: string, size: number, family: string, weight: nu
     }
   }
   if (line) lines.push(line);
-  return lines.slice(0, maxLines).map((l, i, all) => (i === all.length - 1 ? ellipsize(l, size, family, weight, max, tracking) : ellipsize(l, size, family, weight, max, tracking)));
+  return lines.slice(0, maxLines).map((l) => ellipsize(l, size, family, weight, max, tracking, italic));
 }
 
 /* ---------------- svg helpers ---------------- */
@@ -144,13 +147,14 @@ function esc(value: string) {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 }
 const n = (v: number) => (Math.round(v * 10) / 10).toString();
-type TextOpts = { size: number; family: string; weight: number; fill: string; anchor?: "start" | "end" | "middle"; tracking?: number; opacity?: number; transform?: string };
+type TextOpts = { size: number; family: string; weight: number; fill: string; anchor?: "start" | "end" | "middle"; tracking?: number; opacity?: number; transform?: string; italic?: boolean };
 function text(x: number, y: number, value: string, o: TextOpts) {
   const ls = o.tracking ? ` letter-spacing="${n(o.tracking * o.size)}"` : "";
   const anchor = o.anchor && o.anchor !== "start" ? ` text-anchor="${o.anchor}"` : "";
   const op = o.opacity != null && o.opacity < 1 ? ` fill-opacity="${o.opacity}"` : "";
   const tf = o.transform ? ` transform="${o.transform}"` : "";
-  return `<text x="${n(x)}" y="${n(y)}" font-family="${esc(o.family)}" font-size="${n(o.size)}" font-weight="${o.weight}" fill="${o.fill}"${ls}${anchor}${op}${tf}>${esc(value)}</text>`;
+  const it = o.italic ? ` font-style="italic"` : "";
+  return `<text x="${n(x)}" y="${n(y)}" font-family="${esc(o.family)}" font-size="${n(o.size)}" font-weight="${o.weight}"${it} fill="${o.fill}"${ls}${anchor}${op}${tf}>${esc(value)}</text>`;
 }
 function rect(x: number, y: number, w: number, h: number, fill: string, extra = "") {
   return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"${extra ? ` ${extra}` : ""}/>`;

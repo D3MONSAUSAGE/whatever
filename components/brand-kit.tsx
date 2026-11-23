@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, useApi, type MediaItem } from "@/lib/api";
 import { DirectImageUpload } from "@/components/direct-image-upload";
-import { BOARD_FONTS, fontFaceCss } from "@/lib/board-fonts";
+import { BOARD_FONTS, fontFaceCss, isClassicFont } from "@/lib/board-fonts";
 import { useToast } from "@/components/toast";
 import { IconGear } from "@/components/icons";
 import { LoadState, PageHeader } from "@/components/ui";
@@ -128,7 +128,8 @@ export function BrandKit({ fixture }: { fixture?: BrandKitFixture }) {
 }
 
 // E6-F4: each option is drawn in its own face where the browser supports styled options (Chrome desktop).
-const FONT_OPTIONS: { id: BrandFont; label: string; family: string }[] = BOARD_FONTS.map((font) => ({ id: font.id, label: font.label, family: font.family }));
+// Brand Kit offers the faces the database allows (see CLASSIC_FONT_IDS).
+const FONT_OPTIONS: { id: BrandFont; label: string; family: string }[] = BOARD_FONTS.filter((font) => isClassicFont(font.id)).map((font) => ({ id: font.id, label: font.label, family: font.family }));
 
 function BrandEditor({
   form, setForm, images, custom, busy, onSave, nameFromBusiness = false, onLogoUploaded, saveResult = null,

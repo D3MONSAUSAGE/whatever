@@ -2092,6 +2092,8 @@ export const en = {
   "font.montserrat.hint": "Wide and modern",
   "font.bebas-neue.hint": "All capitals, bold signage",
   "font.lobster.hint": "Friendly script",
+  "font.cormorant-garamond.hint": "Refined, high-contrast serif",
+  "font.playfair-display.hint": "Editorial display serif",
 
   // I18N-3: Layout Studio (more)
   "ls.browserCopy": "This browser copy does not write an account.",

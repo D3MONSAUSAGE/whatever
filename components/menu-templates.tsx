@@ -21,7 +21,7 @@ import { accountSaveBody, findSameVideo, readAccountStudio, selectFeaturedMedia,
 import { isProcessingMediaStatus, isReadyMediaStatus } from "@/lib/media-ready";
 import { mediaHits, selectedVideoOption, videoPreview } from "@/lib/board-preview";
 import { ZoneVideo } from "@/components/zone-video";
-import { BOARD_FONTS, isBoardFont } from "@/lib/board-fonts";
+import { BOARD_FONTS, isBoardFont, isClassicFont } from "@/lib/board-fonts";
 import { ColorField } from "@/components/color-field";
 import { menuSvg } from "@/lib/menu-classic-svg";
 import { boardCanvas, orientationOf, type BoardOrientation } from "@/lib/board-orientation";
@@ -1301,6 +1301,8 @@ function layoutName(template: LayoutTemplate, t: ReturnType<typeof useLocale>["t
 /** Everything the previous layout editor could set that isn't a first-step choice, behind one disclosure. */
 function AdvancedLook({ engine, doc, patch }: { engine: Engine; doc: LayoutDocument; patch: (p: Partial<LayoutDocument>) => void }) {
   const { t } = useLocale();
+  // Classic menus keep the six faces their save path and the Android app accept; template/layout boards offer every face.
+  const lookFonts = engine === "classic" ? BOARD_FONTS.filter((font) => isClassicFont(font.id)) : BOARD_FONTS;
   // The menu/photo proportion is the Step 4 Basic "Featured photo size" slider now (custom.mediaSize, synced to split).
   const columnWidths = engine === "layout" && (doc.template === "triple-column" || doc.template === "two-menu-promo");
   const widths: [number, number, number] = doc.columnWidths ?? (doc.template === "two-menu-promo" ? [0.35, 0.35, 0.3] : [doc.split, (1 - doc.split) / 2, (1 - doc.split) / 2]);
@@ -1331,20 +1333,20 @@ function AdvancedLook({ engine, doc, patch }: { engine: Engine; doc: LayoutDocum
         <label className="form-label grid gap-1">{t("ls.font")}
           <select className="field" value={doc.font} data-testid="tpl-font" onChange={(e) => {
             const next = e.target.value;
-            if (!isBoardFont(next)) return;
+            if (!isBoardFont(next) || (engine === "classic" && !isClassicFont(next))) return;
             const { bodyFont, ...rest } = doc;
             patch(bodyFont && bodyFont !== next ? { ...rest, font: next, bodyFont } : { ...rest, font: next, bodyFont: undefined });
           }}>
-            {BOARD_FONTS.map((font) => <option key={font.id} value={font.id}>{font.label} · {t(`font.${font.id}.hint` as MessageKey)}</option>)}
+            {lookFonts.map((font) => <option key={font.id} value={font.id}>{font.label} · {t(`font.${font.id}.hint` as MessageKey)}</option>)}
           </select>
         </label>
         <label className="form-label grid gap-1">{t("studio.bodyFont")}
           <select className="field" value={doc.bodyFont ?? ""} data-testid="tpl-body-font" onChange={(e) => {
             const next = e.target.value;
-            patch({ bodyFont: isBoardFont(next) && next !== doc.font ? next : undefined });
+            patch({ bodyFont: isBoardFont(next) && next !== doc.font && (engine !== "classic" || isClassicFont(next)) ? next : undefined });
           }}>
             <option value="">{t("studio.bodyFontSame")}</option>
-            {BOARD_FONTS.filter((font) => font.id !== doc.font).map((font) => <option key={font.id} value={font.id}>{font.label} · {t(`font.${font.id}.hint` as MessageKey)}</option>)}
+            {lookFonts.filter((font) => font.id !== doc.font).map((font) => <option key={font.id} value={font.id}>{font.label} · {t(`font.${font.id}.hint` as MessageKey)}</option>)}
           </select>
         </label>
         {engine === "layout" ? (

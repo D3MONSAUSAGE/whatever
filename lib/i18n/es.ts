@@ -2080,6 +2080,8 @@ export const es: Record<MessageKey, string> = {
   "font.montserrat.hint": "Ancha y moderna",
   "font.bebas-neue.hint": "Todo en mayúsculas, letrero llamativo",
   "font.lobster.hint": "Cursiva amigable",
+  "font.cormorant-garamond.hint": "Serifa refinada de alto contraste",
+  "font.playfair-display.hint": "Serifa editorial de exhibición",
 
   // I18N-3: Layout Studio (more)
   "ls.browserCopy": "Esta copia del navegador no guarda cambios en ninguna cuenta.",

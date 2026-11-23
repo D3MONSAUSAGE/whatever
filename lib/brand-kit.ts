@@ -1,6 +1,6 @@
 import { MENU_LIMITS, normalizeHex, type MenuContent, type MenuTemplate } from "@/lib/menu-templates";
 import type { MediaItem } from "@/lib/api";
-import { BOARD_FONT_IDS, boardFont, FONT_CHOICE_ERROR, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
+import { CLASSIC_FONT_IDS, boardFont, FONT_CHOICE_ERROR, isClassicFont, type BoardFontId } from "@/lib/board-fonts";
 
 /** JPG or PNG images that can go on a menu (logos and photos). Menu slides themselves are left out. */
 export function artImages(media: MediaItem[] | null | undefined) {
@@ -8,7 +8,11 @@ export function artImages(media: MediaItem[] | null | undefined) {
 }
 
 /** Fonts Layout documents and the published PNG renderer support (lib/board-fonts.ts). Keep in sync with the brand_kits font check. */
-export const BRAND_FONTS = BOARD_FONT_IDS;
+/**
+ * Brand Kit fonts. Deliberately the six faces the database allows (brand_kits check constraint, migration 0026);
+ * newer board fonts (Cormorant Garamond, Playfair Display) are template/board fonts until a migration adds them here.
+ */
+export const BRAND_FONTS = CLASSIC_FONT_IDS;
 export type BrandFont = BoardFontId;
 
 export const DISPLAY_NAME_MAX = 80;
@@ -16,7 +20,7 @@ export const PHONE_MAX = 32;
 export const WEBSITE_MAX = 200;
 
 export function isBrandFont(value: unknown): value is BrandFont {
-  return isBoardFont(value);
+  return isClassicFont(value);
 }
 
 export type BrandIdentity = {

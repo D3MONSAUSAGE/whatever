@@ -1,6 +1,6 @@
 /** Layout Studio boards. Shared by the editor and the server. No database and no HTML from clients. */
 
-import { boardFont, FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type BoardFontId } from "@/lib/board-fonts";
+import { boardFont, BOARD_FONT_CHOICE_ERROR, isBoardFont, widthScaleForFamily, type BoardFontId } from "@/lib/board-fonts";
 import { MENU_LIMITS } from "@/lib/menu-templates";
 import { boardCanvas, LANDSCAPE_CANVAS, orientationField, orientationOf, PORTRAIT_CANVAS, type BoardOrientation } from "@/lib/board-orientation";
 import { sectionShows, shownSections } from "@/lib/menu-fields";
@@ -414,8 +414,8 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   const palette = raw.palette === "classic" || raw.palette === "bold" || raw.palette === "fresh" ? raw.palette : "fresh";
   const typeScale = raw.typeScale === "counter" ? "counter" : "room";
   const font = isBoardFont(raw.font) ? raw.font : raw.font == null || raw.font === "" ? "inter" : null;
-  if (font == null) return { ok: false, error: FONT_CHOICE_ERROR };
-  if (raw.bodyFont != null && raw.bodyFont !== "" && !isBoardFont(raw.bodyFont)) return { ok: false, error: FONT_CHOICE_ERROR };
+  if (font == null) return { ok: false, error: BOARD_FONT_CHOICE_ERROR };
+  if (raw.bodyFont != null && raw.bodyFont !== "" && !isBoardFont(raw.bodyFont)) return { ok: false, error: BOARD_FONT_CHOICE_ERROR };
   const bodyFont = isBoardFont(raw.bodyFont) && raw.bodyFont !== font ? raw.bodyFont : undefined;
   const primaryColor = hexColor(raw.primaryColor);
   const accentColor = hexColor(raw.accentColor);
