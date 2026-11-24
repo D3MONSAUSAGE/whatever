@@ -41,7 +41,8 @@ import {
 } from "@/lib/menu-designs";
 import { designColors, designSvgWithReport, hasOwnerItemPhoto, itemPhotosShown } from "@/lib/menu-design-svg";
 import { customOverflow, roomierDesignId, safeResetPaths } from "@/lib/board-fit";
-import { applyCustomReset, customizationSpec } from "@/lib/board-custom";
+import { anchorFocus, applyCustomReset, customizationSpec, framePlacement, type ItemPhotoSize } from "@/lib/board-custom";
+import { withCustom } from "@/components/menu-customize";
 import { CustomizeLook, type HeadingScope } from "@/components/menu-customize";
 import { boardSvgWithReport } from "@/lib/layout-studio";
 import type { Brand } from "@/lib/brand-kit";
@@ -110,6 +111,12 @@ const STYLES = `${FONT_CSS}
 .tpl-zone-hit:hover, .tpl-zone-hit:focus-visible { border-color: var(--color-primary); outline: none; }
 .tpl-zone-hit.tpl-region-hit > span { opacity: 0; }
 .tpl-zone-hit.tpl-region-hit:hover > span, .tpl-zone-hit.tpl-region-hit:focus-visible > span { opacity: 1; }
+.tpl-photo-drag { position: absolute; z-index: 4; padding: 0; background: transparent; border: 2px dashed transparent; cursor: grab; touch-action: none; }
+.tpl-photo-drag:hover, .tpl-photo-drag:focus-visible, .tpl-photo-drag.is-dragging { border-color: var(--color-primary); outline: none; }
+.tpl-photo-drag.is-dragging { cursor: grabbing; background: rgb(255 255 255 / .06); }
+.tpl-photo-drag > span { position: absolute; left: 6px; top: 6px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgb(11 18 32 / .72); color: #fff; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; line-height: 14px; opacity: 0; }
+.tpl-photo-drag:hover > span, .tpl-photo-drag:focus-visible > span, .tpl-photo-drag.is-dragging > span { opacity: 1; }
+@media (pointer: coarse) { .tpl-photo-drag > span { opacity: 1; } }
 .tpl-zone-hit > span { position: absolute; left: 6px; top: 6px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; background: rgb(11 18 32 / .72); color: #fff; border-radius: 6px; padding: 2px 7px; font-size: 11px; font-weight: 700; line-height: 14px; }
 /* Gallery filters: one label column shared by every row (so all button groups start at the same x), and Pekko's
    segmented control (.seg, as on My Screens) for the buttons. Phones stack the label above its buttons. */
@@ -292,7 +299,77 @@ const blankItem = () => ({ name: "", price: "", description: "" });
 function itemCount(doc: LayoutDocument) { return doc.sections.reduce((a, s) => a + s.items.length, 0); }
 
 /** What the board can't show, in one shape for every engine. */
-type Fit = { dropped: number; scale: number; hiddenSections: number; clipped: string[]; photosSuppressed?: boolean };
+type Fit = { dropped: number; scale: number; hiddenSections: number; clipped: string[]; photosSuppressed?: boolean; itemPhotos?: { requested: ItemPhotoSize; effective: ItemPhotoSize | null } };
+
+/**
+ * t421u: drag the featured photo in the Step 4 preview to move its focal point (custom.imageFocus). `slack` is the
+ * box size minus the drawn photo size per axis (canvas px): negative = the photo overflows (Fill/zoom), positive =
+ * spare space (Fit). Moving the pointer by d canvas px moves the photo by d, so focus changes by d / slack.
+ */
+export type PhotoDrag = {
+  box: { x: number; y: number; w: number; h: number };
+  slack: { x: number; y: number };
+  focus: { x: number; y: number };
+  label: string;
+  onMove: (focus: { x: number; y: number }) => void;
+  onTap?: () => void;
+};
+const DRAG_THRESHOLD = 6;
+export function dragFocus(start: { x: number; y: number }, d: { x: number; y: number }, slack: { x: number; y: number }) {
+  const axis = (f: number, delta: number, s: number) => (Math.abs(s) < 1 ? f : Math.min(100, Math.max(0, f + (delta / s) * 100)));
+  return { x: Math.round(axis(start.x, d.x, slack.x)), y: Math.round(axis(start.y, d.y, slack.y)) };
+}
+
+function PhotoDragLayer({ drag, canvas }: { drag: PhotoDrag; canvas: { width: number; height: number } }) {
+  const start = useRef<{ px: number; py: number; focus: { x: number; y: number }; scale: number; moved: boolean; id: number } | null>(null);
+  const frame = useRef<number | null>(null);
+  const [active, setActive] = useState(false);
+  const nudge = (dx: number, dy: number) => drag.onMove({ x: Math.min(100, Math.max(0, drag.focus.x + dx)), y: Math.min(100, Math.max(0, drag.focus.y + dy)) });
+  return (
+    <button
+      type="button"
+      className={`tpl-photo-drag${active ? " is-dragging" : ""}`}
+      data-testid="tpl-photo-drag"
+      aria-label={drag.label}
+      style={{
+        left: `${(drag.box.x / canvas.width) * 100}%`, top: `${(drag.box.y / canvas.height) * 100}%`,
+        width: `${(drag.box.w / canvas.width) * 100}%`, height: `${(drag.box.h / canvas.height) * 100}%`,
+      }}
+      onPointerDown={(e) => {
+        const board = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+        start.current = { px: e.clientX, py: e.clientY, focus: drag.focus, scale: canvas.width / Math.max(1, board.width), moved: false, id: e.pointerId };
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const s = start.current;
+        if (!s || s.id !== e.pointerId) return;
+        const dx = e.clientX - s.px; const dy = e.clientY - s.py;
+        if (!s.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        if (!s.moved) { s.moved = true; setActive(true); }
+        e.preventDefault();
+        const next = dragFocus(s.focus, { x: dx * s.scale, y: dy * s.scale }, drag.slack);
+        if (frame.current != null) cancelAnimationFrame(frame.current);
+        frame.current = requestAnimationFrame(() => { frame.current = null; drag.onMove(next); });
+      }}
+      onPointerUp={(e) => {
+        const s = start.current; start.current = null; setActive(false);
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+        if (s && !s.moved) drag.onTap?.();
+      }}
+      onPointerCancel={() => { start.current = null; setActive(false); }}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 10 : 2;
+        const map: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+        const d = map[e.key];
+        if (!d) return;
+        e.preventDefault();
+        nudge(d[0], d[1]);
+      }}
+    >
+      <span>{drag.label}</span>
+    </button>
+  );
+}
 
 /** Classic boards draw with the classic renderer; the browser gets the same SVG the server rasterises. */
 function classicArt(classic: ClassicSettings, brand: Brand | null, art: Art) {
@@ -306,11 +383,13 @@ function classicArt(classic: ClassicSettings, brand: Brand | null, art: Art) {
 }
 
 /** The board as the TV shows it, plus a live muted video overlay when the editor has a zone video. */
-export function BoardView({ engine, doc, classic, art, brand, label, className = "", video = null, hits, onHit }: {
+export function BoardView({ engine, doc, classic, art, brand, label, className = "", video = null, hits, onHit, photoDrag }: {
   engine: Engine; doc: LayoutDocument; classic: ClassicSettings | null; art: Art; brand: Brand | null; label?: string; className?: string;
   video?: ReturnType<typeof videoPreview>;
   hits?: { id: string; label: string; box: { x: number; y: number; w: number; h: number }; region?: boolean }[];
   onHit?: (id: string) => void;
+  /** t421u: drag the featured photo (Step 4 only). */
+  photoDrag?: PhotoDrag | null;
 }) {
   const t = useT();
   const canvas = boardCanvas(orientationOf(doc));
@@ -323,7 +402,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
     return designSvgWithReport(doc, { imageHref: art.imageHref, logoHref: art.logoHref, itemImages: art.itemImages, ...(art.imageSize ? { imageSize: art.imageSize } : {}) }).svg;
   }, [engine, doc, classic, art.imageHref, art.logoHref, art.itemImages, art.imageSize, brand]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className={`tpl-board ${orientationOf(doc) === "portrait" ? "is-portrait " : ""}${className}`} data-orientation={orientationOf(doc)} role={label && !hits?.length ? "img" : undefined} aria-label={label && !hits?.length ? label : undefined}>
+    <div className={`tpl-board ${orientationOf(doc) === "portrait" ? "is-portrait " : ""}${className}`} data-orientation={orientationOf(doc)} role={label && !hits?.length && !photoDrag ? "img" : undefined} aria-label={label && !hits?.length && !photoDrag ? label : undefined}>
       <div className="tpl-board-svg" aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
       {video ? (
         <ZoneVideo
@@ -354,6 +433,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
           <span>{hit.label}</span>
         </button>
       ))}
+      {photoDrag ? <PhotoDragLayer drag={photoDrag} canvas={canvas} /> : null}
     </div>
   );
 }
@@ -474,7 +554,7 @@ export function TemplateEditor({
   const czOverflow = useMemo(() => (engine === "classic" ? [] : customOverflow(doc)), [engine, doc]);
   const czSafe = useMemo(() => (czOverflow.length ? safeResetPaths(doc) : null), [czOverflow, doc]);
   const fit: Fit = useMemo(() => {
-    if (engine === "design") { const r = designSvgWithReport(doc, art).report; return { dropped: r.dropped, scale: r.scale, hiddenSections: 0, clipped: [], photosSuppressed: r.photosSuppressed }; }
+    if (engine === "design") { const r = designSvgWithReport(doc, art).report; return { dropped: r.dropped, scale: r.scale, hiddenSections: 0, clipped: [], photosSuppressed: r.photosSuppressed, ...(r.itemPhotos ? { itemPhotos: r.itemPhotos } : {}) }; }
     if (engine === "layout") { const r = layoutReport(doc, art); return { dropped: r.hiddenItems, scale: 1, hiddenSections: r.hiddenSections, clipped: r.clipped }; }
     return { dropped: 0, scale: 1, hiddenSections: 0, clipped: [] };
   }, [engine, doc, art.imageHref, art.logoHref, itemImages]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -725,7 +805,26 @@ export function TemplateEditor({
     box: hit.box,
     label: hit.id === "video" ? t("tpl.editVideoArea") : t("tpl.editPhotoArea"),
   }));
-  /** Click-to-select in Step 4: open the matching control (no dragging). */
+  // t421u: in Step 4 the featured photo can be dragged (both the pinned preview and the expanded one).
+  const hasFeaturedPhoto = Boolean(art.imageHref || (isDesign && doc.stockPhoto && designHasMedia(design)) || (engine === "layout" && doc.imageMediaId));
+  const framingOn = engine !== "classic" && step === 3 && hasFeaturedPhoto && !activeVideoId && Boolean(customizationSpec(doc).imageFocus);
+  const featuredHit = framingOn ? previewHits.find((h) => (h as { target?: { kind: string } }).target?.kind === "featuredMedia") : undefined;
+  const photoDrag: PhotoDrag | null = useMemo(() => {
+    if (!featuredHit) return null;
+    const box = featuredHit.box;
+    const custom = doc.custom && doc.custom.v === 1 ? doc.custom : null;
+    const focus = custom?.imageFocus ?? anchorFocus(doc.imageAnchor);
+    const placed = framePlacement(box, doc.imageFit === "contain" ? "contain" : "cover", custom?.imageZoom ?? 1, focus, art.imageSize);
+    // Unknown photo size at zoom 1: let a drag sweep the whole range across the box.
+    const slack = { x: Math.abs(box.w - placed.w) < 1 && !art.imageSize ? -box.w : box.w - placed.w, y: Math.abs(box.h - placed.h) < 1 && !art.imageSize ? -box.h : box.h - placed.h };
+    return {
+      box, slack, focus, label: t("cz.hitMediaDrag"),
+      onMove: (f) => update(withCustom(doc, (c) => { c.imageFocus = f; })),
+      onTap: () => selectRegion(featuredHit.id),
+    };
+  }, [featuredHit?.id, featuredHit?.box.x, featuredHit?.box.y, featuredHit?.box.w, featuredHit?.box.h, doc, art.imageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  const boardHits = photoDrag ? previewHits.filter((h) => h !== featuredHit) : previewHits;
+  /** Click-to-select in Step 4: open the matching control; the featured photo can also be dragged (t421u). */
   function selectRegion(id: string) {
     const hit = previewHits.find((h) => h.id === id) as (typeof previewHits)[number] & { target?: (typeof regions)[number]["target"] } | undefined;
     const target = hit?.target;
@@ -802,7 +901,7 @@ export function TemplateEditor({
       <div className="tpl-grid">
         <div className={`tpl-preview${orientationOf(doc) === "portrait" ? " is-portrait" : ""}`} data-testid="tpl-preview">
           <p className="text-xs text-muted mb-2 flex justify-between gap-2"><span>{previewVideo ? t("tpl.previewCapVideo") : t("tpl.previewCap")}</span><span data-testid="tpl-canvas-size">{orientationOf(doc) === "portrait" ? "1080 × 1920" : "1920 × 1080"}</span></p>
-          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={previewHits} onHit={onPreviewHit} />
+          <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} hits={boardHits} onHit={onPreviewHit} photoDrag={photoDrag} />
           {orientationOf(doc) === "portrait" ? (
             <button type="button" className="btn btn-quiet min-h-9 tpl-expand-preview mt-2" data-testid="tpl-expand-preview" onClick={() => setPreviewExpanded(true)}>{t("tpl.expandPreview")}</button>
           ) : null}
@@ -1072,11 +1171,13 @@ export function TemplateEditor({
                           <button type="button" aria-pressed={doc.imageFit === "contain"} onClick={() => patch({ imageFit: "contain" })}>{t("ls.fit")}</button>
                         </div>
                         <p className="text-xs text-muted">{t("ls.fillFitNote")}</p>
-                        <label className="form-label grid gap-1">{t("ls.position")}
-                          <select className="field" aria-label={t("ls.photoPosition")} value={doc.imageAnchor} onChange={(e) => patch({ imageAnchor: e.target.value as LayoutDocument["imageAnchor"] })}>
-                            {(["center", "top", "bottom", "left", "right"] as const).map((a) => <option key={a} value={a}>{t(`ls.${a}` as MessageKey)}</option>)}
-                          </select>
-                        </label>
+                        {doc.custom?.v === 1 && doc.custom.imageFocus ? <p className="text-xs text-muted" data-testid="tpl-position-in-look">{t("ls.positionInLook")}</p> : (
+                          <label className="form-label grid gap-1">{t("ls.position")}
+                            <select className="field" aria-label={t("ls.photoPosition")} value={doc.imageAnchor} onChange={(e) => patch({ imageAnchor: e.target.value as LayoutDocument["imageAnchor"] })}>
+                              {(["center", "top", "bottom", "left", "right"] as const).map((a) => <option key={a} value={a}>{t(`ls.${a}` as MessageKey)}</option>)}
+                            </select>
+                          </label>
+                        )}
                       </div>
                     </details>
                   ) : null}
@@ -1148,7 +1249,7 @@ export function TemplateEditor({
                 </div>
               ) : (
                 <CustomizeLook doc={doc} update={update} open={czOpen} onOpen={setCzOpen} scope={czScope} onScope={setCzScope}
-                  hasPhoto={Boolean(art.imageHref || (isDesign && doc.stockPhoto && designHasMedia(design)) || (engine === "layout" && doc.imageMediaId))} />
+                  hasPhoto={hasFeaturedPhoto} video={Boolean(activeVideoId)} itemPhotos={engine === "design" ? fit.itemPhotos : undefined} />
               )}
               {engine === "classic" ? (
                 <div className="grid gap-2" data-testid="tpl-classic-switch">
@@ -1220,7 +1321,8 @@ export function TemplateEditor({
         <Dialog label={t("tpl.previewAria", { name })} onClose={() => setPreviewExpanded(false)} variant="center" tone="dark" testId="tpl-preview-overlay" className="tpl-preview-overlay">
           <div className="tpl-preview-overlay-inner">
             <button type="button" className="btn btn-quiet bg-white min-h-10" data-testid="tpl-preview-close" onClick={() => setPreviewExpanded(false)}>{t("tpl.closePreview")}</button>
-            <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo} />
+            <BoardView engine={engine} doc={doc} classic={classic} art={art} brand={brand} className="tpl-tv" label={t("tpl.previewAria", { name })} video={previewVideo}
+              photoDrag={photoDrag ? { ...photoDrag, onTap: undefined } : null} />
           </div>
         </Dialog>
       ) : null}

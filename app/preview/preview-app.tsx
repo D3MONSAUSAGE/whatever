@@ -9,7 +9,8 @@ import { Playlists } from "@/components/playlist-list";
 import { Displays } from "@/components/displays-screen";
 import { MyScreens, ScreenGroups, ScreenWorkspace } from "@/components/my-screens";
 import type { AccountStudio } from "@/lib/layout-account";
-import { sampleLayout, type LayoutTemplate } from "@/lib/layout-studio";
+import { sampleLayout, type LayoutDocument, type LayoutTemplate } from "@/lib/layout-studio";
+import { designById, designDocument } from "@/lib/menu-designs";
 import { ScheduleScreen, type ScheduleFixture } from "@/components/schedule-screen";
 import type { DisplayItem, MediaItem, PlaylistSummary } from "@/lib/api";
 import { ShowOnScreens } from "@/components/show-on-screens";
@@ -255,6 +256,7 @@ export function PreviewApp() {
       {screen === "unified-edit" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startTemplate: params.get("design") || "modern-restaurant" }} /> : null}
       {screen === "unified-layout" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startLayout: (params.get("layout") as LayoutTemplate) || "two-column", startBoardId: null }} /> : null}
       {screen === "unified-board" ? <MenuBoards fixture={{ ...menuFixture, templates: true, unified: true, startMenuId: params.get("menu") || "menu-dinner" }} /> : null}
+      {screen === "t421u-board" ? <MenuBoards fixture={t421uFixture(params)} /> : null}
       {screen === "unify-list" ? <MenuBoards fixture={menuFixture} /> : null}
       {screen === "unify-picker" ? <MenuBoards fixture={{ ...menuFixture, startView: "pick-layout" }} /> : null}
       {screen === "unify-full-screen" ? <MenuBoards fixture={{ ...menuFixture, startEditing: true }} /> : null}
@@ -533,3 +535,36 @@ function poster(label: string, color: string) {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><rect fill='${color}' width='100%' height='100%'/><text x='50%' y='54%' fill='white' font-family='sans-serif' font-size='36' text-anchor='middle'>${label}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
+
+/**
+ * t421u screenshot fixture: a template board with owner item photos (the first `photos` items) and an optional wide
+ * featured photo (`/menu-templates/widephoto.jpg`, served by the screenshot script; 404 otherwise), `size` = stored itemPhotoSize ("none" = absent).
+ */
+const T421U_PHOTOS = ["tacos", "burrito", "quesadilla", "carnitas", "streettacos", "chicken", "salad", "steak", "pasta", "burger", "wings", "ribs"];
+function t421uFixture(params: URLSearchParams): MenuFixture {
+  const design = designById(params.get("design") || "modern-restaurant") ?? designById("modern-restaurant")!;
+  const count = Number(params.get("photos") ?? 6);
+  const library = T421U_PHOTOS.map((id, i) => ({ id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`, name: `${id}.jpg`, kind: "image" as const, mime: "image/jpeg", url: `/menu-templates/${id}.jpg` }));
+  if (params.get("wide") === "1") library.push({ id: "00000000-0000-4000-8000-000000000999", name: "wide-dining-room.jpg", kind: "image", mime: "image/jpeg", url: "/menu-templates/widephoto.jpg" });
+  const seed = designDocument(design);
+  let n = 0;
+  const doc: LayoutDocument = {
+    ...seed,
+    ...(params.get("orientation") === "portrait" ? { orientation: "portrait" as const } : {}),
+    ...(params.get("wide") === "1" ? { imageMediaId: "00000000-0000-4000-8000-000000000999", stockPhoto: undefined } : {}),
+    sections: seed.sections.map((sec) => ({ ...sec, items: sec.items.map((item) => (n < count ? { ...item, imageMediaId: library[n++ % T421U_PHOTOS.length].id } : item)) })),
+  };
+  const size = params.get("size");
+  if (size === "none") delete doc.itemPhotoSize;
+  else if (size === "small" || size === "medium" || size === "large") doc.itemPhotoSize = size;
+  return {
+    ...menuFixture, templates: true, unified: true, startMenuId: "board-t421u",
+    menus: [{ id: "board-t421u", name: "t421u board", template: "fresh", content: doc, mediaId: null, playlistId: null, imageUrl: null, createdAt: "2026-11-23T10:00:00.000Z", updatedAt: "2026-11-23T10:00:00.000Z" }, ...menuFixture.menus],
+    studio: {
+      ...menuFixture.studio!,
+      boards: [{ id: "board-t421u", name: "t421u board", document: doc, mediaId: null, playlistId: null }, ...(menuFixture.studio?.boards ?? [])],
+      library: [...(menuFixture.studio?.library ?? []), ...library],
+    },
+  };
+}
+

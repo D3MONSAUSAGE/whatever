@@ -158,10 +158,10 @@ Step 4 Look, progressive disclosure:
 | `cz.itemPhoto.large` | Large | Grande |
 | `cz.itemPhotoReduced` | Showing {size} so every item and price still fits. | Se muestra en {size} para que todos los artículos y precios quepan. |
 | `cz.featuredFraming` | How the photo fills its area | Cómo la foto llena su área |
-| `cz.zoom` | Zoom {n}% | Zoom {n}% |
+| `cz.zoom` | Zoom {n}% | Ampliación {n}% |
 | `cz.dragHint` | Drag the photo in the preview to choose what shows. | Arrastre la foto en la vista previa para elegir qué se ve. |
 | `cz.photoReset` | Reset photo | Restablecer foto |
-| `cz.fitBackdrop` | Empty space uses the template colour. | El espacio libre usa el color de la plantilla. |
+| `cz.fitBackdrop` | Empty space uses the template colour. | El espacio libre toma el color de la plantilla. |
 | `cz.hitMediaDrag` | Featured photo. Drag to move it, or use the arrow keys. | Foto destacada. Arrástrela para moverla o use las flechas. |
 Reused: `cz.fill` (Fill the area / Llenar el área), `cz.fitWhole` (Show the whole photo / Mostrar la foto completa),
 `cz.photo`, `cz.focusX`, `cz.focusY`, `cz.reset`, `cz.mediaSize`.
