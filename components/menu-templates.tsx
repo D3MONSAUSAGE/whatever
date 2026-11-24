@@ -766,7 +766,7 @@ export function TemplateEditor({
     addItem: terms ? t(`tpl.terms.${terms}.addItem` as MessageKey) : t("tpl.addItem"),
     // Classes and schedules keep a time in the price field; other service boards can leave the price empty.
     price: terms === "classes" || terms === "schedule" ? t("tpl.time") : terms === "board" ? t("tpl.detail") : terms ? t("tpl.priceOptional") : t("tpl.price"),
-    itemPrice: (n: number) => terms === "classes" || terms === "schedule" ? t("tpl.itemTime", { n }) : terms === "board" ? t("tpl.itemDetail", { n }) : t("tpl.itemPrice", { n }),
+    itemPrice: (n: number) => terms === "classes" || terms === "schedule" ? t("tpl.itemTime", { n }) : terms === "board" ? t("tpl.itemDetail", { n }) : terms ? t("tpl.itemPriceAny", { n }) : t("tpl.itemPrice", { n }),
     photoTip: terms ? t("tpl.photoTipAny") : t("tpl.photoTip"),
     itemPhotosWhere: terms ? t("tpl.itemPhotosWhereAny") : t("tpl.itemPhotosWhere"),
   };
@@ -871,7 +871,7 @@ export function TemplateEditor({
 
           {step === 1 ? (
             <div className="grid gap-3">
-              <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg" data-testid="tpl-list-title">{words.title}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
+              <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg" data-testid="tpl-list-title">{words.title}</h3><span className="text-xs text-muted">{t(terms ? "tpl.limitsAny" : "tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
               {columns ? <p className="text-sm text-muted" data-testid="tpl-columns-note">{t("tpl.columnsNote", { n: columns })}</p> : null}
               {fit.photosSuppressed ? (
                 <div className="note-warn text-sm grid gap-2" role="status" data-testid="tpl-photos-dont-fit-menu">

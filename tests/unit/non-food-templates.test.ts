@@ -123,7 +123,7 @@ describe("non-food templates", () => {
       expect(es[key], key).toBeTruthy();
       expect(es[key], key).not.toBe(en[key]);
     }
-    for (const key of ["tpl.priceOptional", "tpl.time", "tpl.itemTime", "tpl.detail", "tpl.itemDetail", "tpl.photoTipAny", "tpl.itemPhotosWhereAny"] as const) {
+    for (const key of ["tpl.priceOptional", "tpl.itemPriceAny", "tpl.time", "tpl.itemTime", "tpl.detail", "tpl.itemDetail", "tpl.photoTipAny", "tpl.itemPhotosWhereAny"] as const) {
       expect(en[key], key).toBeTruthy();
       expect(es[key], key).toBeTruthy();
     }
