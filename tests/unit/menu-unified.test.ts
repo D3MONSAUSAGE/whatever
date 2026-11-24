@@ -161,7 +161,7 @@ describe("item photos in every menu style", () => {
     }
   });
 
-  it("every one of the 22 templates still shows an owner photo", () => {
+  it("every template still shows an owner photo", () => {
     for (const d of MENU_DESIGNS) expect(layoutSvg(withLayoutPhoto(designDocument(d)), { itemImages: { [P1]: href } }), d.id).toContain(href);
   });
 
@@ -241,19 +241,19 @@ describe("switching between templates and original layouts", () => {
 
 describe("one gallery", () => {
   const all = galleryEntries();
-  it("holds the 26 templates, the 7 original layouts and the full-screen classic menu", () => {
-    expect(all.filter((e) => e.kind === "design")).toHaveLength(26);
+  it("holds the 42 templates, the 7 original layouts and the full-screen classic menu", () => {
+    expect(all.filter((e) => e.kind === "design")).toHaveLength(42);
     expect(all.filter((e) => e.kind === "layout").map((e) => e.id)).toEqual(ORIGINAL_LAYOUTS.map((l) => l.id));
     expect(all.filter((e) => e.kind === "classic")).toHaveLength(1);
-    expect(all).toHaveLength(34);
+    expect(all).toHaveLength(50);
   });
   it("filters by business type, style, photos and layout structure; original layouts suit any business", () => {
     const f = { business: "all", style: "all", photos: false, structure: "all" } as const;
-    expect(filterGallery(all, f)).toHaveLength(34);
-    // The service business types show their own templates plus the original layouts (which suit any business).
+    expect(filterGallery(all, f)).toHaveLength(50);
+    // The premium service templates appear under their business types.
     for (const [business, ids] of [["salon", ["luxury-barbershop"]], ["retail", ["boutique-promotion", "product-spotlight"]], ["fitness", ["modern-gym"]]] as const) {
-      const hits = filterGallery(all, { ...f, business });
-      expect(hits.filter((e) => e.kind === "design").map((e) => e.id), business).toEqual(ids);
+      const hits = filterGallery(all, { ...f, business }).filter((e) => e.kind === "design").map((e) => e.id);
+      for (const id of ids) expect(hits, business).toContain(id);
     }
     const cafes = filterGallery(all, { ...f, business: "cafe" });
     expect(cafes.every((e) => e.business === "cafe" || e.business === "any")).toBe(true);

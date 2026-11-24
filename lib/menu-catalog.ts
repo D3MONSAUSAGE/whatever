@@ -99,7 +99,7 @@ const EN = makeT("en");
 const ES = makeT("es");
 const both = (key: MessageKey): Localized => ({ en: EN(key), es: ES(key) });
 
-const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness"];
+const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness", "office", "pets"];
 const STYLES: (DesignStyle | "all")[] = ["all", "dark", "light", "bold"];
 const STRUCTURES: (Structure | "all")[] = ["all", "single", "columns", "media", "cards"];
 

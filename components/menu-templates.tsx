@@ -223,7 +223,7 @@ const STYLES = `${FONT_CSS}
 .tpl-adv > summary { cursor: pointer; font-weight: 700; font-size: 14px; min-height: 28px; display: flex; align-items: center; }
 `;
 
-const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness"];
+const BUSINESSES: (DesignBusiness | "all")[] = ["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness", "office", "pets"];
 const STYLE_IDS: (DesignStyle | "all")[] = ["all", "dark", "light", "bold"];
 
 /* ------------------------------------------------------------------ gallery ------------------------------------------------------------------ */
@@ -758,7 +758,21 @@ export function TemplateEditor({
       node?.scrollIntoView({ block: "nearest" });
     });
   }
-  const stepNames = [t("tpl.step.business"), t("tpl.step.menu"), t("tpl.step.content"), t("tpl.step.look")];
+  // Non-food templates name the list in their own words (services, products, classes...); menus keep the menu words.
+  const terms = isDesign ? design.terms : undefined;
+  const words = {
+    step: terms ? t(`tpl.terms.${terms}.step` as MessageKey) : t("tpl.step.menu"),
+    title: terms ? t(`tpl.terms.${terms}.title` as MessageKey) : t("tpl.menuTitle"),
+    item: terms ? t(`tpl.terms.${terms}.item` as MessageKey) : t("tpl.item"),
+    itemName: (n: number) => terms ? t(`tpl.terms.${terms}.itemName` as MessageKey, { n }) : t("tpl.itemName", { n }),
+    addItem: terms ? t(`tpl.terms.${terms}.addItem` as MessageKey) : t("tpl.addItem"),
+    // Classes and schedules keep a time in the price field; other service boards can leave the price empty.
+    price: terms === "classes" || terms === "schedule" ? t("tpl.time") : terms === "board" ? t("tpl.detail") : terms ? t("tpl.priceOptional") : t("tpl.price"),
+    itemPrice: (n: number) => terms === "classes" || terms === "schedule" ? t("tpl.itemTime", { n }) : terms === "board" ? t("tpl.itemDetail", { n }) : terms ? t("tpl.itemPriceAny", { n }) : t("tpl.itemPrice", { n }),
+    photoTip: terms ? t("tpl.photoTipAny") : t("tpl.photoTip"),
+    itemPhotosWhere: terms ? t("tpl.itemPhotosWhereAny") : t("tpl.itemPhotosWhere"),
+  };
+  const stepNames = [t("tpl.step.business"), words.step, t("tpl.step.content"), t("tpl.step.look")];
   const styleName = engine === "classic" ? t("tpl.classicName") : engine === "layout" ? layoutName(doc.template, t) : design.name[L];
 
   return (
@@ -859,7 +873,7 @@ export function TemplateEditor({
 
           {step === 1 ? (
             <div className="grid gap-3">
-              <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg">{t("tpl.menuTitle")}</h3><span className="text-xs text-muted">{t("tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
+              <div className="flex justify-between items-baseline gap-2"><h3 className="font-display font-bold text-lg" data-testid="tpl-list-title">{words.title}</h3><span className="text-xs text-muted">{t(terms ? "tpl.limitsAny" : "tpl.limits", { n, max: MENU_LIMITS.items, sections: columns ?? MENU_LIMITS.sections })}</span></div>
               {columns ? <p className="text-sm text-muted" data-testid="tpl-columns-note">{t("tpl.columnsNote", { n: columns })}</p> : null}
               {timeFirst ? <p className="text-sm text-muted" data-testid="tpl-time-note">{t("tpl.timeNote")}</p> : null}
               {isDesign && design.composition === "spotlight" ? <p className="text-sm text-muted" data-testid="tpl-spotlight-note">{t("tpl.spotlightNote")}</p> : null}
@@ -870,7 +884,7 @@ export function TemplateEditor({
                 </div>
               ) : ownerPhotos && !(isDesign && isPhotoDesign(design)) ? (
                 <p className="text-sm text-live-ink" role="status" data-testid="tpl-photos-shown">✓ {t("tpl.photosShownNote")}</p>
-              ) : <p className="text-xs text-muted">{t("tpl.photoTip")}</p>}
+              ) : <p className="text-xs text-muted">{words.photoTip}</p>}
               {doc.sections.map((section, si) => (
                 <div className={`tpl-sec ${columns && si >= columns ? "tpl-sec-off" : ""}`} key={si} data-testid={`tpl-section-${si}`}>
                   <div className="tpl-sec-h">
@@ -884,14 +898,14 @@ export function TemplateEditor({
                   {section.items.map((item, ii) => (
                     <div className="tpl-item" key={ii}>
                       <button type="button" className="tpl-photo" onClick={() => setPhotoFor({ si, ii })} data-testid={`tpl-photo-${si}-${ii}`}
-                        aria-label={item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || t("tpl.item") }) : t("tpl.addPhotoFor", { name: item.name || t("tpl.item") })}>
+                        aria-label={item.imageMediaId || item.stockPhoto ? t("tpl.changePhotoFor", { name: item.name || words.item }) : t("tpl.addPhotoFor", { name: item.name || words.item })}>
                         {item.imageMediaId && urlFor(item.imageMediaId) ? <img src={urlFor(item.imageMediaId)!} alt="" />
                           : item.stockPhoto && isDesign ? <img src={stockPhotoPath(item.stockPhoto)} alt="" />
                             : <span aria-hidden>＋<br />{t("tpl.photo")}</span>}
                       </button>
-                      <input className="field" aria-label={t("tpl.itemName", { n: ii + 1 })} placeholder={t("tpl.item")} maxLength={MENU_LIMITS.itemName} value={item.name}
+                      <input className="field" aria-label={words.itemName(ii + 1)} placeholder={words.item} maxLength={MENU_LIMITS.itemName} value={item.name}
                         onChange={(e) => setSections((s) => { s[si].items[ii].name = e.target.value; return s; })} data-testid={`tpl-item-${si}-${ii}`} />
-                      <input className="field text-right" aria-label={timeFirst ? t("tpl.itemTime", { n: ii + 1 }) : t("tpl.itemPrice", { n: ii + 1 })} placeholder={timeFirst ? t("tpl.time") : t("tpl.price")} maxLength={MENU_LIMITS.price} value={item.price}
+                      <input className="field text-right" aria-label={words.itemPrice(ii + 1)} placeholder={words.price} data-testid={`tpl-price-${si}-${ii}`} maxLength={MENU_LIMITS.price} value={item.price}
                         onChange={(e) => setSections((s) => { s[si].items[ii].price = e.target.value; return s; })} />
                       <div className="acts">
                         <button type="button" className="tpl-ib" aria-label={t("tpl.moveItemUp", { n: ii + 1 })} disabled={ii === 0 && si === 0} onClick={() => moveItemAt(si, ii, -1)}>↑</button>
@@ -904,7 +918,7 @@ export function TemplateEditor({
                   ))}
                   <div className="p-2">
                     <button type="button" className="btn btn-quiet min-h-9" disabled={section.items.length >= MENU_LIMITS.itemsPerSection || n >= MENU_LIMITS.items}
-                      onClick={() => setSections((s) => { s[si].items.push(blankItem()); return s; })}>＋ {t("tpl.addItem")}</button>
+                      onClick={() => setSections((s) => { s[si].items.push(blankItem()); return s; })}>＋ {words.addItem}</button>
                   </div>
                 </div>
               ))}
@@ -916,7 +930,7 @@ export function TemplateEditor({
           {step === 2 ? (
             <div className="grid gap-3" data-testid="tpl-step-content">
               <h3 className="font-display font-bold text-lg">{t("tpl.contentTitle")}</h3>
-              {unified ? <p className="text-sm text-muted" data-testid="tpl-photos-items">{t("tpl.itemPhotosWhere")}</p> : null}
+              {unified ? <p className="text-sm text-muted" data-testid="tpl-photos-items">{words.itemPhotosWhere}</p> : null}
               {engine === "design" && !designHasMedia(design) ? (
                 <div className="grid gap-2">
                   <p className="text-sm text-muted">{t("tpl.noPhotoArea")}</p>

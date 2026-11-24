@@ -204,7 +204,7 @@ describe("service templates (salon, retail, fitness), signed in: the real save/p
     const { otherBoardMedia } = await seed();
     for (const id of SERVICE) for (const orientation of ["landscape", "portrait"] as const) {
       const design = designById(id)!;
-      const start: LayoutDocument = { ...designDocument(design), orientation };
+      const start: LayoutDocument = { ...designDocument(design), ...(orientation === "portrait" ? { orientation } : {}) };
       const draft = await saveV("token-a", "draft", null, `${id} ${orientation}`, start);
       expect(draft.status, `${id}/${orientation}`).toBe(200);
       const { menuId } = await draft.json() as { menuId: string };

@@ -83,7 +83,7 @@ describe("GET /api/menu-templates/catalog", () => {
 
   it("uses the same filters, names and seeds as the web, in English and Spanish", async () => {
     const { body } = await catalog();
-    expect(body.filters.business.map((f) => f.id)).toEqual(["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness"]);
+    expect(body.filters.business.map((f) => f.id)).toEqual(["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness", "office", "pets"]);
     expect(body.filters.style.map((f) => f.id)).toEqual(["all", "dark", "light", "bold"]);
     expect(body.filters.structure.map((f) => f.id)).toEqual(["all", "single", "columns", "media", "cards"]);
     // Older clients' font list is unchanged; the template-only faces are listed separately (additive).

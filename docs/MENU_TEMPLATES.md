@@ -1,6 +1,6 @@
 # Premium menu templates
 
-A gallery of professionally designed menu boards (26 templates), plus a guided editor (Business → Menu → Photos → Look) shown when an owner clicks **New menu board**. It is behind a rollout flag.
+A gallery of professionally designed menu boards (42 templates), plus a guided editor (Business → Menu → Photos → Look) shown when an owner clicks **New menu board**. It is behind a rollout flag.
 
 ## How it works
 
@@ -84,9 +84,31 @@ salmon 1467003909585-2f8a72700288 · pasta 1621996346565-e3dbc646d9a9 · parfait
 
 Photos showing third-party brands (bottles, newspaper mastheads) were rejected.
 
-## Service templates (salons, retail, fitness)
+## Non-food templates (salons, retail, gyms, offices, pet services)
 
-Four approved premium templates (26 templates in total; the original 22 are unchanged and still pinned by `tests/fixtures/design-svg-baseline.json`):
+Sixteen templates for businesses that aren't restaurants, added after the 22 food templates. They are ordinary presets in `MENU_DESIGNS` on the existing compositions (`list`, `promo`, `columns`), so the editor, preview, publish, Brand Kit, vertical (9:16) drawing and the Flutter catalog all work unchanged.
+
+| Business (`business`) | Templates (`id`) | Use case |
+| --- | --- | --- |
+| Salons & barbers (`salon`) | `salon-maison`, `barber-blade`, `beauty-glow`, `nails-polished` | Service and price lists, a beauty promotion |
+| Retail (`retail`) | `retail-sale`, `retail-offers`, `retail-boutique` | Sale promotion, product deals, boutique collection |
+| Gyms & fitness (`fitness`) | `fitness-timetable`, `fitness-join`, `fitness-motivate` | Weekly classes, membership offer, workout of the day |
+| Offices (`office`) | `office-welcome`, `office-rooms`, `office-kudos` | Reception welcome, meeting rooms, recognition |
+| Pet services (`pets`) | `pets-groom`, `pets-treats`, `pets-care` | Grooming prices, product promotion, daycare and boarding |
+
+- **`useCase`** (EN/ES) on each design says what the board is for, for the gallery and a future onboarding recommendation.
+- **`terms`** sets the guided editor's words for the list: `services` / `products` ("Price (optional)"), `classes` / `schedule` (the price field is labelled "Time"), `board` ("Detail (optional)"). Food templates have no `terms` and keep the menu words. The stored document is unchanged: the field is still `price`, free text up to 12 characters, and may be empty; an empty price draws no tag, leader or badge.
+- `tests/unit/non-food-templates.test.ts` checks every colour style in both shapes (publishable, nothing dropped or shortened) and pins the SVGs in `tests/fixtures/non-food-svg-baseline.json`.
+
+### Non-food sample photos
+
+From Unsplash under the [Unsplash License](https://unsplash.com/license) (same licence and ids as `docs/MARKETING_PHOTOS.md`, where the WebP copies are used on the marketing site):
+
+shoppingbags 1607082348824-0a96f2a4b9da (`retail-sale`) · beagle 1543466835-00a7907e9de1 (`pets-treats`, `pets-care`).
+
+## Premium service templates (Noir & Co., Linden, Forge)
+
+Four approved premium templates on their own compositions, after the 16 non-food templates (42 templates in total; the original 22 are unchanged and still pinned by `tests/fixtures/design-svg-baseline.json`):
 
 | Template | Business | Composition | Fonts | Colour styles |
 | --- | --- | --- | --- | --- |
@@ -98,7 +120,7 @@ Four approved premium templates (26 templates in total; the original 22 are unch
 Content rules:
 
 - **Product Spotlight** features the first named item (its name, description and price). The other items are listed as highlights; their prices are optional.
-- **Modern Gym** reads each class's time from the item's price field. The editor labels that field "Time" for this template.
+- **Modern Gym** reads each class's time from the item's price field (`terms: "classes"`, so the editor labels it "Time").
 - Owner item photos, Brand Kit colours, text size and the photo-size slider work like on the other templates. The product column on Spotlight has a fixed size.
 
 Vertical (1080×1920) boards: each template has its own tall composition. Nothing is stretched or cropped from the 16:9 drawing.

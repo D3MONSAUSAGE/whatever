@@ -10,10 +10,17 @@ import type { BoardFontId } from "@/lib/board-fonts";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
 export type DesignComposition = "showcase" | "columns" | "promo" | "list" | "cards" | "featured"
-  // Service templates (salons, retail, fitness).
+  // Premium service templates (Noir & Co., Linden, Forge).
   | "showcaseLeft" | "editorial" | "spotlight" | "timetable";
 export type DesignStyle = "dark" | "light" | "bold";
-export type DesignBusiness = "restaurant" | "cafe" | "fast" | "bar" | "sweets" | "salon" | "retail" | "fitness";
+export type DesignBusiness = "restaurant" | "cafe" | "fast" | "bar" | "sweets"
+  // Non-food businesses (service and retail boards).
+  | "salon" | "retail" | "fitness" | "office" | "pets";
+/**
+ * Words the guided editor uses for a design's list. Absent = the menu words ("Your menu", "Item", "Price").
+ * services/products: "Price (optional)"; classes/schedule: the price field holds a time; board: a free detail.
+ */
+export type DesignTerms = "services" | "products" | "classes" | "schedule" | "board";
 export type Localized = { en: string; es: string };
 
 export type DesignVariant = {
@@ -54,7 +61,9 @@ export const STOCK_PHOTOS = [
   // Item photos for the photo templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
   "salmon", "pasta", "parfait", "smoothie", "cinnamon", "bowl", "sandwich", "salad", "donuts", "tacos", "carnitas",
   "streettacos", "wings", "macarons", "cake", "chicken", "muffins", "quesadilla", "burrito",
-  // Service templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
+  // Non-food templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
+  "shoppingbags", "beagle",
+  // Premium service templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
   "barbershave", "knitwear", "amberoil", "deadlift",
 ] as const;
 export type StockPhotoId = (typeof STOCK_PHOTOS)[number];
@@ -82,6 +91,10 @@ export type MenuDesign = {
   sample: Sample;
   /** Item photos on non-card templates: "thumbs" shows them by default. Absent = text-focused. */
   photoStyle?: "thumbs" | "text";
+  /** Editor wording for non-menu boards (see DesignTerms). Absent = menu wording. */
+  terms?: DesignTerms;
+  /** One line on what the board is for (gallery and future onboarding recommendations). */
+  useCase?: Localized;
 };
 
 /** Layout Studio geometry each composition is drawn on. Keeps the frame and the video box contract intact. */
@@ -574,11 +587,365 @@ export const MENU_DESIGNS: MenuDesign[] = [
       ],
     },
   },
-  /* ---------------- service templates (salons, retail, fitness) ---------------- */
+  /* ---------------- salons & barbershops ---------------- */
   {
-    id: "luxury-barbershop", composition: "showcaseLeft", business: "salon", style: "dark",
+    id: "salon-maison", composition: "list", business: "salon", style: "light", terms: "services",
+    name: { en: "Maison Salon", es: "Salón Maison" },
+    blurb: { en: "Quiet luxury: serif headings, dotted leaders and fine rules on a soft, warm ground.", es: "Lujo discreto: títulos con serifa, líneas punteadas y filetes finos sobre un fondo cálido." },
+    useCase: { en: "Elegant service & price list", es: "Lista elegante de servicios y precios" },
+    look: { head: "noto-serif", headWeight: 700, body: "inter", sectionInHead: true, sectionWeight: 700, sectionTracking: 0.14, leader: true, rule: true },
+    variants: [
+      v("blush", "Blush & ivory", "Rubor y marfil", "#f7efe9", "#2b2220", "#7a6a64", "#a8616a", "#e8d3cc"),
+      v("sage", "Sage & linen", "Salvia y lino", "#eef1ea", "#1f2a22", "#5f6b61", "#4f7559", "#d5ddd2"),
+      v("noir", "Noir & champagne", "Negro y champán", "#141213", "#f4ece6", "#a99f99", "#c8a27a", "#221e1f"),
+    ],
+    stock: null,
+    sample: {
+      title: "Maison Lumière", subtitle: "Hair · Color · Care", footer: "Complimentary consultation with every color service · Book at the front desk",
+      featureTitle: "New client offer", featureDetail: "20% off your first color service",
+      sections: [
+        { name: "Cut & style", items: [i("Women’s cut & style", "$75", "Consultation, wash, cut and finish"), i("Men’s cut", "$45"), i("Signature blowout", "$50", "Wash and a smooth, lasting finish"), i("Bang trim", "$15")] },
+        { name: "Color", items: [i("Single process", "$95"), i("Full highlights", "$185", "Includes toner"), i("Balayage", "From $220", "Hand-painted, natural blend"), i("Gloss & tone", "$65"), i("Root touch-up", "$75")] },
+        { name: "Treatments", items: [i("Keratin smoothing", "$280", "Frizz-free for up to 4 months"), i("Bond repair", "$45"), i("Scalp ritual", "$40"), i("Deep conditioning", "$30")] },
+      ],
+    },
+  },
+  {
+    id: "barber-blade", composition: "list", business: "salon", style: "dark", terms: "services",
+    name: { en: "Blade & Fade", es: "Blade & Fade" },
+    blurb: { en: "Bold condensed type on deep charcoal with metallic price tags. Reads from across the shop.", es: "Letra condensada y fuerte sobre carbón con etiquetas de precio metálicas. Se lee desde toda la barbería." },
+    useCase: { en: "Barbershop price list", es: "Lista de precios de barbería" },
+    look: { head: "bebas-neue", headWeight: 400, body: "inter", sectionInHead: true, sectionWeight: 400, sectionTracking: 0.06, namesUpper: true, tags: true },
+    variants: [
+      v("brass", "Charcoal & brass", "Carbón y latón", "#121212", "#f5f1e8", "#a39e94", "#c9a14a", "#1c1c1c", "#c9a14a"),
+      v("crimson", "Black & crimson", "Negro y carmesí", "#141011", "#f7efe9", "#a99c97", "#d23c3c", "#1e1718", "#d23c3c"),
+      v("steel", "Steel blue", "Azul acero", "#0f1720", "#eef3f8", "#93a3b5", "#6fb4d9", "#172331", "#6fb4d9"),
+    ],
+    stock: null,
+    sample: {
+      title: "Blade & Fade", subtitle: "Barbershop · Walk-ins welcome", footer: "Card, cash and tap accepted · Kids under 12: $5 off any cut",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Cuts", items: [i("Classic cut", "$30", "Scissor or clipper, hot towel finish"), i("Skin fade", "$35"), i("Buzz cut", "$20"), i("Long hair cut", "$40"), i("Kids cut", "$22", "12 and under")] },
+        { name: "Beard & shave", items: [i("Beard trim", "$18", "Shape, line-up and oil"), i("Hot towel shave", "$35", "Straight razor, two towels"), i("Beard color", "$25")] },
+        { name: "Combos", items: [i("Cut + beard", "$45"), i("Cut + shave", "$55"), i("Father & son", "$45")] },
+        { name: "Extras", items: [i("Line-up", "$12"), i("Hair design", "From $10"), i("Brow trim", "$8")] },
+      ],
+    },
+  },
+  {
+    id: "beauty-glow", composition: "promo", business: "salon", style: "bold", terms: "services",
+    name: { en: "Glow Studio", es: "Glow Studio" },
+    blurb: { en: "A confident promo panel with a price badge, beside your full treatment list.", es: "Un panel de promoción con insignia de precio, junto a la lista completa de tratamientos." },
+    useCase: { en: "Beauty service promotion", es: "Promoción de servicios de belleza" },
+    look: { head: "montserrat", headWeight: 800, body: "inter", sectionInHead: true, sectionWeight: 800, sectionTracking: 0.02, accentPrices: true },
+    variants: [
+      v("plum", "Plum & pink", "Ciruela y rosa", "#fbf3f6", "#2a1424", "#7d6375", "#b0306a", "#3b1233", "#f2b8cf"),
+      v("rose", "Rose", "Rosa", "#fff5f2", "#2b1a17", "#806a64", "#c8465b", "#c8465b", "#2b1a17"),
+      v("violet", "Midnight violet", "Violeta noche", "#120f1c", "#f6f0ff", "#aaa1c2", "#c792ff", "#2a1f45", "#c792ff"),
+    ],
+    stock: null,
+    sample: {
+      title: "Glow Studio", subtitle: "Lashes · Brows · Skin", footer: "Book online or at the front desk · Offer ends Sunday",
+      featureTitle: "Lash lift", featureDetail: "With tint · our most-booked treatment · $85",
+      sections: [
+        { name: "Lashes", items: [i("Lash lift", "$65", "Lasts 6–8 weeks"), i("Classic extensions", "$120"), i("Lash tint", "$25")] },
+        { name: "Brows", items: [i("Brow lamination", "$70"), i("Shape & tint", "$40"), i("Brow wax", "$20")] },
+        { name: "Skin", items: [i("Signature facial", "$95", "60 minutes"), i("Hydrating peel", "$110")] },
+      ],
+    },
+  },
+  {
+    id: "nails-polished", composition: "list", business: "salon", style: "light", terms: "services",
+    name: { en: "Polished", es: "Polished" },
+    blurb: { en: "Airy and modern. Accent prices and fine rules, with a specials column that stands out.", es: "Ligero y moderno. Precios en color, filetes finos y una columna de especiales que destaca." },
+    useCase: { en: "Services & weekly specials", es: "Servicios y especiales de la semana" },
+    look: { head: "montserrat", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 800, sectionTracking: 0.18, rule: true, accentPrices: true },
+    variants: [
+      v("ivory", "Ivory & copper", "Marfil y cobre", "#fbf8f3", "#262322", "#7c756f", "#a8693d", "#efe6da"),
+      v("lilac", "Lilac", "Lila", "#f6f3fb", "#24203a", "#726c88", "#6b4fc0", "#e6dff6"),
+      v("mint", "Mint", "Menta", "#f1f8f5", "#17302a", "#5e7a72", "#22816a", "#dcefe7"),
+    ],
+    stock: null,
+    sample: {
+      title: "Polished Nail Studio", subtitle: "Nails · Spa · Waxing", footer: "Walk-ins welcome when chairs are open · Gift cards at the desk",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Manicures", items: [i("Classic manicure", "$25"), i("Gel manicure", "$40", "Lasts up to 3 weeks"), i("Nail art", "From $10"), i("French tip", "+$5")] },
+        { name: "Pedicures", items: [i("Classic pedicure", "$35"), i("Spa pedicure", "$55", "Scrub, mask and hot stones"), i("Gel pedicure", "$50"), i("Paraffin add-on", "$10")] },
+        { name: "Specials", items: [i("Gel mani + spa pedi", "$80", "Save $15"), i("Brow wax + tint", "$30"), i("Bring a friend", "$10 off", "Both guests, any service")] },
+      ],
+    },
+  },
+  /* ---------------- retail ---------------- */
+  {
+    id: "retail-sale", composition: "promo", business: "retail", style: "bold", terms: "products",
+    name: { en: "Big Sale", es: "Gran rebaja" },
+    blurb: { en: "Loud and clear: a huge sale message, condensed type and was/now prices.", es: "Claro y llamativo: un gran mensaje de rebajas, letra condensada y precios antes/ahora." },
+    useCase: { en: "Seasonal sale promotion", es: "Promoción de rebajas de temporada" },
+    look: { head: "oswald", headWeight: 700, body: "inter", sectionInHead: true, sectionWeight: 700, sectionTracking: 0.04, namesUpper: true, tags: true },
+    variants: [
+      v("red", "Sale red", "Rojo rebajas", "#f8f4ee", "#161616", "#66605a", "#d42a1a", "#d42a1a", "#161616"),
+      v("black", "Black & yellow", "Negro y amarillo", "#111111", "#ffffff", "#a3a3a3", "#ffd400", "#1f1f1f", "#ffd400"),
+      v("navy", "Navy", "Marino", "#f3f6fb", "#0d1b33", "#5d6b80", "#1f5cff", "#0d1b33", "#ffcf33"),
+    ],
+    stock: "shoppingbags",
+    sample: {
+      title: "Northline Outfitters", subtitle: "Winter sale · This week only", footer: "While stock lasts · Prices as marked at the register",
+      featureTitle: "Up to 50% off", featureDetail: "Storewide on winter styles",
+      sections: [
+        { name: "Outerwear", items: [i("Puffer jacket", "$89", "Was $149"), i("Wool coat", "$129", "Was $210"), i("Rain shell", "$59", "Was $95"), i("Fleece vest", "$39", "Was $65")] },
+        { name: "Knits & boots", items: [i("Merino sweater", "$49", "Was $79"), i("Cable beanie", "$15"), i("Trail boots", "$99", "Was $160"), i("Wool socks, 3 pack", "$18", "Was $30")] },
+      ],
+    },
+  },
+  {
+    id: "retail-offers", composition: "list", business: "retail", style: "bold", terms: "products",
+    name: { en: "Tech Deals", es: "Ofertas tech" },
+    blurb: { en: "High-contrast product board with neon price tags, made for electronics and phone stores.", es: "Tablero de productos de alto contraste con etiquetas neón, pensado para tiendas de electrónica y telefonía." },
+    useCase: { en: "Featured products & offers", es: "Productos destacados y ofertas" },
+    look: { head: "montserrat", headWeight: 800, body: "inter", sectionInHead: true, sectionWeight: 800, sectionTracking: 0.1, tags: true },
+    variants: [
+      v("electric", "Electric mint", "Menta eléctrica", "#0e1116", "#f3f6fa", "#9aa5b4", "#2ee6a8", "#161b23", "#2ee6a8"),
+      v("sun", "Sun yellow", "Amarillo sol", "#fffbea", "#1a1a1a", "#6b6450", "#1a1a1a", "#ffcc00", "#ffcc00"),
+      v("coral", "Coral", "Coral", "#fff6f3", "#231815", "#7a625b", "#d9452a", "#ffe3dc", "#ff5a3c"),
+    ],
+    stock: null,
+    sample: {
+      title: "Volt Mobile", subtitle: "This week’s deals", footer: "Trade in your old phone for credit · Repairs while you wait",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Phones", items: [i("Refurbished phones", "From $199", "12-month warranty"), i("Prepaid plans", "From $25/mo"), i("Unlocked phones", "From $299"), i("Phone trade-in", "Up to $300")] },
+        { name: "Accessories", items: [i("Wireless earbuds", "$49", "Was $79"), i("Fast charger", "$19"), i("Rugged case", "$24"), i("Screen protector", "$15", "Installed free")] },
+        { name: "Services", items: [i("Screen repair", "From $79", "Most models in 1 hour"), i("Battery swap", "$59"), i("Data transfer", "Free"), i("Phone cleaning", "Free")] },
+      ],
+    },
+  },
+  {
+    id: "retail-boutique", composition: "list", business: "retail", style: "light", terms: "products",
+    name: { en: "Juniper Boutique", es: "Boutique Juniper" },
+    blurb: { en: "Editorial serif headings and fine rules: a calm, gallery-like board for a curated shop.", es: "Títulos editoriales con serifa y filetes finos: un tablero sereno, de galería, para una tienda selecta." },
+    useCase: { en: "Boutique collection & services", es: "Colección y servicios de boutique" },
+    look: { head: "noto-serif", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.18, leader: false, rule: true },
+    variants: [
+      v("stone", "Stone & ink", "Piedra y tinta", "#f4f1ec", "#1d1c1a", "#77716a", "#1d1c1a", "#e4ded5"),
+      v("olive", "Olive", "Oliva", "#eff0e8", "#1e2219", "#686e5f", "#55613f", "#dadcca"),
+      v("night", "Night", "Noche", "#16181b", "#f1eee8", "#9d9890", "#d9c3a0", "#212428"),
+    ],
+    stock: null,
+    sample: {
+      title: "Juniper", subtitle: "Clothing · Home · Gifts", footer: "Free gift wrapping on every purchase · Open daily 10–7",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "New this week", items: [i("Linen shirt dress", "$128", "Sand, olive, ink"), i("Cashmere crew", "$165"), i("Wide-leg trousers", "$98"), i("Leather tote", "$210", "Handmade in Portugal")] },
+        { name: "Home & gifts", items: [i("Stoneware mug set", "$48"), i("Hand-poured candle", "$34", "Fig & cedar"), i("Wool throw", "$120"), i("Gift card", "From $25")] },
+        { name: "Services", items: [i("Personal styling", "Free", "By appointment"), i("Alterations", "From $15"), i("Gift wrapping", "Free"), i("Local delivery", "$8")] },
+      ],
+    },
+  },
+  /* ---------------- gyms & fitness ---------------- */
+  {
+    id: "fitness-timetable", composition: "list", business: "fitness", style: "dark", terms: "classes",
+    name: { en: "Class Timetable", es: "Horario de clases" },
+    blurb: { en: "A week of classes at a glance: days as columns, times in the accent colour, coach and room underneath.", es: "Las clases de la semana de un vistazo: días en columnas, horas en color, coach y sala debajo." },
+    useCase: { en: "Weekly class schedule", es: "Horario semanal de clases" },
+    look: { head: "oswald", headWeight: 700, body: "inter", sectionInHead: true, sectionWeight: 700, sectionTracking: 0.08, namesUpper: true, accentPrices: true, rule: true },
+    variants: [
+      v("lime", "Black & lime", "Negro y lima", "#0d0f0c", "#f3f7ee", "#9ba596", "#c6ff3d", "#171a15"),
+      v("orange", "Ink & orange", "Tinta y naranja", "#111014", "#f6f3ff", "#a19caf", "#ff7a1a", "#1c1a21"),
+      v("aqua", "Light aqua", "Aqua claro", "#f2f7f8", "#0e1c22", "#5b707a", "#0a7f9d", "#dcebef"),
+    ],
+    stock: null,
+    sample: {
+      title: "Pulse Fitness", subtitle: "Class schedule · This week", footer: "Book in the Pulse app · Arrive 10 minutes early · Towels at the desk",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Monday", items: [i("HIIT 45", "6:00 AM", "Coach Maya · Studio A"), i("Spin", "12:15 PM", "Coach Leo · Cycle room"), i("Strength club", "5:30 PM", "Coach Marcus · Floor"), i("Yoga flow", "6:30 PM", "Coach Ana · Studio B")] },
+        { name: "Wednesday", items: [i("Strength club", "6:00 AM", "Coach Marcus · Floor"), i("Pilates core", "12:15 PM", "Coach Ana · Studio B"), i("Boxing", "7:00 PM", "Coach Dre · Studio A")] },
+        { name: "Friday", items: [i("Bootcamp", "6:00 AM", "Coach Maya · Studio A"), i("Mobility", "12:15 PM", "Coach Leo · Studio B"), i("Spin", "5:30 PM", "Coach Leo · Cycle room")] },
+        { name: "Saturday", items: [i("Bootcamp", "8:00 AM", "Coach Maya · Park"), i("Yoga flow", "9:30 AM", "Coach Ana · Studio B")] },
+      ],
+    },
+  },
+  {
+    id: "fitness-join", composition: "promo", business: "fitness", style: "bold", terms: "services",
+    name: { en: "Join Now", es: "Inscríbete" },
+    blurb: { en: "Membership plans on the left, a punchy offer and price badge on the right.", es: "Planes de membresía a la izquierda y una oferta llamativa con insignia de precio a la derecha." },
+    useCase: { en: "Membership promotion", es: "Promoción de membresías" },
+    look: { head: "montserrat", headWeight: 800, body: "inter", sectionInHead: true, sectionWeight: 800, sectionTracking: 0.02, accentPrices: true },
+    variants: [
+      v("blue", "Electric blue", "Azul eléctrico", "#f4f7ff", "#0b1533", "#5e6b87", "#1d4fe0", "#1d4fe0", "#ffd23f"),
+      v("red", "Power red", "Rojo intenso", "#fff5f3", "#1d0f0c", "#7b625c", "#c9281f", "#1d0f0c", "#e5352b"),
+      v("black", "Black & volt", "Negro y neón", "#0f0f10", "#ffffff", "#a2a2a6", "#e5ff3b", "#202022", "#e5ff3b"),
+    ],
+    stock: null,
+    sample: {
+      title: "Iron District", subtitle: "Memberships", footer: "Cancel anytime · Student and military rates at the desk",
+      featureTitle: "Join for $1", featureDetail: "No joining fee · first month $1",
+      sections: [
+        { name: "Plans", items: [i("Basic", "$29/mo", "Gym floor, 5 AM–11 PM"), i("Plus", "$49/mo", "All classes, sauna, guest pass"), i("Premier", "$79/mo", "Plus a monthly PT session"), i("Student", "$19/mo", "With a valid student ID")] },
+        { name: "Extras", items: [i("Day pass", "$15"), i("Personal training", "$60", "Per session"), i("Towel service", "$8/mo"), i("Guest pass", "$10")] },
+      ],
+    },
+  },
+  {
+    id: "fitness-motivate", composition: "promo", business: "fitness", style: "bold", terms: "board",
+    name: { en: "Daily Grind", es: "Entreno del día" },
+    blurb: { en: "Workout of the day beside a big motivational line. Change it daily in seconds.", es: "El entrenamiento del día junto a una gran frase motivadora. Se cambia cada día en segundos." },
+    useCase: { en: "Workout of the day & motivation", es: "Entrenamiento del día y motivación" },
+    look: { head: "bebas-neue", headWeight: 400, body: "inter", sectionInHead: true, sectionWeight: 400, sectionTracking: 0.06, namesUpper: true, accentPrices: true },
+    variants: [
+      v("yellow", "Black & yellow", "Negro y amarillo", "#121212", "#f5f5f5", "#9c9c9c", "#ffd400", "#ffd400"),
+      v("red", "Black & red", "Negro y rojo", "#0f0f0f", "#ffffff", "#a0a0a0", "#ff3b30", "#ff3b30"),
+      v("mono", "Concrete", "Concreto", "#ecebe7", "#111111", "#666666", "#111111", "#111111"),
+    ],
+    stock: null,
+    sample: {
+      title: "Forge Athletics", subtitle: "Workout of the day", footer: "Scale any movement · Log your time at the desk",
+      featureTitle: "Stronger than yesterday", featureDetail: "Every rep counts.",
+      sections: [
+        { name: "Warm-up", items: [i("Row", "500 m"), i("Jumping jacks", "50"), i("Air squats", "25"), i("Arm circles", "30 s")] },
+        { name: "5 rounds", items: [i("Kettlebell swings", "20"), i("Box jumps", "15"), i("Push-ups", "12"), i("Finisher: plank", "2 min")] },
+      ],
+    },
+  },
+  /* ---------------- offices & workplaces ---------------- */
+  {
+    id: "office-welcome", composition: "promo", business: "office", style: "light", terms: "board",
+    name: { en: "Welcome", es: "Bienvenida" },
+    blurb: { en: "Greets guests with today’s visitors and building info. Calm, corporate, on brand.", es: "Recibe a los invitados con las visitas del día e información del edificio. Sereno y corporativo." },
+    useCase: { en: "Reception welcome screen", es: "Pantalla de bienvenida en recepción" },
+    look: { head: "inter", headWeight: 800, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.16, rule: true },
+    variants: [
+      v("navy", "Navy", "Marino", "#f6f7f9", "#101828", "#667085", "#1d4ed8", "#101828"),
+      v("teal", "Teal", "Verde azulado", "#f4f8f8", "#0f2a2e", "#5b7377", "#0c7b7d", "#0c7b7d"),
+      v("charcoal", "Charcoal", "Carbón", "#111317", "#f2f4f7", "#9aa1ab", "#8ab4ff", "#1d2129"),
+    ],
+    stock: null,
+    sample: {
+      title: "Northwind Partners", subtitle: "Tuesday, Nov 25", footer: "Wi-Fi: Northwind-Guest · Ask reception for the password",
+      featureTitle: "Hello", featureDetail: "Welcome · please check in at reception",
+      sections: [
+        { name: "Visitors", items: [i("Acme Robotics", "10:00 AM", "Boardroom · Host: Dana Ruiz"), i("Harbor Health", "1:30 PM", "Room 4B · Host: Sam Patel"), i("Westline Capital", "3:00 PM", "Boardroom · Host: Lee Chen")] },
+        { name: "Building", items: [i("Reception", "Floor 1"), i("Restrooms", "End of hall"), i("Emergency exit", "Stairs A & B")] },
+      ],
+    },
+  },
+  {
+    id: "office-rooms", composition: "list", business: "office", style: "light", terms: "schedule",
+    name: { en: "Room Schedule", es: "Agenda de salas" },
+    blurb: { en: "Today’s meetings by room, with times in clear tags. Built for lobbies and hallways.", es: "Las reuniones de hoy por sala, con horas en etiquetas claras. Pensado para recepciones y pasillos." },
+    useCase: { en: "Meeting room schedule", es: "Agenda de salas de reuniones" },
+    look: { head: "montserrat", headWeight: 800, body: "inter", sectionInHead: true, sectionWeight: 800, sectionTracking: 0.1, tags: true },
+    variants: [
+      v("indigo", "Indigo", "Índigo", "#f5f6fb", "#141a33", "#646b85", "#4338ca", "#141a33", "#4338ca"),
+      v("graphite", "Graphite & green", "Grafito y verde", "#121417", "#f1f3f6", "#9aa1ab", "#22c55e", "#1b1f24", "#22c55e"),
+      v("sand", "Sand & amber", "Arena y ámbar", "#f7f3ec", "#231d16", "#7a6f61", "#a14a07", "#ece2d2", "#b45309"),
+    ],
+    stock: null,
+    sample: {
+      title: "Brightline HQ", subtitle: "Meeting rooms · Today", footer: "Book rooms in the calendar app · Please leave rooms tidy",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Boardroom", items: [i("Q4 planning", "9:00", "Finance team"), i("Client review", "11:00", "Acme Robotics"), i("Leadership sync", "4:00", "Exec team")] },
+        { name: "Room 2A", items: [i("Design critique", "10:00", "Product design"), i("Interviews", "1:00", "Engineering hiring"), i("Product demo", "3:30", "Partners")] },
+        { name: "Room 3C", items: [i("New hire onboarding", "9:30", "People team"), i("Sales standup", "2:00", "Sales"), i("Customer call", "4:00", "Support")] },
+      ],
+    },
+  },
+  {
+    id: "office-kudos", composition: "promo", business: "office", style: "dark", terms: "board",
+    name: { en: "Kudos", es: "Reconocimientos" },
+    blurb: { en: "Celebrate people: employee of the month up front, work anniversaries and kudos alongside.", es: "Celebre a su equipo: el empleado del mes al frente, aniversarios y reconocimientos al lado." },
+    useCase: { en: "Employee recognition", es: "Reconocimiento a empleados" },
+    look: { head: "noto-serif", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.16 },
+    variants: [
+      v("gold", "Black & gold", "Negro y oro", "#12110f", "#f5efe3", "#aaa293", "#d4a54a", "#d4a54a"),
+      v("plum", "Plum", "Ciruela", "#150f17", "#f7eef9", "#b0a0b5", "#d48bd9", "#3a1f40"),
+      v("light", "Ivory", "Marfil", "#f8f6f1", "#1c1a16", "#6f6a60", "#8a6418", "#1c1a16"),
+    ],
+    stock: null,
+    sample: {
+      title: "Brightline", subtitle: "Team celebrations", footer: "Nominate a teammate in the People portal",
+      featureTitle: "Maria Gómez", featureDetail: "Employee of the month · Customer Success",
+      sections: [
+        { name: "Tenure", items: [i("Dana Ruiz", "10 years", "Operations"), i("Sam Patel", "5 years", "Engineering"), i("Lee Chen", "1 year", "Sales"), i("Ana Ortiz", "3 years", "Design")] },
+        { name: "Kudos", items: [i("Priya N.", "", "Led our smoothest launch yet"), i("Jordan K.", "", "Mentored three new hires"), i("Support team", "", "Record satisfaction this quarter"), i("Facilities crew", "", "Kept the office running all week")] },
+      ],
+    },
+  },
+  /* ---------------- pet shops & services ---------------- */
+  {
+    id: "pets-groom", composition: "list", business: "pets", style: "light", terms: "services",
+    name: { en: "Groom Room", es: "Peluquería canina" },
+    blurb: { en: "Friendly script title, clear size-based prices in tags, and the add-ons owners actually ask for.", es: "Título manuscrito y amable, precios claros por tamaño en etiquetas y los extras que más se piden." },
+    useCase: { en: "Grooming price list", es: "Lista de precios de peluquería" },
+    look: { head: "lobster", headWeight: 400, body: "inter", sectionInHead: false, sectionWeight: 800, sectionTracking: 0.1, tags: true },
+    variants: [
+      v("teal", "Teal", "Verde azulado", "#f2faf8", "#12302b", "#5d7772", "#0d7f73", "#0d7f73", "#ffb84d"),
+      v("sunny", "Sunny", "Soleado", "#fffaf0", "#2a2112", "#7a6c52", "#b8600f", "#ffe8c2", "#e07a1f"),
+      v("berry", "Berry", "Frutos rojos", "#fbf5fb", "#2a1530", "#7a6280", "#93307f", "#f2dcef", "#a4378f"),
+    ],
+    stock: null,
+    sample: {
+      title: "The Groom Room", subtitle: "Dog & cat grooming", footer: "Prices vary by coat and temperament · Ask about our puppy intro visit",
+      featureTitle: "", featureDetail: "",
+      sections: [
+        { name: "Bath & tidy", items: [i("Small dog", "$35", "Up to 20 lb"), i("Medium dog", "$45", "21–50 lb"), i("Large dog", "$60", "Over 50 lb"), i("Puppy intro", "$30", "Under 6 months")] },
+        { name: "Full groom", items: [i("Small dog", "$65"), i("Medium dog", "$80"), i("Large dog", "$95+"), i("Cat groom", "$75")] },
+        { name: "Add-ons", items: [i("Nail trim", "$15"), i("Teeth brushing", "$10"), i("Blueberry facial", "$12"), i("De-shed treatment", "$20")] },
+      ],
+    },
+  },
+  {
+    id: "pets-treats", composition: "promo", business: "pets", style: "bold", terms: "products",
+    name: { en: "Treat Week", es: "Semana de premios" },
+    blurb: { en: "A happy pet photo, a bold offer and a price badge, with products and prices beside it.", es: "Una foto de mascota feliz, una oferta llamativa y una insignia de precio, con productos y precios al lado." },
+    useCase: { en: "Pet product promotion", es: "Promoción de productos para mascotas" },
+    look: { head: "montserrat", headWeight: 800, body: "inter", sectionInHead: true, sectionWeight: 800, sectionTracking: 0.02, accentPrices: true },
+    variants: [
+      v("sky", "Sky & sun", "Cielo y sol", "#f3f8ff", "#0f1d33", "#5d6c82", "#1f6fe8", "#0f1d33", "#ffcc33"),
+      v("leaf", "Leaf", "Hoja", "#f4f8ef", "#17240f", "#63705a", "#3f7a22", "#17240f", "#ffd24d"),
+      v("coral", "Coral", "Coral", "#fff6f2", "#2b1610", "#7f655d", "#d24a2c", "#2b1610", "#ff6b4a"),
+    ],
+    stock: "beagle",
+    sample: {
+      title: "Happy Tails", subtitle: "Pet supply · Treat week", footer: "Offer valid while supplies last",
+      featureTitle: "2 for $15", featureDetail: "Mix and match any treat bags · $15",
+      sections: [
+        { name: "Treats", items: [i("Peanut butter biscuits", "$8.99"), i("Dental chews, 12 pack", "$14.99"), i("Salmon bites", "$9.49"), i("Freeze-dried liver", "$12.99")] },
+        { name: "Toys & gear", items: [i("Rope tug toy", "$7.99"), i("Reflective leash", "$18.99"), i("Cozy bed, medium", "$49"), i("Squeaky balls, 3 pack", "$6.99")] },
+      ],
+    },
+  },
+  {
+    id: "pets-care", composition: "columns", business: "pets", style: "light", terms: "services",
+    name: { en: "Pet Care", es: "Cuidado de mascotas" },
+    blurb: { en: "Daycare, boarding and grooming prices in two tidy columns, with a pet photo and booking note.", es: "Precios de guardería, hospedaje y peluquería en dos columnas ordenadas, con foto y aviso de reservas." },
+    useCase: { en: "Daycare, boarding & grooming board", es: "Guardería, hospedaje y peluquería" },
+    look: { head: "montserrat", headWeight: 800, body: "inter", sectionInHead: true, sectionWeight: 800, sectionTracking: 0.12, leader: true },
+    variants: [
+      v("cream", "Cream & rust", "Crema y óxido", "#fbf7f0", "#2b2118", "#7d6f60", "#a9521f", "#f1e5d3"),
+      v("sage", "Sage", "Salvia", "#f1f5ef", "#1b2a1d", "#627062", "#2f6b3f", "#dde7da"),
+      v("navy", "Navy & amber", "Marino y ámbar", "#0f1726", "#eef2f8", "#95a0b3", "#f2a541", "#1a2436"),
+    ],
+    stock: "beagle",
+    sample: {
+      title: "Paws & Co.", subtitle: "Daycare · Boarding · Grooming", footer: "Vaccination records required · Tours daily 10 AM–4 PM",
+      featureTitle: "Now booking", featureDetail: "Holiday boarding fills fast. Reserve today.",
+      sections: [
+        { name: "Daycare", items: [i("Half day", "$22"), i("Full day", "$35"), i("10-day pass", "$300", "Save $50")] },
+        { name: "Boarding", items: [i("Dog suite", "$55", "Per night, two walks"), i("Cat condo", "$35", "Per night"), i("Late pickup", "$15", "After 7 PM")] },
+        { name: "Grooming", items: [i("Bath & brush", "$40"), i("Full groom", "From $65")] },
+      ],
+    },
+  },
+  /* ---------------- premium service templates (salons, retail, fitness) ---------------- */
+  {
+    id: "luxury-barbershop", composition: "showcaseLeft", business: "salon", style: "dark", terms: "services",
     name: { en: "Luxury Barbershop", es: "Barbería de lujo" },
     blurb: { en: "Quiet and expensive. A refined serif, brass details and a moody photo that melts into the page.", es: "Sobria y exclusiva. Serifa refinada, detalles dorados y una foto que se funde con la página." },
+    useCase: { en: "Premium barbershop service list", es: "Lista premium de servicios de barbería" },
     look: { head: "cormorant-garamond", headWeight: 600, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.25, rule: true, accentPrices: true },
     variants: [
       v("noir", "Noir & brass", "Negro y latón", "#100f0e", "#f1e9dc", "#9c9183", "#c8a46e", "#1b1a18"),
@@ -598,9 +965,10 @@ export const MENU_DESIGNS: MenuDesign[] = [
     },
   },
   {
-    id: "boutique-promotion", composition: "editorial", business: "retail", style: "light",
+    id: "boutique-promotion", composition: "editorial", business: "retail", style: "light", terms: "products",
     name: { en: "Boutique Promotion", es: "Promoción boutique" },
     blurb: { en: "Editorial and calm, like a magazine page. A big serif headline, one offer band and featured products.", es: "Editorial y serena, como una página de revista. Gran titular con serifa, una franja de oferta y productos destacados." },
+    useCase: { en: "Boutique collection promotion", es: "Promoción de colección boutique" },
     look: { head: "playfair-display", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.26 },
     variants: [
       v("stone", "Stone & rust", "Piedra y óxido", "#f2ede5", "#1c1a17", "#746b61", "#9b4a2c", "#9b4a2c"),
@@ -617,9 +985,10 @@ export const MENU_DESIGNS: MenuDesign[] = [
     },
   },
   {
-    id: "product-spotlight", composition: "spotlight", business: "retail", style: "light",
+    id: "product-spotlight", composition: "spotlight", business: "retail", style: "light", terms: "products",
     name: { en: "Product Spotlight", es: "Producto destacado" },
     blurb: { en: "One hero product in the centre, its story and price on one side, what makes it special on the other.", es: "Un producto protagonista en el centro, su historia y precio a un lado y lo que lo hace especial al otro." },
+    useCase: { en: "Single hero product launch", es: "Lanzamiento de un producto estrella" },
     look: { head: "playfair-display", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.26 },
     variants: [
       v("stone", "Stone & rust", "Piedra y óxido", "#f2ede5", "#1c1a17", "#746b61", "#9b4a2c", "#9b4a2c"),
@@ -637,9 +1006,10 @@ export const MENU_DESIGNS: MenuDesign[] = [
     },
   },
   {
-    id: "modern-gym", composition: "timetable", business: "fitness", style: "bold",
+    id: "modern-gym", composition: "timetable", business: "fitness", style: "bold", terms: "classes",
     name: { en: "Modern Gym", es: "Gimnasio moderno" },
     blurb: { en: "Dark and athletic. A huge wordmark, today's classes by time and a bright offer block.", es: "Oscuro y atlético. Un gran logotipo, las clases de hoy por hora y una oferta llamativa." },
+    useCase: { en: "Today's classes & member offer", es: "Clases de hoy y oferta para socios" },
     look: { head: "bebas-neue", headWeight: 400, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.2, namesUpper: true },
     variants: [
       v("volt", "Volt", "Voltio", "#0a0a0b", "#f5f6f2", "#8c9088", "#d4ff3a", "#d4ff3a"),

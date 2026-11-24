@@ -52,10 +52,11 @@ describe("existing boards are untouched", () => {
 });
 
 describe("template library", () => {
-  it("has 26 templates (18 + 4 photo + 4 service templates) across business types and styles, including the approved designs", () => {
-    expect(MENU_DESIGNS.length).toBe(26);
-    // The approved service templates (salon, retail, fitness), in every approved colour style.
-    expect(MENU_DESIGNS.slice(22).map((d) => [d.id, d.business, d.variants.map((v) => v.id)])).toEqual([
+  it("has 42 templates: the 22 food templates (18 + 4 photo templates), 16 non-food templates and the 4 premium service templates", () => {
+    expect(MENU_DESIGNS.length).toBe(42);
+    expect(MENU_DESIGNS.filter((d) => ["restaurant", "cafe", "fast", "bar", "sweets"].includes(d.business))).toHaveLength(22);
+    // The approved premium service templates (salon, retail, fitness), last, in every approved colour style.
+    expect(MENU_DESIGNS.slice(38).map((d) => [d.id, d.business, d.variants.map((v) => v.id)])).toEqual([
       ["luxury-barbershop", "salon", ["noir", "bone", "oxblood"]],
       ["boutique-promotion", "retail", ["stone", "sage", "noir"]],
       ["product-spotlight", "retail", ["stone", "sage", "noir"]],
@@ -83,9 +84,10 @@ describe("template library", () => {
       expect(doc.sections.length).toBeLessThanOrEqual(MENU_LIMITS.sections);
       if (design.stock) expect(STOCK_PHOTOS).toContain(design.stock);
       expect(design.variants.length).toBeGreaterThanOrEqual(2);
-      // Realistic content, no placeholders: menus ship 8+ items; service boards ship their approved, shorter lists.
-      const service = ["salon", "retail", "fitness"].includes(design.business);
-      expect(items, design.id).toBeGreaterThanOrEqual(service ? 4 : 8);
+      // Realistic content: every template ships with real items and prices, no placeholders. Menus are full;
+      // non-food boards carry fewer, larger lines; the premium service boards ship their approved, shorter lists.
+      const premium = ["showcaseLeft", "editorial", "spotlight", "timetable"].includes(design.composition);
+      expect(items, design.id).toBeGreaterThanOrEqual(premium ? 4 : design.terms ? 6 : 8);
       expect(JSON.stringify(doc)).not.toMatch(/lorem|placeholder|item name/i);
     }
     const scratch = parseLayout(scratchDocument());
