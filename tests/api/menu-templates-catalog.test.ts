@@ -86,6 +86,9 @@ describe("GET /api/menu-templates/catalog", () => {
     expect(body.filters.business.map((f) => f.id)).toEqual(["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness"]);
     expect(body.filters.style.map((f) => f.id)).toEqual(["all", "dark", "light", "bold"]);
     expect(body.filters.structure.map((f) => f.id)).toEqual(["all", "single", "columns", "media", "cards"]);
+    // Older clients' font list is unchanged; the template-only faces are listed separately (additive).
+    expect(body.fonts).toEqual(["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"]);
+    expect(body.templateFonts).toEqual([...body.fonts, "cormorant-garamond", "playfair-display"]);
     expect(body.filters.business.find((f) => f.id === "sweets")!.name).toEqual({ en: "Drinks & sweets", es: expect.any(String) });
     const gallery = galleryEntries();
     for (const entry of body.entries) {
