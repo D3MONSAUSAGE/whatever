@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Renders 38 templates × 2 orientations × 3 content shapes × 3 sizes; slow CI runners need more than the 30 s default.
+vi.setConfig({ testTimeout: 180_000 });
 import {
   applyCustomReset, customizationSpec, focusPlacement, framePlacement, IMAGE_ZOOM, ITEM_PHOTO_SIZES, parseCustom, resetFeaturedPhoto,
   type ItemPhotoSize,

@@ -2,14 +2,16 @@
 
 /**
  * Step 4 (Look) Guided Customization: Basic (overall text size, featured photo size) and a collapsed Advanced section
- * (per-role size and weight, section heading overrides, spacing, Fill/Fit and focus, individual resets).
+ * (per-role size and weight, section heading overrides, spacing, featured photo zoom and focus, individual resets).
+ * t421u: Basic also holds Item photo size (Small/Medium/Large) and the featured photo's Fill/Fit.
  * Every control edits the shared `custom` contract (lib/board-custom.ts); reset = deleting the key.
  */
 import { useLocale } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/en";
 import {
-  applyCustomReset, customizationSpec, effectiveMediaSize, fontWeightChoices, normalizeCustomFor, ROLE_SCALE, SPACING_SCALE, TEXT_SIZE_PRESETS,
-  type FontWeightChoice, type LayoutCustom, type RoleKey, type RoleTypography, type TextSizePreset,
+  anchorFocus, applyCustomReset, customizationSpec, effectiveMediaSize, fontWeightChoices, IMAGE_ZOOM, ITEM_PHOTO_SIZES, normalizeCustomFor, resetFeaturedPhoto, ROLE_SCALE,
+  SPACING_SCALE, TEXT_SIZE_PRESETS,
+  type FontWeightChoice, type ItemPhotoSize, type LayoutCustom, type RoleKey, type RoleTypography, type TextSizePreset,
 } from "@/lib/board-custom";
 import type { LayoutDocument } from "@/lib/layout-studio";
 import { orientationOf } from "@/lib/board-orientation";
@@ -63,11 +65,15 @@ function RoleRow({ choices, value, onScale, onWeight, onReset, testid, label }: 
   );
 }
 
-export function CustomizeLook({ doc, update, hasPhoto, open, onOpen, scope, onScope }: {
+export function CustomizeLook({ doc, update, hasPhoto, video = false, itemPhotos, open, onOpen, scope, onScope }: {
   doc: LayoutDocument;
   update: (next: LayoutDocument) => void;
   /** A featured photo (owner's or sample) is drawn, so Fill/Fit and focus apply. */
   hasPhoto: boolean;
+  /** The featured media is a video: framing controls are hidden (they never change video placement). */
+  video?: boolean;
+  /** What the preview drew for item photos (undefined = the board shows none, so the size control is hidden). */
+  itemPhotos?: { requested: ItemPhotoSize; effective: ItemPhotoSize | null } | null;
   open: boolean;
   onOpen: (open: boolean) => void;
   scope: HeadingScope;
@@ -101,6 +107,14 @@ export function CustomizeLook({ doc, update, hasPhoto, open, onOpen, scope, onSc
   };
   const hasAny = Boolean(custom) || doc.sections.some((s) => s.headingOverride);
   const roles = spec.roles.filter((r) => r !== "sectionHeading");
+  const photoSize: ItemPhotoSize = doc.itemPhotoSize ?? "small";
+  const framing = Boolean(spec.imageFocus && hasPhoto && !video);
+  const zoom = custom?.imageZoom ?? 1;
+  const focus = custom?.imageFocus ?? null;
+  // Sliders start where the photo already is (the template's anchor), so the first move never makes it jump.
+  const shown = focus ?? anchorFocus(doc.imageAnchor);
+  const photoChanged = custom?.imageZoom != null || focus != null || doc.imageFit === "contain" || (doc.imageAnchor ?? "center") !== "center";
+  const reduced = itemPhotos && itemPhotos.effective && itemPhotos.effective !== itemPhotos.requested ? itemPhotos.effective : null;
 
   return (
     <div className="grid gap-3" data-testid="tpl-cz">
@@ -127,6 +141,31 @@ export function CustomizeLook({ doc, update, hasPhoto, open, onOpen, scope, onSc
               onChange={(e) => update(withCustom(doc, (c) => { c.mediaSize = Number(e.target.value); }))} />
           </label>
           {custom?.mediaSize != null ? <button type="button" className="btn btn-quiet min-h-8 text-xs justify-self-start" onClick={() => reset("custom.mediaSize")} data-testid="tpl-cz-media-reset">{t("cz.reset")}</button> : null}
+        </div>
+      ) : null}
+      {spec.itemPhotoSize && itemPhotos !== undefined ? (
+        <div className="grid gap-1" data-testid="tpl-cz-item-photos">
+          <p className="text-sm font-semibold" id="tpl-cz-item-photo-label">{t("cz.itemPhotoSize")}</p>
+          <div className="seg grid grid-cols-3" role="group" aria-labelledby="tpl-cz-item-photo-label">
+            {ITEM_PHOTO_SIZES.map((size) => (
+              // Small is written explicitly: a save replaces the content, so a missing key would not keep a choice.
+              <button key={size} type="button" className="min-h-11" aria-pressed={photoSize === size} data-testid={`tpl-cz-item-photo-${size}`}
+                onClick={() => update({ ...doc, itemPhotoSize: size })}>
+                {t(`cz.itemPhoto.${size}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+          {reduced ? <p className="text-xs text-muted" role="status" data-testid="tpl-cz-item-photo-reduced">{t("cz.itemPhotoReduced", { size: t(`cz.itemPhoto.${reduced}` as MessageKey).toLowerCase() })}</p> : null}
+        </div>
+      ) : null}
+      {framing ? (
+        <div className="grid gap-1" data-testid="tpl-cz-framing">
+          <p className="text-sm font-semibold" id="tpl-cz-framing-label">{t("cz.featuredFraming")}</p>
+          <div className="seg grid grid-cols-2" role="group" aria-labelledby="tpl-cz-framing-label">
+            <button type="button" className="min-h-11 !whitespace-normal leading-tight" aria-pressed={doc.imageFit !== "contain"} onClick={() => update({ ...doc, imageFit: "cover" })} data-testid="tpl-cz-fill">{t("cz.fill")}</button>
+            <button type="button" className="min-h-11 !whitespace-normal leading-tight" aria-pressed={doc.imageFit === "contain"} onClick={() => update({ ...doc, imageFit: "contain" })} data-testid="tpl-cz-fit">{t("cz.fitWhole")}</button>
+          </div>
+          {doc.imageFit === "contain" && doc.design ? <p className="text-xs text-muted">{t("cz.fitBackdrop")}</p> : null}
         </div>
       ) : null}
       <p className="text-xs text-muted">{t("cz.selectHint")}</p>
@@ -175,29 +214,26 @@ export function CustomizeLook({ doc, update, hasPhoto, open, onOpen, scope, onSc
               {custom?.spacing ? <button type="button" className="btn btn-quiet min-h-8 text-xs justify-self-start" onClick={() => reset("custom.spacing")} data-testid="tpl-cz-spacing-reset">{t("cz.reset")}</button> : null}
             </fieldset>
           ) : null}
-          {spec.imageFocus ? (
+          {spec.imageFocus && !video ? (
             <fieldset className="grid gap-2 border border-line rounded-xl p-3" data-testid="tpl-cz-photo">
               <legend className="form-label px-1">{t("cz.photo")}</legend>
-              {hasPhoto ? (
+              {framing ? (
                 <>
-                  <div className="seg" role="group" aria-label={t("cz.photo")}>
-                    <button type="button" aria-pressed={doc.imageFit !== "contain"} onClick={() => update({ ...doc, imageFit: "cover" })} data-testid="tpl-cz-fill">{t("cz.fill")}</button>
-                    <button type="button" aria-pressed={doc.imageFit === "contain"} onClick={() => update({ ...doc, imageFit: "contain" })} data-testid="tpl-cz-fit">{t("cz.fitWhole")}</button>
-                  </div>
-                  {doc.imageFit !== "contain" ? (
-                    <>
-                      <label className="text-sm grid gap-1">{t("cz.focusX", { n: Math.round(custom?.imageFocus?.x ?? 50) })}
-                        <input type="range" min={0} max={100} step={1} value={custom?.imageFocus?.x ?? 50} data-testid="tpl-cz-focus-x"
-                          onChange={(e) => update(withCustom(doc, (c) => { c.imageFocus = { x: Number(e.target.value), y: c.imageFocus?.y ?? 50 }; }))} />
-                      </label>
-                      <label className="text-sm grid gap-1">{t("cz.focusY", { n: Math.round(custom?.imageFocus?.y ?? 50) })}
-                        <input type="range" min={0} max={100} step={1} value={custom?.imageFocus?.y ?? 50} data-testid="tpl-cz-focus-y"
-                          onChange={(e) => update(withCustom(doc, (c) => { c.imageFocus = { x: c.imageFocus?.x ?? 50, y: Number(e.target.value) }; }))} />
-                      </label>
-                      <p className="text-xs text-muted">{t("cz.focusNote")}</p>
-                      {custom?.imageFocus ? <button type="button" className="btn btn-quiet min-h-8 text-xs justify-self-start" onClick={() => reset("custom.imageFocus")} data-testid="tpl-cz-focus-reset">{t("cz.reset")}</button> : null}
-                    </>
-                  ) : null}
+                  <label className="text-sm grid gap-1">{t("cz.zoom", { n: pct(zoom) })}
+                    <input type="range" className="min-h-8" min={IMAGE_ZOOM.min} max={IMAGE_ZOOM.max} step={IMAGE_ZOOM.step} value={zoom} data-testid="tpl-cz-zoom"
+                      onChange={(e) => update(withCustom(doc, (c) => { const v = Number(e.target.value); if (v <= IMAGE_ZOOM.min) delete c.imageZoom; else c.imageZoom = v; }))} />
+                  </label>
+                  <p className="text-xs text-muted">{t("cz.dragHint")}</p>
+                  <label className="text-sm grid gap-1">{t("cz.focusX", { n: Math.round(shown.x) })}
+                    <input type="range" className="min-h-8" min={0} max={100} step={1} value={shown.x} data-testid="tpl-cz-focus-x"
+                      onChange={(e) => update(withCustom(doc, (c) => { c.imageFocus = { x: Number(e.target.value), y: c.imageFocus?.y ?? shown.y }; }))} />
+                  </label>
+                  <label className="text-sm grid gap-1">{t("cz.focusY", { n: Math.round(shown.y) })}
+                    <input type="range" className="min-h-8" min={0} max={100} step={1} value={shown.y} data-testid="tpl-cz-focus-y"
+                      onChange={(e) => update(withCustom(doc, (c) => { c.imageFocus = { x: c.imageFocus?.x ?? shown.x, y: Number(e.target.value) }; }))} />
+                  </label>
+                  <p className="text-xs text-muted">{t("cz.focusNote")}</p>
+                  {photoChanged ? <button type="button" className="btn btn-quiet min-h-11 text-sm justify-self-start" onClick={() => update(resetFeaturedPhoto(doc))} data-testid="tpl-cz-photo-reset">{t("cz.photoReset")}</button> : null}
                 </>
               ) : <p className="text-xs text-muted">{t("cz.focusNeedsPhoto")}</p>}
             </fieldset>
