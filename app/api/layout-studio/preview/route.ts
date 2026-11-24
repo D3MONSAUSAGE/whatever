@@ -5,7 +5,8 @@ import { withLocalizedErrors } from "@/lib/server/locale";
 import { layoutStudioEnabled, parseLayout } from "@/lib/layout-studio";
 import { boardFit } from "@/lib/board-fit";
 import { boardCanvas, orientationOf } from "@/lib/board-orientation";
-import { loadBoardArt } from "@/lib/server/layout-boards";
+import { featuredPhotoSize, loadBoardArt } from "@/lib/server/layout-boards";
+import { customizationSpec } from "@/lib/board-custom";
 import { noteOnboarding } from "@/lib/server/onboarding-hooks";
 
 export const runtime = "nodejs";
@@ -31,7 +32,11 @@ export const POST = withLocalizedErrors(async function POST(req: Request) {
   const doc = parsed.value;
   if (body.format === "fit") {
     const limited = await enforceLimit(`board-fit:${admin.userId}`, 60, 240, "Too many previews. Wait a minute.");
-    return limited ?? json({ fit: boardFit(doc) }, 200, { "Cache-Control": "no-store" });
+    if (limited) return limited;
+    // t421u: the featured photo's size lets PNG-preview clients map a drag exactly (only for boards with a photo area).
+    const natural = customizationSpec(doc).imageFocus && !doc.videoMediaId && (doc.imageMediaId || doc.stockPhoto)
+      ? await featuredPhotoSize(admin.accountId, doc).catch(() => null) : null;
+    return json({ fit: boardFit(doc, { natural }) }, 200, { "Cache-Control": "no-store" });
   }
   const limited = await enforceLimit(`menu-preview:${admin.userId}`, 60, 60, "Too many previews. Wait a minute.");
   if (limited) return limited;

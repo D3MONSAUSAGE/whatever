@@ -38,14 +38,24 @@ function small(doc: LayoutDocument): LayoutDocument {
 
 export type Case = { key: string; svg: () => string };
 
+/**
+ * Boards saved before t421u have no `itemPhotoSize` (new seeds carry the template default), so the corpus pins the
+ * documents customers actually have: the seed without it.
+ */
+function existing(doc: LayoutDocument): LayoutDocument {
+  const { itemPhotoSize: _seeded, ...rest } = doc;
+  void _seeded;
+  return rest;
+}
+
 export function corpus(): Case[] {
   const out: Case[] = [];
   for (const design of MENU_DESIGNS) {
     for (const variant of design.variants) {
-      const base = designDocument(design, variant.id);
+      const base = existing(designDocument(design, variant.id));
       out.push({ key: `design/${design.id}/${variant.id}`, svg: () => layoutSvg(base) });
     }
-    const base = designDocument(design);
+    const base = existing(designDocument(design));
     const own = { ...base, stockPhoto: undefined };
     out.push({ key: `design/${design.id}/photo`, svg: () => layoutSvg(own, { imageHref: PHOTO }) });
     out.push({ key: `design/${design.id}/photo-contain-top`, svg: () => layoutSvg({ ...own, imageFit: "contain", imageAnchor: "top" }, { imageHref: PHOTO }) });

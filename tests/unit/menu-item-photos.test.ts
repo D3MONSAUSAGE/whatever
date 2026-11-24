@@ -19,6 +19,8 @@ const P2 = "00000000-0000-4000-8000-000000000102";
 const FOREIGN = "00000000-0000-4000-8000-000000000999";
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const href = `data:image/png;base64,${PNG}`;
+/** All drawn text in reading order, so a name wrapped beside a larger photo still reads as one name (t421u). */
+const drawnText = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]).join(" ");
 const sha = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
 
 function photoBoard(designId = "coffee-shop"): LayoutDocument {
@@ -145,7 +147,7 @@ describe("regression: a photo on Modern Restaurant's Burrata appears on the TV",
     const svg = layoutSvg(doc, { itemImages: { [P1]: href } });
     expect(svg).toContain(href);
     expect(svg).toContain("Burrata");
-    for (const s of doc.sections) for (const i of s.items) expect(svg, i.name).toContain(i.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
+    for (const s of doc.sections) for (const i of s.items) expect(drawnText(svg), i.name).toContain(i.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
     expect(designSvgWithReport(doc, { itemImages: { [P1]: href } }).report.dropped).toBe(0);
   });
 
@@ -238,7 +240,7 @@ describe("rendering item photos (shared SVG: browser preview and TV PNG)", () =>
     const svg = layoutSvg(four, { itemImages: { [P1]: href, [P2]: href } });
     const count = (svg.match(new RegExp(href.replace(/[+/]/g, "\\$&"), "g")) ?? []).length;
     expect(count).toBe(4);
-    for (const sec of four.sections) for (const it of sec.items) expect(svg, it.name).toContain(it.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
+    for (const sec of four.sections) for (const it of sec.items) expect(drawnText(svg), it.name).toContain(it.name.replace(/&/g, "&amp;").replace(/'/g, "&#39;"));
     // Items without photos on taqueria-specials render as clean text without empty/monogram placeholders.
     const taq = layoutSvg(designDocument(designById("taqueria-specials")!));
     expect(taq).not.toMatch(/text-anchor="middle">T</);

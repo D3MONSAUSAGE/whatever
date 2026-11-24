@@ -212,7 +212,9 @@ describe("custom: readable floors", () => {
 
 describe("custom: overflow, safe size and publish", () => {
   it("blocks only overflow that customization introduced, and safeAction targets the culprit", () => {
-    const base = design("photo-menu-grid");
+    // A board saved before t421u (no itemPhotoSize, i.e. Small photos): the safe action is the single culprit role.
+    const { itemPhotoSize: _seeded, ...base } = design("photo-menu-grid");
+    void _seeded;
     const doc = withC(base, { v: 1, imageFocus: { x: 10, y: 10 }, roles: { itemName: { scale: 1.5 }, price: { scale: 1.1 } }, spacing: { itemGap: 1.1 } });
     const fit = boardFit(doc);
     expect(fit.overflowReasons).toContain("text_clipped");

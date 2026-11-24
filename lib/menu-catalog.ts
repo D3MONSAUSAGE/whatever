@@ -16,7 +16,7 @@ import { sampleLayout, type LayoutDocument } from "@/lib/layout-studio";
 import { sampleMenu, type MenuContent } from "@/lib/menu-templates";
 import { seedClassicMenu, type Brand } from "@/lib/brand-kit";
 import {
-  designCustomizationSpec, fontWeightsByFont, layoutCustomizationSpec, CUSTOM_VERSION, READABLE_FLOORS, ROLE_KEYS, ROLE_SCALE, SPACING_SCALE,
+  IMAGE_ZOOM, ITEM_PHOTO_SIZES, designCustomizationSpec, fontWeightsByFont, layoutCustomizationSpec, CUSTOM_VERSION, READABLE_FLOORS, ROLE_KEYS, ROLE_SCALE, SPACING_SCALE,
   TEXT_SCALE, TEXT_SIZE_PRESETS, WEIGHT_CHOICES, type CustomizationSpec,
 } from "@/lib/board-custom";
 
@@ -83,6 +83,9 @@ export const CUSTOMIZATION_META = {
   roleScale: ROLE_SCALE,
   spacingScale: SPACING_SCALE,
   imageFocus: { min: 0, max: 100 },
+  /** t421u: featured photo zoom (custom.imageZoom) and item photo size presets (top-level itemPhotoSize). */
+  imageZoom: IMAGE_ZOOM,
+  itemPhotoSizes: [...ITEM_PHOTO_SIZES],
   weights: [...WEIGHT_CHOICES],
   /** Weight choices each bundled font can draw (others snap to the nearest shipped face at render time). */
   fontWeights: fontWeightsByFont(),
