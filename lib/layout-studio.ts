@@ -7,8 +7,8 @@ import { sectionShows, shownSections } from "@/lib/menu-fields";
 import { isDesignId, isStockPhoto, type StockPhotoId } from "@/lib/menu-designs";
 import { designSvg, designSvgWithReport, designVideoBox, safeDesignHref, type DesignArt } from "@/lib/menu-design-svg";
 import {
-  activeCustom, emptyClips, fixedRegion, focusPlacement, itemRegion, parseCustom, parseHeadingOverride, sectionHeadingStyle, sectionRegion, snapWeight,
-  LAYOUT_MEDIA, READABLE_FLOORS, setRegionCanvas, type ActiveCustom, type BoardRegion, type ClipArea, type LayoutCustom, type RoleKey, type RoleTypography,
+  activeCustom, anchorFocus, emptyClips, fixedRegion, focusPlacement, framePlacement, isItemPhotoSize, itemRegion, usesFraming, CUSTOM_ERROR, parseCustom, parseHeadingOverride, sectionHeadingStyle, sectionRegion, snapWeight,
+  LAYOUT_MEDIA, READABLE_FLOORS, setRegionCanvas, type ActiveCustom, type BoardRegion, type ClipArea, type ItemPhotoSize, type LayoutCustom, type RoleKey, type RoleTypography,
 } from "@/lib/board-custom";
 
 export { MENU_LIMITS };
@@ -98,6 +98,11 @@ export type LayoutDocument = {
    * on the items). Absent = the design's own default. Card templates always show item photos.
    */
   photoStyle?: "thumbs" | "text";
+  /**
+   * t421u: item photo size on template boards. Absent = legacy size (exactly "small"), so existing boards draw as
+   * before; new template boards are seeded with the template default. Original layouts keep it but ignore it.
+   */
+  itemPhotoSize?: ItemPhotoSize;
   /**
    * Guided customization (lib/board-custom.ts). Absent on every board made before it, which draw exactly as before.
    * Reset = delete the key. v > 1 is preserved but not applied.
@@ -430,6 +435,8 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
   if (raw.textColor && !textColor) return { ok: false, error: "Use a color like #112233." };
   if (raw.backgroundColor && !backgroundColor) return { ok: false, error: "Use a color like #f6f9fe." };
   const design = designFields(raw);
+  // t421u: item photo size is kept when valid; any other non-null value is a malformed known key (400).
+  if (raw.itemPhotoSize != null && !isItemPhotoSize(raw.itemPhotoSize)) return { ok: false, error: CUSTOM_ERROR };
   const custom = parseCustom(raw.custom, { template: raw.template, design: design.design });
   if (!custom.ok) return custom;
   // Original layouts: a customized media size is the split older apps already understand, so both stay in sync.
@@ -447,6 +454,7 @@ export function parseLayout(input: unknown): { ok: true; value: LayoutDocument }
       columnWidths, imageFit, imageAnchor,
       // Item photo display applies to every board (templates and original layouts). Absent = shown when present.
       ...(raw.photoStyle === "thumbs" || raw.photoStyle === "text" ? { photoStyle: raw.photoStyle } : {}),
+      ...(isItemPhotoSize(raw.itemPhotoSize) ? { itemPhotoSize: raw.itemPhotoSize } : {}),
       ...design,
       ...(custom.value ? { custom: custom.value } : {}),
       ...orientationField(orientationOf(raw)),
@@ -1192,6 +1200,15 @@ export function layoutSvg(doc: LayoutDocument, art?: LayoutArt): string {
 /** The featured/background photo of an original layout: template placement, or the owner's focal point. */
 function layoutPhoto(href: string, box: ZoneBox, doc: LayoutDocument, art?: LayoutArt) {
   const focus = lrun?.active?.focus;
+  // t421u framing (zoom, or a focal point on a Fit photo). The board's feature colour is already painted underneath,
+  // so a Fit photo's spare space shows it. Boards without these keys take the unchanged paths below.
+  if (usesFraming(doc, lrun?.active ?? null)) {
+    const a = lrun!.active!;
+    const place = framePlacement(box, doc.imageFit === "contain" ? "contain" : "cover", a.zoom ?? 1, a.focus ?? anchorFocus(doc.imageAnchor), art?.imageSize);
+    const r = (v: number) => (Math.round(v * 10) / 10).toString();
+    const par = place.kind === "approx" ? place.aspect : "none";
+    return `<clipPath id="lfp"><rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"/></clipPath><image href="${esc(href)}" x="${r(place.x)}" y="${r(place.y)}" width="${r(place.w)}" height="${r(place.h)}" preserveAspectRatio="${par}" clip-path="url(#lfp)"/>`;
+  }
   if (!focus || doc.imageFit === "contain") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${imageAspect(doc)}"/>`;
   const place = focusPlacement(box, focus, art?.imageSize);
   if (place.kind === "anchor") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${place.aspect}"/>`;

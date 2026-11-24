@@ -11,8 +11,8 @@ import { designById, designVariant, isPhotoDesign, type MenuDesign } from "@/lib
 import type { LayoutDocument, LayoutItem, LayoutSection, ZoneBox } from "@/lib/layout-studio";
 import { boardCanvas, orientationOf } from "@/lib/board-orientation";
 import {
-  activeCustom, emptyClips, fixedRegion, setRegionCanvas, focusPlacement, itemRegion, sectionHeadingStyle, sectionRegion, snapWeight, READABLE_FLOORS,
-  type ActiveCustom, type BoardRegion, type ClipArea, type RoleKey,
+  activeCustom, anchorFocus, emptyClips, fixedRegion, framePlacement, isItemPhotoSize, setRegionCanvas, focusPlacement, itemRegion, sectionHeadingStyle, sectionRegion, snapWeight, usesFraming, READABLE_FLOORS,
+  type ActiveCustom, type BoardRegion, type ClipArea, type ItemPhotoSize, type RoleKey,
 } from "@/lib/board-custom";
 
 // Canvas of the board being drawn: 1920×1080, or 1080×1920 for a vertical board (set per render, like `run`).
@@ -92,7 +92,17 @@ export function designColors(doc: LayoutDocument, design: MenuDesign): DesignCol
 
 /* ---------------- text measurement from the font files ---------------- */
 
+// Text is measured thousands of times per board; the face lookup is pure, so it is cached per family/weight/style.
+const metricsCache = new Map<string, (typeof FONT_METRICS)[string]>();
 function metricsFor(family: string, weight: number, italic = false) {
+  const cacheKey = `${family}|${weight}|${italic ? "i" : ""}`;
+  const hit = metricsCache.get(cacheKey);
+  if (hit) return hit;
+  const found = findMetrics(family, weight, italic);
+  metricsCache.set(cacheKey, found);
+  return found;
+}
+function findMetrics(family: string, weight: number, italic: boolean) {
   // Italic faces are keyed "Family|weight|i"; a family without italics measures with its upright faces.
   const all = Object.keys(FONT_METRICS).filter((k) => k.startsWith(`${family}|`));
   const italics = all.filter((k) => k.endsWith("|i"));
@@ -187,7 +197,11 @@ type Style = {
   thumb: number;
   /** Draw a tinted initial tile for items without a photo (photo templates); text templates leave the space clean. */
   placeholders?: boolean;
+  /** t421u: Medium/Large thumbnails never take more than this share of the column (absent on Small = legacy). */
+  thumbCap?: number;
 };
+/** Thumbnail edge in a column: the style's size, capped on Medium/Large so names and prices keep their room. */
+function thumbOf(st: Style, colW: number) { return st.thumbCap ? Math.min(st.thumb, colW * st.thumbCap) : st.thumb; }
 type PlacedItem = { lines: string[]; desc: string[]; price: string; priceW: number; h: number; photo?: string | null; initial?: string; src?: LayoutItem };
 type PlacedSection = { name: string; items: PlacedItem[]; headH: number; h: number; thumbs?: boolean; src?: LayoutSection; head?: { size: number; weight: number } };
 
@@ -207,8 +221,22 @@ type Run = {
   items: Map<object, [number, number]>;
   imageSize?: { w: number; h: number } | null;
   doc: LayoutDocument;
+  /** t421u: smallest item photo size actually drawn (undefined = no item photos considered; null = left off). */
+  photoEffective?: ItemPhotoSize | null;
+  featuredNoted?: boolean;
 };
 let run: Run | null = null;
+const PHOTO_RANK: Record<ItemPhotoSize, number> = { small: 0, medium: 1, large: 2 };
+/** Records the item photo size one part of the board could draw; the report keeps the smallest. */
+function notePhotoSize(effective: ItemPhotoSize | null) {
+  if (!run) return;
+  const prev = run.photoEffective;
+  if (prev === undefined) { run.photoEffective = effective; return; }
+  if (prev === null || effective === null) { run.photoEffective = null; return; }
+  if (PHOTO_RANK[effective] < PHOTO_RANK[prev]) run.photoEffective = effective;
+}
+/** The board's requested item photo size (absent = legacy = small). */
+function askedPhotoSize(): ItemPhotoSize { return isItemPhotoSize(run?.doc.itemPhotoSize) ? run!.doc.itemPhotoSize! : "small"; }
 
 function note(area: ClipArea, original: string, drawn: string | string[]) {
   if (!run) return;
@@ -267,9 +295,18 @@ function titleFit(value: string, max: number, start: number, min: number, family
   return { ...fitTitle(value, max, hi, lo, family, w, tracking), weight: w };
 }
 /** The featured photo: the template's placement, or the owner's focal point when it fills the box. */
-function photoImage(href: string, box: { x: number; y: number; w: number; h: number }, doc: LayoutDocument) {
+function photoImage(href: string, box: { x: number; y: number; w: number; h: number }, doc: LayoutDocument, backdrop?: string) {
   const focus = run?.active?.focus;
-  if (!focus || doc.imageFit === "contain") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${aspect(doc)}"/>`;
+  // t421u: a Fit photo sits on the template's panel colour, so any spare space looks intentional.
+  const under = doc.imageFit === "contain" && backdrop ? rect(box.x, box.y, box.w, box.h, backdrop) : "";
+  if (usesFraming(doc, run?.active ?? null)) {
+    const a = run!.active!;
+    const place = framePlacement(box, doc.imageFit === "contain" ? "contain" : "cover", a.zoom ?? 1, a.focus ?? anchorFocus(doc.imageAnchor), run?.imageSize);
+    const id = `fp${clipSeq++}`;
+    const par = place.kind === "approx" ? place.aspect : "none";
+    return `${place.letterbox && backdrop ? rect(box.x, box.y, box.w, box.h, backdrop) : ""}<clipPath id="${id}"><rect x="${n(box.x)}" y="${n(box.y)}" width="${n(box.w)}" height="${n(box.h)}"/></clipPath><image href="${esc(href)}" x="${n(place.x)}" y="${n(place.y)}" width="${n(place.w)}" height="${n(place.h)}" preserveAspectRatio="${par}" clip-path="url(#${id})"/>`;
+  }
+  if (!focus || doc.imageFit === "contain") return `${under}<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${aspect(doc)}"/>`;
   const place = focusPlacement(box, focus, run?.imageSize);
   if (place.kind === "anchor") return `<image href="${esc(href)}" x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" preserveAspectRatio="${place.aspect}"/>`;
   const id = `fp${clipSeq++}`;
@@ -316,8 +353,9 @@ function measureSection(section: LayoutSection, colW: number, st: Style, photoOf
 function initialOf(name: string) { return ([...name.trim()][0] ?? "").toUpperCase(); }
 function measureThumbSection(section: LayoutSection, colW: number, st: Style, photoOf: ItemPhotoResolver): PlacedSection {
   const items: PlacedItem[] = [];
-  const gap = st.thumb * 0.22;
-  const textW = colW - st.thumb - gap;
+  const thumb = thumbOf(st, colW);
+  const gap = thumb * 0.22;
+  const textW = colW - thumb - gap;
   for (const item of section.items) {
     if (!item.name.trim()) continue;
     const name = st.name.upper ? item.name.toUpperCase() : item.name;
@@ -333,7 +371,7 @@ function measureThumbSection(section: LayoutSection, colW: number, st: Style, ph
     const photo = photoOf(item);
     // Photo-less items stay text-height (no empty placeholder gap). Items in the same section still share the
     // thumbnail indent so names and prices line up beside photos.
-    const h = (photo || st.placeholders ? Math.max(textH, st.thumb) : textH) + st.itemGap;
+    const h = (photo || st.placeholders ? Math.max(textH, thumb) : textH) + st.itemGap;
     items.push({ lines, desc, price, priceW, h, photo, initial: initialOf(item.name), ...(run ? { src: item } : {}) });
   }
   const head = sectionHead(section, st);
@@ -560,7 +598,7 @@ function photoTile(parts: string[], href: string | null, x: number, y: number, w
   }
 }
 function paintThumbItem(parts: string[], item: PlacedItem, x: number, y: number, colW: number, st: Style, c: DesignColors) {
-  const t = st.thumb; const gap = t * 0.22; const tx = x + t + gap; const textW = colW - t - gap;
+  const t = thumbOf(st, colW); const gap = t * 0.22; const tx = x + t + gap; const textW = colW - t - gap;
   if (item.photo || st.placeholders) photoTile(parts, item.photo ?? null, x, y, t, t, t * 0.16, c, item.initial ?? "", c.paper);
   const lineH = st.name.size * 1.17;
   const tagH = st.tags && item.price ? st.price.size * 1.25 : 0;
@@ -626,6 +664,8 @@ export type DesignReport = {
   regions?: BoardRegion[];
   /** True when item photos were left off so items that fit as text-only are not dropped. */
   photosSuppressed?: boolean;
+  /** t421u: item photo size asked for and the size actually drawn (null = photos left off). Absent = no item photos. */
+  itemPhotos?: { requested: ItemPhotoSize; effective: ItemPhotoSize | null };
 };
 
 function family(id: BoardFontId) { return boardFont(id).family; }
@@ -671,11 +711,34 @@ function baseStyle(design: MenuDesign, f: { head: string; body: string }, sizes:
   };
 }
 /** Same style with the thumbnail column switched on when this board shows item photos. */
-function withThumbs(st: Style, on: boolean, placeholders = true, ratio = 2.3): Style { return on ? { ...st, thumb: Math.round(st.name.size * ratio), placeholders } : st; }
+function withThumbs(st: Style, on: boolean, placeholders = true, ratio = 2.3, cap?: number): Style { return on ? { ...st, thumb: Math.round(st.name.size * ratio), placeholders, ...(cap ? { thumbCap: cap } : {}) } : st; }
 
 /** Default, then gradually more compact (down to a single-row thumb ≈ the name line) so photos don't drop items. */
 const THUMB_RATIOS = [2.3, 1.8, 1.4, 1.15] as const;
+/**
+ * t421u: larger starting sizes tried before the Small ladder. Each is kept only when it drops no more items than
+ * Small and the menu text stays at least MIN_TEXT_VS_SMALL of the size Small reaches; otherwise Small (legacy) wins.
+ */
+const MEDIUM_STEPS = [3.0, 2.8, 2.6].map((ratio) => ({ ratio, size: "medium" as const }));
+const LARGER_RATIOS: Record<ItemPhotoSize, { ratio: number; size: ItemPhotoSize }[]> = {
+  small: [],
+  // Medium also tries a slightly larger start: on tall menus a bigger ratio can fit at a text size a smaller one can't.
+  medium: [...MEDIUM_STEPS, ...[3.2, 3.5, 3.8].map((ratio) => ({ ratio, size: "medium" as const }))],
+  large: [...[3.8, 3.5, 3.2].map((ratio) => ({ ratio, size: "large" as const })), ...MEDIUM_STEPS],
+};
+const MIN_TEXT_VS_SMALL = 0.88;
+const MIN_GAIN: Record<ItemPhotoSize, number> = { small: 1, medium: 1.12, large: 1.3 };
+const THUMB_CAP = 0.38;
 type PhotoFit = FitResult & { photosSuppressed: boolean };
+/** Item names or descriptions shortened with "…" (a bigger photo must never cut text that Small shows whole). */
+function shortenedCount(fit: FitResult): number {
+  let n = 0;
+  for (const col of fit.columns) for (const sec of col.sections) for (const it of sec.items) {
+    if (it.lines.some((l) => l.endsWith("…"))) n += 1;
+    if (it.desc.some((l) => l.endsWith("…"))) n += 1;
+  }
+  return n;
+}
 /**
  * Fit with item photos when they don't increase dropped items versus text-only. Tries shrinking thumbnails toward a
  * readable single-row size first; if they still don't fit, falls back to text-only and reports photosSuppressed.
@@ -694,11 +757,22 @@ function fitPhotos(
 ): PhotoFit {
   if (!wantPhotos || !photoOf) return { ...fitC(sections, base, options, colH, maxScale, minScale, preferFewerAbove), photosSuppressed: false };
   const text = fitC(sections, base, options, colH, maxScale, minScale, preferFewerAbove);
+  let small: PhotoFit | null = null;
   for (const ratio of THUMB_RATIOS) {
     const tried = fitC(sections, withThumbs(base, true, placeholders, ratio), options, colH, maxScale, minScale, preferFewerAbove, photoOf);
-    if (tried.dropped <= text.dropped) return { ...tried, photosSuppressed: false };
+    if (tried.dropped <= text.dropped) { small = { ...tried, photosSuppressed: false }; break; }
   }
-  return { ...text, photosSuppressed: true };
+  if (!small) { notePhotoSize(null); return { ...text, photosSuppressed: true }; }
+  // Only boards that ask for Medium/Large reach this; Small and absent return exactly the legacy result above.
+  for (const step of LARGER_RATIOS[askedPhotoSize()]) {
+    const tried = fitC(sections, withThumbs(base, true, placeholders, step.ratio, THUMB_CAP), options, colH, maxScale, minScale, preferFewerAbove, photoOf);
+    // A size only counts when the photos really come out bigger on screen (text is fitted too): Medium ≥ 1.12×,
+    // Large ≥ 1.3× the Small edge. Otherwise the board keeps the Small (legacy) result.
+    const bigger = tried.style.thumb >= small.style.thumb * MIN_GAIN[step.size] - 0.01;
+    if (bigger && tried.dropped <= small.dropped && tried.scale >= small.scale * MIN_TEXT_VS_SMALL - 1e-6 && shortenedCount(tried) <= shortenedCount(small)) { notePhotoSize(step.size); return { ...tried, photosSuppressed: false }; }
+  }
+  notePhotoSize("small");
+  return small;
 }
 
 /** Where a muted video may play on a design board (null when the design has no media area). */
@@ -745,7 +819,7 @@ function showcase(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: H }, doc));
+    parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: H }, doc, c.panel));
     parts.push(`<defs><linearGradient id="dg-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.44" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.86" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="1" stop-color="${c.paper}" stop-opacity="0.98"/></linearGradient></defs>`);
     parts.push(rect(L, 0, W - L, H, "url(#dg-fade)"));
   } else {
@@ -801,7 +875,7 @@ function columns(parts: string[], doc: LayoutDocument, design: MenuDesign, c: De
   const L = mediaLeft(run?.active ?? null, 1344); const x0 = 84; const top = 80;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
-  if (photo) parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: 640 }, doc));
+  if (photo) parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: 640 }, doc, c.panel));
   else parts.push(rect(L, 0, W - L, 640, mix(c.panel, c.paper, 0.6)));
   parts.push(rect(L, 640, W - L, H - 640, c.panel));
   const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, top, 92, c.paper);
@@ -855,7 +929,7 @@ function promo(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   parts.push(rect(L, 0, W - L, H, c.panel));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: PH }, doc));
+    parts.push(photoImage(photo, { x: L, y: 0, w: W - L, h: PH }, doc, c.panel));
     parts.push(`<defs><linearGradient id="dg-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0.55" stop-color="${c.panel}" stop-opacity="0"/><stop offset="1" stop-color="${c.panel}" stop-opacity="1"/></linearGradient></defs>`);
     parts.push(rect(L, 0, W - L, PH, "url(#dg-panel)"));
   }
@@ -1006,18 +1080,44 @@ function cards(parts: string[], doc: LayoutDocument, design: MenuDesign, c: Desi
   const multiSection = new Set(all.map((x) => x.section)).size > 1;
   const nameSize0 = Math.max(22, Math.min(condensed ? 50 : 38, cardW * (condensed ? 0.1 : 0.075))) * (rows === 3 ? 0.9 : 1);
   const nameSize = run?.active ? Math.max(Math.min(READABLE_FLOORS.itemName, nameSize0), nameSize0 * roleScale("itemName")) : nameSize0;
+  // t421u item photo size on cards: Small is the legacy share of the card; Medium/Large take more of it only while every
+  // card keeps room for its section label, two name lines at the template size and (round cards) the price below.
+  const photoFrac = (size: ItemPhotoSize) => {
+    const k = PHOTO_RANK[size];
+    const rectFrac = rows === 1 ? 0.58 : rows === 2 ? 0.5 : 0.46;
+    return { circleW: k ? 0.66 + 0.06 * k : 0.66, circleH: k ? 0.52 + 0.05 * k : 0.52, rect: k ? rectFrac + 0.06 * k : rectFrac };
+  };
+  const photoDepth = (size: ItemPhotoSize) => {
+    const fr = photoFrac(size);
+    return circle ? 6 + Math.min(cardW * fr.circleW, cardH * fr.circleH) + 18 : cardH * fr.rect + 16;
+  };
+  let cardSize: ItemPhotoSize = "small";
+  {
+    const asked = askedPhotoSize();
+    const ps0 = nameSize0 * (condensed ? 1 : 0.95);
+    const ps = run?.active ? Math.max(Math.min(READABLE_FLOORS.price, ps0), ps0 * roleScale("price")) : ps0;
+    const priceRow = circle ? (design.look.tags ? ps * 1.3 : ps * 1.1) : 0;
+    const label = multiSection ? Math.max(14, (run?.active ? nameSize0 : nameSize) * 0.42) * 1.5 : 0;
+    const needMin = label + 2 * nameSize * 1.1;
+    for (const size of (["large", "medium"] as const)) {
+      if (PHOTO_RANK[size] > PHOTO_RANK[asked]) continue;
+      if (cardH - 14 - priceRow - photoDepth(size) >= needMin) { cardSize = size; break; }
+    }
+    if (shownItems.length) notePhotoSize(cardSize);
+  }
+  const fr = photoFrac(cardSize);
   shownItems.forEach(({ item, section }, i) => {
     const x = x0 + (i % cols) * (cardW + gap);
     const y = top + Math.floor(i / cols) * (cardH + gap);
     if (!circle) parts.push(rect(x, y, cardW, cardH, cardBg, `rx="20"${dark ? "" : ` stroke="${mix(c.ink, c.paper, 0.86)}" stroke-width="2"`}`));
     let photoBottom: number;
     if (circle) {
-      const d = Math.min(cardW * 0.66, cardH * 0.52);
+      const d = Math.min(cardW * fr.circleW, cardH * fr.circleH);
       photoTile(parts, photoOf(item), x + (cardW - d) / 2, y + 6, d, d, d / 2, c, initialOf(item.name), cardBg, true);
       parts.push(`<circle cx="${n(x + cardW / 2)}" cy="${n(y + 6 + d / 2)}" r="${n(d / 2 + 5)}" fill="none" stroke="${mix(c.accent, c.paper, 0.55)}" stroke-width="3"/>`);
       photoBottom = y + 6 + d + 18;
     } else {
-      const ph = cardH * (rows === 1 ? 0.58 : rows === 2 ? 0.5 : 0.46);
+      const ph = cardH * fr.rect;
       photoTile(parts, photoOf(item), x + 10, y + 10, cardW - 20, ph - 10, 14, c, initialOf(item.name), cardBg);
       photoBottom = y + ph + 16;
     }
@@ -1135,6 +1235,26 @@ function featured(parts: string[], doc: LayoutDocument, design: MenuDesign, c: D
   return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
 }
 
+/**
+ * t421u: dish photo edge in a featured card. Small = legacy (520 for one dish, 300 otherwise); Medium/Large grow it
+ * (×1.13 / ×1.25) only while the text column beside it stays at least 300 px wide.
+ */
+function featuredSide(cardH: number, k: number, panelW: number, pad: number): number {
+  const base = k === 1 ? 520 : 300;
+  const legacy = Math.min(cardH, base);
+  const asked = askedPhotoSize();
+  let used: ItemPhotoSize = "small"; let side = legacy;
+  for (const [size, mult] of [["large", 1.25], ["medium", 1.13]] as const) {
+    if (PHOTO_RANK[size] > PHOTO_RANK[asked]) continue;
+    const s2 = Math.min(cardH, base * mult);
+    if (s2 > legacy && panelW - pad * 2 - s2 - 36 >= 300) { used = size; side = s2; break; }
+  }
+  // A dish photo already as tall as its card is as large as this layout allows: that is not a reduction.
+  if (used === "small" && legacy >= cardH) used = asked;
+  if (run && !run.featuredNoted) { run.featuredNoted = true; notePhotoSize(used); }
+  return side;
+}
+
 /** The featured dish cards, stacked in the panel box (right column on horizontal boards, bottom band on vertical). */
 function featuredCards(parts: string[], picks: LayoutItem[], panel: { x: number; y: number; w: number; h: number }, design: MenuDesign, c: DesignColors, f: { head: string; body: string }, art: DesignArt | undefined) {
   const L = panel.x; const R = panel.x + panel.w;
@@ -1147,7 +1267,7 @@ function featuredCards(parts: string[], picks: LayoutItem[], panel: { x: number;
     const y = panel.y + pad + i * (cardH + gapY);
     const at = run?.items.get(item);
     if (at) addRegion(itemRegion(item, at[0], at[1], { x: L, y, w: panel.w, h: cardH }));
-    const side = Math.min(cardH, k === 1 ? 520 : 300);
+    const side = featuredSide(cardH, k, panel.w, pad);
     const px = L + pad;
     photoTile(parts, photoOf(item), px, y + (cardH - side) / 2, side, side, 18, c, initialOf(item.name), c.panel);
     const fx = px + side + 36; const fw = R - pad - fx;
@@ -1253,7 +1373,7 @@ function showcaseLeft(parts: string[], doc: LayoutDocument, design: MenuDesign, 
   const dark = luminance(c.paper) < 0.4;
   const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
   if (photo) {
-    parts.push(photoImage(photo, { x: 0, y: 0, w: PW, h: H }, doc));
+    parts.push(photoImage(photo, { x: 0, y: 0, w: PW, h: H }, doc, c.paper));
     parts.push(`<defs><linearGradient id="dg-sl-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0.45" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity="${title || detail ? 0.82 : 0.35}"/></linearGradient>`
       + `<linearGradient id="dg-sl-r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${c.paper}" stop-opacity="0"/><stop offset="1" stop-color="${c.paper}" stop-opacity="1"/></linearGradient></defs>`);
     parts.push(rect(0, 0, PW, H, "url(#dg-sl-b)"));
@@ -1355,7 +1475,7 @@ function editorial(parts: string[], doc: LayoutDocument, design: MenuDesign, c: 
   const PW = active && active.mediaSize != null ? Math.round(W * active.mediaSize) : 840;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
-  if (photo) parts.push(photoImage(photo, { x: 0, y: 0, w: PW, h: H }, doc));
+  if (photo) parts.push(photoImage(photo, { x: 0, y: 0, w: PW, h: H }, doc, c.paper));
   else parts.push(rect(0, 0, PW, H, mix(c.panel, c.paper, 0.55)));
   addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: PW, h: H }));
   return editorialColumn(parts, doc, design, c, f, art, { x0: PW + 100, x1: W - 96, top: 96, bottom: H - 58, headline: 124, logoSize: 96 });
@@ -1443,7 +1563,7 @@ function spotlight(parts: string[], doc: LayoutDocument, design: MenuDesign, c: 
   const PX = 650; const PW = 620;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
-  if (photo) parts.push(photoImage(photo, { x: PX, y: 0, w: PW, h: H }, doc));
+  if (photo) parts.push(photoImage(photo, { x: PX, y: 0, w: PW, h: H }, doc, c.paper));
   else parts.push(rect(PX, 0, PW, H, mix(c.panel, c.paper, 0.55)));
   addRegion(fixedRegion("featuredMedia", { x: PX, y: 0, w: PW, h: H }));
   const { hero, rest } = spotlightSplit(doc);
@@ -1531,7 +1651,7 @@ function timetable(parts: string[], doc: LayoutDocument, design: MenuDesign, c: 
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(photoImage(photo, { x: PX, y: 0, w: W - PX, h: H }, doc));
+    parts.push(photoImage(photo, { x: PX, y: 0, w: W - PX, h: H }, doc, c.paper));
     parts.push(`<defs><linearGradient id="dg-tt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${c.paper}" stop-opacity="1"/><stop offset="0.35" stop-color="${c.paper}" stop-opacity="0"/></linearGradient></defs>`);
     parts.push(rect(PX, 0, W - PX, H, "url(#dg-tt)"));
   }
@@ -1684,7 +1804,7 @@ function showcaseLeftPortrait(parts: string[], doc: LayoutDocument, design: Menu
   const dark = luminance(c.paper) < 0.4;
   const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
   if (photo) {
-    parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc));
+    parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc, c.paper));
     parts.push(`<defs><linearGradient id="dg-slp" x1="0" y1="0" x2="0" y2="1"><stop offset="0.4" stop-color="${dark ? c.paper : "#000000"}" stop-opacity="0"/><stop offset="1" stop-color="${dark ? c.paper : "#000000"}" stop-opacity="${dark ? 1 : 0.78}"/></linearGradient></defs>`);
     parts.push(rect(0, 0, W, MB, "url(#dg-slp)"));
   } else {
@@ -1738,7 +1858,7 @@ function editorialPortrait(parts: string[], doc: LayoutDocument, design: MenuDes
   const MB = mediaBand(run?.active ?? null, ED_BAND);
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
-  if (photo) parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc));
+  if (photo) parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc, c.paper));
   else parts.push(rect(0, 0, W, MB, mix(c.panel, c.paper, 0.55)));
   addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: W, h: MB }));
   return editorialColumn(parts, doc, design, c, f, art, { x0: 80, x1: W - 80, top: MB + 76, bottom: H - 64, headline: 112, logoSize: 88 });
@@ -1768,7 +1888,7 @@ function spotlightPortrait(parts: string[], doc: LayoutDocument, design: MenuDes
     if (dropped === 0) break;
   }
   const photo = photoHref(doc, art);
-  if (photo) parts.push(photoImage(photo, { x: 0, y: bandY, w: W, h: BH }, doc));
+  if (photo) parts.push(photoImage(photo, { x: 0, y: bandY, w: W, h: BH }, doc, c.paper));
   else parts.push(rect(0, bandY, W, BH, mix(c.panel, c.paper, 0.55)));
   addRegion(fixedRegion("featuredMedia", { x: 0, y: bandY, w: W, h: BH }));
   const belowTop = bandY + BH + 64;
@@ -1794,7 +1914,7 @@ function timetablePortrait(parts: string[], doc: LayoutDocument, design: MenuDes
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc));
+    parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc, c.paper));
     parts.push(`<defs><linearGradient id="dg-ttp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="0.3" stop-color="${c.paper}" stop-opacity="0.88"/><stop offset="0.5" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.7" stop-color="${c.paper}" stop-opacity="0"/><stop offset="1" stop-color="${c.paper}" stop-opacity="1"/></linearGradient></defs>`);
     parts.push(rect(0, 0, W, MB, "url(#dg-ttp)"));
   }
@@ -1916,7 +2036,7 @@ function showcasePortrait(parts: string[], doc: LayoutDocument, design: MenuDesi
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(photoImage(photo, { x: 0, y: T, w: W, h: MB }, doc));
+    parts.push(photoImage(photo, { x: 0, y: T, w: W, h: MB }, doc, c.panel));
     parts.push(`<defs><linearGradient id="dg-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.44" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.86" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="1" stop-color="${c.paper}" stop-opacity="0.98"/></linearGradient></defs>`);
     parts.push(rect(0, T, W, MB, "url(#dg-fade)"));
   } else {
@@ -1951,7 +2071,7 @@ function columnsPortrait(parts: string[], doc: LayoutDocument, design: MenuDesig
   const MB = mediaBand(run?.active ?? null, COLUMNS_MEDIA); const PT = H - COLUMNS_PANEL; const T = PT - MB; const x0 = 72; const top = 80;
   parts.push(rect(0, 0, W, H, c.paper));
   const photo = photoHref(doc, art);
-  if (photo) parts.push(photoImage(photo, { x: 0, y: T, w: W, h: MB }, doc));
+  if (photo) parts.push(photoImage(photo, { x: 0, y: T, w: W, h: MB }, doc, c.panel));
   else parts.push(rect(0, T, W, MB, mix(c.panel, c.paper, 0.6)));
   parts.push(rect(0, PT, W, COLUMNS_PANEL, c.panel));
   const headBottom = portraitHeader(parts, doc, design, c, f, art, { x0, top, logo: 92, start: 68, min: 44, sub: "muted" });
@@ -1988,7 +2108,7 @@ function promoPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign,
   parts.push(rect(0, T, W, H - T, c.panel));
   const photo = photoHref(doc, art);
   if (photo) {
-    parts.push(photoImage(photo, { x: 0, y: T, w: W, h: PB }, doc));
+    parts.push(photoImage(photo, { x: 0, y: T, w: W, h: PB }, doc, c.panel));
     parts.push(`<defs><linearGradient id="dg-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0.55" stop-color="${c.panel}" stop-opacity="0"/><stop offset="1" stop-color="${c.panel}" stop-opacity="1"/></linearGradient></defs>`);
     parts.push(rect(0, T, W, PB, "url(#dg-panel)"));
   }
@@ -2067,7 +2187,8 @@ function renderDesignOn(doc: LayoutDocument, art: DesignArt | undefined, active:
     const draw = { showcase, columns, promo, list, cards, featured, showcaseLeft, editorial, spotlight, timetable }[design.composition];
     const report = draw(parts, doc, design, c, f, art);
     parts.push("</svg>");
-    return { svg: parts.join(""), report: { ...report, clips: run.clips, regions: run.regions } };
+    const itemPhotos = run.photoEffective !== undefined ? { itemPhotos: { requested: askedPhotoSize(), effective: run.photoEffective } } : {};
+    return { svg: parts.join(""), report: { ...report, clips: run.clips, regions: run.regions, ...itemPhotos } };
   } finally {
     run = previous;
   }

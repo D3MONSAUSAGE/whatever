@@ -12,6 +12,14 @@ import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout
 export type DesignComposition = "showcase" | "columns" | "promo" | "list" | "cards" | "featured"
   // Premium service templates (Noir & Co., Linden, Forge).
   | "showcaseLeft" | "editorial" | "spotlight" | "timetable";
+/**
+ * t421u: item photo size seeded into NEW template boards (see lib/board-custom.ts ITEM_PHOTO_SIZES). Existing boards
+ * have no `itemPhotoSize` and keep the legacy size (= "small"). Lists have the widest columns, so they start Large.
+ */
+export const DESIGN_ITEM_PHOTO_DEFAULT: Record<DesignComposition, "small" | "medium" | "large"> = {
+  list: "large", showcase: "medium", columns: "medium", promo: "medium", cards: "medium", featured: "medium",
+  showcaseLeft: "medium", editorial: "medium", spotlight: "medium", timetable: "medium",
+};
 export type DesignStyle = "dark" | "light" | "bold";
 export type DesignBusiness = "restaurant" | "cafe" | "fast" | "bar" | "sweets"
   // Non-food businesses (service and retail boards).
@@ -1073,6 +1081,7 @@ export function designDocument(design: MenuDesign, variantId?: string): LayoutDo
     columnWidths: geo.columnWidths,
     imageFit: "cover",
     imageAnchor: "center",
+    itemPhotoSize: DESIGN_ITEM_PHOTO_DEFAULT[design.composition],
     design: design.id,
     variant: designVariant(design, variantId).id,
     ...(design.stock ? { stockPhoto: design.stock } : {}),

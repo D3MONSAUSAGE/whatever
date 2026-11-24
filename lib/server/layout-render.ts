@@ -84,7 +84,8 @@ export function renderLayoutPng(doc: LayoutDocument, image?: BoardImage | null, 
     art = { imageHref: href, stockHref: href ? null : stockPhotoDataUri(doc.stockPhoto), logoHref: dataUri(extras?.logo), stockHrefs, itemImages };
   }
   // Guided customization: a focal point needs the featured photo's own size to place it exactly (as the editor does).
-  if (doc.custom?.imageFocus) {
+  // t421u: zoom places the photo with the same exact math, so it needs the size too.
+  if (doc.custom?.imageFocus || typeof doc.custom?.imageZoom === "number") {
     const source = image && image.bytes.length ? imageDims(image.bytes) : dataUriDims(art?.stockHref ?? (doc.design ? stockPhotoDataUri(doc.stockPhoto) : null));
     art = { ...art, imageSize: source };
   }

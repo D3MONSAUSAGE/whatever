@@ -463,6 +463,20 @@ Full contract: [`docs/vertical/API_CONTRACT.md`](vertical/API_CONTRACT.md). What
 - **Mismatch.** Assigning a vertical board to a horizontal screen (or the reverse) is allowed. Show a non-blocking warning; the TV letterboxes, never stretches.
 - **Vertical drawing (PR B).** Every existing template and layout draws on 1080×1920 (photo/video areas become a bottom band, columns stack). Horizontal boards draw exactly as before. Catalog thumbnails: add `orientation=portrait` to a thumbnail path for the 9:16 sample (widths 320/640/960/1080). `orientation=landscape` is a harmless no-op that redirects to the normal landscape thumbnail; other values 404. The catalog `version` changed with this release (`CATALOG_RENDER_REVISION` 2), so cached thumbnail URLs redirect once.
 
+## Item photo size and featured photo framing (t421u)
+
+Full contract: `docs/t421u/CONTRACT.md`. Additive only; `custom.v` stays `1`; no route, kind or response field was removed.
+
+- **`itemPhotoSize`** (top level of a template board document, next to `imageFit`): `"small"` | `"medium"` | `"large"`. **Absent = legacy = Small**; existing boards never get the key unless the owner picks a size. New boards from the catalog seed carry the template default (`list` templates `"large"`, every other template `"medium"`). Read the default from the catalog entry: `customization.itemPhotoSize = { def }` (null on original layouts and classic boards: hide the control there). Allowed values: `customization.itemPhotoSizes` in the catalog meta. Any other non-null value is a **400** (`"Check the look settings."`); `null` removes the key. When the owner picks Small, send `"small"` explicitly (the server does not keep a stored size when the key is missing, because the save replaces content).
+- **Fit guard.** Medium/Large only take effect when nothing is dropped or cut that Small shows and menu text stays ≥ 88% of Small's size; otherwise the board draws Small. `fit.itemPhotos = { requested, effective }` (preview `format: "fit"`) says what was drawn (`effective: null` = photos left off, as before). Show a short "reduced to fit" note when `effective` is smaller than `requested`.
+- **`custom.imageZoom`** (next to `custom.imageFocus`): number 1–3, clamped and rounded to 2 dp; non-numbers are a 400. Bounds: catalog meta `customization.imageZoom = { min: 1, max: 3, step: 0.05 }`. Absent = 1.
+- **`custom.imageFocus`** `{x, y}` 0–100 now also applies in Fit (`imageFit: "contain"`): it places the letterboxed photo inside its area. In Fill it chooses the crop, as before. Show the X/Y controls in both modes.
+- **Framing math** (the same in preview and on the TV): `base = Fit ? min(boxW/imgW, boxH/imgH) : max(...)`; `w = imgW·base·zoom`, `h = imgH·base·zoom`; `x = box.x + (box.w − w)·focus.x/100`, `y = box.y + (box.h − h)·focus.y/100`; clipped to the box. Fit on templates now fills the letterbox with the template's panel colour (it was paper). Without `imageFocus`, Fit/Fill still follow `imageAnchor`.
+- **Reset photo**: delete `custom.imageZoom` and `custom.imageFocus`, set `imageFit: "cover"` and `imageAnchor: "center"`; keep `custom.mediaSize`. "Reset all" is unchanged.
+- **Video**: framing settings never change the video area. Hide the framing controls when the featured media is a video.
+- **Fit echo**: preview `format: "fit"` adds `photo: { fit, zoom, focus, natural }` (null when there is no featured photo; `natural` is the photo's pixel size when the server knows it).
+- **Round trip**: keep every key you don't edit (`itemPhotoSize`, `custom.imageZoom`, unknown `custom` keys) when re-saving. Older builds that copy the whole document already do.
+
 ## Changes since Android +14 (web PRs #148–#163)
 
 | Change | What the app sees | PR |
@@ -476,6 +490,7 @@ Full contract: [`docs/vertical/API_CONTRACT.md`](vertical/API_CONTRACT.md). What
 | `GET /api/health` returns `commit` | Additive | #153 |
 | Menu designer API: catalog, public thumbnails, switch, preview + fit | New routes only | #162 |
 | 16 non-food templates and five business filters (`salon`, `retail`, `fitness`, `office`, `pets`) | More catalog entries (`kind: "template"`, existing shape) and more `filters.business` objects, each with its own `{en, es}` name. Boards made from them are ordinary `layoutVersion: 1` + `design` boards. No field, route or kind is new; render filter chips from `filters.business` rather than a fixed list | non-food templates PR |
+| Item photo size and featured photo zoom/framing (t421u) | Optional top-level `itemPhotoSize`, optional `custom.imageZoom`; `imageFocus` also in Fit; catalog `customization.itemPhotoSize` and meta `imageZoom`/`itemPhotoSizes`; fit adds `itemPhotos` and `photo`. Absent keys draw exactly as before | t421u PR-A |
 | Additive `playerBuild` on `GET /api/player/state` | Current value `2026-11-22.1` (was `2026-11-20.2`). Older clients can ignore it. The phone does not call this route | #163 |
 
 No route was removed or renamed, and no response field was removed. `GET /api/player/state` now includes an additive `playerBuild` field (PR #163; current value `2026-11-22.1`). Older clients can ignore it. The phone does not call `/api/player/*`.
