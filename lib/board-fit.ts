@@ -1,12 +1,12 @@
 import { boardCanvas, orientationOf } from "@/lib/board-orientation";
 import { mediaVideoBox, boardSvgWithReport, type LayoutDocument, type ZoneBox } from "@/lib/layout-studio";
 import { designById, isDesignId, isPhotoDesign, type MenuDesign } from "@/lib/menu-designs";
-import { itemPhotosShown } from "@/lib/menu-design-svg";
+import { designSvgWithReport, itemPhotosShown } from "@/lib/menu-design-svg";
 import { layoutReport, mergeExtraSections } from "@/lib/menu-designer";
 import { boardFont } from "@/lib/board-fonts";
 import {
-  activeCustom, applyCustomReset, customPaths, sectionRegionId, snapWeight, withoutCustom, ROLE_KEYS,
-  type BoardRegion, type FontWeightChoice, type LayoutCustom, type RoleKey, type RoleTypography,
+  activeCustom, applyCustomReset, customizationSpec, customPaths, sectionRegionId, snapWeight, withoutCustom, ROLE_KEYS,
+  type BoardRegion, type FontWeightChoice, type ItemPhotoSize, type LayoutCustom, type RoleKey, type RoleTypography,
 } from "@/lib/board-custom";
 
 /**
@@ -74,7 +74,36 @@ export type BoardFit = {
    * overflowReasons / safeAction / custom / regions / videoBox fields are unchanged.
    */
   photosSuppressed: boolean;
+  /**
+   * t421u (additive): item photo size asked for (absent on the board = "small") and the size actually drawn
+   * (null = photos left off). Null when the board draws no item photos or is an original layout/classic board.
+   */
+  itemPhotos: { requested: ItemPhotoSize; effective: ItemPhotoSize | null } | null;
+  /**
+   * t421u (additive): how the featured photo is framed, for drag-to-position on clients that preview a server PNG.
+   * `natural` is the photo's pixel size when the server loaded it (preview API), else null. Null when the board has no
+   * featured photo area (list, cards, featured dishes).
+   */
+  photo: PhotoEcho | null;
 };
+export type PhotoEcho = { fit: "cover" | "contain"; zoom: number; focus: { x: number; y: number } | null; natural: { w: number; h: number } | null };
+
+/** A tiny valid image href standing in for owner item photos, so the fit check reserves the same rows the PNG does. */
+const PHOTO_STANDIN = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+
+/** Item photo size drawn on a template board (the same fitting as the PNG; owner photos stood in by a placeholder). */
+export function itemPhotoEcho(doc: LayoutDocument): BoardFit["itemPhotos"] {
+  if (!doc.design || !isDesignId(doc.design)) return null;
+  const ids = doc.sections.flatMap((section) => section.items.map((item) => item.imageMediaId).filter((id): id is string => Boolean(id)));
+  const itemImages = Object.fromEntries(ids.map((id) => [id, PHOTO_STANDIN]));
+  return designSvgWithReport(doc, { itemImages }).report.itemPhotos ?? null;
+}
+
+export function photoEcho(doc: LayoutDocument, natural?: { w: number; h: number } | null): PhotoEcho | null {
+  if (!customizationSpec(doc).imageFocus) return null;
+  const active = activeCustom(doc);
+  return { fit: doc.imageFit === "contain" ? "contain" : "cover", zoom: active?.zoom ?? 1, focus: active?.focus ?? null, natural: natural ?? null };
+}
 
 type Metrics = { dropped: number; clipped: number; feature: number };
 function metrics(doc: LayoutDocument): Metrics {
@@ -136,7 +165,7 @@ export function customEcho(doc: LayoutDocument): CustomEcho {
 }
 
 /** The same checks publish uses (lib/layout-publish.ts). */
-export function boardFit(doc: LayoutDocument): BoardFit {
+export function boardFit(doc: LayoutDocument, opts?: { natural?: { w: number; h: number } | null }): BoardFit {
   const design = doc.design && isDesignId(doc.design) ? designById(doc.design) : null;
   const { report } = boardSvgWithReport(doc);
   const overflowReasons = customOverflow(doc);
@@ -148,6 +177,8 @@ export function boardFit(doc: LayoutDocument): BoardFit {
     overflowReasons, safeAction: paths ? { kind: "reset_custom" as const, paths } : null,
     custom: customEcho(doc),
     photosSuppressed: Boolean(report.photosSuppressed),
+    itemPhotos: itemPhotoEcho(doc),
+    photo: photoEcho(doc, opts?.natural),
   };
   if (design) {
     const dropped = report.dropped;

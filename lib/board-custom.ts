@@ -14,7 +14,7 @@
  * Client-safe: no server imports.
  */
 import { BOARD_FONTS, type BoardFontId } from "@/lib/board-fonts";
-import { designById, isDesignId, type DesignComposition } from "@/lib/menu-designs";
+import { designById, isDesignId, DESIGN_ITEM_PHOTO_DEFAULT, type DesignComposition } from "@/lib/menu-designs";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
 export const CUSTOM_VERSION = 1;
@@ -41,8 +41,10 @@ export type LayoutCustom = {
   roles?: Partial<Record<RoleKey, RoleTypography>>;
   /** Spacing multipliers, clamped to SPACING_SCALE. */
   spacing?: { itemGap?: number; sectionGap?: number };
-  /** Focal point (percent, 0–100) of the featured photo when it fills its box (imageFit "cover"). */
+  /** Focal point (percent, 0–100) of the featured photo inside its box (Fill and, since t421u, Fit). */
   imageFocus?: { x: number; y: number };
+  /** t421u: zoom of the featured photo inside its box, × the Fill/Fit scale, clamped to IMAGE_ZOOM. Absent = 1. */
+  imageZoom?: number;
   /** Unknown keys from newer clients are preserved. */
   [extra: string]: unknown;
 };
@@ -52,6 +54,19 @@ export const TEXT_SIZE_PRESETS = { compact: 0.88, default: 1, large: 1.12, extra
 export type TextSizePreset = keyof typeof TEXT_SIZE_PRESETS;
 export const ROLE_SCALE = { min: 0.75, max: 1.5 } as const;
 export const SPACING_SCALE = { min: 0.75, max: 1.4 } as const;
+/** t421u: featured photo zoom bounds (× the Fill or Fit scale). */
+export const IMAGE_ZOOM = { min: 1, max: 3, step: 0.05 } as const;
+
+/**
+ * t421u item photo size: a top-level LayoutDocument field (not inside `custom`, so a size-only board keeps the
+ * template's own text fitting). Absent = the legacy size, which is exactly "small".
+ */
+export const ITEM_PHOTO_SIZES = ["small", "medium", "large"] as const;
+export type ItemPhotoSize = (typeof ITEM_PHOTO_SIZES)[number];
+export function isItemPhotoSize(value: unknown): value is ItemPhotoSize {
+  return typeof value === "string" && (ITEM_PHOTO_SIZES as readonly string[]).includes(value);
+}
+export { DESIGN_ITEM_PHOTO_DEFAULT };
 
 /**
  * Smallest size (board px on the 1920×1080 canvas) a customized board may draw each role at. A customized board never
@@ -72,6 +87,8 @@ export type CustomizationSpec = {
   spacing: boolean;
   /** Fill/Fit and focus for the featured or background photo. */
   imageFocus: boolean;
+  /** t421u: item photo size presets (null = control hidden: original layouts and classic boards). */
+  itemPhotoSize: { def: ItemPhotoSize } | null;
 };
 
 const ALL_ROLES: RoleKey[] = [...ROLE_KEYS];
@@ -83,7 +100,7 @@ export const DESIGN_MEDIA: Partial<Record<DesignComposition, MediaSpec>> = {
   columns: { axis: "width", min: 0.24, max: 0.4, def: 576 / 1920 },
   promo: { axis: "width", min: 0.26, max: 0.42, def: 660 / 1920 },
 };
-const DESIGN_SPEC: Record<DesignComposition, Omit<CustomizationSpec, "media" | "engine">> = {
+const DESIGN_SPEC: Record<DesignComposition, Omit<CustomizationSpec, "media" | "engine" | "itemPhotoSize">> = {
   showcase: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
   columns: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
   promo: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
@@ -100,7 +117,7 @@ export const LAYOUT_MEDIA: Partial<Record<LayoutTemplate, MediaSpec & { toSplit:
   signature: { axis: "width", min: 0.3, max: 0.6, def: 0.45, toSplit: (m) => 1 - m, fromSplit: (s) => 1 - s },
   "menu-banner": { axis: "height", min: 0.12, max: 0.28, def: 0.15, toSplit: (m) => m, fromSplit: (s) => s },
 };
-const LAYOUT_SPEC: Record<LayoutTemplate, Omit<CustomizationSpec, "media" | "engine">> = {
+const LAYOUT_SPEC: Record<LayoutTemplate, Omit<CustomizationSpec, "media" | "engine" | "itemPhotoSize">> = {
   "menu-promo-67": { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
   "split-50": { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
   // Signature draws its feature copy at a fixed size (no featuredText role).
@@ -118,10 +135,10 @@ function strip(spec: MediaSpec | undefined): MediaSpec | null {
 }
 
 export function designCustomizationSpec(composition: DesignComposition): CustomizationSpec {
-  return { engine: "design", media: strip(DESIGN_MEDIA[composition]), ...DESIGN_SPEC[composition] };
+  return { engine: "design", media: strip(DESIGN_MEDIA[composition]), ...DESIGN_SPEC[composition], itemPhotoSize: { def: DESIGN_ITEM_PHOTO_DEFAULT[composition] } };
 }
 export function layoutCustomizationSpec(template: LayoutTemplate): CustomizationSpec {
-  return { engine: "layout", media: strip(LAYOUT_MEDIA[template]), ...LAYOUT_SPEC[template] };
+  return { engine: "layout", media: strip(LAYOUT_MEDIA[template]), ...LAYOUT_SPEC[template], itemPhotoSize: null };
 }
 /** The spec for a document: its template design when it has one, else its original layout. */
 export function customizationSpec(doc: Pick<LayoutDocument, "design" | "template">): CustomizationSpec {
@@ -224,6 +241,10 @@ export function parseCustom(raw: unknown, doc: Pick<LayoutDocument, "design" | "
     if (!isObj(f) || !num(f.x) || !num(f.y)) return { ok: false, error: CUSTOM_ERROR };
     out.imageFocus = { ...f, x: round(clamp(f.x as number, 0, 100), 2), y: round(clamp(f.y as number, 0, 100), 2) };
   } else delete out.imageFocus;
+  if (raw.imageZoom != null) {
+    if (!num(raw.imageZoom)) return { ok: false, error: CUSTOM_ERROR };
+    out.imageZoom = round(clamp(raw.imageZoom as number, IMAGE_ZOOM.min, IMAGE_ZOOM.max), 2);
+  } else delete out.imageZoom;
   // `{ v: 1 }` alone is "no customization" (the same as a full reset), so the board stays on the template path.
   if (Object.keys(out).every((k) => k === "v")) return { ok: true, value: undefined };
   return { ok: true, value: out as LayoutCustom };
@@ -247,6 +268,8 @@ export type ActiveCustom = {
   sectionGap: number;
   mediaSize: number | null;
   focus: { x: number; y: number } | null;
+  /** t421u: featured photo zoom (null = not set; the photo draws exactly as before). */
+  zoom: number | null;
 };
 
 export function hasHeadingOverrides(doc: Pick<LayoutDocument, "sections">): boolean {
@@ -268,6 +291,7 @@ export function activeCustom(doc: Pick<LayoutDocument, "custom" | "sections">): 
     itemGap: c.spacing?.itemGap ?? 1, sectionGap: c.spacing?.sectionGap ?? 1,
     mediaSize: typeof c.mediaSize === "number" ? c.mediaSize : null,
     focus: c.imageFocus ? { x: c.imageFocus.x, y: c.imageFocus.y } : null,
+    zoom: typeof c.imageZoom === "number" ? clamp(c.imageZoom, IMAGE_ZOOM.min, IMAGE_ZOOM.max) : null,
   };
 }
 
@@ -310,7 +334,7 @@ export function normalizeCustomFor(doc: LayoutDocument): LayoutDocument {
 /**
  * Reset paths, applied by deleting keys:
  *   "custom" · "custom.mediaSize" · "custom.textScale" · "custom.roles" · "custom.roles.<role>" · "custom.spacing" ·
- *   "custom.spacing.itemGap" · "custom.spacing.sectionGap" · "custom.imageFocus" · "sections.<i>.headingOverride" ·
+ *   "custom.spacing.itemGap" · "custom.spacing.sectionGap" · "custom.imageFocus" · "custom.imageZoom" · "sections.<i>.headingOverride" ·
  *   "sections.*.headingOverride".
  * Empty parents are removed too, and `custom` disappears when only `v` is left.
  */
@@ -427,4 +451,45 @@ export function focusPlacement(box: Box, focus: { x: number; y: number }, size?:
   const ax = focus.x < 100 / 3 ? "xMin" : focus.x > 200 / 3 ? "xMax" : "xMid";
   const ay = focus.y < 100 / 3 ? "YMin" : focus.y > 200 / 3 ? "YMax" : "YMid";
   return { kind: "anchor", aspect: `${ax}${ay} slice` };
+}
+
+/* ---------------- t421u featured photo framing ---------------- */
+
+/** Focal point implied by the legacy anchor, so turning on zoom or focus never makes the photo jump. */
+export function anchorFocus(anchor: string | undefined): { x: number; y: number } {
+  return { x: anchor === "left" ? 0 : anchor === "right" ? 100 : 50, y: anchor === "top" ? 0 : anchor === "bottom" ? 100 : 50 };
+}
+
+/** True when the board uses the t421u framing path (zoom set, or a focal point on a Fit photo). */
+export function usesFraming(doc: Pick<LayoutDocument, "imageFit">, active: ActiveCustom | null): boolean {
+  if (!active) return false;
+  return active.zoom != null || (doc.imageFit === "contain" && active.focus != null);
+}
+
+/**
+ * Where the featured photo is drawn inside its box: base scale (Fill = cover, Fit = contain) × zoom, then the focal
+ * point slides it inside the box (Fill: which part is cropped; Fit: where the spare space goes). Canvas px.
+ * Without the photo's natural size, the same box is approximated (enlarged box + SVG alignment).
+ */
+export type FramePlacement =
+  | { kind: "exact"; x: number; y: number; w: number; h: number; letterbox: boolean }
+  | { kind: "approx"; x: number; y: number; w: number; h: number; aspect: string; letterbox: boolean };
+export function framePlacement(box: Box, fit: "cover" | "contain", zoom: number, focus: { x: number; y: number }, size?: { w: number; h: number } | null): FramePlacement {
+  const z = clamp(zoom, IMAGE_ZOOM.min, IMAGE_ZOOM.max);
+  const fx = clamp(focus.x, 0, 100) / 100; const fy = clamp(focus.y, 0, 100) / 100;
+  if (size && size.w > 0 && size.h > 0) {
+    const base = fit === "contain" ? Math.min(box.w / size.w, box.h / size.h) : Math.max(box.w / size.w, box.h / size.h);
+    const w = size.w * base * z; const h = size.h * base * z;
+    return { kind: "exact", x: box.x + (box.w - w) * fx, y: box.y + (box.h - h) * fy, w, h, letterbox: w < box.w - 0.5 || h < box.h - 0.5 };
+  }
+  const w = box.w * z; const h = box.h * z;
+  const ax = fx < 1 / 3 ? "xMin" : fx > 2 / 3 ? "xMax" : "xMid";
+  const ay = fy < 1 / 3 ? "YMin" : fy > 2 / 3 ? "YMax" : "YMid";
+  return { kind: "approx", x: box.x + (box.w - w) * fx, y: box.y + (box.h - h) * fy, w, h, aspect: `${ax}${ay} ${fit === "contain" ? "meet" : "slice"}`, letterbox: fit === "contain" };
+}
+
+/** "Reset photo": the template's own framing. Leaves the featured area size (custom.mediaSize) alone. */
+export function resetFeaturedPhoto(doc: LayoutDocument): LayoutDocument {
+  const next = applyCustomReset(doc, ["custom.imageZoom", "custom.imageFocus"]);
+  return { ...next, imageFit: "cover", imageAnchor: "center" };
 }

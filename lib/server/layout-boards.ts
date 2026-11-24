@@ -92,6 +92,19 @@ export async function loadBoardArt(accountId: string, document: LayoutDocument):
   return { photo, logo, itemImages };
 }
 
+/** t421u: pixel size of the board's featured photo as the PNG draws it (owner photo or stock photo), for the fit echo. */
+export async function featuredPhotoSize(accountId: string, document: LayoutDocument): Promise<{ w: number; h: number } | null> {
+  const { prepareBoardPhoto, stockPhotoDataUri } = await import("@/lib/server/layout-render");
+  const { imageDims, dataUriDims } = await import("@/lib/image-dims");
+  if (document.imageMediaId) {
+    const raw = await imageBytes(accountId, document.imageMediaId);
+    if (!raw || !raw.bytes.length) return null;
+    const prepared = await prepareBoardPhoto(raw.bytes, raw.mime);
+    return prepared && prepared.bytes.length ? imageDims(prepared.bytes) : null;
+  }
+  return document.design && document.stockPhoto ? dataUriDims(stockPhotoDataUri(document.stockPhoto)) : null;
+}
+
 export async function saveLayoutForAccount(accountId: string, body: {
   menuId?: string | null;
   name?: string;
