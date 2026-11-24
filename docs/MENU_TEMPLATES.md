@@ -83,3 +83,25 @@ From Unsplash under the [Unsplash License](https://unsplash.com/license): free f
 salmon 1467003909585-2f8a72700288 · pasta 1621996346565-e3dbc646d9a9 · parfait 1488477181946-6428a0291777 · smoothie 1505252585461-04db1eb84625 · cinnamon 1509365465985-25d11c17e812 · bowl 1512621776951-a57141f2eefd · sandwich 1528735602780-2552fd46c7af · salad 1540189549336-e6e99c3679fe · donuts 1551024601-bec78aea704b · tacos 1565299585323-38d6b0865b47 · carnitas 1599974579688-8dbdd335c77f · streettacos 1551504734-5ee1c4a1479b · wings 1567620832903-9fc6debc209f · macarons 1569864358642-9d1684040f43 · cake 1578985545062-69928b1d9587 · chicken 1598103442097-8b74394b95c6 · muffins 1607958996333-41aef7caefaa · quesadilla 1618040996337-56904b7850b9 · burrito 1626700051175-6818013e1d4f.
 
 Photos showing third-party brands (bottles, newspaper mastheads) were rejected.
+
+## Non-food templates (salons, retail, gyms, offices, pet services)
+
+Sixteen templates for businesses that aren't restaurants, added after the 22 food templates. They are ordinary presets in `MENU_DESIGNS` on the existing compositions (`list`, `promo`, `columns`), so the editor, preview, publish, Brand Kit, vertical (9:16) drawing and the Flutter catalog all work unchanged.
+
+| Business (`business`) | Templates (`id`) | Use case |
+| --- | --- | --- |
+| Salons & barbers (`salon`) | `salon-maison`, `barber-blade`, `beauty-glow`, `nails-polished` | Service and price lists, a beauty promotion |
+| Retail (`retail`) | `retail-sale`, `retail-offers`, `retail-boutique` | Sale promotion, product deals, boutique collection |
+| Gyms & fitness (`fitness`) | `fitness-timetable`, `fitness-join`, `fitness-motivate` | Weekly classes, membership offer, workout of the day |
+| Offices (`office`) | `office-welcome`, `office-rooms`, `office-kudos` | Reception welcome, meeting rooms, recognition |
+| Pet services (`pets`) | `pets-groom`, `pets-treats`, `pets-care` | Grooming prices, product promotion, daycare and boarding |
+
+- **`useCase`** (EN/ES) on each design says what the board is for, for the gallery and a future onboarding recommendation.
+- **`terms`** sets the guided editor's words for the list: `services` / `products` ("Price (optional)"), `classes` / `schedule` (the price field is labelled "Time"), `board` ("Detail (optional)"). Food templates have no `terms` and keep the menu words. The stored document is unchanged: the field is still `price`, free text up to 12 characters, and may be empty; an empty price draws no tag, leader or badge.
+- `tests/unit/non-food-templates.test.ts` checks every colour style in both shapes (publishable, nothing dropped or shortened) and pins the SVGs in `tests/fixtures/non-food-svg-baseline.json`.
+
+### Non-food sample photos
+
+From Unsplash under the [Unsplash License](https://unsplash.com/license) (same licence and ids as `docs/MARKETING_PHOTOS.md`, where the WebP copies are used on the marketing site):
+
+shoppingbags 1607082348824-0a96f2a4b9da (`retail-sale`) · beagle 1543466835-00a7907e9de1 (`pets-treats`, `pets-care`).

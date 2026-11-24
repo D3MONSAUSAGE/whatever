@@ -66,14 +66,14 @@ describe("GET /api/menu-templates/catalog", () => {
     expect(res.status).toBe(401);
   });
 
-  it("lists the web gallery's entries in its order: 22 templates, the classic board and 7 layouts", async () => {
+  it("lists the web gallery's entries in its order: 38 templates, the classic board and 7 layouts", async () => {
     const { res, body } = await catalog();
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toContain("private");
     expect(body.schema).toBe(1);
     expect(body.version).toBe(catalogVersion());
     expect(body.entries.map((e) => e.id)).toEqual(galleryEntries().map((e) => e.id));
-    expect(body.entries.filter((e) => e.kind === "template")).toHaveLength(22);
+    expect(body.entries.filter((e) => e.kind === "template")).toHaveLength(38);
     expect(body.entries.filter((e) => e.kind === "template").map((e) => e.id)).toEqual(MENU_DESIGNS.map((d) => d.id));
     expect(body.entries.filter((e) => e.kind === "layout").map((e) => e.id)).toEqual(ORIGINAL_LAYOUTS.map((l) => l.id));
     expect(body.entries.filter((e) => e.kind === "classic").map((e) => e.id)).toEqual(["full-screen"]);
@@ -83,7 +83,7 @@ describe("GET /api/menu-templates/catalog", () => {
 
   it("uses the same filters, names and seeds as the web, in English and Spanish", async () => {
     const { body } = await catalog();
-    expect(body.filters.business.map((f) => f.id)).toEqual(["all", "restaurant", "cafe", "fast", "bar", "sweets"]);
+    expect(body.filters.business.map((f) => f.id)).toEqual(["all", "restaurant", "cafe", "fast", "bar", "sweets", "salon", "retail", "fitness", "office", "pets"]);
     expect(body.filters.style.map((f) => f.id)).toEqual(["all", "dark", "light", "bold"]);
     expect(body.filters.structure.map((f) => f.id)).toEqual(["all", "single", "columns", "media", "cards"]);
     expect(body.filters.business.find((f) => f.id === "sweets")!.name).toEqual({ en: "Drinks & sweets", es: expect.any(String) });

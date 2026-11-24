@@ -52,8 +52,9 @@ describe("existing boards are untouched", () => {
 });
 
 describe("template library", () => {
-  it("has 22 templates (18 + 4 photo templates) across business types and styles, including the three approved designs", () => {
-    expect(MENU_DESIGNS.length).toBe(22);
+  it("has 38 templates: the 22 food templates (18 + 4 photo templates) and 16 non-food templates, including the three approved designs", () => {
+    expect(MENU_DESIGNS.length).toBe(38);
+    expect(MENU_DESIGNS.filter((d) => ["restaurant", "cafe", "fast", "bar", "sweets"].includes(d.business))).toHaveLength(22);
     expect(new Set(MENU_DESIGNS.map((d) => d.id)).size).toBe(MENU_DESIGNS.length);
     for (const id of ["modern-restaurant", "coffee-shop", "bold-fast-casual"]) expect(designById(id), id).not.toBeNull();
     for (const business of ["restaurant", "cafe", "fast", "bar", "sweets"] as const) expect(filterDesigns(business, "all").length, business).toBeGreaterThanOrEqual(2);
@@ -75,8 +76,9 @@ describe("template library", () => {
       expect(doc.sections.length).toBeLessThanOrEqual(MENU_LIMITS.sections);
       if (design.stock) expect(STOCK_PHOTOS).toContain(design.stock);
       expect(design.variants.length).toBeGreaterThanOrEqual(2);
-      // Realistic content: every template ships with real items and prices, no placeholders.
-      expect(items).toBeGreaterThanOrEqual(8);
+      // Realistic content: every template ships with real items and prices, no placeholders. Menus are full;
+      // non-food boards (welcome screens, recognition) carry fewer, larger lines.
+      expect(items, design.id).toBeGreaterThanOrEqual(design.terms ? 6 : 8);
       expect(JSON.stringify(doc)).not.toMatch(/lorem|placeholder|item name/i);
     }
     const scratch = parseLayout(scratchDocument());
