@@ -760,3 +760,23 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='14' width='52' height='40' rx='14' fill='%23FFC53D' stroke='%23251A3A' stroke-width='1.5'/%3E%3Crect x='25' y='55' width='14' height='5' rx='2.5' fill='%23FFC53D'/%3E%3Cpath d='M19 36Q24 40 29 36M35 36Q40 40 45 36' stroke='%23251A3A' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
 }
 .peek [data-testid="deletion-pending"] > button:first-of-type { background: var(--pk-primary); color: var(--pk-on-primary); border-color: var(--pk-primary); box-shadow: 0 var(--pk-ledge) 0 var(--pk-primary-ledge); }
+
+/* ---- PR12: Plan & billing (boards 32-34). CSS only: the billing page file, Stripe calls and entitlement logic are untouched. ---- */
+.peek div:has(> #plans) h2 { font-family: var(--pk-font-display); font-weight: 800; }
+.peek div:has(> #plans) [data-testid="plan-status-label"] { font-family: var(--pk-font-display); font-weight: 700; font-size: 12px; }
+.peek div:has(> #plans) [data-testid="plan-status"] { border-radius: var(--pk-radius-card); }
+.peek #plans > ul > li { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: 16px; box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); }
+.peek #plans > ul > li.border-primary { border-color: var(--pk-primary); background: var(--pk-primary-tint); }
+.peek #plans > ul > li > div:first-child { font-family: var(--pk-font-display); font-weight: 800; }
+.peek #plans > ul > li > div:nth-child(2) { font-family: var(--pk-font-display); font-weight: 800; font-size: 28px; }
+.peek #screens > ul { border: 0; display: grid; gap: 8px; }
+.peek #screens > ul > li { border: var(--pk-outline) solid var(--pk-line) !important; border-radius: 14px; padding: 2px 12px; background: var(--pk-surface); }
+.peek #screens > ul > li input[type="checkbox"] { accent-color: var(--pk-primary); }
+.peek #screens > ul > li label > span:last-child { font-family: var(--pk-font-display); font-weight: 700; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--pk-offline-tint); color: var(--pk-text); }
+@media (min-width: 1100px) {
+  .peek div:has(> #plans):has(> #screens) { max-width: 1180px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); column-gap: 20px; row-gap: 20px; grid-auto-flow: row dense; align-items: start; }
+  .peek div:has(> #plans):has(> #screens) > * { margin: 0 !important; grid-column: 1; }
+  .peek div:has(> #plans):has(> #screens) > [data-testid="page-header"],
+  .peek div:has(> #plans):has(> #screens) > [data-testid="english-only-note"] { grid-column: 1 / -1; }
+  .peek div:has(> #plans):has(> #screens) > #screens { grid-column: 2; grid-row: span 3; position: sticky; top: calc(var(--pk-header) + 16px); }
+}
