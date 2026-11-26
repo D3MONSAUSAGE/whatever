@@ -28,3 +28,15 @@ Peek is on for every web app user in Production while the Production env var `PE
 - **One browser:** `?peek=0` opts out (cookie `pekko_peek=0`, 30 days); `?peek=1` opts back in.
 - Dark mode stays opt-in (`?theme=dark|system|light`). `PANTALLA_UI_PREVIEW` stays Preview-only, so /preview is 404 in Production.
 - Marketing site, /pair, /tv, /player and Staff never use Peek.
+
+## Server-rendered Peek (no flash) and the sign-in logo
+
+- The sign-in pages (`/login`, `/forgot-password`, `/reset-password`, `/auth/confirm`) and the dashboard layout are wrapped in
+  `<PeekServer>` (`components/peek/server.tsx`). It reads the `pekko_peek` cookie plus the build default (on in Production while
+  `PEEK_WEB_PRODUCTION=on`) and the first HTML already has the Peek markup. A tiny inline script puts `peek` and `data-theme` on
+  `<body>` before first paint (it skips `?peek=0` and `/dashboard/staff`). `usePeekWeb` still decides after hydration and is the
+  source of truth. Marketing, `/pair`, `/tv` and `/player` never use `PeekServer`.
+- The Peek lockup is an inline SVG (`components/peek/lockup.tsx`), not an `<img>`, so it can not render blank if an image request
+  fails. The light and dark art are both in the markup and CSS shows the one for the theme.
+- The Peek fonts moved to `app/peek-fonts/` and are loaded through the CSS bundle (`/_next/static/media/*`, hashed, immutable cache)
+  instead of `/peek/fonts/*` (which was served with `max-age=0, must-revalidate`).

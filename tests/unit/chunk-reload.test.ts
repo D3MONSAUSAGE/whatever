@@ -65,7 +65,7 @@ describe("R14-01 reload once per build id", () => {
 
 describe("R14-01 wiring", () => {
   it("is mounted in the dashboard layout and both error boundaries, and the player is untouched", () => {
-    expect(readFileSync("app/dashboard/layout.tsx", "utf8")).toContain("<ChunkReloadGuard />");
+    expect(readFileSync("app/dashboard/layout-client.tsx", "utf8")).toContain("<ChunkReloadGuard />");
     expect(readFileSync("app/error.tsx", "utf8")).toContain("reloadOnceOnChunkErrorInBrowser(error)");
     expect(readFileSync("app/global-error.tsx", "utf8")).toContain("reloadOnceOnChunkErrorInBrowser(error)");
     expect(readFileSync("app/layout.tsx", "utf8")).not.toContain("ChunkReloadGuard");
