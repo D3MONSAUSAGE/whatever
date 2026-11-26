@@ -14,6 +14,9 @@ import { useT } from "@/lib/i18n/client";
 import { SUPPORT_EMAIL, TRIAL } from "@/lib/plans";
 import { heroImage } from "@/lib/marketing-home";
 import "@/components/auth/signup-view.css";
+import { usePeekBodyClass, usePeekWeb } from "@/lib/peek-flag";
+import { PeekLockup } from "@/components/peek/lockup";
+import { Peek } from "@/components/peek/ui";
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const emailLooksValid = (email: string) => EMAIL_SHAPE.test(email.trim());
@@ -76,11 +79,16 @@ export function SignupView(p: Props) {
 
   const noteEl = p.note ? <p role={p.note.error ? "alert" : "status"} className={`su-note ${p.note.error ? "is-error" : "is-ok"}`}>{p.note.text}</p> : null;
 
+  // Peek redesign preview (board 28, UPDATE-1): lockup top-left and the light Peek palette. Markup only; validation,
+  // submit and the inbox state are unchanged. Off unless this browser opted in.
+  const peek = usePeekWeb();
+  usePeekBodyClass(peek);
+
   return (
-    <div className="su" data-testid="signup-view">
+    <div className={peek ? "su pk-su" : "su"} data-testid="signup-view">
       <header className="su-header">
         <div className="su-wrap su-header-row">
-          <Link href="/" className="su-brand" aria-label={t("brand.homeLabel")}><LogoMark className="size-8" /><Wordmark size="sm" /></Link>
+          <Link href="/" className="su-brand" aria-label={t("brand.homeLabel")}>{peek ? <PeekLockup height={48} /> : <><LogoMark className="size-8" /><Wordmark size="sm" /></>}</Link>
           <button type="button" className="su-signin" onClick={p.onSignIn}>{t("auth.up.haveAccount")}</button>
         </div>
       </header>
@@ -151,7 +159,7 @@ export function SignupView(p: Props) {
                 <li key={k} data-n={i + 1}><span>{rich(t(k))}</span></li>
               ))}
             </ul>
-            <div className="su-peek"><img src={heroImage("modern-restaurant", 640)} width={1280} height={720} alt={t("auth.up.peekAlt")} loading="lazy" decoding="async" /></div>
+            <div className="su-peek">{peek ? <span className="pk-su-peek"><Peek mood="happy" size={52} /></span> : null}<img src={heroImage("modern-restaurant", 640)} width={1280} height={720} alt={t("auth.up.peekAlt")} loading="lazy" decoding="async" /></div>
           </div>
         </div>
       </main>

@@ -5,21 +5,31 @@ import { useT } from "@/lib/i18n/client";
 import { makeT, type MessageKey, type T } from "@/lib/i18n/index";
 import { LanguageSelect } from "@/components/i18n/language-select";
 import { usePeekBodyClass, usePeekWeb } from "@/lib/peek-flag";
+import { PeekLockup } from "@/components/peek/lockup";
 
 /** Shared frame for sign-in, forgot-password, and reset-password. */
 export function AuthFrame({ title, lede, children, footer }: { title: string; lede?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode }) {
   const t = useT();
-  // Peek redesign preview: tokens only for now (the full sign-in restyle is build step 9). Off unless opted in.
-  usePeekBodyClass(usePeekWeb());
+  // Peek redesign preview (boards 26/27, UPDATE-1): the Peek lockup replaces the mark + wordmark. Markup only;
+  // every form, handler and message on these pages is unchanged. Off unless this browser opted in.
+  const peek = usePeekWeb();
+  usePeekBodyClass(peek);
   return (
-    <main className="wave-surface relative min-h-dvh overflow-hidden grid place-items-center px-5 py-12">
-      <WaveBackdrop />
+    <main className={`wave-surface relative min-h-dvh overflow-hidden grid place-items-center px-5 py-12${peek ? " pk-auth" : ""}`}>
+      {peek ? null : <WaveBackdrop />}
       <div className="relative z-10 auth-card">
-        <Link href="/login" className="flex flex-col items-center text-center mb-8" aria-label={t("brand.homeLabel")}>
-          <LogoMark className="size-16" />
-          <span className="mt-4"><Wordmark size="lg" align="center" /></span>
-          <span className="mt-3 text-sm text-muted">{t("brand.tagline")}</span>
-        </Link>
+        {peek ? (
+          <Link href="/login" className="pk-auth-brand" aria-label={t("brand.homeLabel")}>
+            <PeekLockup height={64} className="pk-auth-lockup" />
+            <span className="pk-auth-tagline">{t("brand.tagline")}</span>
+          </Link>
+        ) : (
+          <Link href="/login" className="flex flex-col items-center text-center mb-8" aria-label={t("brand.homeLabel")}>
+            <LogoMark className="size-16" />
+            <span className="mt-4"><Wordmark size="lg" align="center" /></span>
+            <span className="mt-3 text-sm text-muted">{t("brand.tagline")}</span>
+          </Link>
+        )}
         <div className="card p-6 md:p-8">
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
           {lede ? <p className="mt-1.5 mb-5 text-sm text-muted leading-relaxed">{lede}</p> : <div className="mb-5" />}
