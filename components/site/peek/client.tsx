@@ -55,19 +55,21 @@ export function PeekHeroBoards({ slides, chipsLabel, swipeLabel, slideLabel, bad
   return (
     <>
       <div className="pkm-tv">
-      <div className="pkm-bezel"><div className="pkm-screen">
-      <div className="pkm-slides" ref={track} tabIndex={0} role="group" aria-roledescription="carousel" aria-label={swipeLabel} onKeyDown={key} data-testid="hero-boards">
-        {slides.map((s, i) => (
-          <img key={s.id} src={heroImage(s.id, 640)} srcSet={heroSrcSet(s.id)} sizes={HERO_SIZES} width={1280} height={720} alt={s.alt}
-            loading={i === 0 ? "eager" : "lazy"} fetchPriority={i === 0 ? "high" : "auto"} decoding="async"
-            aria-roledescription="slide" aria-label={slideLabel.replace("{n}", String(i + 1)).replace("{total}", String(slides.length))}
-            data-testid={i === index ? "hero-board" : undefined} data-template={s.id} />
-        ))}
-      </div>
-      </div></div>
-      <div className="pkm-stand" />
-      {corner}
-      <span className="pkm-tag">{badge}</span>
+        <div className="pkm-bezel">
+          <div className="pkm-screen">
+            <div className="pkm-slides" ref={track} tabIndex={0} role="group" aria-roledescription="carousel" aria-label={swipeLabel} onKeyDown={key} data-testid="hero-boards">
+              {slides.map((s, i) => (
+                <img key={s.id} src={heroImage(s.id, 640)} srcSet={heroSrcSet(s.id)} sizes={HERO_SIZES} width={1280} height={720} alt={s.alt}
+                  loading={i === 0 ? "eager" : "lazy"} fetchPriority={i === 0 ? "high" : "auto"} decoding="async"
+                  aria-roledescription="slide" aria-label={slideLabel.replace("{n}", String(i + 1)).replace("{total}", String(slides.length))}
+                  data-testid={i === index ? "hero-board" : undefined} data-template={s.id} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="pkm-stand" />
+        {corner}
+        <span className="pkm-tag">{badge}</span>
       </div>
       <div className="pkm-dots" role="group" aria-label={swipeLabel} data-pkm-dots="">
         {slides.map((s, i) => (
