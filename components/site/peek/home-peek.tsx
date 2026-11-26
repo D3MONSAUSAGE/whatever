@@ -52,7 +52,7 @@ export function HomePeek({ t, locale, href }: { t: T; locale: Locale; href: (pat
   return (
     <>
       {/* 1 · Hero: a real board on a TV, the promise, one CTA and the trial terms above the fold. */}
-      <section className="pkm-wrap pkm-hero" aria-labelledby="pkm-hero-title">
+      <section className="pkm-wrap pkm-hero" aria-labelledby="pkm-hero-title" data-testid="landing-hero">
         <div className="pkm-hero-grid">
           <div className="pkm-hero-copy">
             <h1 id="pkm-hero-title" data-testid="home-title">{rich(t("home2.heroTitle"), em)}</h1>

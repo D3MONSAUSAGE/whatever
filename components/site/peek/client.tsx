@@ -113,17 +113,20 @@ export function PeekMenu({ openLabel, closeLabel, children }: { openLabel: strin
   }, [open]);
   return (
     <>
-      <button ref={button} type="button" className="pkm-menu-btn" aria-expanded={open} aria-controls="pkm-sheet" aria-label={open ? closeLabel : openLabel}
-        onClick={() => setOpen((v) => !v)} data-testid="pkm-menu-button">
+      <button ref={button} type="button" className="pkm-menu-btn" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? closeLabel : openLabel}
+        onClick={() => setOpen((v) => !v)} data-testid="menu-toggle">
         {open ? (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
         ) : (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
         )}
       </button>
-      <div id="pkm-sheet" className="pkm-sheet" ref={sheet} hidden={!open} onClick={(e) => { if ((e.target as Element).closest("a")) setOpen(false); }} data-testid="pkm-sheet">
-        {children}
-      </div>
+      {/* Same id and test id as the shared SiteNav menu, and removed from the page when closed, as there. */}
+      {open ? (
+        <div id="mobile-menu" className="pkm-sheet" ref={sheet} onClick={(e) => { if ((e.target as Element).closest("a")) setOpen(false); }}>
+          {children}
+        </div>
+      ) : null}
     </>
   );
 }
