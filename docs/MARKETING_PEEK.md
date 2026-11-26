@@ -14,7 +14,7 @@ The switch is read on the server at request time. Changing the env var needs a r
 ## What it does not change
 - Shared public shell: `PublicPage`, `SiteNav`, `SiteFooter` and `PricingCards` are untouched. Support, contact, legal pages and 404 keep their current look.
 - Web-app styles: everything is scoped to `.pkm` in `components/site/peek/peek-marketing.css`.
-- Fonts and brand files: Gabarito and Figtree come from `app/peek.css`, and the lockup from `public/peek/brand/`. Both belong to the Peek web app and are only read here; nothing was added or changed.
+- Fonts and brand files: Gabarito and Figtree come from `app/peek.css` (bundled from `app/peek-fonts`), and the lockup from `public/peek/brand/`. Per `tests/unit/peek-web-flag.test.ts`, marketing code never imports `components/peek`. Both belong to the Peek web app and are only read here; nothing was added or changed.
 - Signup destination (`/signup`), trial terms (`TRIAL`, `PLAYBACK_GRACE_DAYS`), prices (`lib/plans.ts`), EN/ES routes and hreflang, structured data, the signed-in redirect to `/dashboard`.
 - Funnel events: the same `cta_click` locations (`hero`, `demo`, `pricing`, `final`, `sticky`, `nav`) and `template_try` (`hero`, `demo`). The standalone pages stay untracked except the header, as before.
 - Interactive demo: the same `LiveDemo` and real renderer, styled with `ns="pkm"`. It opens on the Tacos template.
