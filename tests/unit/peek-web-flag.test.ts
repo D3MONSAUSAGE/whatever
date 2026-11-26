@@ -86,7 +86,7 @@ describe("Peek stays out of out-of-scope surfaces", () => {
 describe("Peek copy", () => {
   it("every new peek.* string has Spanish", () => {
     const keys = Object.keys(en).filter((k) => k.startsWith("peek."));
-    expect(keys.length).toBe(29);
+    expect(keys.length).toBe(32); // 29 from new-strings.json + 3 singular forms
     for (const k of keys) expect((es as Record<string, string>)[k]).toBeTruthy();
   });
 });

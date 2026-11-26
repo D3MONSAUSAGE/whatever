@@ -11,6 +11,7 @@ import { boardKindLabel } from "@/lib/menu-board-label";
 import { storedOrientation } from "@/lib/board-orientation";
 import { boardTvCount } from "@/lib/peek-publish";
 import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n";
 import { Fab, OverflowMenu, PeekButton, SegmentedFilter, StatusPill } from "@/components/peek/ui";
 
 export type PeekBoardFilter = "all" | "live" | "drafts";
@@ -24,6 +25,13 @@ export function peekBoardState(menu: Pick<MenuBoard, "playlistId" | "mediaId">, 
 export function filterPeekBoards<M extends Pick<MenuBoard, "playlistId" | "mediaId">>(menus: M[], displays: DisplayItem[] | null | undefined, filter: PeekBoardFilter): M[] {
   if (filter === "all") return menus;
   return menus.filter((m) => (filter === "live" ? peekBoardState(m, displays).live : peekBoardState(m, displays).draft));
+}
+
+/** Singular only for exactly one (boards can't outnumber TVs: one playlist per TV). */
+export function showingSummaryText(t: T, boards: number, tvs: number): string {
+  if (boards === 1 && tvs === 1) return t("peek.menus.showingSummaryOne");
+  if (boards === 1) return t("peek.menus.showingSummaryOneBoard", { tvs });
+  return t("peek.menus.showingSummary", { boards, tvs });
 }
 
 export function PeekMenuBoardsList({ menus, displays, onNew, newDisabled, onEdit, onDelete, brand, limitNote }: {
@@ -59,7 +67,7 @@ export function PeekMenuBoardsList({ menus, displays, onNew, newDisabled, onEdit
             { id: "live", label: t("peek.menus.filterLive", { count: live.length }) },
             { id: "drafts", label: t("peek.menus.filterDrafts", { count: drafts.length }) },
           ]} />
-          <span className="pk-boards-summary">{t("peek.menus.showingSummary", { boards: live.length, tvs: tvIds.size })}</span>
+          <span className="pk-boards-summary">{showingSummaryText(t, live.length, tvIds.size)}</span>
         </div>
       ) : null}
       <ul className="pk-board-grid" aria-label={t("mb.title")} data-testid="unify-list">
@@ -77,7 +85,7 @@ export function PeekMenuBoardsList({ menus, displays, onNew, newDisabled, onEdit
                   <p className="pk-screen-meta">{boardKindLabel(menu.template, menu.content, t)} · {t("mb.updated", { ago: timeAgo(menu.updatedAt, t) })}</p>
                   <div className="pk-board-pills">
                     {state.draft ? <StatusPill variant="wait">{t("pl.draft")}</StatusPill> : null}
-                    {state.live ? <StatusPill variant="live">{t("peek.menus.liveOnTvs", { n: state.tvs })}</StatusPill> : <StatusPill variant="asleep">{t("peek.menus.notOnTv")}</StatusPill>}
+                    {state.live ? <StatusPill variant="live">{(state.tvs === 1 ? t("peek.menus.liveOnOneTv") : t("peek.menus.liveOnTvs", { n: state.tvs }))}</StatusPill> : <StatusPill variant="asleep">{t("peek.menus.notOnTv")}</StatusPill>}
                     <StatusPill variant="neutral">{t(portrait ? "tpl.orientationVertical" : "tpl.orientationHorizontal")}</StatusPill>
                   </div>
                 </div>

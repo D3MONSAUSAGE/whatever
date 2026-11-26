@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { boardTvCount, lockedPublishRows, publishTargets } from "@/lib/peek-publish";
-import { filterPeekBoards, peekBoardState } from "@/components/peek/menu-boards-view";
+import { filterPeekBoards, peekBoardState, showingSummaryText } from "@/components/peek/menu-boards-view";
+import { makeT } from "@/lib/i18n";
 import { afterClassicSave } from "@/lib/show-on-screens";
 import type { DisplayItem } from "@/lib/api";
 
@@ -71,5 +72,16 @@ describe("Menu Boards list states", () => {
     expect(src).toContain('title: t("mb.delTitle")');
     expect(src).toContain('onDelete={(menu) => { void remove(menu); }}');
     expect(src).toContain('toast.show(t("mb.deleted"))');
+  });
+});
+
+describe("TV counts read singular for one", () => {
+  for (const loc of ["en", "es"] as const) it(loc, () => {
+    const t = makeT(loc);
+    const one = t("peek.menus.liveOnOneTv"), two = t("peek.menus.liveOnTvs", { n: 2 });
+    expect(one).toMatch(/1 TV$/); expect(two).toMatch(/2 TVs?$/);
+    expect(showingSummaryText(t, 1, 1)).not.toMatch(/boards|TVs/);
+    expect(showingSummaryText(t, 1, 3)).toMatch(/^1 (board|menú) /);
+    expect(showingSummaryText(t, 2, 3)).toMatch(/^2 /);
   });
 });
