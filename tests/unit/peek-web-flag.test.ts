@@ -10,6 +10,10 @@ describe("Peek preview flag (PR1)", () => {
   it("is never allowed on a Vercel Production build", () => {
     expect(peekAllowedForBuild({ VERCEL_ENV: "production" })).toBe("0");
     expect(peekAllowedForBuild({ VERCEL_ENV: "production", PEEK_WEB: "on" })).toBe("0");
+    expect(peekAllowedForBuild({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "off" })).toBe("0");
+    expect(peekAllowedForBuild({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "yes" })).toBe("0");
+    // t425u: the Production kill switch.
+    expect(peekAllowedForBuild({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "on" })).toBe("1");
   });
   it("is allowed on Preview and local builds unless PEEK_WEB=off", () => {
     expect(peekAllowedForBuild({ VERCEL_ENV: "preview" })).toBe("1");

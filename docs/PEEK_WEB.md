@@ -17,3 +17,14 @@ With the flag on, `class="peek"` (and `data-theme="light"`) is put on `<body>` w
 `PANTALLA_UI_PREVIEW=1 next start` then `/preview?screen=<name>&peek=1` (e.g. `screens`, `menus`, `overview`, `peek-kit` for the primitives sheet). Fixtures only; no account or data.
 
 No API, database or shared-contract changes: the Android app is unaffected.
+
+## Production (t425u)
+
+Peek is on for every web app user in Production while the Production env var `PEEK_WEB_PRODUCTION` is `on`
+(read at build time by next.config.ts, see `peekProductionOn` in lib/peek-gate.ts).
+
+- **Turn it off fast:** promote the previous Peek-off Production deployment (Vercel "Instant Rollback"), or set
+  `PEEK_WEB_PRODUCTION=off` and redeploy main. With the switch off, a Production build cannot render Peek at all.
+- **One browser:** `?peek=0` opts out (cookie `pekko_peek=0`, 30 days); `?peek=1` opts back in.
+- Dark mode stays opt-in (`?theme=dark|system|light`). `PANTALLA_UI_PREVIEW` stays Preview-only, so /preview is 404 in Production.
+- Marketing site, /pair, /tv, /player and Staff never use Peek.
