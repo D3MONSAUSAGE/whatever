@@ -4,12 +4,15 @@ The public site at pekkotv.com in the Peek identity: home (`/`, `/es`), `/featur
 `/es/…` URLs). Source: `components/site/peek/`. Design: `pekko-marketing-site-handoff` (approved November 2026).
 
 ## When it shows (`lib/home-variant.ts`)
-| Where | Default | Override |
-|---|---|---|
-| Vercel Production | Peek only while `PEEK_WEB_PRODUCTION=on` (Pantalla's web-app switch), otherwise today's site (Option B home + dark pages) | `HOME_VARIANT=peek`, `b` or `classic` |
-| Vercel Preview, local | Peek (`PEEK_WEB=off` turns it off) | same |
+Launched November 2026: the Peek marketing site is the default on every environment (`MARKETING_DEFAULT = "peek"`).
+It is **independent of the web app**. Pantalla's `PEEK_WEB_PRODUCTION` (dashboard and sign-in) doesn't change it, and rolling the marketing site back never touches the dashboard.
 
-The switch is read on the server at request time. Changing the env var needs a redeploy, and so does turning it off: set `HOME_VARIANT=b`, or promote the previous deployment.
+| Need | Do this |
+|---|---|
+| Roll back the marketing site only (ops) | Vercel → Environment Variables → Production: `HOME_VARIANT=b`, then redeploy. Remove it to return to Peek. |
+| Roll back the marketing site only (code) | PR changing `MARKETING_DEFAULT` to `"b"` |
+| Older home page | `HOME_VARIANT=classic` |
+| Local/Preview without Peek | `PEEK_WEB=off` (ignored in Production) |
 
 ## What it does not change
 - Shared public shell: `PublicPage`, `SiteNav`, `SiteFooter` and `PricingCards` are untouched. Support, contact, legal pages and 404 keep their current look.

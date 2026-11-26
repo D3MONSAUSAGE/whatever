@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { homeVariant, marketingPeek } from "@/lib/home-variant";
+import { homeVariant, MARKETING_DEFAULT, marketingPeek } from "@/lib/home-variant";
 import { en } from "@/lib/i18n/en";
 import { es } from "@/lib/i18n/es";
 
@@ -8,20 +8,28 @@ const read = (f: string) => readFileSync(f, "utf8");
 const PEEK = ["components/site/peek/shell.tsx", "components/site/peek/home-peek.tsx", "components/site/peek/sections.tsx", "components/site/peek/pages.tsx", "components/site/peek/client.tsx"];
 
 describe("Peek marketing site: variant gate", () => {
-  it("follows Pantalla's Production switch, with HOME_VARIANT as the override", () => {
-    expect(homeVariant({ VERCEL_ENV: "production" })).toBe("b");
-    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "off" })).toBe("b");
-    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: " On " })).toBe("peek");
-    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "on", HOME_VARIANT: "b" })).toBe("b");
-    expect(homeVariant({ VERCEL_ENV: "production", HOME_VARIANT: "peek" })).toBe("peek");
-    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "on", HOME_VARIANT: "classic" })).toBe("classic");
-  });
-  it("shows Peek on Preview and local builds unless PEEK_WEB is off", () => {
+  it("is launched: Peek is the default everywhere, independent of the web app's PEEK_WEB_PRODUCTION switch", () => {
+    expect(MARKETING_DEFAULT).toBe("peek");
+    expect(homeVariant({ VERCEL_ENV: "production" })).toBe("peek");
+    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "off" })).toBe("peek");
+    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "on" })).toBe("peek");
     expect(homeVariant({ VERCEL_ENV: "preview" })).toBe("peek");
     expect(homeVariant({})).toBe("peek");
+  });
+  it("rolls the marketing site back with HOME_VARIANT only (no web-app flag involved)", () => {
+    expect(homeVariant({ VERCEL_ENV: "production", HOME_VARIANT: "b" })).toBe("b");
+    expect(homeVariant({ VERCEL_ENV: "production", HOME_VARIANT: " B ", PEEK_WEB_PRODUCTION: "on" })).toBe("b");
+    expect(homeVariant({ VERCEL_ENV: "production", HOME_VARIANT: "classic" })).toBe("classic");
+    expect(homeVariant({ VERCEL_ENV: "production", HOME_VARIANT: "other" })).toBe("peek");
+    expect(marketingPeek({ VERCEL_ENV: "production", HOME_VARIANT: "b" })).toBe(false);
+    // PEEK_WEB=off (local/preview opt-out) never applies to Production.
     expect(homeVariant({ VERCEL_ENV: "preview", PEEK_WEB: "off" })).toBe("b");
-    expect(marketingPeek({ VERCEL_ENV: "production" })).toBe(false);
-    expect(marketingPeek({ VERCEL_ENV: "production", PEEK_WEB_PRODUCTION: "on" })).toBe(true);
+    expect(homeVariant({ VERCEL_ENV: "production", PEEK_WEB: "off" })).toBe("peek");
+  });
+  it("keeps the marketing gate out of the web app's Peek flag code", () => {
+    const gate = read("lib/home-variant.ts");
+    expect(gate).not.toMatch(/^import /m);
+    expect(gate).not.toContain("env.PEEK_WEB_PRODUCTION");
   });
   it("routes home, /features, /pricing and /faq through the gate and keeps the current pages as the fallback", () => {
     expect(read("app/page.tsx")).toContain('variant === "peek"');
