@@ -158,7 +158,7 @@ export function HomePeek({ t, locale, href }: { t: T; locale: Locale; href: (pat
       </section>
 
       {/* 7 · Final CTA */}
-      <PeekFinal title={t("home2.finalTitle")} body={t("home2.finalBody")} track />
+      <PeekFinal title={t("home2.finalTitle")} body={t("home2.finalBody")} track home />
 
       <StickyCta ns="pkm" btnClass="pkm-cta" href={SIGNUP_HREF} label={t("home2.cta")} days={t("home2.stickyDays", { days: TRIAL.days })} card={t("home2.stickyCard")} watch="hb-hero-cta" />
     </>

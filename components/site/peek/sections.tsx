@@ -42,7 +42,8 @@ export async function PeekPricingCards({ canBuy, testPrefix = "plan", track = fa
 }
 
 /** Indigo closing CTA with Peek (home and the standalone pages). */
-export async function PeekFinal({ title, body, track = false }: { title: string; body: string; track?: boolean }) {
+/** `home` shows the home trial line (home2.trialLine); the standalone pages keep their own line (site.trialNote), as before. */
+export async function PeekFinal({ title, body, track = false, home = false }: { title: string; body: string; track?: boolean; home?: boolean }) {
   const t = await getT();
   return (
     <section className="pkm-wrap pkm-sec" aria-labelledby="pkm-final-title">
@@ -53,7 +54,7 @@ export async function PeekFinal({ title, body, track = false }: { title: string;
           {track
             ? <TrialLink href={SIGNUP_HREF} location="final" className="pkm-cta pkm-cta-block" testId="final-cta">{t("home2.cta")}<Arrow /></TrialLink>
             : <a href={SIGNUP_HREF} className="pkm-cta pkm-cta-block" data-testid="final-cta">{t("home2.cta")}<Arrow /></a>}
-          <p className="pkm-trial">{rich(t("home2.trialLine", { days: TRIAL.days }))}</p>
+          <p className="pkm-trial">{home ? rich(t("home2.trialLine", { days: TRIAL.days })) : t("site.trialNote", { days: TRIAL.days, screens: TRIAL.screens })}</p>
         </div>
       </div>
       <p className="pkm-samples">{t("home2.samplesNote")}</p>

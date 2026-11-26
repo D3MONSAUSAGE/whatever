@@ -3,11 +3,12 @@ import { expect, test } from "@playwright/test";
 test("signed-out visitors get the landing page with verified claims only", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByTestId("landing-hero")).toBeVisible();
+  // The hero test id differs by home variant (landing-hero: classic and Peek; home-title: Option B).
+  await expect(page.locator('[data-testid="landing-hero"], [data-testid="home-title"]').first()).toBeVisible();
   const text = await page.locator("main").innerText();
   for (const s of ["$19", "$39", "$59", "14 days free", "No credit card"]) expect(text).toContain(s);
   expect(text).not.toMatch(/Technologies|LLC|Inc\.|checkout/i);
-  await expect(page.getByTestId("start-trial")).toHaveAttribute("href", "/signup");
+  await expect(page.locator('[data-testid="start-trial"], [data-testid="hero-cta"]').first()).toHaveAttribute("href", "/signup");
   for (const href of ["/support", "/privacy", "/terms", "/pricing"]) await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
 });
 
