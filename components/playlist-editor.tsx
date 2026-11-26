@@ -1,6 +1,6 @@
 "use client";
 import { Dialog } from "@/components/dialog";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +15,10 @@ import { secondsLeft, startSlideTimer, videoSecondsLeft } from "@/lib/slide-time
 /** Same as PLAYLIST_MAX_ITEMS on the server. */
 const MAX_SLIDES = 40;
 import { IconList } from "@/components/icons";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { ActionBar, OverflowMenu } from "@/components/peek/ui";
+import { formatNameList } from "@/components/ui";
+import { removalQueued } from "@/lib/peek-playlist";
 
 type Slide = {
   key: string; mediaId: string; fileName: string; url: string | null; thumbnailUrl: string | null;
@@ -26,6 +30,8 @@ type Slide = {
 
 export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   const t = useT();
+  const peek = usePeekWeb();
+  const { locale } = useLocale();
   const params = useParams<{ id: string }>();
   const id = seed?.id ?? params.id;
   const live = useApi<PlaylistDetail>(seed ? null : `/api/playlists/${id}`);
@@ -242,19 +248,81 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
   }
 
   const using = playlist.data.displays.filter((display) => display.assigned);
+  // Peek "Removal queued": publish_playlist unassigns every TV that has this playlist but is unticked (unchanged);
+  // the flag only shows that before Publish. Same rule: display.assigned && !chosen[display.id].
+  const queued = peek ? removalQueued(playlist.data.displays, chosen) : [];
+  const queuedIds = new Set(queued.map((display) => display.id));
+  const queuedNames = formatNameList(queued.map((display) => display.name), locale);
+  const publishCard = (
+          <div className="card p-4 pe-publish">
+            <h2 className="font-semibold mb-1">{t("pe.publish")}</h2>
+            <p className="text-sm text-muted mb-3">{t("pe.publishNote")}</p>
+            <p className="text-sm mb-4">
+              {using.length
+                ? <>{t("pe.on", { names: using.map((display) => display.name).join(", ") })}</>
+                : t("pe.notOnScreen")}
+            </p>
+            {playlist.data.displays.length === 0 ? (
+              <p className="text-sm text-muted">{t("pe.connectFirst")}</p>
+            ) : (
+              <ul className="grid gap-2 mb-4">
+                {playlist.data.displays.map((display) => (
+                  <li key={display.id} className={peek ? `pe-tv${queuedIds.has(display.id) ? " is-removal" : ""}` : undefined} data-testid={peek && queuedIds.has(display.id) ? "pe-removal-row" : undefined}>
+                    <label className="flex items-center gap-3 min-h-11">
+                      <input type="checkbox" className="size-5" checked={!!chosen[display.id]} aria-label={display.name}
+                        onChange={(event) => setChosen({ ...chosen, [display.id]: event.target.checked })} />
+                      <span>{display.name}</span>
+                    </label>
+                    {peek && queuedIds.has(display.id) ? (
+                      <div className="pe-removal">
+                        <span className="pe-removal-tag"><span aria-hidden="true">⚠</span> {t("peek.pe.removalQueued")}</span>
+                        <p>{t("peek.pe.removalBody", { name: display.name })}</p>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {peek && queued.length ? (
+              <p className="pe-removal-summary" role="status" data-testid="pe-removal-summary"><span aria-hidden="true">⚠</span> {queued.length === 1
+                ? t("peek.pe.removalSummaryOne", { names: queuedNames })
+                : t("peek.pe.removalSummaryMany", { n: queued.length, names: queuedNames })}</p>
+            ) : null}
+            {peek ? null : (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={save}>{busy === "Saving…" ? t("ed.saving") : t("pe.saveDraft")}</button>
+              <button type="button" className="btn btn-primary" disabled={!!busy} onClick={publish}>{busy === "Publishing…" ? t("ls.publishing") : t("pe.publish")}</button>
+            </div>
+            )}
+          </div>
+  );
 
   return (
-    <section>
+    <section className={peek ? "pe-peek" : undefined}>
+      {peek ? (
+        // 39-R-PlaylistEditor (approved): back link, title, Duplicate (quiet) and ⋯ holding Delete. Same handlers.
+        <div className="pe-head">
+          <Link href="/dashboard/playlists" className="pe-back">‹ {t("pe.playlists")}</Link>
+          <h1 className="pe-title">{t("pe.title")}</h1>
+          <div className="pe-head-actions">
+            <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>{t("pe.duplicate")}</button>
+            <OverflowMenu label={t("screens.moreFor", { name: playlist.data.name })} items={[{ id: "delete", label: t("pe.del"), danger: true, onSelect: () => void remove() }]} />
+          </div>
+        </div>
+      ) : (
+        <>
       <p className="text-sm mb-3"><Link href="/dashboard/playlists" className="underline">{t("pe.playlists")}</Link></p>
       <PageHeader title={t("pe.title")} eyebrow={t("pe.playlists")} icon={<IconList />} lede={t("pe.lede")} />
       <div className="mb-4 flex flex-wrap gap-2">
         <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={duplicate}>{t("pe.duplicate")}</button>
         <button type="button" className="btn btn-quiet text-danger" onClick={remove}>{t("ed.delete")}</button>
       </div>
+        </>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className={`grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]${peek ? " pe-grid" : ""}`}>
         <div className="grid gap-6">
-          <div className="card p-4 grid gap-4">
+          <div className={`card p-4 grid gap-4${peek ? " pe-settings" : ""}`}>
             <label className="grid gap-1">
               <span className="text-sm font-medium">{t("pe.name")}</span>
               <input className="field" maxLength={80} aria-label={t("pe.nameAria")} value={name} onChange={(event) => setName(event.target.value)} />
@@ -344,12 +412,12 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
                             dragRef.current = index;
                             setDragFrom(index);
                           }}
-                          onDragEnd={() => { dragRef.current = null; setDragFrom(null); }}>{t("pe.drag")}</button>
-                        <button type="button" className="btn btn-quiet min-w-16" aria-label={t("pe.moveUp", { name: slide.fileName })} disabled={index === 0} onClick={() => move(index, -1)}>{t("pe.up")}</button>
-                        <button type="button" className="btn btn-quiet" aria-label={t("pe.moveDown", { name: slide.fileName })} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>{t("pe.down")}</button>
+                          onDragEnd={() => { dragRef.current = null; setDragFrom(null); }}>{peek ? <span aria-hidden="true" className="pe-ico">⠿</span> : t("pe.drag")}</button>
+                        <button type="button" className="btn btn-quiet min-w-16" aria-label={t("pe.moveUp", { name: slide.fileName })} disabled={index === 0} onClick={() => move(index, -1)}>{peek ? <span aria-hidden="true" className="pe-ico">↑</span> : t("pe.up")}</button>
+                        <button type="button" className="btn btn-quiet" aria-label={t("pe.moveDown", { name: slide.fileName })} disabled={index === slides.length - 1} onClick={() => move(index, 1)}>{peek ? <span aria-hidden="true" className="pe-ico">↓</span> : t("pe.down")}</button>
                         </div>
                         <button type="button" className="btn btn-quiet text-danger ml-auto" aria-label={t("pe.removeName", { name: slide.fileName })}
-                          onClick={() => setSlides(slides.filter((_, i) => i !== index))}>{t("pe.remove")}</button>
+                          onClick={() => setSlides(slides.filter((_, i) => i !== index))}>{peek ? <span aria-hidden="true" className="pe-ico">✕</span> : t("pe.remove")}</button>
                       </div>
                     </div>
                   </li>
@@ -358,40 +426,20 @@ export function PlaylistEditor({ seed }: { seed?: PlaylistDetail }) {
             )}
           </div>
 
-          <div className="card p-4">
-            <h2 className="font-semibold mb-1">{t("pe.publish")}</h2>
-            <p className="text-sm text-muted mb-3">{t("pe.publishNote")}</p>
-            <p className="text-sm mb-4">
-              {using.length
-                ? <>{t("pe.on", { names: using.map((display) => display.name).join(", ") })}</>
-                : t("pe.notOnScreen")}
-            </p>
-            {playlist.data.displays.length === 0 ? (
-              <p className="text-sm text-muted">{t("pe.connectFirst")}</p>
-            ) : (
-              <ul className="grid gap-2 mb-4">
-                {playlist.data.displays.map((display) => (
-                  <li key={display.id}>
-                    <label className="flex items-center gap-3 min-h-11">
-                      <input type="checkbox" className="size-5" checked={!!chosen[display.id]} aria-label={display.name}
-                        onChange={(event) => setChosen({ ...chosen, [display.id]: event.target.checked })} />
-                      <span>{display.name}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={save}>{busy === "Saving…" ? t("ed.saving") : t("pe.saveDraft")}</button>
-              <button type="button" className="btn btn-primary" disabled={!!busy} onClick={publish}>{busy === "Publishing…" ? t("ls.publishing") : t("pe.publish")}</button>
-            </div>
-          </div>
+          {peek ? null : publishCard}
         </div>
 
-        <div className="order-first lg:order-none">
+        <div className={`order-first lg:order-none${peek ? " pe-right" : ""}`}>
           <Preview slides={previewSlides} transition={transition} playbackMode={playbackMode} label={t("pe.slideshowPreview")} />
+          {peek ? publishCard : null}
         </div>
       </div>
+      {peek ? (
+        <ActionBar help={t("pe.lede")}>
+          <button type="button" className="btn btn-quiet" disabled={!!busy} onClick={save} data-testid="pe-save-draft">{busy === "Saving…" ? t("ed.saving") : t("pe.saveDraft")}</button>
+          <button type="button" className="btn btn-primary" disabled={!!busy} onClick={publish} data-testid="pe-publish">{busy === "Publishing…" ? t("ls.publishing") : t("pe.publish")}</button>
+        </ActionBar>
+      ) : null}
 
       {previewing && (
         <Dialog onClose={() => setPreviewing(false)} label={t("pe.fullAria")} variant="center" tone="dark" className="bg-paper w-full max-w-4xl rounded-2xl p-4 md:p-5">

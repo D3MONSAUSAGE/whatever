@@ -28,6 +28,8 @@ import { UPLOAD_SUCCESS_TOAST_MS } from "@/lib/upload-notice";
 import type { ScreenLibrary } from "@/components/screen-actions";
 import { AlertsScreen } from "@/components/alerts";
 import { PresentationDetailView } from "@/components/presentation-detail";
+import { PlaylistEditor } from "@/components/playlist-editor";
+import type { PlaylistDetail } from "@/lib/api";
 import type { PresentationDetail } from "@/lib/api";
 import type { AlertItem } from "@/lib/api";
 import type { NotificationsFixture } from "@/components/notifications";
@@ -157,6 +159,7 @@ function previewPath(screen: string) {
   if (screen.startsWith("presentation-")) return "/dashboard/media?kind=presentation";
   if (screen === "media" || screen === "upload" || screen === "upload-error") return "/dashboard/media";
   if (screen === "playlists") return "/dashboard/playlists";
+  if (screen === "playlist-edit") return "/dashboard/playlists/pl-lunch";
   if (screen === "overview") return "/dashboard";
   if (screen === "menus" || screen === "menu-edit" || screen.startsWith("unify-") || screen.startsWith("templates")) return "/dashboard/media/menus";
   if (screen === "promos" || screen === "promo-edit") return "/dashboard/media/promos";
@@ -246,6 +249,7 @@ export function PreviewApp() {
       {screen === "presentation-detail" ? <PresentationDetailView fixture={presentationFixture("ready")} /> : null}
       {screen === "presentation-processing" ? <PresentationDetailView fixture={presentationFixture("processing")} /> : null}
       {screen === "playlists" ? <Playlists fixture={playlists} pathOverride="/dashboard/playlists" /> : null}
+      {screen === "playlist-edit" ? <PlaylistEditor seed={playlistSeed()} /> : null}
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
       {screen === "overview" ? <OverviewScreen fixture={overview} /> : null}
@@ -538,6 +542,28 @@ function MyScreensPreview() {
     },
   ];
   return <MyScreens fixture={{ displays: [...displays, ...extra], groups: demoGroups.groups }} />;
+}
+
+/** Playlist editor fixture (39 / 40 / 41-R-PlaylistEditor): image, video, presentation, image; three TVs play it. */
+function playlistSeed(): PlaylistDetail {
+  const at = "2026-10-28T16:00:00.000Z";
+  return {
+    id: "pl-lunch", name: "Lunch loop", defaultDurationMs: 10000, transition: "fade", playbackMode: "auto",
+    publishedAt: at, publishedTransition: "fade", publishedPlaybackMode: "auto", revision: 2, updatedAt: at,
+    items: [
+      { id: "it-1", mediaId: "media-lunch", fileName: "demo-cafe-lunch.png", url: lunch, kind: "image", durationMs: 10000, position: 0 },
+      { id: "it-2", mediaId: "media-video", fileName: "demo-cafe-specials.mp4", url: null, thumbnailUrl: video, kind: "video", mediaDurationMs: 24000, durationMs: null, position: 1 },
+      { id: "it-3", mediaId: "media-deck", fileName: "demo-cafe-menu.pptx", url: dinner, thumbnailUrl: dinner, kind: "presentation", slideCount: 6, groupDurationMs: 8000, durationMs: 8000, position: 2,
+        slides: [{ id: "s1", fileName: "slide-1.png", index: 0, url: dinner, width: 1920, height: 1080, durationMs: null }] },
+      { id: "it-4", mediaId: "media-dinner", fileName: "demo-cafe-dinner.png", url: dinner, kind: "image", durationMs: null, position: 3 },
+    ],
+    displays: [
+      { id: "screen-front", name: "Front counter", assigned: true },
+      { id: "screen-kitchen", name: "Kitchen", assigned: true },
+      { id: "screen-drive", name: "Drive-thru", assigned: true },
+      { id: "screen-bar", name: "Bar TV", assigned: false },
+    ],
+  };
 }
 
 /** Presentation details fixture (42 / 43-R-Presentation): six slides, or none while it is still processing. */

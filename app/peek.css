@@ -586,3 +586,52 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
 /* The two-column split in presentation-detail.tsx (lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]) is missing from the
    built CSS today, so the page is one column with the flag off; Peek supplies the 42-R split itself. */
 @media (min-width: 1024px) { .peek .pd-peek { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; } }
+
+/* ---------- Playlists (19) and the playlist editor (39, 40, 41) ----------
+   Unlayered like .card / .btn. publish_playlist, the payload and every validation toast are unchanged. */
+.peek .pl-row-actions .pl-edit { background: var(--pk-primary-tint); border-color: transparent; color: var(--pk-on-primary-tint); }
+.peek .pl-row-actions { position: relative; }
+.peek .pe-peek { padding-bottom: 24px; }
+.peek .pe-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.peek .pe-back { font-weight: 700; color: var(--pk-on-primary-tint); text-decoration: none; }
+.peek .pe-back:hover { text-decoration: underline; }
+.peek .pe-title { font-family: var(--pk-font-display); font-weight: 800; font-size: 28px; letter-spacing: -0.02em; margin: 0; flex: 1 1 auto; min-width: 0; }
+.peek .pe-head-actions { display: inline-flex; align-items: center; gap: 8px; position: relative; }
+@media (min-width: 1024px) {
+  .peek .pe-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 340px); align-items: start; }
+  .peek .pe-settings { grid-template-columns: minmax(0, 1.4fr) minmax(0, 2.6fr); align-items: start; }
+  .peek .pe-settings > div.grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .peek .pe-settings > div.grid > label.sm\:col-span-2 { grid-column: auto; }
+  .peek .pe-right { position: sticky; top: 88px; display: grid; gap: 16px; }
+}
+.peek .pe-settings { position: relative; }
+.peek .pe-peek ol > li.card { box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); border-radius: 18px; }
+.peek .pe-peek .slide-order { border: 0; padding: 0; gap: 2px; }
+.peek .pe-peek .slide-order .btn, .peek .pe-peek .btn.text-danger.ml-auto { min-width: 40px; min-height: 40px; padding: 0 10px; border-color: transparent; background: transparent; box-shadow: none; }
+.peek .pe-peek .slide-order .btn:hover:not(:disabled) { background: var(--pk-surface2); }
+.peek .pe-ico { font-size: 18px; line-height: 1; }
+.peek .pe-publish h2 { font-family: var(--pk-font-display); font-weight: 800; }
+.peek .pe-publish ul > li.pe-tv { border: var(--pk-outline) solid var(--pk-line); border-radius: 14px; padding: 6px 12px; background: var(--pk-surface); }
+.peek .pe-publish ul > li.pe-tv.is-removal { border: 2px dashed var(--pk-error); background: var(--pk-error-tint); }
+.peek .pe-removal { padding: 0 0 8px 32px; display: grid; gap: 6px; color: var(--pk-text); font-size: 13px; }
+.peek .pe-removal p { margin: 0; }
+.peek .pe-removal-tag { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; border: 1.5px solid var(--pk-error); background: var(--pk-surface); color: var(--pk-error); font-weight: 700; font-size: 12px; }
+.peek .pe-removal-summary { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0 0; font-size: 13px; font-weight: 600; color: var(--pk-error); }
+.peek .pe-peek .pk-actionbar { margin-top: 24px; }
+.peek .pe-peek .pk-actionbar .btn { min-height: 44px; }
+@media (max-width: 767px) {
+  .peek .pe-peek { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .peek .pe-peek .pk-actionbar > .btn { flex: 1; min-height: 48px; justify-content: center; }
+  .peek .pe-title { font-size: 22px; flex-basis: 100%; order: 2; }
+}
+/* lg:order-none from the editor's markup is not in the built CSS, so the preview column would stay first on
+   desktop; Peek puts it back on the right. Phones (40-R): preview, slides, publish, then settings. */
+@media (min-width: 1024px) { .peek .pe-grid > .pe-right { order: 0; } }
+@media (max-width: 1023px) {
+  .peek .pe-grid { display: flex; flex-direction: column; }
+  .peek .pe-grid > div:first-child, .peek .pe-grid > .pe-right { display: contents; }
+  .peek .pe-grid > .pe-right > :first-child { order: 1; }
+  .peek .pe-grid > div:first-child > div:not(.pe-settings) { order: 2; }
+  .peek .pe-grid > .pe-right > .pe-publish { order: 3; }
+  .peek .pe-grid > div:first-child > .pe-settings { order: 4; }
+}
