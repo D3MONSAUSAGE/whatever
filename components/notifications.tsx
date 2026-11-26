@@ -6,6 +6,8 @@ import { badgeText, dayLabel, groupAlerts, readBatches, type NotificationGroup }
 import { useLocale } from "@/lib/i18n/client";
 import type { T } from "@/lib/i18n";
 import { StudioGuardedLink, useStudioRequestLeave } from "@/components/studio-leave";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { Peek } from "@/components/peek/ui";
 import { IconBell, IconCard, IconCheck, IconInfo, IconScreens, IconTvOff, IconX } from "@/components/icons";
 
 /**
@@ -207,11 +209,14 @@ export function groupHref(g: NotificationGroup): string {
 export function GroupRow({ group, onOpen }: { group: NotificationGroup; onOpen: (g: NotificationGroup) => void }) {
   const { t, locale } = useLocale();
   const text = groupText(group, t, locale);
-  const icon = group.kind === "burst" ? <IconScreens /> : text.tone === "ok" ? <IconCheck /> : <IconTvOff />;
+  const peek = usePeekWeb();
+  const icon = group.kind === "burst" ? <IconScreens />
+    : peek ? <Peek mood={text.tone === "ok" ? "happy" : "asleep"} size={28} />
+    : text.tone === "ok" ? <IconCheck /> : <IconTvOff />;
   return (
     <li>
       <button type="button" className={`nc-row${group.read ? " is-read" : ""}`} data-testid="nc-row" data-kind={group.kind} onClick={() => onOpen(group)}>
-        <span className={`nc-icon nc-${text.tone}`}>{icon}</span>
+        <span className={`nc-icon nc-${text.tone}${peek && group.kind !== "burst" ? " nc-peek" : ""}`}>{icon}</span>
         <span className="min-w-0">
           <span className="nc-row-title">{text.title}</span>
           <span className="nc-row-body">{text.body}</span>
