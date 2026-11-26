@@ -27,6 +27,8 @@ import { useToast } from "@/components/toast";
 import { UPLOAD_SUCCESS_TOAST_MS } from "@/lib/upload-notice";
 import type { ScreenLibrary } from "@/components/screen-actions";
 import { AlertsScreen } from "@/components/alerts";
+import { PresentationDetailView } from "@/components/presentation-detail";
+import type { PresentationDetail } from "@/lib/api";
 import type { AlertItem } from "@/lib/api";
 import type { NotificationsFixture } from "@/components/notifications";
 import { AnalyticsScreen, type AnalyticsFixture } from "@/components/analytics-screen";
@@ -152,6 +154,7 @@ function previewPath(screen: string) {
   if (screen === "groups") return "/dashboard/screens/groups";
   if (screen === "workspace") return "/dashboard/screens/screen-front";
   if (screen === "presentations") return "/dashboard/media?kind=presentation";
+  if (screen.startsWith("presentation-")) return "/dashboard/media?kind=presentation";
   if (screen === "media" || screen === "upload" || screen === "upload-error") return "/dashboard/media";
   if (screen === "playlists") return "/dashboard/playlists";
   if (screen === "overview") return "/dashboard";
@@ -240,6 +243,8 @@ export function PreviewApp() {
       {screen === "notifications" ? <AlertsScreen fixture={previewAlerts()} /> : null}
       {screen === "media" ? <MediaLibrary fixture={media} pathOverride="/dashboard/media" /> : null}
       {screen === "presentations" ? <MediaLibrary fixture={media} pathOverride="/dashboard/media?kind=presentation" /> : null}
+      {screen === "presentation-detail" ? <PresentationDetailView fixture={presentationFixture("ready")} /> : null}
+      {screen === "presentation-processing" ? <PresentationDetailView fixture={presentationFixture("processing")} /> : null}
       {screen === "playlists" ? <Playlists fixture={playlists} pathOverride="/dashboard/playlists" /> : null}
       {screen === "displays" ? <Displays fixture={displays} /> : null}
       {screen === "schedule" ? <ScheduleScreen fixture={scheduleFixture} /> : null}
@@ -533,6 +538,21 @@ function MyScreensPreview() {
     },
   ];
   return <MyScreens fixture={{ displays: [...displays, ...extra], groups: demoGroups.groups }} />;
+}
+
+/** Presentation details fixture (42 / 43-R-Presentation): six slides, or none while it is still processing. */
+function presentationFixture(state: "ready" | "processing"): PresentationDetail {
+  const colors = ["#3d2a1c", "#1c3d32", "#5b2a2a", "#1c243d", "#2d2d2d", "#3d3a1c"];
+  const slides = state === "ready" ? colors.map((color, index) => {
+    const src = poster(`Slide ${index + 1}`, color);
+    return { id: `deck-slide-${index + 1}`, fileName: `demo-cafe-menu-${index + 1}.png`, index, url: src, thumbnailUrl: src, width: 1920, height: 1080, durationMs: index === 0 ? 12000 : null };
+  }) : [];
+  return {
+    id: "media-deck", accountId: "preview", fileName: "demo-cafe-menu.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    sizeBytes: 4_200_000, createdAt: "2026-10-25T09:00:00.000Z", updatedAt: "2026-10-25T09:00:00.000Z", width: 1920, height: 1080,
+    processingStatus: state === "ready" ? "ready" : "processing", processingError: null, processingDone: state === "ready" ? 6 : 2,
+    slideCount: 6, defaultDurationMs: 8000, coverUrl: slides[0]?.url ?? null, usedIn: [{ id: "pl-lunch", name: "Lunch loop" }], slides,
+  };
 }
 
 function poster(label: string, color: string) {
