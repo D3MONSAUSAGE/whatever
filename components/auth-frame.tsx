@@ -4,10 +4,13 @@ import { LogoMark, WaveBackdrop, Wordmark } from "@/components/brand";
 import { useT } from "@/lib/i18n/client";
 import { makeT, type MessageKey, type T } from "@/lib/i18n/index";
 import { LanguageSelect } from "@/components/i18n/language-select";
+import { usePeekBodyClass, usePeekWeb } from "@/lib/peek-flag";
 
 /** Shared frame for sign-in, forgot-password, and reset-password. */
 export function AuthFrame({ title, lede, children, footer }: { title: string; lede?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode }) {
   const t = useT();
+  // Peek redesign preview: tokens only for now (the full sign-in restyle is build step 9). Off unless opted in.
+  usePeekBodyClass(usePeekWeb());
   return (
     <main className="wave-surface relative min-h-dvh overflow-hidden grid place-items-center px-5 py-12">
       <WaveBackdrop />

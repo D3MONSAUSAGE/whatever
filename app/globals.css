@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./peek.css";
 
 @theme {
   /* Pekko app tokens (design system, redesign phase 0). Derived from the marketing site's navy and blue. */

@@ -30,6 +30,7 @@ import { AlertsScreen } from "@/components/alerts";
 import type { AlertItem } from "@/lib/api";
 import type { NotificationsFixture } from "@/components/notifications";
 import { AnalyticsScreen, type AnalyticsFixture } from "@/components/analytics-screen";
+import { PeekKit } from "@/components/peek/kit";
 
 // Fixed timestamps so server and client render the same text.
 const analyticsFixture: AnalyticsFixture = {
@@ -160,6 +161,7 @@ function previewPath(screen: string) {
   if (screen === "screens") return "/dashboard/screens";
   if (screen === "account") return "/dashboard/account";
   if (screen === "notifications") return "/dashboard/notifications";
+  if (screen === "peek-kit") return "/dashboard/screens";
   return `/dashboard/${screen}`;
 }
 
@@ -280,6 +282,8 @@ export function PreviewApp() {
       {screen === "account" ? <AccountPreview /> : null}
       {screen === "screens" ? <MyScreensPreview /> : null}
       {screen === "groups" ? <ScreenGroups fixture={empty ? { groups: [], displays } : demoGroups} startCreating={params.get("creating") === "1"} /> : null}
+      {/* Peek redesign primitives (add &peek=1; the preview flag is off otherwise). */}
+      {screen === "peek-kit" ? <PeekKit dialog={params.get("dialog") === "1"} sheet={params.get("sheet") === "1"} /> : null}
       {screen === "upload" ? <UploadNoticeDemo mode="success" /> : null}
       {screen === "upload-error" ? <UploadNoticeDemo mode="error" /> : null}
     </DashboardShell>

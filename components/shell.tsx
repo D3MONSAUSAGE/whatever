@@ -22,6 +22,9 @@ import {
 import { useLocale, useT } from "@/lib/i18n/client";
 import type { Locale } from "@/lib/i18n/locales";
 import type { MessageKey } from "@/lib/i18n/index";
+import { peekExcludedPath, usePeekBodyClass, usePeekWeb } from "@/lib/peek-flag";
+import { Peek } from "@/components/peek/ui";
+import { OfflineBanner, SetupProgressCard } from "@/components/peek/shell-extras";
 
 /**
  * Signed-in app shell (redesign phase 1): navy sidebar (icon rail on tablets and in the menu-board editor),
@@ -75,6 +78,10 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
   const t = useT();
   // Developer-only link (developer_users, checked on the server). Customers never see it.
   const developer = useDeveloperAccess() && !preview;
+  // Peek redesign preview (lib/peek-gate.ts): off unless this browser opted in on a non-production build.
+  // Staff keeps the current shell. The class sits on <body> so dialogs and toasts (portals) pick up the tokens.
+  const peek = usePeekWeb() && !peekExcludedPath(path);
+  usePeekBodyClass(peek);
 
   useEffect(() => {
     if (preview) return;
@@ -142,18 +149,19 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
     <div className="min-h-dvh md:flex">
       <nav aria-label={t("nav.main")} className="ps-side hidden md:flex">
         <StudioGuardedLink href="/dashboard" className="ps-brand" aria-label={PRODUCT_NAME}>
-          <LogoMark className="size-8 shrink-0" />
+          {peek ? <Peek size={34} outline={false} /> : <LogoMark className="size-8 shrink-0" />}
           <span className="ps-nav-label">{PRODUCT_NAME}</span>
         </StudioGuardedLink>
         {SIDE_TOP.map((item) => sideLink(item))}
         <span className="flex-1" />
+        {peek ? <SetupProgressCard fixture={preview ? PREVIEW_SETUP : undefined} /> : null}
         {developer ? sideLink({ href: "/developer/analytics", labelKey: "dash.nav.developer", icon: IconChart }, "nav-developer") : null}
         {sideLink(ACCOUNT)}
       </nav>
       <div className="flex-1 min-w-0">
         <header className="ps-topbar">
           <StudioGuardedLink href="/dashboard" className="md:hidden shrink-0" aria-label={PRODUCT_NAME}>
-            <LogoMark className="size-8" />
+            {peek ? <Peek size={34} outline={false} /> : <LogoMark className="size-8" />}
           </StudioGuardedLink>
           <span className="ps-title" data-testid="shell-title">{current}</span>
           <BillingChip />
@@ -162,14 +170,15 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
         </header>
         {/* Standard pages sit in one centred column (max 1360px) inside the space next to the sidebar.
             The menu-board workspaces opt out via StudioStyles and use their own wider cap. */}
-        <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : "w-full max-w-[1360px] mx-auto px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
+        <main className={`shell-main ${studio ? "studio-shell max-w-none px-0 pt-0 md:px-3 md:pt-3 pb-4" : peek ? "w-full max-w-[1360px] mx-auto px-4 pt-4 pb-32 md:px-6 md:pt-6 md:pb-12 xl:px-10" : "w-full max-w-[1360px] mx-auto px-4 pt-5 pb-28 md:px-8 md:pt-8 md:pb-12"}`}>
+          {peek ? <OfflineBanner /> : null}
           <UploadProgress />
           {showContentNav ? <ContentNav pathOverride={pathOverride} /> : null}
           {showAccountNav ? <AccountNav path={path} /> : null}
           {children}
         </main>
       </div>
-      {studio ? null : <PhoneTabs path={path} developer={developer} onSignOut={signOut} />}
+      {studio ? null : <PhoneTabs path={path} developer={developer} onSignOut={signOut} peek={peek} />}
     </div>
     </NotificationsProvider>
     </UploadsProvider>
@@ -177,6 +186,9 @@ export function DashboardShell({ children, preview = false, pathOverride, notifi
     </StudioLeaveProvider>
   );
 }
+
+/** Screenshot harness only: a fixed "5 of 8" setup state for the Peek sidebar card. */
+const PREVIEW_SETUP = { show: true, finished: false, completed: 5, total: 8 };
 
 /* ---------------- Account menu ---------------- */
 
@@ -245,7 +257,7 @@ function AccountMenu({ email, onSignOut }: { email: string | null; onSignOut: ()
 
 /* ---------------- Phone tabs and More sheet ---------------- */
 
-function PhoneTabs({ path, developer, onSignOut }: { path: string; developer: boolean; onSignOut: () => void | Promise<void> }) {
+function PhoneTabs({ path, developer, onSignOut, peek = false }: { path: string; developer: boolean; onSignOut: () => void | Promise<void>; peek?: boolean }) {
   const t = useT();
   const requestLeave = useStudioRequestLeave();
   const [more, setMore] = useState(false);
@@ -300,8 +312,10 @@ function PhoneTabs({ path, developer, onSignOut }: { path: string; developer: bo
             {sheetLink("/dashboard", "dash.nav.overview", IconHome)}
             {sheetLink("/dashboard/playlists", "dash.nav.playlists", IconList)}
             {sheetLink("/dashboard/notifications", "dash.nav.notifications", IconBell)}
+            {/* Peek: More lists Overview, Playlists, Notifications, Analytics and Account (Brand Kit stays under Account). */}
+            {peek ? sheetLink("/dashboard/analytics", "an.title", IconChart) : null}
             {sheetLink("/dashboard/account", "dash.nav.account", IconGear)}
-            {sheetLink("/dashboard/account/brand-kit", "dash.nav.brandKit", IconBrush)}
+            {peek ? null : sheetLink("/dashboard/account/brand-kit", "dash.nav.brandKit", IconBrush)}
             {developer ? sheetLink("/developer/analytics", "dash.nav.developer", IconChart) : null}
             <div className="ps-menu-sep" role="separator" />
             <button type="button" className="ps-menu-item" onClick={() => { setMore(false); requestLeave(() => void onSignOut()); }}>

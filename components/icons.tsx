@@ -116,3 +116,13 @@ export function IconScreens() {
 export function IconInfo() {
   return <svg {...STROKE}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5M12 7.6v.2" /></svg>;
 }
+
+/* Peek redesign: the few icons the handoff needs that did not exist yet (reference: handoff assets/icons). */
+export function IconPlus() { return <svg {...STROKE}><path d="M12 5v14M5 12h14" /></svg>; }
+export function IconWarn() { return <svg {...STROKE}><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18h.01" /></svg>; }
+export function IconBack() { return <svg {...STROKE}><path d="M15 18l-6-6 6-6" /></svg>; }
+export function IconUp() { return <svg {...STROKE}><path d="M6 15l6-6 6 6" /></svg>; }
+export function IconDown() { return <svg {...STROKE}><path d="M6 9l6 6 6-6" /></svg>; }
+export function IconCopy() { return <svg {...STROKE}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></svg>; }
+export function IconEye() { return <svg {...STROKE}><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>; }
+export function IconSearch() { return <svg {...STROKE}><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg>; }
