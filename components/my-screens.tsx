@@ -20,6 +20,9 @@ import { useToast } from "@/components/toast";
 import { unifiedEditorPath } from "@/lib/menu-board-unify";
 import { filterScreens, SCREEN_FILTER_MIN, type ScreenStatusFilter } from "@/lib/screen-filter";
 import { BillingStatusBanner, type EntitlementsStatus } from "@/components/billing-status-banner";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { PeekMyScreens } from "@/components/peek/my-screens-view";
+import { PeekReconnectFocus } from "@/components/peek/reconnect-focus";
 
 export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; groups?: ScreenGroupItem[] } } = {}) {
   const t = useT();
@@ -35,6 +38,14 @@ export function MyScreens({ fixture }: { fixture?: { displays: DisplayItem[]; gr
   const [status, setStatus] = useState<ScreenStatusFilter>("all");
   const showFilters = list.length >= SCREEN_FILTER_MIN;
   const shown = showFilters ? filterScreens(list, query, status) : list;
+  const peek = usePeekWeb();
+  // Peek preview only (lib/peek-gate.ts): same data, links and ⋯ actions, new layout.
+  if (peek) {
+    return (
+      <PeekMyScreens displays={displays} groups={groups.data ?? []}
+        billing={!fixture && entitlements.data ? <BillingStatusBanner entitlements={entitlements.data} /> : null} />
+    );
+  }
   return (
     // overflow-x-clip, not overflow-x-hidden: "hidden" on one axis turns the other into "auto", which made this
     // section its own vertical scroll box that clipped the ⋯ menus and showed an inner scrollbar.
@@ -146,6 +157,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   const timeline = useApi<{ nextChange: DisplayItem["nextChange"] }>(fixture ? null : `/api/displays/${id}/timeline`, 10_000);
   const confirm = useConfirm();
   const toast = useToast();
+  const peek = usePeekWeb();
   const display = fixture ?? displays.data?.find((item) => item.id === id);
   if (!fixture && !displays.data) return <LoadState error={displays.error} label={t("screens.loadingOne")} />;
   if (!display) return <EmptyState title={t("screens.notInAccount")}>{t("screens.maybeDisconnected")} <Link href="/dashboard/screens" className="underline font-semibold">{t("screens.backToList")}</Link>.</EmptyState>;
@@ -167,8 +179,12 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
   }
   const preview = display.boardPreviewUrl || display.media?.url || display.playlist?.url;
   const next = display.nextChange ?? timeline.data?.nextChange ?? null;
+  const reconnect = <ReconnectTv display={display} preview={Boolean(fixture)} onConnected={() => { void displays.reload?.(); }} onMessage={(text, error) => toast.show(text, error)} />;
+  // Peek preview (05-ROUTES workspace): for an asleep or unpaired screen the same Reconnect card sits above What's playing.
+  const reconnectFirst = peek && (!display.connected || !display.online);
   return (
     <section className="min-w-0 overflow-x-clip">
+      {peek ? <PeekReconnectFocus /> : null}
       <PageHeader compact title={display.name} lede={display.location ? `${display.location.name} · ${display.location.timezone}` : t("screens.noLocationYet")}
         action={<Link href="/dashboard/screens" className="btn btn-primary min-h-11">{t("screens.all")}</Link>}
       />
@@ -178,6 +194,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
       </div>
       {/* The management column gets the wider share (it holds the content picker and schedule panels); the preview
           sizes to its content and stays in view while those panels scroll, instead of a tall, mostly empty card. */}
+      {reconnectFirst ? <div className="pk-reconnect-first mb-4">{reconnect}</div> : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start" data-testid="screen-workspace-grid">
         <article className="card p-4 min-w-0">
           <h2 className="font-semibold">{t("screens.whatsPlaying")}</h2>
@@ -197,7 +214,7 @@ export function ScreenWorkspace({ id, fixture, library, initialPanel = null }: {
             <p className="text-sm mt-3">{t("screens.nothingAssigned")} <Link href="/dashboard/media" className="underline font-semibold">{t("screens.addMedia")}</Link> {t("screens.or")} <Link href={unifiedEditorPath({ screen: display.id, isNew: true })} className="underline font-semibold">{t("screens.openMenus")}</Link>.</p>
           ) : null}
           <ScreenActions display={display} preview={Boolean(fixture)} library={library} initialPanel={initialPanel} onChanged={() => displays.reload()} />
-          <ReconnectTv display={display} preview={Boolean(fixture)} onConnected={() => { void displays.reload?.(); }} onMessage={(text, error) => toast.show(text, error)} />
+          {reconnectFirst ? null : reconnect}
           <ScreenOrientation display={display} preview={Boolean(fixture)} onChanged={() => { void displays.reload?.(); }} onMessage={(text, error) => toast.show(text, error)} />
         </article>
         {confirm.node}
