@@ -30,6 +30,8 @@ import {
 } from "@/lib/menu-board-unify";
 import { makeT, type T } from "@/lib/i18n";
 import { boardKindLabel } from "@/lib/menu-board-label";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { PeekMenuBoardsList } from "@/components/peek/menu-boards-view";
 
 export type { Brand };
 export { artImages };
@@ -161,6 +163,7 @@ export function MenuBoards({
   const unifiedFlag = useUnifiedEditorFlag(Boolean(fixture));
   const unifiedOn = Boolean(fixture?.unified) || unifiedFlag === true;
   const flagsLoading = !fixture && unifiedFlag === null;
+  const peek = usePeekWeb();
   const draftOpen = view.mode === "classic" || view.mode === "layout" || view.mode === "pick-layout" || view.mode === "template-gallery" || view.mode === "template" || view.mode === "design-gallery";
 
   /**
@@ -257,7 +260,7 @@ export function MenuBoards({
 
   return (
     <section>
-      {draftOpen ? null : (
+      {draftOpen || (peek && menus.data?.available && menus.data.menus.length) ? null : (
         <>
           <PageHeader
             title={t("mb.title")}
@@ -274,7 +277,7 @@ export function MenuBoards({
         </>
       )}
 
-      {!draftOpen && menus.data?.available ? <BrandSummary fixture={fixture?.brand} /> : null}
+      {!draftOpen && menus.data?.available && !(peek && menus.data.menus.length) ? <BrandSummary fixture={fixture?.brand} /> : null}
 
       {flagsLoading && draftOpen ? <LoadState error={null} /> : null}
 
@@ -313,6 +316,7 @@ export function MenuBoards({
           unified={unifiedOn}
           onNewBoard={(document, name) => { toast.show(t("tpl.newBoardFrom")); setView({ mode: "template", menuId: null, name, document, classic: null }); }}
           displays={displays.data ? displays.data.filter((d) => d.connected) : null}
+          board={view.menuId ? menus.data?.menus.find((item) => item.id === view.menuId) ?? null : null}
           brand={kit}
           preview={Boolean(fixture)}
           fixtureLibrary={fixture?.studio?.library}
@@ -413,7 +417,13 @@ export function MenuBoards({
       {menus.data?.available && menus.data.menus.length === 0 && !draftOpen ? (
         <EmptyState title={t("mb.emptyTitle")}>{t("mb.emptyBody")}</EmptyState>
       ) : null}
-      {menus.data?.menus.length && view.mode === "list" ? (
+      {/* Peek preview: same data and handlers, new list (components/peek/menu-boards-view.tsx). */}
+      {peek && menus.data?.available && menus.data.menus.length && view.mode === "list" ? (
+        <PeekMenuBoardsList menus={menus.data.menus} displays={displays.data} onNew={startNew} newDisabled={atLimit(menus.data.menus.length, 100)}
+          onEdit={editMenu} onDelete={(menu) => { void remove(menu); }}
+          brand={<BrandSummary fixture={fixture?.brand} />} />
+      ) : null}
+      {!peek && menus.data?.menus.length && view.mode === "list" ? (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("mb.title")} data-testid="unify-list">
           {menus.data.menus.map((menu) => (
             <li key={menu.id} className="card overflow-hidden">

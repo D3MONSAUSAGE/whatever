@@ -459,6 +459,23 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
 }
 }
 
+/* ---------- Menu Boards list (boards 03 / 04) ---------- */
+@layer components {
+.pk-boards-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 16px; }
+.pk-boards-lede { flex: 1 1 24rem; min-width: 0; margin: 0; font-size: 15px; color: var(--pk-muted); }
+.pk-boards-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 16px; }
+.pk-boards-summary { font-size: 13px; color: var(--pk-muted); }
+.pk-board-grid { display: grid; gap: 16px; grid-template-columns: minmax(0,1fr); list-style: none; padding: 0; margin: 0; }
+@media (min-width: 768px) { .pk-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (min-width: 1280px) { .pk-board-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+.pk-board-card { display: grid; gap: 10px; width: 100%; min-width: 0; }
+.pk-board-thumb { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 12px; overflow: hidden; }
+.pk-board-thumb .pk-bezel-screen { background: var(--pk-tv-bezel); }
+.pk-board-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+@media (max-width: 767px) { .pk-boards { padding-bottom: 96px; } .pk-boards-lede { flex-basis: 100%; } .pk-board-card .pk-screen-actions .pk-btn { min-height: 48px; font-size: 16px; } }
+.peek .pk-boards #brand { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); box-shadow: 0 3px 0 var(--pk-card-ledge); margin-bottom: 16px; }
+}
+
 /* Reduced motion: opacity fades only (04-RESPONSIVE). */
 @media (prefers-reduced-motion: reduce) {
   .peek .ps-sheet, .peek .ps-menu, .peek .nc-panel, .peek .ps-toast, .peek .ps-dialog { animation: none; }
