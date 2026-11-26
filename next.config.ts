@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
+import { peekAllowedForBuild } from "./lib/peek-gate";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Peek redesign preview (lib/peek-gate.ts): "0" on every Vercel Production build, so the preview UI cannot turn on there.
+  env: { PEEK_WEB_ALLOWED: peekAllowedForBuild(process.env) },
   // SEO: Next 15 streams page metadata (description, canonical, hreflang) after <head> for most user agents,
   // including Googlebot, and Google ignores a canonical outside <head>. Our metadata only reads the locale
   // cookie, so rendering it in <head> for every request costs nothing noticeable.
