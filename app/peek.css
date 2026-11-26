@@ -354,6 +354,61 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
 .pk-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 }
 
+
+/* ---------- Auth screens (boards 26–28, UPDATE-1 Peek lockup) ---------- */
+.peek .pk-auth { background: var(--pk-bg); }
+.peek .pk-auth .auth-card { max-width: 420px; }
+.peek .pk-auth-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; text-align: center; color: var(--pk-muted); text-decoration: none; }
+.peek .pk-auth-tagline { font-size: 15px; font-weight: 500; color: var(--pk-muted); }
+.peek .pk-auth .card { padding: 24px; }
+.peek .pk-auth h1 { font-family: var(--pk-font-display); font-weight: 800; font-size: 24px; letter-spacing: -0.01em; }
+.peek .pk-auth .field { min-height: 48px; }
+.peek .pk-auth .btn-primary { min-height: 48px; font-size: 16px; }
+.peek .pk-auth a, .peek .pk-auth .text-primary { color: var(--pk-on-primary-tint); }
+/* Sign in: the existing screen-reader labels become the visible labels the board shows (same <label for>). */
+.peek form[name="login"] > label.sr-only { position: static; width: auto; height: auto; margin: 0 0 -6px; overflow: visible; clip: auto; clip-path: none; white-space: normal; display: block; font-size: 13px; font-weight: 600; color: var(--pk-muted); }
+@media (max-width: 767px) { .peek .pk-auth { place-items: start center; padding-top: 48px; } .peek .pk-auth-lockup { height: 52px !important; } }
+
+/* Create account: same markup, light Peek palette. */
+.peek .su.pk-su {
+  --su-night: var(--pk-bg); --su-panel: var(--pk-surface); --su-line: var(--pk-line); --su-text: var(--pk-text); --su-muted: var(--pk-muted);
+  --su-blue: var(--pk-primary); --su-cyan: var(--pk-primary); --su-ok: var(--pk-live); --su-err: var(--pk-error);
+  background: var(--pk-bg); color: var(--pk-text); color-scheme: light; font-family: var(--pk-font-text);
+}
+.peek .su.pk-su .text-ink { color: var(--pk-text); }
+.peek .su.pk-su :focus-visible { outline: 2px solid var(--pk-primary); outline-offset: 2px; }
+.peek .su.pk-su h1, .peek .su.pk-su h2 { font-family: var(--pk-font-display); }
+.peek .su.pk-su h1 { font-weight: 900; }
+.peek .su.pk-su .su-header-row { min-height: 88px; }
+/* The lockup never shrinks below its 3.81:1 box; the "Have an account?" link wraps instead (ES at 390). */
+.peek .su.pk-su .su-brand { flex: none; }
+.pk-lockup { flex: none; max-width: none; }
+.peek .su.pk-su .su-signin { min-width: 0; text-align: right; }
+.peek .su.pk-su .su-signin { color: var(--pk-on-primary-tint); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.peek .su.pk-su .su-promise li { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); font-size: 13px; font-weight: 700; }
+.peek .su.pk-su .su-promise li::before { content: "● "; color: var(--pk-live); font-size: 10px; vertical-align: 2px; }
+.peek .su.pk-su .su-get li { color: var(--pk-muted); }
+.peek .su.pk-su .su-get li strong { color: var(--pk-text); font-weight: 700; }
+.peek .su.pk-su .su-get li::before { border-radius: 14px; background: var(--pk-accent); border: var(--pk-outline) solid var(--pk-eye-ink); color: var(--pk-on-accent); font-family: var(--pk-font-text); }
+.peek .su.pk-su .su-peek { position: relative; overflow: visible; background: var(--pk-tv-bezel); border: var(--pk-outline) solid var(--pk-eye-ink); border-radius: 18px; padding: 6px; box-shadow: 0 3px 0 var(--pk-eye-ink); }
+.peek .su.pk-su .su-peek img { border-radius: 12px; }
+.peek .su.pk-su .pk-su-peek { position: absolute; right: -14px; bottom: -22px; z-index: 1; }
+.peek .su.pk-su .su-card { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); box-shadow: 0 3px 0 var(--pk-card-ledge); padding: 20px; }
+.peek .su.pk-su .su-field label { font-family: var(--pk-font-text); font-size: 13px; color: var(--pk-muted); }
+.peek .su.pk-su .su-field input { background: var(--pk-surface); color: var(--pk-text); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-field); font-family: var(--pk-font-text); font-weight: 500; }
+.peek .su.pk-su .su-field input::placeholder { color: #8C83A0; }
+.peek .su.pk-su .su-field input:focus { border-color: var(--pk-primary); box-shadow: 0 0 0 3px var(--pk-info-line); }
+.peek .su.pk-su .su-field input[aria-invalid="true"] { border-color: var(--pk-error); }
+.peek .su.pk-su .su-pw button { background: transparent; color: var(--pk-on-primary-tint); }
+.peek .su.pk-su .su-btn { font-family: var(--pk-font-display); background: var(--pk-primary); color: var(--pk-on-primary); box-shadow: 0 3px 0 var(--pk-primary-ledge); border-radius: var(--pk-radius-button); font-size: 16px; }
+.peek .su.pk-su .su-btn:hover { background: #3D26A3; }
+.peek .su.pk-su .su-btn-quiet { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-primary); color: var(--pk-on-primary-tint); box-shadow: none; }
+.peek .su.pk-su .su-legal a, .peek .su.pk-su .su-below a { color: var(--pk-on-primary-tint); }
+.peek .su.pk-su .su-note.is-error { background: var(--pk-error-tint); color: var(--pk-error); border-color: var(--pk-error-line); }
+.peek .su.pk-su .su-note.is-ok { background: var(--pk-live-tint); color: var(--pk-live-ink); border-color: var(--pk-live-line); }
+.peek .su.pk-su .su-footer { border-top: var(--pk-outline) solid var(--pk-line); }
+.peek .su.pk-su .su-footer [data-testid="language-select"] { background: var(--pk-surface); color: var(--pk-text); border-color: var(--pk-line); }
+
 /* Reduced motion: opacity fades only (04-RESPONSIVE). */
 @media (prefers-reduced-motion: reduce) {
   .peek .ps-sheet, .peek .ps-menu, .peek .nc-panel, .peek .ps-toast, .peek .ps-dialog { animation: none; }

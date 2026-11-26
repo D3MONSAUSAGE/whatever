@@ -90,3 +90,17 @@ describe("Peek copy", () => {
     for (const k of keys) expect((es as Record<string, string>)[k]).toBeTruthy();
   });
 });
+
+describe("Peek lockup (UPDATE-1)", () => {
+  it("adds the lockup as new assets and keeps the marketing logo files", () => {
+    for (const f of ["pekko-lockup-light.svg", "pekko-lockup-dark.svg", "peek-mark.svg"]) expect(statSync(`public/peek/brand/${f}`).size).toBeGreaterThan(100);
+    expect(readdirSync("public/brand").length).toBeGreaterThan(0);
+    expect(readFileSync("public/peek/brand/pekko-lockup-light.svg", "utf8")).toContain('aria-label="Pekko"');
+  });
+  it("auth frame and sign-up use only the lockup in Peek mode", () => {
+    const frame = readFileSync("components/auth-frame.tsx", "utf8");
+    const signup = readFileSync("components/auth/signup-view.tsx", "utf8");
+    expect(frame).toMatch(/peek \? \(\s*<Link[^]*?<PeekLockup/);
+    expect(signup).toContain("{peek ? <PeekLockup height={48} /> :");
+  });
+});
