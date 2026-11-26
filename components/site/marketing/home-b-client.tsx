@@ -108,11 +108,15 @@ async function loadRenderer(): Promise<Renderer> {
 }
 
 /** "Type your menu. See it on screen.": the live template demo. Loads only when the section is near. */
-export function LiveDemo({ chips, text, children }: { chips: Chip[]; text: DemoText; children?: ReactNode }) {
+/**
+ * `ns` is the class-name prefix ("hb" for the Option B home, "pkm" for the Peek marketing site) so each site styles the
+ * same demo with its own stylesheet; `initial` is the template shown first (defaults to the first chip).
+ */
+export function LiveDemo({ chips, text, children, ns = "hb", initial }: { chips: Chip[]; text: DemoText; children?: ReactNode; ns?: string; initial?: string }) {
   const root = useRef<HTMLDivElement>(null);
   const [renderer, setRenderer] = useState<Renderer | null>(null);
   const [failed, setFailed] = useState(false);
-  const [current, setCurrent] = useState(chips[0].id);
+  const [current, setCurrent] = useState(initial && chips.some((c) => c.id === initial) ? initial : chips[0].id);
   const [input, setInput] = useState({ title: "", itemName: "", itemPrice: "" });
   const [svg, setSvg] = useState("");
   const [fontsTick, setFontsTick] = useState(0);
@@ -161,29 +165,29 @@ export function LiveDemo({ chips, text, children }: { chips: Chip[]; text: DemoT
   const set = (k: keyof typeof input) => (e: React.ChangeEvent<HTMLInputElement>) => { touch(); setInput((v) => ({ ...v, [k]: e.target.value })); };
 
   return (
-    <div className="hb-demo" ref={root} data-testid="live-demo">
-      <form className="hb-demo-form" autoComplete="off" aria-describedby="hb-demo-note" onSubmit={(e) => e.preventDefault()} onFocusCapture={() => booted.current?.()} onPointerDownCapture={() => booted.current?.()}>
+    <div className={`${ns}-demo`} ref={root} data-testid="live-demo">
+      <form className={`${ns}-demo-form`} autoComplete="off" aria-describedby="hb-demo-note" onSubmit={(e) => e.preventDefault()} onFocusCapture={() => booted.current?.()} onPointerDownCapture={() => booted.current?.()}>
         <label htmlFor="hb-d-title">{text.name}<input id="hb-d-title" maxLength={28} placeholder={placeholder.title} value={input.title} onChange={set("title")} /></label>
-        <div className="hb-demo-row">
+        <div className={`${ns}-demo-row`}>
           <label htmlFor="hb-d-item">{text.item}<input id="hb-d-item" maxLength={26} placeholder={placeholder.itemName} value={input.itemName} onChange={set("itemName")} /></label>
           <label htmlFor="hb-d-price">{text.price}<input id="hb-d-price" maxLength={7} inputMode="decimal" placeholder={placeholder.itemPrice} value={input.itemPrice} onChange={set("itemPrice")} /></label>
         </div>
-        <div className="hb-chips hb-chips-tight" role="group" aria-label={text.chipsLabel}>
+        <div className={`${ns}-chips ${ns}-chips-tight`} role="group" aria-label={text.chipsLabel}>
           {chips.map((c) => (
             <button key={c.id} type="button" aria-pressed={c.id === current} data-template={c.id} onClick={() => { touch(); setCurrent(c.id); }}>{c.label}</button>
           ))}
         </div>
-        <p className="hb-demo-note" id="hb-demo-note">{text.note}</p>
+        <p className={`${ns}-demo-note`} id="hb-demo-note">{text.note}</p>
       </form>
       <div>
-        <div className="hb-tv">
+        <div className={`${ns}-tv`}>
           {svg && !failed ? (
-            <div className="hb-svg" role="img" aria-label={text.preview.replace("{name}", name)} data-testid="demo-board" data-template={current} dangerouslySetInnerHTML={{ __html: svg }} />
+            <div className={`${ns}-svg`} role="img" aria-label={text.preview.replace("{name}", name)} data-testid="demo-board" data-template={current} dangerouslySetInnerHTML={{ __html: svg }} />
           ) : (
-            <div className="hb-svg hb-svg-wait" data-testid="demo-board-status">
+            <div className={`${ns}-svg ${ns}-svg-wait`} data-testid="demo-board-status">
               {/* The same template, pre-rendered, while the live renderer loads (or if it can't). */}
               <img src={heroImage(current, 640)} srcSet={heroSrcSet(current)} sizes={HERO_SIZES} width={1280} height={720} alt="" loading="lazy" decoding="async" />
-              <span role="status" className={failed ? "hb-svg-msg" : "sr-only"}>{failed ? text.failed : text.loading}</span>
+              <span role="status" className={failed ? `${ns}-svg-msg` : "sr-only"}>{failed ? text.failed : text.loading}</span>
             </div>
           )}
         </div>
@@ -227,7 +231,8 @@ export function HowTabs({ steps, label }: { steps: Step[]; label: string }) {
 }
 
 /** Phone-only sticky CTA, shown once the hero CTA has scrolled away. */
-export function StickyCta({ href, label, days, card, watch }: { href: string; label: string; days: string; card: string; watch: string }) {
+/** `ns` and `btnClass` let the Peek marketing site restyle it; the defaults are the Option B home. */
+export function StickyCta({ href, label, days, card, watch, ns = "hb", btnClass = "btn btn-primary hb-btn-sm" }: { href: string; label: string; days: string; card: string; watch: string; ns?: string; btnClass?: string }) {
   const [on, setOn] = useState(false);
   useEffect(() => {
     const target = document.getElementById(watch);
@@ -237,9 +242,9 @@ export function StickyCta({ href, label, days, card, watch }: { href: string; la
     return () => io.disconnect();
   }, [watch]);
   return (
-    <div className={`hb-sticky ${on ? "is-on" : ""}`} aria-hidden={!on} data-testid="sticky-cta">
+    <div className={`${ns}-sticky ${on ? "is-on" : ""}`} aria-hidden={!on} data-testid="sticky-cta">
       <span><b>{days}</b><br />{card}</span>
-      <TrialLink href={href} location="sticky" className="btn btn-primary hb-btn-sm" tabIndex={on ? 0 : -1}>{label}</TrialLink>
+      <TrialLink href={href} location="sticky" className={btnClass} tabIndex={on ? 0 : -1}>{label}</TrialLink>
     </div>
   );
 }

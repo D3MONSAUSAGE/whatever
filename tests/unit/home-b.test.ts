@@ -85,12 +85,13 @@ describe("home page (Option B) and sign-up copy", () => {
   });
 
   it("keeps the previous home page as the rollback (HOME_VARIANT=classic)", () => {
-    expect(homeVariant({})).toBe("b");
-    expect(homeVariant({ HOME_VARIANT: "" })).toBe("b");
-    expect(homeVariant({ HOME_VARIANT: "Classic" })).toBe("classic");
-    expect(homeVariant({ HOME_VARIANT: "other" })).toBe("b");
+    // The Peek marketing site is the default since its launch; HOME_VARIANT=b / classic still serve these pages
+    // (see tests/unit/peek-marketing.test.ts).
+    const prod = { VERCEL_ENV: "production" };
+    expect(homeVariant({ ...prod, HOME_VARIANT: "b" })).toBe("b");
+    expect(homeVariant({ ...prod, HOME_VARIANT: "Classic" })).toBe("classic");
     const page = read("app/page.tsx");
-    expect(page).toContain('homeVariant() === "classic"');
+    expect(page).toContain('variant === "classic"');
     expect(page).toContain("<ClassicHome");
     expect(page).toContain("<HomeB");
     expect(page).toContain("SIGNED_IN_REDIRECT");

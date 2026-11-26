@@ -3,6 +3,13 @@ import { expect, test, type Page } from "@playwright/test";
 /** Public marketing site: shared nav, footer, routes and sign-up entry, on desktop and mobile. */
 const PAGES = ["/", "/features", "/pricing", "/faq", "/support", "/contact", "/terms", "/privacy", "/account-deletion"];
 const NAV = [["Home", "/"], ["Features", "/features"], ["Pricing", "/pricing"], ["FAQ", "/faq"], ["Login", "/login"]] as const;
+/** Peek marketing site (docs/MARKETING_PEEK.md): the logo is the home link and Features/Pricing/FAQ open those sections on the home page. */
+const NAV_PEEK = [["Features", "/", "#features"], ["Pricing", "/", "#pricing"], ["FAQ", "/", "#faq"], ["Login", "/login", ""]] as const;
+const isPeek = async (page: Page) => (await page.getByTestId("pkm-root").count()) > 0;
+/** The trial CTA label: "Start Free Trial" on the current site, "Create my free menu" on the Peek site (approved). */
+const TRIAL_LABEL = /^(Start Free Trial|Create my free menu)$/;
+/** The sign-up page heading (components/auth/signup-view.tsx, auth.up.title). */
+const SIGNUP_HEADING = /Create your (account|free menu)/;
 const FOOTER = ["/features", "/pricing", "/faq", "/signup", "/login", "/support", "/contact", "/terms", "/privacy", "/account-deletion"];
 
 function trackErrors(page: Page) {
@@ -33,6 +40,25 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
     });
 
     test("nav links work", async ({ page }) => {
+      await page.goto("/faq");
+      if (await isPeek(page)) {
+        for (const [label, href, hash] of NAV_PEEK) {
+          await page.goto("/faq");
+          if (mobile) {
+            await page.getByTestId("menu-toggle").click();
+            await expect(page.getByTestId("menu-toggle")).toHaveAttribute("aria-expanded", "true");
+            await page.locator("#mobile-menu").getByRole("link", { name: label, exact: true }).click();
+          } else {
+            await page.getByTestId("site-nav").getByRole("link", { name: label, exact: true }).click();
+          }
+          await page.waitForURL((u) => u.pathname === href && u.hash === hash);
+          if (mobile) await expect(page.locator("#mobile-menu")).toHaveCount(0);
+        }
+        await page.goto("/faq");
+        await page.getByTestId("site-nav").getByRole("link", { name: "Pekko home" }).click();
+        await page.waitForURL((u) => u.pathname === "/");
+        return;
+      }
       for (const [label, href] of NAV) {
         await page.goto("/faq");
         if (mobile) {
@@ -51,18 +77,18 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
       await page.goto("/");
       if (mobile) {
         await page.getByTestId("menu-toggle").click();
-        await page.locator("#mobile-menu").getByRole("link", { name: "Start Free Trial" }).click();
+        await page.locator("#mobile-menu").getByRole("link", { name: TRIAL_LABEL }).click();
       } else {
         await page.getByTestId("nav-trial").click();
       }
       await page.waitForURL(/\/login\?mode=up/);
-      await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: SIGNUP_HEADING })).toBeVisible();
       const legal = page.getByTestId("signup-legal");
       await expect(legal).toBeVisible();
       await expect(legal.getByRole("link", { name: "Terms of Service" })).toHaveAttribute("href", "/terms");
       await expect(legal.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
       await page.goto("/");
-      await page.getByTestId("start-trial").click();
+      await page.locator('[data-testid="start-trial"], [data-testid="hero-cta"]').first().click();
       await page.waitForURL(/\/login\?mode=up/);
     });
 

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { marketingPeek } from "@/lib/home-variant";
+import { PeekPage } from "@/components/site/peek/shell";
+import { PeekFaqPage } from "@/components/site/peek/pages";
 import { FaqList, TrialCta } from "@/components/site/sections";
 import { FaqStructuredData } from "@/components/site/structured-data";
 import { ContactBlock } from "@/components/contact-block";
@@ -16,6 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Faq() {
   const t = await getT();
   const locale = await getLocale();
+  if (marketingPeek()) {
+    return (
+      <PeekPage base="/faq">
+        <FaqStructuredData locale={locale} t={t} />
+        <PeekFaqPage />
+      </PeekPage>
+    );
+  }
   return (
     <PublicPage bare theme="dark">
       <FaqStructuredData locale={locale} t={t} />

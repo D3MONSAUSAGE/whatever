@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { marketingPeek } from "@/lib/home-variant";
+import { PeekPage } from "@/components/site/peek/shell";
+import { PeekPricingPage } from "@/components/site/peek/pages";
 import { checkoutAvailable } from "@/lib/server/stripe";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { marketingHref, marketingMetadata } from "@/lib/seo";
@@ -18,6 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Pricing() {
   const t = await getT();
   const locale = await getLocale();
+  if (marketingPeek()) {
+    return (
+      <PeekPage base="/pricing">
+        <PricingStructuredData locale={locale} t={t} />
+        <PeekPricingPage canBuy={checkoutAvailable()} />
+      </PeekPage>
+    );
+  }
   return (
     <PublicPage bare theme="dark">
       <PricingStructuredData locale={locale} t={t} />
