@@ -1,7 +1,9 @@
 "use client";
 import { onlineNow } from "@/lib/sync-line";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { Peek, btnClass } from "@/components/peek/ui";
 import { useApi, type DisplayItem, type PlaylistSummary, type ScheduleItem } from "@/lib/api";
 import { WaveBackdrop } from "@/components/brand";
 import { IconCalendar, IconCard, IconChevron, IconImage, IconList, IconTv } from "@/components/icons";
@@ -24,6 +26,7 @@ export type OverviewFixture = {
 };
 
 export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
+  const peek = usePeekWeb();
   const displaysLive = useApi<DisplayItem[]>(fixture ? null : "/api/displays", fixture ? undefined : 10_000);
   const mediaLive = useApi<{ id: string }[]>(fixture ? null : "/api/media");
   const playlistsLive = useApi<PlaylistSummary[]>(fixture ? null : "/api/playlists");
@@ -45,6 +48,22 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
 
   return (
     <section>
+      {peek ? (
+        // 08 / 09-R-Overview: Peek hero. Same three links and destinations; Add screen is the accent action.
+        <div className="ov-hero" data-testid="ov-hero">
+          <Peek mood="happy" size={64} />
+          <div className="ov-hero-text min-w-0">
+            <p className="ov-hero-eyebrow">{t("ov.eyebrow")}</p>
+            <h2 className="ov-hero-title">{t("ov.welcome")}</h2>
+            <p className="ov-hero-lede">{t("ov.lede")}</p>
+          </div>
+          <div className="ov-hero-actions">
+            <Link href="/dashboard/screens/add#add-screen" className={btnClass("accent", "default", "ov-hero-add")}>{t("screens.add")}</Link>
+            <Link href="/dashboard/media/menus?new=1" className={btnClass("tint")}>{t("mb.new")}</Link>
+            <Link href="/dashboard/media" className={btnClass("tint")}>{t("ov.upload")}</Link>
+          </div>
+        </div>
+      ) : (
       <div className="banner-dark hero-gradient px-5 py-6 md:px-8 md:py-8 mb-6">
         <WaveBackdrop tone="dark" className="h-[85%]" />
         <div className="relative flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
@@ -60,6 +79,7 @@ export function OverviewScreen({ fixture }: { fixture?: OverviewFixture }) {
           </div>
         </div>
       </div>
+      )}
 
       {!ready || !displayData || mediaCount == null ? (
         <LoadState error={displaysLive.error || mediaLive.error} />
@@ -102,6 +122,7 @@ function OverviewBody({
   onboarding?: OnboardingV2State;
 }) {
   const t = useT();
+  const peek = usePeekWeb();
   const hint = onlineHint(t);
   const online = displayData.filter(onlineNow).length;
   const offline = offlineScreens(displayData).length;
@@ -113,8 +134,9 @@ function OverviewBody({
     return bt - at;
   });
 
+  const Wrap = peek ? "div" : Fragment;
   return (
-    <>
+    <Wrap {...(peek ? { className: "ov-body" } : {})}>
       <NeedsAttention displays={displayData} />
       {/* Redesign phase 2: each count opens the page it counts. */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
@@ -163,7 +185,7 @@ function OverviewBody({
           </p>
         </div>
       )}
-    </>
+    </Wrap>
   );
 }
 

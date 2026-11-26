@@ -665,3 +665,29 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
   .peek .sch-rule-state { grid-column: 2; grid-row: 2; }
   .peek .sch-rule > p { padding-left: 0; }
 }
+
+/* ---------- Overview (boards 08, 09) ----------
+   Peek hero, then Needs attention, tiles and Recent Screens on the left and the setup checklist on the right.
+   Counts, links, checklist steps and their rules are unchanged. */
+.peek .ov-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; padding: 22px 24px; margin-bottom: 20px; background: var(--pk-surface2); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); }
+.peek .ov-hero-text { flex: 1 1 260px; }
+.peek .ov-hero-eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--pk-muted); }
+.peek .ov-hero-title { margin: 2px 0 4px; font-family: var(--pk-font-display); font-weight: 800; font-size: 30px; line-height: 1.1; letter-spacing: -0.02em; color: var(--pk-text); }
+.peek .ov-hero-lede { margin: 0; color: var(--pk-muted); font-size: 15px; }
+.peek .ov-hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: min(100%, 300px); }
+.peek .ov-hero-actions .ov-hero-add { grid-column: 1 / -1; }
+@media (max-width: 767px) {
+  .peek .ov-hero { padding: 18px; }
+  .peek .ov-hero-title { font-size: 24px; }
+  .peek .ov-hero-actions { grid-template-columns: 1fr; width: 100%; }
+}
+@media (min-width: 1280px) {
+  .peek .ov-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; column-gap: 24px; align-items: start; }
+  .peek .ov-body > * { grid-column: 1; }
+  .peek .ov-body > [data-testid="setup-tracker"], .peek .ov-body > [data-testid="setup-resume"], .peek .ov-body > [data-testid="first-success"] { grid-column: 2; grid-row: 1 / span 6; position: sticky; top: 88px; }
+}
+.peek [data-testid="setup-tracker"] h2, .peek [data-testid="needs-attention"] h2 { font-family: var(--pk-font-display); font-weight: 800; }
+.peek [data-testid="setup-tracker"] [role="progressbar"] { background: var(--pk-skeleton); }
+.peek [data-testid="setup-tracker"] [role="progressbar"] > div { background: var(--pk-live); }
+.peek a.ps-stat-link:hover > .card { border-color: var(--pk-primary); box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); }
+.peek .ps-callout.is-warn { background: var(--pk-warning-tint); border-color: var(--pk-warning-line); color: var(--pk-text); }
