@@ -1,0 +1,127 @@
+/*
+ * Developer console in Peek (t428u). Presentation only: every rule is scoped to `body.peek .dc-peek`, and the
+ * console adds `dc-peek` only while the Peek flag is on (usePeekWeb, PEEK_WEB_PRODUCTION kill switch, ?peek=0).
+ * With Peek off none of this matches and the console keeps the dark navy console.css look unchanged.
+ * Colours come from the Peek tokens in app/peek.css, so the opt-in dark theme (?theme=dark) follows too.
+ * Chart series keep the validated blue / orange / aqua palette, the same one the Flutter Developer screen uses.
+ */
+body.peek .dc-peek {
+  --mk-bg: var(--pk-bg); --mk-text: var(--pk-text); --mk-muted: var(--pk-muted);
+  --mk-line: var(--pk-line); --mk-line-strong: var(--pk-offline-line); --mk-cyan: var(--pk-primary);
+  --dc-surface: var(--pk-surface); --dc-panel: var(--pk-surface);
+  --font-display: var(--pk-font-display);
+  background: var(--pk-bg); color: var(--pk-text); color-scheme: inherit; font-family: var(--pk-font-text);
+}
+body.peek .dc-peek h1, body.peek .dc-peek h2, body.peek .dc-peek h3 { font-family: var(--pk-font-display); letter-spacing: 0; color: var(--pk-text); }
+body.peek .dc-peek .mk-eyebrow { color: var(--pk-accent-ink); }
+body.peek .dc-peek a:focus-visible, body.peek .dc-peek button:focus-visible, body.peek .dc-peek select:focus-visible,
+body.peek .dc-peek input:focus-visible, body.peek .dc-peek summary:focus-visible { outline: 2px solid var(--pk-primary); outline-offset: 2px; }
+
+/* Header: Peek lockup, console badge, view switch */
+body.peek .dc-peek .dc-top { background: var(--pk-surface); border-bottom: var(--pk-outline) solid var(--pk-line); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.peek .dc-peek .dc-top-inner { padding: 12px 32px; min-height: 68px; gap: 20px; }
+body.peek .dc-peek .dc-brand { gap: 12px; }
+body.peek .dc-peek .dc-badge { color: var(--pk-on-primary-tint); background: var(--pk-primary-tint); border: var(--pk-outline) solid var(--pk-info-line); font-family: var(--pk-font-text); letter-spacing: .06em; }
+body.peek .dc-peek .dc-top-nav { gap: 6px; font-family: var(--pk-font-text); font-size: 15px; }
+body.peek .dc-peek .dc-top-nav a, body.peek .dc-peek .dc-top-nav button { min-height: 40px; display: inline-flex; align-items: center; border-radius: var(--pk-radius-chip); padding: 0 14px; color: var(--pk-muted); font-weight: 600; }
+body.peek .dc-peek .dc-top-nav a:hover, body.peek .dc-peek .dc-top-nav button:hover { background: var(--pk-surface2); color: var(--pk-text); }
+body.peek .dc-peek .dc-top-nav button.is-on { background: var(--pk-primary-tint); color: var(--pk-on-primary-tint); box-shadow: inset 0 0 0 var(--pk-outline) var(--pk-primary); }
+body.peek .dc-peek [data-testid="language-select"] { background: var(--pk-surface); color: var(--pk-text); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-chip); color-scheme: inherit; }
+body.peek .dc-peek [data-testid="language-select"] option { background: var(--pk-surface); color: var(--pk-text); }
+
+/* Section tabs */
+body.peek .dc-peek .dc-tabs { top: calc(68px + var(--pk-outline)); background: var(--pk-bg); border-bottom: var(--pk-outline) solid var(--pk-line); backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.peek .dc-peek .dc-tabs-inner { padding: 0 32px; }
+body.peek .dc-peek .dc-tabs a { color: var(--pk-muted); font-family: var(--pk-font-text); border-bottom-width: 3px; }
+body.peek .dc-peek .dc-tabs a:hover { color: var(--pk-text); }
+body.peek .dc-peek .dc-tabs a.is-on { color: var(--pk-on-primary-tint); border-bottom-color: var(--pk-primary); }
+
+/* Page */
+body.peek .dc-peek .dc-main { padding: 36px 32px 96px; gap: 28px; }
+body.peek .dc-peek .dc-title { font-weight: 900; }
+body.peek .dc-peek .dc-lede { color: var(--pk-text); }
+body.peek .dc-peek .dc-legend-text, body.peek .dc-peek .dc-meta, body.peek .dc-peek .dc-small, body.peek .dc-peek .dc-empty { color: var(--pk-muted); }
+body.peek .dc-peek .dc-section-head h2 { font-weight: 800; }
+body.peek .dc-peek .dc-section-head p { color: var(--pk-muted); }
+
+/* Buttons (beat `.mk .btn` from the marketing sheet) */
+body.peek .dc-peek .btn { min-height: 44px; border-radius: var(--pk-radius-button); padding: 0 18px; font-family: var(--pk-font-display); font-weight: 700; font-size: 15px; transform: none; }
+body.peek .dc-peek .btn-primary { background: var(--pk-primary); color: var(--pk-on-primary); box-shadow: 0 var(--pk-ledge) 0 var(--pk-primary-ledge); border: 0; }
+body.peek .dc-peek .btn-primary:hover { background: var(--pk-primary); filter: brightness(.92); transform: none; }
+body.peek .dc-peek .btn-quiet { background: var(--pk-surface); color: var(--pk-on-primary-tint); border: var(--pk-outline) solid var(--pk-primary); box-shadow: none; }
+body.peek .dc-peek .btn-quiet:hover { background: var(--pk-primary-tint); }
+body.peek .dc-peek .btn:disabled { opacity: .45; }
+
+/* Filters: range segmented control, custom dates, internal switch, search, selects */
+body.peek .dc-peek .dc-filters { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); padding: 16px 18px; }
+body.peek .dc-peek .dc-segmented { background: var(--pk-surface2); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-button); }
+body.peek .dc-peek .dc-segmented button { color: var(--pk-muted); font-family: var(--pk-font-text); border-radius: 10px; }
+body.peek .dc-peek .dc-segmented button:hover { color: var(--pk-text); background: var(--pk-surface); }
+body.peek .dc-peek .dc-segmented button.is-on { color: var(--pk-on-primary-tint); background: var(--pk-primary-tint); box-shadow: inset 0 0 0 var(--pk-outline) var(--pk-primary); }
+body.peek .dc-peek .dc-custom label { color: var(--pk-muted); font-weight: 600; }
+body.peek .dc-peek .dc-input { min-height: 44px; border-radius: var(--pk-radius-field); border: var(--pk-outline) solid var(--pk-line); background: var(--pk-surface); color: var(--pk-text); padding: 0 12px; color-scheme: inherit; font-family: var(--pk-font-text); font-weight: 500; }
+body.peek .dc-peek .dc-input:focus { border-color: var(--pk-primary); }
+body.peek .dc-peek select.dc-input option { background: var(--pk-surface); color: var(--pk-text); }
+body.peek .dc-peek .dc-switch { color: var(--pk-text); }
+body.peek .dc-peek .dc-switch span { background: var(--pk-offline-line); }
+body.peek .dc-peek .dc-switch input:checked + span { background: var(--pk-primary); }
+body.peek .dc-peek .dc-switch input:focus-visible + span { outline: 2px solid var(--pk-primary); }
+
+/* Cards, metric tiles, notes */
+body.peek .dc-peek .dc-panel { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); }
+body.peek .dc-peek .dc-panel-title, body.peek .dc-peek .dc-empty-title { font-family: var(--pk-font-display); font-size: 17px; font-weight: 800; color: var(--pk-text); }
+body.peek .dc-peek .dc-panel-sub { color: var(--pk-muted); }
+body.peek .dc-peek .dc-empty-panel { border-style: dashed; background: transparent; box-shadow: none; }
+body.peek .dc-peek .dc-mini-title { color: var(--pk-accent-ink); }
+body.peek .dc-peek .dc-kpi { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: 16px; }
+body.peek .dc-peek .dc-kpi:hover { border-color: var(--pk-info-line); }
+body.peek .dc-peek .dc-kpi.is-accent { background: var(--pk-primary-tint); border-color: var(--pk-info-line); }
+body.peek .dc-peek .dc-kpi-label, body.peek .dc-peek .dc-kpi-hint { color: var(--pk-muted); }
+body.peek .dc-peek .dc-kpi.is-accent .dc-kpi-label, body.peek .dc-peek .dc-kpi.is-accent .dc-kpi-hint, body.peek .dc-peek .dc-kpi.is-accent .dc-kpi-value { color: var(--pk-on-primary-tint); }
+body.peek .dc-peek .dc-kpi-value { font-family: var(--pk-font-display); font-weight: 900; color: var(--pk-text); }
+body.peek .dc-peek .dc-banner { background: var(--pk-warning-tint); border: var(--pk-outline) solid var(--pk-warning-line); color: var(--pk-warning); border-radius: var(--pk-radius-banner); }
+body.peek .dc-peek .dc-notes li { color: var(--pk-muted); }
+body.peek .dc-peek .dc-note-badge { background: var(--pk-warning-tint); color: var(--pk-warning); border-color: var(--pk-warning-line); }
+body.peek .dc-peek .dc-code { background: var(--pk-surface2); border-color: var(--pk-line); color: var(--pk-text); }
+body.peek .dc-peek .dc-id { color: var(--pk-muted); }
+
+/* Tables (Customer Accounts, traffic pages, chart table views) */
+body.peek .dc-peek .dc-table th { color: var(--pk-muted); border-bottom: var(--pk-outline) solid var(--pk-line); background: var(--pk-surface); }
+body.peek .dc-peek .dc-table td { color: var(--pk-text); border-bottom: 1px solid var(--pk-line); }
+body.peek .dc-peek .dc-table tr:hover td { background: var(--pk-bg); }
+body.peek .dc-peek .dc-table-view summary { color: var(--pk-primary); }
+body.peek .dc-peek .dc-email { color: var(--pk-text); }
+body.peek .dc-peek .dc-cell-sub { color: var(--pk-muted); }
+body.peek .dc-peek .dc-chip { background: var(--pk-surface2); color: var(--pk-muted); border: 1px solid var(--pk-line); }
+body.peek .dc-peek .dc-chip.is-warn { background: var(--pk-warning-tint); color: var(--pk-warning); border-color: var(--pk-warning-line); }
+body.peek .dc-peek .dc-empty-row { color: var(--pk-muted); }
+body.peek .dc-peek .dc-pager { color: var(--pk-text); }
+
+/* Charts: same marks and palette, Peek surfaces, gridlines, axes and tooltip */
+body.peek .dc-peek .dc-grid { stroke: var(--pk-line); }
+body.peek .dc-peek .dc-baseline { stroke: var(--pk-offline-line); }
+body.peek .dc-peek .dc-crosshair { stroke: var(--pk-muted); }
+body.peek .dc-peek .dc-axis { fill: var(--pk-muted); font-family: var(--pk-font-text); }
+body.peek .dc-peek .dc-hidden-bar { stroke: var(--pk-muted); }
+body.peek .dc-peek .dc-chart circle { stroke: var(--pk-surface); }
+body.peek .dc-peek .dc-tooltip { background: var(--pk-toast-bg); color: var(--pk-toast-text); border: 0; border-radius: 12px; box-shadow: 0 10px 30px rgb(37 26 58 / 0.25); }
+body.peek .dc-peek .dc-tooltip b { color: var(--pk-toast-text); }
+body.peek .dc-peek .dc-legend, body.peek .dc-peek .dc-bar-head { color: var(--pk-muted); }
+body.peek .dc-peek .dc-legend b, body.peek .dc-peek .dc-bar-head b { color: var(--pk-text); }
+body.peek .dc-peek .dc-bar-head span { color: var(--pk-text); }
+body.peek .dc-peek .dc-bar-note { color: var(--pk-muted); }
+body.peek .dc-peek .dc-track, body.peek .dc-peek .dc-meter, body.peek .dc-peek .dc-segbar { background: var(--pk-surface2); }
+body.peek .dc-peek .dc-fill-hidden { background: repeating-linear-gradient(135deg, var(--pk-offline-line) 0 3px, transparent 3px 6px); }
+
+/* Health checks */
+body.peek .dc-peek .dc-status-label { color: var(--pk-text); }
+body.peek .dc-peek .dc-status-value { color: var(--pk-muted); }
+body.peek .dc-peek .dc-status-row.is-ok .dc-status-icon { background: var(--pk-live-tint); color: var(--pk-live-ink); }
+body.peek .dc-peek .dc-status-row.is-warn .dc-status-icon { background: var(--pk-warning-tint); color: var(--pk-warning); }
+body.peek .dc-peek .dc-status-row.is-bad .dc-status-icon { background: var(--pk-error-tint); color: var(--pk-error); }
+
+@media (max-width: 760px) {
+  body.peek .dc-peek .dc-top-inner { padding: 10px 16px; }
+  body.peek .dc-peek .dc-tabs-inner { padding: 0 16px; }
+  body.peek .dc-peek .dc-main { padding: 24px 16px 72px; }
+}

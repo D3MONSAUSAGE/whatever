@@ -10,9 +10,12 @@ import { BarRows, ColumnChart, Legend, LineChart, Meter, ORDINAL_BLUE, NEUTRAL, 
 import { currentLocale, useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n/index";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
+import { usePeekBodyClass, usePeekWeb } from "@/lib/peek-flag";
+import { PeekLockup } from "@/components/peek/lockup";
 import { RANGE_PRESETS, type DevAnalytics, type GroupCount, type Note, type NoteKey, type OnboardingFunnel, type Rate, type RangePreset } from "@/lib/dev-analytics";
 import "@/components/site/marketing/marketing.css";
 import "@/components/developer/console.css";
+import "@/components/developer/console-peek.css";
 
 /**
  * Developer console (DA-1 data, redesigned). This client shell is public JavaScript and holds no data; every
@@ -50,6 +53,10 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [confirmed, setConfirmed] = useState(false);
   const [denied, setDenied] = useState(false);
+  // Peek (t428u): same flag and kill switch as the web app. Presentation only; the body class (tokens) is added only
+  // after a developer API confirms the visitor, so the "not found" page everyone else sees is unchanged.
+  const peek = usePeekWeb();
+  usePeekBodyClass(peek && confirmed);
 
   useEffect(() => {
     const v = new URLSearchParams(location.search).get("view");
@@ -106,8 +113,8 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
   };
 
   return (
-    <div className="mk dc" data-testid="dev-analytics">
-      <ConsoleHeader view={view} setView={setView} />
+    <div className={peek ? "mk dc dc-peek" : "mk dc"} data-testid="dev-analytics">
+      <ConsoleHeader view={view} setView={setView} peek={peek} />
       <SectionTabs view={view} setView={setView} />
       <main id="main" className="dc-main">
         {view === "accounts" ? <AccountsView onConfirmed={onConfirmed} onNotFound={onDenied} /> : view === "traffic" ? <TrafficView onConfirmed={onConfirmed} onNotFound={onDenied} /> : (
@@ -154,14 +161,14 @@ export function DeveloperAnalytics({ notFound }: { notFound: React.ReactNode }) 
 
 type ViewProps = { view: View; setView: (next: View, section?: SectionId) => void };
 
-function ConsoleHeader({ view, setView }: ViewProps) {
+function ConsoleHeader({ view, setView, peek }: ViewProps & { peek: boolean }) {
   const t = useT();
   return (
     <header className="dc-top">
       <div className="dc-top-inner">
         <Link href="/dashboard" className="dc-brand" aria-label={t("dc.backToApp")}>
-          <LogoMark className="size-8" />
-          <span className="dc-brand-name">Pekko</span>
+          {peek ? <PeekLockup height={34} /> : <><LogoMark className="size-8" />
+          <span className="dc-brand-name">Pekko</span></>}
           <span className="dc-badge">{t("dc.console")}</span>
         </Link>
         <nav className="dc-top-nav" aria-label={t("dc.console")}>
