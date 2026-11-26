@@ -21,6 +21,8 @@ import { EmptyState, LoadState, PageHeader , LimitNote, atLimit, useRequiredMess
 import { formatClock12 } from "@/lib/clock";
 import { ScheduleViews } from "@/components/schedule-views";
 import { orderedZones } from "@/lib/time-zones";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { OverflowMenu, PeekSwitch } from "@/components/peek/ui";
 
 const DAYS = [
   { value: 1, labelKey: "day.mon" },
@@ -70,6 +72,7 @@ export type ScheduleFixture = {
 };
 
 export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
+  const peek = usePeekWeb();
   const t = useT();
   const liveLocations = useApi<LocationItem[]>(fixture ? null : "/api/locations");
   const liveGroups = useApi<ScreenGroupItem[]>(fixture ? null : "/api/screen-groups");
@@ -98,7 +101,19 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
   }
 
   return (
-    <section>
+    <section className={peek ? "sch-peek" : undefined}>
+      {peek ? (
+        <>
+          <PageHeader title={t("ss.title")} icon={<IconCalendar />} />
+          {/* 20-R-Schedule (approved): the existing lede and rules note move into the info card. */}
+          <aside className="sch-info" aria-labelledby="sch-info-title">
+            <h2 id="sch-info-title">{t("peek.sched.howRules")}</h2>
+            <p>{t("ss.lede")}</p>
+            <p>{t("ss.rulesNote")}</p>
+          </aside>
+        </>
+      ) : (
+        <>
       <PageHeader
         title={t("ss.title")}
         icon={<IconCalendar />}
@@ -107,6 +122,8 @@ export function ScheduleScreen({ fixture }: { fixture?: ScheduleFixture }) {
       <p className="text-sm text-muted mb-6 max-w-2xl leading-relaxed">
         {t("ss.rulesNote")}
       </p>
+        </>
+      )}
       {blocked ? <p className="text-danger mb-4" role="alert">{blocked}</p> : null}
 
       <ScheduleViews schedules={schedules.data} displays={displays.data}>
@@ -423,6 +440,7 @@ function Rules({
   onToggle: (schedule: ScheduleItem) => void;
   onDelete: (schedule: ScheduleItem) => void;
 }) {
+  const peek = usePeekWeb();
   const t = useT();
   const requiredMsg = useRequiredMessage();
   const [name, setName] = useState("");
@@ -577,11 +595,22 @@ function Rules({
       ) : (
         <ul className="grid gap-3">
           {schedules.map((schedule) => (
-            <li key={schedule.id} className="card p-4 grid gap-2">
+            <li key={schedule.id} className={`card p-4 grid gap-2${peek ? ` sch-rule${schedule.enabled ? "" : " is-paused"}` : ""}`} data-testid={peek ? "sch-rule" : undefined}>
+              {peek ? (
+                <div className="sch-rule-head">
+                  <span className="sch-rule-tile" aria-hidden="true"><IconCalendar /></span>
+                  <p className="font-semibold sch-rule-name">{schedule.name}</p>
+                  {/* Same onToggle (same endpoint) as Pause / Enable; name from ss.pauseName / ss.enableName. */}
+                  <span className="sch-rule-state" aria-live="polite">{schedule.enabled ? t("ss.enabled") : t("ss.paused")}</span>
+                  <PeekSwitch checked={schedule.enabled} label={schedule.enabled ? t("ss.pauseName", { name: schedule.name }) : t("ss.enableName", { name: schedule.name })} onChange={() => onToggle(schedule)} />
+                  <OverflowMenu label={t("screens.moreFor", { name: schedule.name })} items={[{ id: "delete", label: t("ss.deleteName", { name: schedule.name }), danger: true, onSelect: () => onDelete(schedule) }]} />
+                </div>
+              ) : (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">{schedule.name}</p>
                 <span className={`badge ${schedule.enabled ? "badge-live" : ""}`}>{schedule.enabled ? t("ss.enabled") : t("ss.paused")}</span>
               </div>
+              )}
               <p className="text-sm">
                 {schedule.playlistName} · {schedule.displayName || schedule.groupName} · {dayList(schedule.weekdays, t)} {formatClock12(schedule.startTime)}–{formatClock12(schedule.endTime)}
                 {schedule.priority ? ` · ${t("ss.priority").toLowerCase()} ${schedule.priority}` : ""}
@@ -591,10 +620,10 @@ function Rules({
                 <p key={item.other.id} className="text-xs text-muted" data-testid="schedule-overlap-note">{item.message}</p>
               )) : null}
               {schedule.enabled && isPastRange(schedule.endsOn) ? <p className="text-xs text-muted">{t("ss.datesPassed")}</p> : null}
-              <div className="flex flex-wrap gap-2">
+              {peek ? null : <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn btn-quiet" onClick={() => onToggle(schedule)}>{schedule.enabled ? t("ss.pauseName", { name: schedule.name }) : t("ss.enableName", { name: schedule.name })}</button>
                 <button type="button" className="btn btn-quiet text-danger" onClick={() => onDelete(schedule)}>{t("ss.deleteName", { name: schedule.name })}</button>
-              </div>
+              </div>}
             </li>
           ))}
         </ul>

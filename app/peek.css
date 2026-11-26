@@ -635,3 +635,33 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
   .peek .pe-grid > .pe-right > .pe-publish { order: 3; }
   .peek .pe-grid > div:first-child > .pe-settings { order: 4; }
 }
+
+/* ---------- Schedules (boards 20, 21) ----------
+   Rule rows: tile, name, lines, on/off switch (same onToggle as Pause / Enable) and ⋯ Delete (same confirm).
+   The lede and rules note sit in the "How rules decide what plays" card. Forms, validation and API unchanged. */
+.peek .sch-info { background: var(--pk-surface2); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); padding: 16px 18px; font-size: 14px; line-height: 1.5; color: var(--pk-text); margin-bottom: 16px; }
+.peek .sch-info h2 { font-family: var(--pk-font-display); font-weight: 800; font-size: 17px; margin: 0 0 8px; }
+.peek .sch-info p { margin: 0 0 10px; }
+@media (min-width: 1100px) {
+  .peek .sch-peek { display: grid; grid-template-columns: minmax(0, 1fr) 320px; column-gap: 24px; align-items: start; }
+  .peek .sch-peek > * { grid-column: 1; }
+  .peek .sch-peek > .sch-info { grid-column: 2; grid-row: 2 / span 4; position: sticky; top: 88px; }
+}
+.peek [data-testid="schedule-tabs"].seg { background: var(--pk-surface2); border: 1px solid var(--pk-line); border-radius: 14px; padding: 4px; }
+.peek [data-testid="schedule-tabs"].seg button { border-radius: 10px; font-weight: 600; color: var(--pk-muted); }
+.peek [data-testid="schedule-tabs"].seg button[aria-selected="true"] { background: var(--pk-primary-tint); color: var(--pk-on-primary-tint); box-shadow: inset 0 0 0 1.5px var(--pk-primary); }
+.peek .sch-rule { gap: 4px; }
+.peek .sch-rule-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto auto; align-items: center; column-gap: 12px; position: relative; }
+.peek .sch-rule-tile { width: 44px; height: 44px; border-radius: 12px; background: var(--pk-accent); border: 1.5px solid var(--pk-accent-ledge); display: grid; place-items: center; color: var(--pk-on-accent); grid-row: 1 / span 2; }
+.peek .sch-rule-tile svg { width: 22px; height: 22px; }
+.peek .sch-rule-name { margin: 0; font-family: var(--pk-font-display); font-size: 16px; }
+.peek .sch-rule-state { font-size: 12px; font-weight: 700; color: var(--pk-live-ink); }
+.peek .sch-rule.is-paused .sch-rule-state { color: var(--pk-muted); }
+.peek .sch-rule.is-paused { opacity: .78; }
+.peek .sch-rule.is-paused .sch-rule-tile { opacity: .55; }
+.peek .sch-rule > p { padding-left: 56px; margin: 0; }
+@media (max-width: 767px) {
+  .peek .sch-rule-head { grid-template-columns: 40px minmax(0, 1fr) auto auto; }
+  .peek .sch-rule-state { grid-column: 2; grid-row: 2; }
+  .peek .sch-rule > p { padding-left: 0; }
+}
