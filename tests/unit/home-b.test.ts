@@ -85,12 +85,14 @@ describe("home page (Option B) and sign-up copy", () => {
   });
 
   it("keeps the previous home page as the rollback (HOME_VARIANT=classic)", () => {
-    expect(homeVariant({})).toBe("b");
-    expect(homeVariant({ HOME_VARIANT: "" })).toBe("b");
-    expect(homeVariant({ HOME_VARIANT: "Classic" })).toBe("classic");
-    expect(homeVariant({ HOME_VARIANT: "other" })).toBe("b");
+    // Production without Pantalla's Peek switch keeps serving the Option B home (see tests/unit/peek-marketing.test.ts).
+    const prod = { VERCEL_ENV: "production" };
+    expect(homeVariant(prod)).toBe("b");
+    expect(homeVariant({ ...prod, HOME_VARIANT: "" })).toBe("b");
+    expect(homeVariant({ ...prod, HOME_VARIANT: "Classic" })).toBe("classic");
+    expect(homeVariant({ ...prod, HOME_VARIANT: "other" })).toBe("b");
     const page = read("app/page.tsx");
-    expect(page).toContain('homeVariant() === "classic"');
+    expect(page).toContain('variant === "classic"');
     expect(page).toContain("<ClassicHome");
     expect(page).toContain("<HomeB");
     expect(page).toContain("SIGNED_IN_REDIRECT");

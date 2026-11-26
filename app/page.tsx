@@ -8,6 +8,8 @@ import { homeVariant } from "@/lib/home-variant";
 import { HomeStructuredData } from "@/components/site/structured-data";
 import { HomeB } from "@/components/site/marketing/home-b";
 import { ClassicHome } from "@/components/site/marketing/home-classic";
+import { HomePeek } from "@/components/site/peek/home-peek";
+import { PeekPage } from "@/components/site/peek/shell";
 
 export async function generateMetadata(): Promise<Metadata> {
   const [t, locale] = [await getT(), await getLocale()];
@@ -22,11 +24,21 @@ export default async function Home() {
   const t = await getT();
   const locale = await getLocale();
   const href = (path: string) => marketingHref(path, locale);
+  const variant = homeVariant();
+  if (variant === "peek") {
+    return (
+      <PeekPage base="/">
+        <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_REDIRECT }} />
+        <HomeStructuredData locale={locale} t={t} />
+        <HomePeek t={t} locale={locale} href={href} />
+      </PeekPage>
+    );
+  }
   return (
     <PublicPage bare theme="dark">
       <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_REDIRECT }} />
       <HomeStructuredData locale={locale} t={t} />
-      {homeVariant() === "classic"
+      {variant === "classic"
         ? <ClassicHome t={t} c={sampleCopy(locale)} href={href} />
         : <HomeB t={t} locale={locale} href={href} />}
     </PublicPage>

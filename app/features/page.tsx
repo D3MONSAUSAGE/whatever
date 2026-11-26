@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { marketingPeek } from "@/lib/home-variant";
+import { PeekPage } from "@/components/site/peek/shell";
+import { PeekFeaturesPage } from "@/components/site/peek/pages";
 import { SHOTS } from "@/lib/marketing";
 import { sampleCopy, SAMPLE_MEDIA, type SampleCopy } from "@/lib/marketing-samples";
 import { getLocale, getT } from "@/lib/i18n/server";
@@ -96,6 +99,13 @@ export default async function Features() {
   const t = await getT();
   const locale = await getLocale();
   const c = sampleCopy(locale);
+  if (marketingPeek()) {
+    return (
+      <PeekPage base="/features">
+        <PeekFeaturesPage />
+      </PeekPage>
+    );
+  }
   return (
     <PublicPage bare theme="dark">
       <section className="px-5 pt-16 pb-8 md:pt-24">
