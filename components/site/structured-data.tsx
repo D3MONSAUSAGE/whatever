@@ -54,7 +54,7 @@ export function HomeStructuredData({ locale, t }: { locale: Locale; t: T }) {
     <JsonLd data={{
       "@context": "https://schema.org",
       "@graph": [
-        { "@type": "Organization", "@id": id.org, name: SITE_NAME, url: `${origin}/`, logo: `${origin}/brand/pekko-p-512.png`, email: SUPPORT_EMAIL,
+        { "@type": "Organization", "@id": id.org, name: SITE_NAME, url: `${origin}/`, logo: `${origin}/brand/icon-512.png`, email: SUPPORT_EMAIL,
           contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: SUPPORT_EMAIL, availableLanguage: ["English", "Spanish"] } },
         { "@type": "WebSite", "@id": id.site, name: SITE_NAME, url: `${origin}/`, inLanguage: ["en", "es"], publisher: { "@id": id.org } },
         softwareApplication(locale, t),
