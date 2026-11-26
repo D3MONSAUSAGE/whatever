@@ -482,3 +482,52 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
   .peek .btn, .pk-btn, .pk-fab { transition: none; }
   .peek .btn:active, .pk-btn:active, .pk-fab:active { transform: none; }
 }
+
+/* ---------- Menu editor (boards 05-Editor-desktop, 06-Editor-narrow) ----------
+   The editor's own styles are an unlayered <style> in menu-templates.tsx, so these stay unlayered and
+   win on the extra .peek specificity. Behaviour, handlers and data-testids are unchanged. */
+.peek [data-testid="template-editor"] { font-family: var(--pk-font-text); color: var(--pk-text); }
+.peek [data-testid="template-editor"] h2, .peek #tpl-name { font-family: var(--pk-font-display); }
+.peek .tpl-showing-on { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--pk-live-tint); color: var(--pk-live-ink); border: 1px solid var(--pk-live-line); font-size: 13px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peek .tpl-showing-on::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--pk-live); flex: none; }
+.peek .tpl-actions { display: inline-flex; gap: 8px; align-items: center; }
+.peek [data-testid="template-editor"] .btn-primary { background: var(--pk-primary); color: var(--pk-on-primary); border-radius: var(--pk-radius-button); box-shadow: 0 var(--pk-ledge) 0 var(--pk-primary-ledge); }
+.peek [data-testid="template-editor"] .btn-quiet { border-radius: var(--pk-radius-button); border: var(--pk-outline) solid var(--pk-line); background: var(--pk-surface); color: var(--pk-text); }
+.peek [data-testid="tpl-status"]:not(.badge-live) { background: var(--pk-warning-tint); color: var(--pk-warning); border: 1px solid var(--pk-warning-line); border-radius: 999px; }
+.peek [data-testid="tpl-status"].badge-live { background: var(--pk-live-tint); color: var(--pk-live-ink); border: 1px solid var(--pk-live-line); border-radius: 999px; }
+.peek .tpl-steps.is-peek { display: flex; gap: 0; padding: 6px 4px; background: transparent; border-radius: 0; counter-reset: none; }
+.peek .tpl-steps.is-peek .tpl-step { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; background: transparent; box-shadow: none; color: var(--pk-muted); padding: 4px 2px; min-height: 56px; font-weight: 700; }
+.peek .tpl-steps.is-peek .tpl-step::before { content: ""; position: absolute; top: 19px; left: calc(-50% + 18px); right: calc(50% + 18px); height: 2px; background: var(--pk-line); }
+.peek .tpl-steps.is-peek .tpl-step:first-child::before { display: none; }
+.peek .tpl-steps.is-peek .tpl-step.is-done::before, .peek .tpl-steps.is-peek .tpl-step[aria-current="step"]::before { background: var(--pk-primary); }
+.peek .tpl-step-dot { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; border: 2px solid var(--pk-line); background: var(--pk-surface); color: var(--pk-muted); position: relative; z-index: 1; }
+.peek .tpl-step[aria-current="step"] .tpl-step-dot { background: var(--pk-primary); border-color: var(--pk-primary); color: var(--pk-on-primary); }
+.peek .tpl-step.is-done .tpl-step-dot { background: var(--pk-primary-tint); border-color: var(--pk-primary); color: var(--pk-on-primary-tint); }
+.peek .tpl-step[aria-current="step"] .tpl-step-label { color: var(--pk-text); }
+.peek .tpl-step-label { font-size: 13px; line-height: 1.2; text-align: center; }
+.peek .tpl-form.card { border-radius: var(--pk-radius-card); border: var(--pk-outline) solid var(--pk-line); box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); background: var(--pk-surface); }
+.peek [data-testid="template-editor"] p.text-live-ink[role="status"] { display: inline-flex; padding: 4px 10px; border-radius: 999px; background: var(--pk-live-tint); color: var(--pk-live-ink); font-weight: 700; }
+@media (max-width: 767px) {
+  /* 06-Editor-narrow: Save draft / Publish pinned to the bottom; the phone tab bar steps aside while editing. */
+  body.peek:has([data-testid="template-editor"]) .ps-mtabs { display: none; }
+  .peek .tpl-actions { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 10px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--pk-surface); border-top: 1px solid var(--pk-line); box-shadow: 0 -6px 20px rgb(37 26 58 / .08); }
+  .peek .tpl-actions > .btn { flex: 1 1 0; min-height: 48px; justify-content: center; }
+  .peek [data-testid="template-editor"] { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .peek .tpl-showing-on { order: 10; flex-basis: 100%; }
+}
+
+/* ---------- Layout editor (board 07-Layout-desktop) ----------
+   studio-chrome.tsx is an unlayered <style> with fixed colours; the page background is an inline style,
+   hence the single !important. Panels become Peek cards; nothing about the zones or controls changes. */
+.peek .studio-app { background: var(--pk-bg) !important; color: var(--pk-text) !important; font-family: var(--pk-font-text) !important; }
+.peek .studio-app .studio-toolbar { background: var(--pk-surface); border-bottom: 1px solid var(--pk-line); }
+.peek .studio-app .studio-title, .peek .studio-app .studio-title-input { font-family: var(--pk-font-display); color: var(--pk-text); }
+.peek .studio-app .studio-panel { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); }
+.peek .studio-app .studio-panel-summary { font-family: var(--pk-font-display); color: var(--pk-text); }
+.peek .studio-app .studio-props { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); border-radius: var(--pk-radius-card); }
+.peek .studio-app .studio-canvas-stage { background: var(--pk-surface2); border-radius: var(--pk-radius-card); }
+.peek .studio-app .btn-primary { background: var(--pk-primary); color: var(--pk-on-primary); border-radius: var(--pk-radius-button); box-shadow: 0 var(--pk-ledge) 0 var(--pk-primary-ledge); }
+.peek .studio-app .btn-quiet { border-radius: var(--pk-radius-button); border: var(--pk-outline) solid var(--pk-line); background: var(--pk-surface); color: var(--pk-text); }
+.peek .studio-app .studio-status-pill.is-dirty { background: var(--pk-warning-tint); color: var(--pk-warning); border-color: var(--pk-warning-line); }
+.peek .studio-app .studio-status-pill.is-saved { background: var(--pk-live-tint); color: var(--pk-live-ink); border-color: var(--pk-live-line); }
+.peek .studio-app .segment button[aria-pressed="true"] { background: var(--pk-primary); color: var(--pk-on-primary); }
