@@ -1,3 +1,4 @@
+import { PeekServer } from "@/components/peek/server";
 import type { Metadata } from "next";
 
 // B2-07A: the email link's token_hash must never leave this page as a Referer
@@ -5,5 +6,5 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { referrer: "no-referrer", robots: { index: false, follow: false } };
 
 export default function AuthConfirmLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <PeekServer>{children}</PeekServer>;
 }

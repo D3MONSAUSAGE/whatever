@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useSyncExternalStore } from "react";
+import { createContext, createElement, useContext, useEffect, useSyncExternalStore } from "react";
 import { PEEK_COOKIE, PEEK_THEME_COOKIE, peekBuildAllowed, peekDefaultOn, peekOptedIn, peekResolvedTheme, peekThemeChoice } from "@/lib/peek-gate";
 
 export { peekExcludedPath } from "@/lib/peek-gate";
@@ -12,9 +12,20 @@ function snapshot(): boolean {
   return peekOptedIn(document.cookie, new URLSearchParams(location.search).get("peek"), peekDefaultOn());
 }
 
-/** True when the Peek UI should render in this browser. Server render (and production builds) always return false. */
+/**
+ * What the server decided for this request (cookie + build default), provided by <PeekServer> (components/peek/server.tsx)
+ * on the sign-in pages and the dashboard only. Everywhere else (marketing, /pair, /tv, /player) it stays false, so those
+ * pages are server-rendered exactly as before.
+ */
+const PeekServerContext = createContext(false);
+export function PeekServerProvider({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return createElement(PeekServerContext.Provider, { value: on }, children);
+}
+
+/** True when the Peek UI should render in this browser. Server render uses the server's cookie-based answer (false outside <PeekServer>). */
 export function usePeekWeb(): boolean {
-  const on = useSyncExternalStore(subscribe, snapshot, () => false);
+  const serverOn = useContext(PeekServerContext);
+  const on = useSyncExternalStore(subscribe, snapshot, () => serverOn);
   useEffect(() => {
     if (!peekBuildAllowed()) return;
     const q = new URLSearchParams(location.search).get("peek");
