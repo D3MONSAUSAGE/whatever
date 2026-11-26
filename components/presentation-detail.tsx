@@ -8,6 +8,8 @@ import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm";
 import { LoadState, PageHeader, formatNameList } from "@/components/ui";
 import { IconImage } from "@/components/icons";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { OverflowMenu } from "@/components/peek/ui";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase-browser";
 import { assetPathFromUrl, rememberSlideSrc, type SlideSrcScope } from "@/lib/slide-src-cache";
@@ -143,6 +145,8 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
     router.push("/dashboard/media");
   }
 
+  // Peek (web flag only): 42-R-Presentation-desktop. Same handlers; Delete moves into ⋯ (approved).
+  const peek = usePeekWeb();
   if (!data) return <PresentationSkeleton error={error} />;
   const count = data.slides.length;
   const current = data.slides[preview];
@@ -150,12 +154,17 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
   return (
     <section className="min-w-0 overflow-x-hidden" data-presentation-detail="">
       <PageHeader title={data.fileName} icon={<IconImage />} lede={t("pd.lede", { count: data.slideCount, date: data.createdAt ? new Date(data.createdAt).toLocaleDateString(locale === "es" ? "es" : undefined) : "", status: statusLabel(data.processingStatus, t) })}
-        action={<Link href="/dashboard/media" className="btn btn-primary">{t("pd.back")}</Link>}
+        action={peek ? (
+          <div className="pd-head-actions">
+            <Link href="/dashboard/media" className="btn btn-quiet">{t("pd.back")}</Link>
+            <OverflowMenu label={t("screens.moreFor", { name: data.fileName })} items={[{ id: "delete", label: t("pd.del"), danger: true, onSelect: () => void remove() }]} />
+          </div>
+        ) : <Link href="/dashboard/media" className="btn btn-primary">{t("pd.back")}</Link>}
       />
       {data.processingError ? <p className="mb-4 text-sm text-danger">{data.processingError}</p> : null}
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <div className="relative flex min-h-48 items-center justify-center overflow-hidden rounded-md border border-ink bg-black">
+      <div className={`grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]${peek ? " pd-peek" : ""}`}>
+        <div className="min-w-0 pd-left">
+          <div className="pd-stage relative flex min-h-48 items-center justify-center overflow-hidden rounded-md border border-ink bg-black">
             {stageSrc && !stageReady ? <div className="absolute inset-0 animate-pulse bg-white/10" /> : null}
             {stageSrc ? (
               <img src={stageSrc} alt="" onLoad={() => setStageReady(true)} className={`max-h-[70vh] w-auto max-w-full object-contain ${stageReady ? "" : "opacity-0"}`} />
@@ -163,21 +172,21 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
               <p className="grid min-h-48 place-items-center text-sm text-white/70">{t("pd.noPreview")}</p>
             )}
           </div>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="pd-nav mt-3 flex items-center gap-2">
             <button type="button" className="btn min-h-12 min-w-12 px-4" aria-label={t("pd.prevAria")} onClick={() => setPreview((index) => (index - 1 + count) % Math.max(count, 1))}>{t("pd.prev")}</button>
             <p className="min-w-0 flex-1 text-center text-sm">{count ? t("pd.slideOf", { n: preview + 1, count }) : t("pd.processing")}</p>
             <button type="button" className="btn min-h-12 min-w-12 px-4" aria-label={t("pd.nextAria")} onClick={() => setPreview((index) => (index + 1) % Math.max(count, 1))}>{t("pd.next")}</button>
           </div>
-          <p className="mt-2 min-w-0 break-words text-sm [overflow-wrap:anywhere]" title={current?.fileName ?? ""}>{current?.fileName ?? ""}</p>
-          <label className="mt-4 grid w-full max-w-xs gap-1">
+          <p className="pd-current mt-2 min-w-0 break-words text-sm [overflow-wrap:anywhere]" title={current?.fileName ?? ""}>{current?.fileName ?? ""}</p>
+          <label className="pd-default mt-4 grid w-full max-w-xs gap-1">
             <span className="text-sm">{t("pd.defaultSecs")}</span>
             <input className="field w-full" type="number" min={3} max={3600} aria-label={t("pd.defaultSecsAria")} value={seconds} onChange={(event) => setSeconds(event.target.value)} />
           </label>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="pd-save mt-3 flex flex-wrap gap-2">
             <button type="button" className="btn btn-primary" onClick={() => void save()}>{t("pd.saveTimes")}</button>
-            <button type="button" className="btn btn-quiet text-danger" onClick={() => void remove()}>{t("ed.delete")}</button>
+            {peek ? null : <button type="button" className="btn btn-quiet text-danger" onClick={() => void remove()}>{t("ed.delete")}</button>}
           </div>
-          <div className="mt-4 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label={t("pd.slides")}>
+          <div className="pd-thumbs mt-4 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label={t("pd.slides")}>
             {data.slides.map((slide, index) => {
               const thumb = slideSrc(viewer, slide.thumbnailUrl ?? null, "thumb");
               return (
@@ -188,19 +197,20 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
             })}
           </div>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 pd-right">
           <h2 className="font-semibold mb-2">{t("pd.slideTimes")}</h2>
           <ul className="grid gap-3">
             {data.slides.map((slide, index) => (
-              <li key={slide.id} className="card min-w-0 p-3">
+              <li key={slide.id} className="card min-w-0 p-3 pd-row">
+                {peek ? <span className="pd-row-thumb" aria-hidden="true">{slideSrc(viewer, slide.thumbnailUrl ?? null, "thumb") ? <img src={slideSrc(viewer, slide.thumbnailUrl ?? null, "thumb") as string} alt="" /> : index + 1}</span> : null}
                 <p className="min-w-0 break-words font-medium [overflow-wrap:anywhere]" title={slide.fileName}>{index + 1}. {slide.fileName}</p>
                 <p className="text-xs text-muted">{slide.width && slide.height ? `${slide.width}×${slide.height}` : ""}</p>
-                <label className="mt-2 grid gap-1">
+                <label className="pd-row-secs mt-2 grid gap-1">
                   <span className="text-xs text-muted">{t("pd.secsBlank")}</span>
                   <input className="field w-full" type="number" min={3} max={3600} aria-label={t("pd.secsFor", { n: index + 1 })} value={overrides[slide.id] ?? ""}
                     onChange={(event) => setOverrides({ ...overrides, [slide.id]: event.target.value })} />
                 </label>
-                <label className="mt-2 flex min-w-0 items-center gap-2 text-sm">
+                <label className="pd-row-own mt-2 flex min-w-0 items-center gap-2 text-sm">
                   <input type="checkbox" className="size-4 shrink-0" checked={!!picked[slide.id]} aria-label={t("pd.select", { name: slide.fileName })}
                     onChange={(event) => setPicked({ ...picked, [slide.id]: event.target.checked })} />
                   <span className="min-w-0">{t("pd.onItsOwn")}</span>
@@ -208,7 +218,7 @@ export function PresentationDetailView({ id, fixture }: { id?: string; fixture?:
               </li>
             ))}
           </ul>
-          <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
+          <div className="pd-add mt-4 flex min-w-0 flex-wrap items-center gap-2">
             <select className="field w-full max-w-full sm:max-w-xs" aria-label={t("pd.playlistAria")} value={playlistId} onFocus={() => { if (!lists) void api<PlaylistSummary[]>("/api/playlists").then(setLists).catch(() => undefined); }} onChange={(event) => setPlaylistId(event.target.value)}>
               <option value="">{t("pd.choosePlaylist")}</option>
               {(lists ?? []).map((playlist) => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}
