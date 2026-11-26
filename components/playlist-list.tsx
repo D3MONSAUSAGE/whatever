@@ -9,8 +9,11 @@ import { useConfirm } from "@/components/confirm";
 import { IconList } from "@/components/icons";
 import { EmptyState, LoadState, PageHeader, useRequiredMessage } from "@/components/ui";
 import { makeT, type T } from "@/lib/i18n";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { OverflowMenu } from "@/components/peek/ui";
 
 export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary[]; pathOverride?: string }) {
+  const peek = usePeekWeb();
   const t = useT();
   const requiredMsg = useRequiredMessage();
   const live = useApi<PlaylistSummary[]>(fixture ? null : "/api/playlists");
@@ -133,11 +136,24 @@ export function Playlists({ fixture, pathOverride }: { fixture?: PlaylistSummary
                     </span>
                   </span>
                 </Link>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center pl-row-actions">
                   <span className={statusClass(playlist)}>{statusLabel(playlist, t)}</span>
+                  {peek ? (
+                    <>
+                      <Link href={`/dashboard/playlists/${playlist.id}`} className="btn btn-quiet pl-edit">{t("ed.edit")}</Link>
+                      {/* 19-R-Playlists (approved): Duplicate and Delete move into ⋯; same handlers and confirmation. */}
+                      <OverflowMenu label={t("screens.moreFor", { name: playlist.name })} items={[
+                        ...(workingId === playlist.id ? [] : [{ id: "duplicate", label: t("pl.duplicate"), onSelect: () => void duplicate(playlist) }]),
+                        { id: "delete", label: t("ed.delete"), danger: true, onSelect: () => void remove(playlist) },
+                      ]} />
+                    </>
+                  ) : (
+                    <>
                   <Link href={`/dashboard/playlists/${playlist.id}`} className="btn btn-quiet">{t("ed.edit")}</Link>
                   <button type="button" className="btn btn-quiet" disabled={workingId === playlist.id} onClick={() => duplicate(playlist)}>{t("pl.duplicate")}</button>
                   <button type="button" className="btn btn-quiet text-danger" onClick={() => remove(playlist)}>{t("ed.delete")}</button>
+                    </>
+                  )}
                 </div>
               </li>
             );
