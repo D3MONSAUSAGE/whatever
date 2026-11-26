@@ -1,5 +1,6 @@
 "use client";
 import { usePeekWeb } from "@/lib/peek-flag";
+import { screenList } from "@/lib/show-on-screens";
 import { lockedPublishRows, publishTargets, type PublishBoardRef } from "@/lib/peek-publish";
 /**
  * Premium menu templates: the gallery shown by "New menu board" and the guided editor
@@ -879,6 +880,15 @@ export function TemplateEditor({
   const stepNames = [t("tpl.step.business"), words.step, t("tpl.step.content"), t("tpl.step.look")];
   const styleName = engine === "classic" ? t("tpl.classicName") : engine === "layout" ? layoutName(doc.template, t) : design.name[L];
 
+  const saveDraftButton = engine === "classic" ? null : (
+    <button type="button" className="btn btn-quiet" disabled={busy !== null} data-testid="tpl-save-draft"
+      onClick={async () => { if (await save("draft")) toast.show(t("tpl.draftSaved")); }}>{busy === "draft" ? t("tpl.saving") : t("ls.saveDraft")}</button>
+  );
+  const publishButton = <button type="button" className="btn btn-primary" disabled={busy !== null || unreadySelectedVideo} data-testid="tpl-publish" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")}</button>;
+  // Peek "Showing on {names}": only connected displays whose playlist is this board's own playlist (05-ROUTES, the
+  // afterClassicSave rule); hidden when that list is empty or the board was never saved.
+  const showingOn = peek && board?.playlistId ? (displays ?? []).filter((d) => d.connected && d.playlist?.id === board.playlistId).map((d) => d.name).sort((x, y) => x.localeCompare(y)) : [];
+
   return (
     <section data-testid="template-editor" data-engine={engine} aria-labelledby="tpl-editor-title">
       <style>{STYLES}</style>
@@ -896,11 +906,8 @@ export function TemplateEditor({
             if (id) onAdvanced(id);
           }}>{t("tpl.advanced")}</button>
         )}
-        {engine === "classic" ? null : (
-          <button type="button" className="btn btn-quiet" disabled={busy !== null} data-testid="tpl-save-draft"
-            onClick={async () => { if (await save("draft")) toast.show(t("tpl.draftSaved")); }}>{busy === "draft" ? t("tpl.saving") : t("ls.saveDraft")}</button>
-        )}
-        <button type="button" className="btn btn-primary" disabled={busy !== null || unreadySelectedVideo} data-testid="tpl-publish" onClick={() => setPublishOpen(true)}>{engine === "classic" ? t("tpl.classicSave") : t("ls.publish")}</button>
+        {peek && showingOn.length ? <span className="tpl-showing-on" data-testid="tpl-showing-on">{t("peek.editor.showingOn", { names: screenList(showingOn, locale) })}</span> : null}
+        {peek ? <div className="tpl-actions" data-testid="tpl-actions">{saveDraftButton}{publishButton}</div> : <>{saveDraftButton}{publishButton}</>}
       </div>
       {engine === "classic" ? <p className="text-xs text-muted -mt-2 mb-3" data-testid="tpl-classic-note">{t("tpl.classicNote")}</p> : null}
       {progress ? <p className="text-sm text-muted mb-2" role="status">{progress}</p> : null}
@@ -943,9 +950,15 @@ export function TemplateEditor({
           {fit.clipped.length ? <p className="note-warn text-sm mt-2" role="status" data-testid="tpl-clipped">{t("ls.clippedNames", { names: fit.clipped.map((x) => `“${x}”`).join(", ") })}</p> : null}
         </div>
         <div className="tpl-form card p-4 grid gap-4 min-w-0">
-          <nav className="tpl-steps" aria-label={t("tpl.stepsAria")}>
+          <nav className={`tpl-steps${peek ? " is-peek" : ""}`} aria-label={t("tpl.stepsAria")}>
             {stepNames.map((label, i) => (
+              peek ? (
+                <button key={label} type="button" className={`tpl-step${i < step ? " is-done" : ""}`} aria-current={step === i ? "step" : undefined} onClick={() => setStep(i as Step)} data-testid={`tpl-step-${i}`}>
+                  <span className="tpl-step-dot" aria-hidden="true">{i < step ? "✓" : i + 1}</span><span className="tpl-step-label">{label}</span>
+                </button>
+              ) : (
               <button key={label} type="button" aria-current={step === i ? "step" : undefined} onClick={() => setStep(i as Step)} data-testid={`tpl-step-${i}`}>{i + 1}. {label}</button>
+              )
             ))}
           </nav>
 
