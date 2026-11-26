@@ -50,7 +50,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
   const uptime = fixture?.uptime ?? uptimeLive.data;
 
   return (
-    <section>
+    <section className="an-root">
       <PageHeader title={t("an.title")} icon={<IconChart />} lede={t("an.lede")} />
       {fixture ? null : <p className="-mt-2 mb-6 text-sm"><Link href="/dashboard/alerts" className="underline font-semibold">{t("an.offlineAlerts")}</Link> · <Link href="/dashboard/settings#alerts" className="underline">{t("an.alertSettings")}</Link></p>}
       {!summary ? (
@@ -62,7 +62,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
       ) : (
         <div className="grid gap-8">
           <div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="an-stats grid grid-cols-2 md:grid-cols-4 gap-3">
               <Stat icon={<IconTv />} label={t("an.screens")} value={summary.screens.total} />
               <Stat tone="live" label={t("an.online")} value={summary.screens.online} />
               <Stat tone="danger" label={t("an.offline")} value={summary.screens.offline} />
@@ -76,7 +76,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
             </p>
           </div>
 
-          <div>
+          <div className="an-sec">
             <h2 className="font-semibold mb-1">{t("an.onScreenTitle")}</h2>
             <p className="text-sm text-muted mb-3">{t("an.onScreenNote")}</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="playback-summary">
@@ -86,7 +86,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
             </div>
           </div>
 
-          <div>
+          <div className="an-sec an-rel">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h2 className="font-semibold">{t("an.reliability")}</h2>
               <div className="seg" role="group" aria-label={t("an.period")}>
@@ -96,7 +96,7 @@ export function AnalyticsScreen({ fixture }: { fixture?: AnalyticsFixture }) {
               </div>
             </div>
             {!uptime ? <LoadState error={uptimeLive.error} label={t("common.loading")} /> : (
-              <ul className="card divide-y divide-line overflow-hidden">
+              <ul className="an-rel-list card divide-y divide-line overflow-hidden">
                 {uptime.screens.map((s) => <ScreenRow key={s.id} screen={s} fixture={!!fixture} />)}
               </ul>
             )}
@@ -130,7 +130,8 @@ function Bars({ daily }: { daily: { date: string; uptimePct: number | null }[] }
     <div className="flex items-end gap-[2px] h-8" aria-hidden>
       {daily.map((d) => (
         <span key={d.date} title={`${d.date}: ${d.uptimePct === null ? t("an.noData") : `${d.uptimePct}%`}`}
-          className={`w-1.5 sm:w-2 rounded-sm ${d.uptimePct === null ? "bg-line" : d.uptimePct >= 95 ? "bg-live-strong" : d.uptimePct >= 50 ? "bg-amber-400" : "bg-danger"}`}
+          data-low={d.uptimePct !== null && d.uptimePct < 95 ? "1" : undefined}
+          className={`an-bar w-1.5 sm:w-2 rounded-sm ${d.uptimePct === null ? "bg-line" : d.uptimePct >= 95 ? "bg-live-strong" : d.uptimePct >= 50 ? "bg-amber-400" : "bg-danger"}`}
           style={{ height: `${d.uptimePct === null ? 15 : Math.max(10, d.uptimePct)}%` }} />
       ))}
     </div>
@@ -144,7 +145,7 @@ function ScreenRow({ screen, fixture }: { screen: UptimeReport["screens"][number
   return (
     <li data-screen={screen.id}>
       <button type="button" className="w-full text-left px-4 py-3 flex flex-wrap items-center gap-3 hover:bg-paper" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className={`size-2.5 rounded-full ${screen.online ? "bg-live" : "bg-danger"}`} aria-hidden />
+        <span className={`an-dot size-2.5 rounded-full ${screen.online ? "bg-live" : "bg-danger is-off"}`} aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="font-semibold block truncate">{screen.name}</span>
           <span className="text-xs text-muted">{t("an.lastSeen", { status: screen.online ? t("an.online") : t("an.offline"), when: when(screen.lastSeenAt) })}</span>
