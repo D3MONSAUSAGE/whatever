@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
 import { LanguageSelect } from "@/components/i18n/language-select";
@@ -25,7 +26,9 @@ const CARDS = [
 export default function AccountHub() {
   const t = useT();
   const developer = useDeveloperAccess();
-  const ent = useApi<EntitlementsStatus>("/api/entitlements");
+  // The sample-data /preview page has no session: skip the entitlements call there (it would send the visitor to /login).
+  const inPreview = usePathname() === "/preview";
+  const ent = useApi<EntitlementsStatus>(inPreview ? null : "/api/entitlements");
   const peek = usePeekWeb();
   return (
     <section className={`min-w-0 pb-28 lg:pb-0${peek ? " acct-hub" : ""}`}>
