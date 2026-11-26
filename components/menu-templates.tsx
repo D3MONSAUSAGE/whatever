@@ -1,4 +1,6 @@
 "use client";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { lockedPublishRows, publishTargets, type PublishBoardRef } from "@/lib/peek-publish";
 /**
  * Premium menu templates: the gallery shown by "New menu board" and the guided editor
  * (Business → Menu → Photos → Look). Behind the MENU_TEMPLATES rollout flag (lib/menu-templates-flag.ts).
@@ -440,7 +442,7 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
 
 export function TemplateEditor({
   menuId: initialMenuId, name: initialName, document: initialDoc, displays, brand, preview = false, onClose, onAdvanced, onSaved, onSplit,
-  unified = false, classic: initialClassic = null, onNewBoard, fixtureLibrary,
+  unified = false, classic: initialClassic = null, onNewBoard, fixtureLibrary, board = null,
 }: {
   menuId: string | null;
   name: string;
@@ -461,8 +463,11 @@ export function TemplateEditor({
   onNewBoard?: (document: LayoutDocument, name: string) => void;
   /** Preview harness only: the fixture media library, including videos. */
   fixtureLibrary?: AccountLibraryFile[];
+  /** The saved board's playlist and image, for the Peek publish dialog's locked rows (lib/peek-publish.ts). */
+  board?: PublishBoardRef;
 }) {
   const { locale, t } = useLocale();
+  const peek = usePeekWeb();
   const L = locale === "es" ? "es" : "en";
   const toast = useToast();
   const [doc, setDoc] = useState<LayoutDocument>(initialDoc);
@@ -478,6 +483,7 @@ export function TemplateEditor({
   const [publishOpen, setPublishOpen] = useState(false);
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const locked = lockedPublishRows(board, displays);
   const [published, setPublished] = useState(false);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -733,7 +739,8 @@ export function TemplateEditor({
       toast.show(t("tpl.videoUnreadyBlocked"), true);
       return;
     }
-    const ids = Object.keys(picked).filter((k) => picked[k]);
+    // Peek preview: rows that already show this board are locked (they update on publish) and never sent.
+    const ids = peek ? publishTargets(picked, locked) : Object.keys(picked).filter((k) => picked[k]);
     if (engine === "classic") {
       // One request: save, re-render and put the board on the ticked screens.
       const id = await save("publish", undefined, ids);
@@ -1342,11 +1349,16 @@ export function TemplateEditor({
             <p className="text-sm text-muted">{engine === "classic" ? t("tpl.classicPublishBody") : t("tpl.publishBody")}</p>
             {displays === null ? <p className="text-sm text-muted">{t("common.loading")}</p> : displays.length === 0 ? <p className="text-sm text-muted">{t("tpl.noScreens")}</p> : (
               <ul className="grid gap-2">
-                {displays.map((d) => (
+                {displays.map((d) => {
+                  const lock = peek ? locked.get(d.id) : undefined;
+                  return (
                   <li key={d.id}>
-                    <label className="flex items-center gap-3 p-3 rounded-xl border border-line min-h-11">
-                      <input type="checkbox" className="size-5" checked={!!picked[d.id]} onChange={(e) => setPicked({ ...picked, [d.id]: e.target.checked })} />
+                    <label className={`flex items-center gap-3 p-3 rounded-xl border border-line min-h-11${lock ? " pk-check-row is-locked" : ""}`} data-locked={lock ? "true" : undefined}>
+                      <input type="checkbox" className="size-5" checked={lock ? true : !!picked[d.id]} disabled={Boolean(lock)} aria-disabled={lock ? true : undefined}
+                        aria-describedby={lock ? `tpl-lock-${d.id}` : undefined}
+                        onChange={(e) => { if (!lock) setPicked({ ...picked, [d.id]: e.target.checked }); }} />
                       <span className="flex-1 min-w-0"><span className="font-semibold block break-words">{d.name}</span>
+                        {lock ? <span id={`tpl-lock-${d.id}`} className="block text-xs text-muted" data-testid="tpl-publish-locked" title={t("peek.publish.lockedHint")}>{t(lock.asleep ? "peek.publish.autoUpdatesAsleep" : "peek.publish.autoUpdates")}<span className="sr-only"> {t("peek.publish.lockedHint")}</span></span> : null}
                         {(d.orientation === "portrait") !== (orientationOf(doc) === "portrait") ? (
                           <span className="block text-xs text-muted" data-testid="tpl-publish-mismatch">{t(orientationOf(doc) === "portrait" ? "tpl.mismatchVerticalOnHorizontal" : "tpl.mismatchHorizontalOnVertical")}</span>
                         ) : null}
@@ -1354,14 +1366,15 @@ export function TemplateEditor({
                       <span className={`badge ${d.online ? "badge-live" : ""}`}>{d.online ? t("tpl.online") : t("tpl.offline")}</span>
                     </label>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
             <p className="text-xs text-muted">{t("tpl.publishNote")}</p>
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className="btn btn-quiet" onClick={() => setPublishOpen(false)}>{t("tpl.cancel")}</button>
               <button type="button" className="btn btn-primary" disabled={busy !== null || fit.dropped > 0 || czOverflow.length > 0} onClick={() => void publishTo()} data-testid="tpl-publish-confirm">
-                {busy === "publish" ? t("tpl.publishing") : engine === "classic" && !Object.values(picked).some(Boolean) ? t("tpl.classicSave") : t("tpl.publishN", { n: Object.values(picked).filter(Boolean).length })}
+                {busy === "publish" ? t("tpl.publishing") : peek ? t("ls.publish") : engine === "classic" && !Object.values(picked).some(Boolean) ? t("tpl.classicSave") : t("tpl.publishN", { n: Object.values(picked).filter(Boolean).length })}
               </button>
             </div>
           </div>
