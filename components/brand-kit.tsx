@@ -192,7 +192,7 @@ function BrandEditor({
   const footerParts = [form.phone?.trim(), form.website?.trim()].filter(Boolean);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,24rem)] items-start">
+    <div className="bk-root grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,24rem)] items-start">
       <style>{`
         ${fontFaceCss()}
       `}</style>
@@ -328,11 +328,11 @@ function BrandEditor({
 
       </section>
 
-      <aside className="card p-5 md:p-6" aria-label={t("bk.previewAria")}>
+      <aside className="bk-preview card p-5 md:p-6" aria-label={t("bk.previewAria")}>
         <h2 className="text-lg font-semibold">{t("bk.preview")}</h2>
         <p className="text-sm text-muted mt-1 mb-4">{t("bk.previewNote")}</p>
         <div
-          className="overflow-hidden rounded-xl border border-line shadow-sm flex flex-col"
+          className="bk-board overflow-hidden rounded-xl border border-line shadow-sm flex flex-col"
           style={{ aspectRatio: "16 / 9", background: backgroundColor, color: textColor }}
         >
           <div
