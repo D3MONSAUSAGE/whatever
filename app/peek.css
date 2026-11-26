@@ -380,6 +380,10 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
 .peek .su.pk-su h1, .peek .su.pk-su h2 { font-family: var(--pk-font-display); }
 .peek .su.pk-su h1 { font-weight: 900; }
 .peek .su.pk-su .su-header-row { min-height: 88px; }
+/* The lockup never shrinks below its 3.81:1 box; the "Have an account?" link wraps instead (ES at 390). */
+.peek .su.pk-su .su-brand { flex: none; }
+.pk-lockup { flex: none; max-width: none; }
+.peek .su.pk-su .su-signin { min-width: 0; text-align: right; }
 .peek .su.pk-su .su-signin { color: var(--pk-on-primary-tint); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .peek .su.pk-su .su-promise li { background: var(--pk-surface); border: var(--pk-outline) solid var(--pk-line); font-size: 13px; font-weight: 700; }
 .peek .su.pk-su .su-promise li::before { content: "● "; color: var(--pk-live); font-size: 10px; vertical-align: 2px; }
