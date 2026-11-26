@@ -5,13 +5,13 @@
  * Source: pekko-peek-web-handoff/tokens. Light by default; dark (build step 10) is opt-in with ?theme=dark while in QA.
  */
 
-@font-face { font-family: "Gabarito"; src: url("/peek/fonts/Gabarito-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
-@font-face { font-family: "Gabarito"; src: url("/peek/fonts/Gabarito-ExtraBold.woff2") format("woff2"); font-weight: 800; font-display: swap; }
-@font-face { font-family: "Gabarito"; src: url("/peek/fonts/Gabarito-Black.woff2") format("woff2"); font-weight: 900; font-display: swap; }
-@font-face { font-family: "Figtree"; src: url("/peek/fonts/Figtree-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Figtree"; src: url("/peek/fonts/Figtree-Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Figtree"; src: url("/peek/fonts/Figtree-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
-@font-face { font-family: "Figtree"; src: url("/peek/fonts/Figtree-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Gabarito"; src: url("./peek-fonts/Gabarito-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Gabarito"; src: url("./peek-fonts/Gabarito-ExtraBold.woff2") format("woff2"); font-weight: 800; font-display: swap; }
+@font-face { font-family: "Gabarito"; src: url("./peek-fonts/Gabarito-Black.woff2") format("woff2"); font-weight: 900; font-display: swap; }
+@font-face { font-family: "Figtree"; src: url("./peek-fonts/Figtree-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Figtree"; src: url("./peek-fonts/Figtree-Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Figtree"; src: url("./peek-fonts/Figtree-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Figtree"; src: url("./peek-fonts/Figtree-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
 
 /* ---------- Tokens (02-TOKENS.md, light) ---------- */
 .peek {
@@ -856,7 +856,10 @@ body.peek[data-theme="dark"] .ps-callout.is-bad { background: var(--pk-error-tin
 body.peek[data-theme="dark"] .stat-live { background: var(--pk-live-tint); border-color: var(--pk-live-line); }
 body.peek[data-theme="dark"] .pk-btn-primary:disabled,
 body.peek[data-theme="dark"] .btn-primary:disabled { opacity: .55; }
-body.peek[data-theme="dark"] img.pk-lockup { content: url("/peek/brand/pekko-lockup-dark.svg"); }
+.pk-lockup-pair { display: contents; }
+.pk-lockup-pair .pk-lockup-dark { display: none; }
+body.peek[data-theme="dark"] .pk-lockup-pair .pk-lockup-light { display: none; }
+body.peek[data-theme="dark"] .pk-lockup-pair .pk-lockup-dark { display: block; }
 body.peek[data-theme="dark"] .order-btn,
 body.peek[data-theme="dark"] .product-card,
 body.peek[data-theme="dark"] .product-edit,
