@@ -715,3 +715,48 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
 .peek .an-root .an-bar[data-low] { background: var(--pk-warning); }
 .peek .an-root .an-dot.is-off { background: var(--pk-offline); }
 .peek .an-root .an-stats > :nth-child(3) .bg-danger { background: var(--pk-offline); }
+
+/* ---- PR11: Account, Brand Kit, Settings, Delete account (boards 24, 25, 35-38). Restyle only. ---- */
+.peek .acct-hub .ps-hub-card h2 { font-size: 18px; margin-top: 2px; }
+.peek .acct-hub .acct-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; margin-bottom: 12px; background: var(--pk-accent); color: var(--pk-on-accent); border: var(--pk-outline) solid var(--pk-accent-ledge); }
+.peek .acct-hub .acct-icon svg { width: 20px; height: 20px; }
+@media (min-width: 1024px) {
+  .peek .acct-hub [data-testid="language-card"] { grid-column: span 3; flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 24px; }
+  .peek .acct-hub [data-testid="language-card"] > h2 { flex-basis: 100%; }
+  .peek .acct-hub [data-testid="language-card"] > p { flex: 1 1 0; margin-top: 0; }
+  .peek .acct-hub [data-testid="language-card"] > :last-child { margin-top: 0; }
+}
+
+.peek .bk-root h3 { font-family: var(--pk-font-display); font-weight: 800; font-size: 15px; color: var(--pk-text); }
+.peek .bk-root h2 { font-family: var(--pk-font-display); font-weight: 800; }
+@media (min-width: 1024px) { .peek .bk-root .bk-preview { position: sticky; top: calc(var(--pk-header) + 16px); } }
+.peek .bk-root .bk-board { border: 8px solid var(--pk-tv-bezel); border-radius: 18px; box-shadow: 0 var(--pk-ledge) 0 var(--pk-card-ledge); }
+
+/* Settings: CSS only, so the page's password, sign-out and name code is untouched. */
+.peek section:has(#pw-heading) { max-width: 1120px; }
+.peek section:has(#pw-heading) h2 { font-family: var(--pk-font-display); font-weight: 800; }
+.peek section:has(#pw-heading) a.card[data-testid="support-link"] { color: var(--pk-on-primary-tint); }
+.peek section:has(#pw-heading) a.card[data-testid="delete-account-link"] { color: var(--pk-error); border-color: var(--pk-error-line); }
+.peek section:has(#pw-heading) a.card[data-testid="support-link"]:hover,
+.peek section:has(#pw-heading) a.card[data-testid="delete-account-link"]:hover { background: var(--pk-surface2); }
+@media (min-width: 1100px) {
+  .peek section:has(#pw-heading) > .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-flow: row dense; align-items: start; }
+  .peek section:has(#pw-heading) > .grid > :nth-child(1),
+  .peek section:has(#pw-heading) > .grid > :nth-child(3),
+  .peek section:has(#pw-heading) > .grid > :nth-child(4),
+  .peek section:has(#pw-heading) > .grid > :nth-child(5),
+  .peek section:has(#pw-heading) > .grid > :nth-child(6),
+  .peek section:has(#pw-heading) > .grid > :nth-child(9) { grid-column: 1; }
+  .peek section:has(#pw-heading) > .grid > :nth-child(2),
+  .peek section:has(#pw-heading) > .grid > :nth-child(7),
+  .peek section:has(#pw-heading) > .grid > :nth-child(10) { grid-column: 2; }
+  .peek section:has(#pw-heading) > .grid > :nth-child(8) { grid-column: 2; grid-row: span 4; }
+}
+
+/* Delete account: CSS only (the deletion and sign-out code is untouched). */
+.peek div:has(> form #confirm), .peek div:has(> [data-testid="deletion-pending"]) { max-width: 36rem; }
+.peek [data-testid="deletion-pending"]::before {
+  content: ""; display: block; width: 56px; height: 56px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='14' width='52' height='40' rx='14' fill='%23FFC53D' stroke='%23251A3A' stroke-width='1.5'/%3E%3Crect x='25' y='55' width='14' height='5' rx='2.5' fill='%23FFC53D'/%3E%3Cpath d='M19 36Q24 40 29 36M35 36Q40 40 45 36' stroke='%23251A3A' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.peek [data-testid="deletion-pending"] > button:first-of-type { background: var(--pk-primary); color: var(--pk-on-primary); border-color: var(--pk-primary); box-shadow: 0 var(--pk-ledge) 0 var(--pk-primary-ledge); }
