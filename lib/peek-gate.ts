@@ -36,3 +36,24 @@ export function peekExcludedPath(path: string): boolean {
   const p = path.split("?")[0];
   return p === "/dashboard/staff" || p.startsWith("/dashboard/staff/");
 }
+
+/**
+ * Dark mode (build step 10), opt-in while it is in QA: inside the Peek preview only, `?theme=dark`, `?theme=system`
+ * (follow the device) or `?theme=light` sets the `pekko_peek_theme` cookie. With no choice the Peek UI stays light,
+ * because the boards were drawn in light mode and dark needs Francisco's QA pass before it becomes the default.
+ */
+export const PEEK_THEME_COOKIE = "pekko_peek_theme";
+export type PeekThemeChoice = "light" | "dark" | "system";
+
+export function peekThemeChoice(cookie: string, query: string | null): PeekThemeChoice {
+  const pick = (v: string | null | undefined): PeekThemeChoice | null => (v === "dark" || v === "light" || v === "system" ? v : null);
+  const fromQuery = pick(query);
+  if (fromQuery) return fromQuery;
+  const part = cookie.split(";").map((p) => p.trim()).find((p) => p.startsWith(`${PEEK_THEME_COOKIE}=`));
+  return pick(part?.slice(PEEK_THEME_COOKIE.length + 1)) ?? "light";
+}
+
+/** The data-theme value to put on <body>. `systemDark` is the device's prefers-color-scheme answer. */
+export function peekResolvedTheme(choice: PeekThemeChoice, systemDark: boolean): "light" | "dark" {
+  return choice === "system" ? (systemDark ? "dark" : "light") : choice;
+}

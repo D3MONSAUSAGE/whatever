@@ -2,7 +2,7 @@
  * Peek redesign (web dashboard + auth frame). Everything here is scoped to `.peek`, which is only added to <body>
  * while the preview flag is on (lib/peek-gate.ts) on a dashboard or sign-in page. With the flag off, or on the
  * marketing site, TV pages and Staff, no selector in this file matches anything.
- * Source: pekko-peek-web-handoff/tokens (light tokens only; dark mode is build step 10 and is not shipped yet).
+ * Source: pekko-peek-web-handoff/tokens. Light by default; dark (build step 10) is opt-in with ?theme=dark while in QA.
  */
 
 @font-face { font-family: "Gabarito"; src: url("/peek/fonts/Gabarito-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
@@ -40,6 +40,26 @@
   --font-sans: var(--pk-font-text); --font-display: var(--pk-font-display);
 
   background: var(--pk-bg); color: var(--pk-text); font-family: var(--pk-font-text);
+}
+
+/* ---------- Dark tokens (02-TOKENS.md; build step 10) ----------
+ * Opt-in while in QA: body gets data-theme="dark" only after ?theme=dark (or ?theme=system on a dark device),
+ * see peekThemeChoice in lib/peek-gate.ts. Core colours are exact; the web-only values (ledges, lines, scrim,
+ * toast) are the handoff's derived values and are part of the QA pass.
+ */
+body.peek[data-theme="dark"] {
+  color-scheme: dark;
+  --pk-bg: #171127; --pk-surface: #211936; --pk-surface2: #2C2246; --pk-text: #FBF4E8; --pk-muted: #B9AFCF; --pk-line: #382C56;
+  --pk-primary: #B9A6FF; --pk-on-primary: #1B1230; --pk-primary-tint: #32275A; --pk-on-primary-tint: #E7E0FF;
+  --pk-accent: #FFC53D; --pk-on-accent: #251A3A; --pk-accent-ink: #FFD36B;
+  --pk-live: #4FE0B0; --pk-live-ink: #8CF0CF; --pk-live-tint: #12382D;
+  --pk-warning: #FFCB5C; --pk-warning-tint: #3A2C0E; --pk-error: #FF8A80; --pk-error-tint: #3F1A1A;
+  --pk-offline: #B9AFCF; --pk-offline-tint: #2C2246; --pk-thumb-bg: #0B0B0E; --pk-eye-ink: #251A3A;
+  --pk-primary-ledge: #1B1230; --pk-accent-ledge: #0E0A18; --pk-danger-ledge: #3F1A1A; --pk-card-ledge: #382C56;
+  --pk-warning-line: #5A4516; --pk-live-line: #1D5A47; --pk-error-line: #6A2A2A; --pk-info-line: #4A3C80; --pk-offline-line: #3E3160;
+  --pk-skeleton: #2C2246; --pk-tv-bezel: #16141B; --pk-scrim: rgba(0,0,0,0.55); --pk-scrim-strong: rgba(0,0,0,0.65);
+  --pk-toast-bg: #FBF4E8; --pk-toast-text: #251A3A;
+  --color-primary-hover: #CDBEFF;
 }
 
 /* ---------- Existing unlayered classes: same properties, Peek values ---------- */
@@ -780,3 +800,71 @@ body:has(.pk-scrim) .pk-fab, body:has(.pk-sheet-scrim) .pk-fab, body:has(.ps-she
   .peek div:has(> #plans):has(> #screens) > [data-testid="english-only-note"] { grid-column: 1 / -1; }
   .peek div:has(> #plans):has(> #screens) > #screens { grid-column: 2; grid-row: span 3; position: sticky; top: calc(var(--pk-header) + 16px); }
 }
+
+/* ---- PR13: Dark mode (build step 10), opt-in with ?theme=dark while in QA ----
+ * Light-only colours that are hard-coded in globals.css, component <style> blocks and a few Tailwind utilities,
+ * re-pointed to the dark tokens. Only matches when body has data-theme="dark", so light Peek and the flag-off UI
+ * are unchanged. Board content (menus, promos, thumbnails, TV previews) keeps its own colours.
+ */
+body.peek[data-theme="dark"] .card,
+body.peek[data-theme="dark"] .btn-quiet,
+body.peek[data-theme="dark"] .field,
+body.peek[data-theme="dark"] .ps-menu,
+body.peek[data-theme="dark"] .ps-mtabs,
+body.peek[data-theme="dark"] .ps-sheet,
+body.peek[data-theme="dark"] .nc-panel,
+body.peek[data-theme="dark"] .tpl-card,
+body.peek[data-theme="dark"] .studio-title-input,
+body.peek[data-theme="dark"] .studio-selected-editor,
+body.peek[data-theme="dark"] .zone-group,
+body.peek[data-theme="dark"] .studio-panel,
+body.peek[data-theme="dark"] .template-thumb,
+body.peek[data-theme="dark"] .section-card,
+body.peek[data-theme="dark"] .item-card .item-name,
+body.peek[data-theme="dark"] .item-card .item-price,
+body.peek[data-theme="dark"] .item-card .item-desc,
+body.peek[data-theme="dark"] .studio-savebar,
+body.peek[data-theme="dark"] .color-swatch,
+body.peek[data-theme="dark"] .color-popover,
+body.peek[data-theme="dark"] .color-popover-row input[type="color"],
+body.peek[data-theme="dark"] .bg-white { background: var(--pk-surface); color: var(--pk-text); border-color: var(--pk-line); }
+body.peek[data-theme="dark"] .studio-toolbar,
+body.peek[data-theme="dark"] .nc-foot,
+body.peek[data-theme="dark"] .ps-form-card,
+body.peek[data-theme="dark"] .studio-select-hint { background: var(--pk-surface2); color: var(--pk-text); border-color: var(--pk-line); }
+body.peek[data-theme="dark"] .seg > button[aria-pressed="true"],
+body.peek[data-theme="dark"] .seg > button[aria-selected="true"],
+body.peek[data-theme="dark"] .segment button[aria-pressed="true"],
+body.peek[data-theme="dark"] .studio-v2m .studio-mtabs button[aria-pressed="true"] { background: var(--pk-primary-tint); color: var(--pk-on-primary-tint); }
+body.peek[data-theme="dark"] .ps-menu-item:hover,
+body.peek[data-theme="dark"] .ps-menu-item:focus-visible,
+body.peek[data-theme="dark"] .nc-row:hover,
+body.peek[data-theme="dark"] .nc-row:focus-visible { background: var(--pk-surface2); }
+body.peek[data-theme="dark"] .badge-warn,
+body.peek[data-theme="dark"] .note-warn,
+body.peek[data-theme="dark"] .studio-status-pill.is-dirty,
+body.peek[data-theme="dark"] .bg-amber-50 { background: var(--pk-warning-tint); color: var(--pk-warning); }
+body.peek[data-theme="dark"] .text-amber-900 { color: var(--pk-warning); }
+body.peek[data-theme="dark"] .border-amber-200 { border-color: var(--pk-warning-line); }
+body.peek[data-theme="dark"] .badge-danger,
+body.peek[data-theme="dark"] .note-error,
+body.peek[data-theme="dark"] .nc-bad,
+body.peek[data-theme="dark"] .section-remove:hover,
+body.peek[data-theme="dark"] .item-card .item-remove:hover { background: var(--pk-error-tint); color: var(--pk-error); }
+body.peek[data-theme="dark"] .stat-danger,
+body.peek[data-theme="dark"] .ps-callout.is-bad { background: var(--pk-error-tint); border-color: var(--pk-error-line); color: var(--pk-error); }
+body.peek[data-theme="dark"] .stat-live { background: var(--pk-live-tint); border-color: var(--pk-live-line); }
+body.peek[data-theme="dark"] .pk-btn-primary:disabled,
+body.peek[data-theme="dark"] .btn-primary:disabled { opacity: .55; }
+body.peek[data-theme="dark"] img.pk-lockup { content: url("/peek/brand/pekko-lockup-dark.svg"); }
+body.peek[data-theme="dark"] .order-btn,
+body.peek[data-theme="dark"] .product-card,
+body.peek[data-theme="dark"] .product-edit,
+body.peek[data-theme="dark"] .tpl-blank,
+body.peek[data-theme="dark"] .board-switch,
+body.peek[data-theme="dark"] .show-on-screens { background: var(--pk-surface); color: var(--pk-text); border-color: var(--pk-line); }
+body.peek[data-theme="dark"] .tpl-tag,
+body.peek[data-theme="dark"] .segment,
+body.peek[data-theme="dark"] .studio-mtabs { background: var(--pk-surface2); color: var(--pk-text); border-color: var(--pk-line); }
+/* bg-ink is used behind thumbnails; in dark the ink token is cream, so keep thumbnails on the thumbnail black. */
+body.peek[data-theme="dark"] .bg-ink { background: var(--pk-thumb-bg); }

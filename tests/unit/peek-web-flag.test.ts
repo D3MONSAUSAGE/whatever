@@ -60,8 +60,11 @@ describe("Peek CSS stays scoped", () => {
     const bad = selectors.filter((s) => !(s.startsWith(".peek") || s.startsWith("body.peek") || s.startsWith(".pk-") || s.startsWith("a.pk-") || s.startsWith("body:has(.pk-") || s.startsWith("body:has(.ps-sheet-wrap) .pk-") || s.startsWith("body:has(.ps-dialog-backdrop) .pk-") || s.startsWith("body:has([data-testid=\"confirm-dialog\"]) .pk-")));
     expect(bad).toEqual([]);
   });
-  it("does not ship dark mode yet (build step 10)", () => {
+  it("dark mode (build step 10) is opt-in: tokens only under body.peek[data-theme=\"dark\"], never from a media query", () => {
+    // The device preference is only followed after ?theme=system (lib/peek-flag.ts), so no CSS media query.
     expect(css).not.toMatch(/prefers-color-scheme/);
+    expect(css).toContain('body.peek[data-theme="dark"] {');
+    expect(css).toContain("--pk-bg: #171127;");
   });
 });
 
