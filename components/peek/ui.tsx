@@ -82,12 +82,12 @@ export function PeekField({ label, help, error, children }: { label: string; hel
 }
 
 /** One real input (inputmode numeric, one-time-code, maxlength 6) drawn as 6 boxes. Paste "483 920" works. */
-export function CodeInput({ value, onChange, label, invalid = false, describedBy, id, autoFocus }: { value: string; onChange: (v: string) => void; label: string; invalid?: boolean; describedBy?: string; id?: string; autoFocus?: boolean }) {
+export function CodeInput({ value, onChange, label, invalid = false, describedBy, id, autoFocus, required, inputProps }: { value: string; onChange: (v: string) => void; label: string; invalid?: boolean; describedBy?: string; id?: string; autoFocus?: boolean; required?: boolean; inputProps?: Pick<React.InputHTMLAttributes<HTMLInputElement>, "onInvalid" | "onInput"> }) {
   const [focused, setFocused] = useState(false);
   const digits = value.replace(/\D/g, "").slice(0, 6);
   return (
     <div className="pk-code" data-invalid={invalid || undefined}>
-      <input id={id} className="pk-code-input" aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={7} pattern="[0-9 ]*"
+      <input {...inputProps} id={id} required={required} className="pk-code-input" aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={7} pattern="[0-9 ]*"
         value={digits} aria-invalid={invalid || undefined} aria-describedby={describedBy} autoFocus={autoFocus}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))} />

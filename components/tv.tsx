@@ -3,6 +3,8 @@ import { IconTvOff } from "@/components/icons";
 import Link from "next/link";
 import { useEffect } from "react";
 import { timeAgo, type DisplayItem } from "@/lib/api";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { PeekScreenPill } from "@/components/peek/screen-pill";
 import { ONLINE_MS } from "@/lib/server/limits";
 import { useT } from "@/lib/i18n/client";
 import { makeT, type T } from "@/lib/i18n";
@@ -58,6 +60,8 @@ export function Tv({ display, onClick }: { display: DisplayItem; onClick?: () =>
 export function Status({ display }: { display: DisplayItem }) {
   const t = useT();
   const hint = onlineHint(t);
+  const peek = usePeekWeb();
+  if (peek) return <PeekScreenPill display={display} title={display.connected ? hint : undefined} />;
   if (!display.connected) return <span className="badge">{t("tv.waiting")}</span>;
   if (display.online) {
     return (

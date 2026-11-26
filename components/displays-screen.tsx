@@ -1,4 +1,6 @@
 "use client";
+import { usePeekWeb } from "@/lib/peek-flag";
+import { CodeInput, btnClass, OverflowMenu as PeekOverflowMenu } from "@/components/peek/ui";
 import { Dialog } from "@/components/dialog";
 import { useEffect, useRef, useState } from "react";
 import { api, useApi, type DisplayItem, type LocationItem, type MediaItem, type PlaylistSummary } from "@/lib/api";
@@ -48,6 +50,7 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
   const toast = useToast();
   const confirm = useConfirm();
   const t = useT();
+  const peek = usePeekWeb();
   const { locale } = useLocale();
   // After pairing, check every few seconds (even if this tab is behind the TV window) until the
   // new screen reports in, so the card flips from "Waiting" to "Online" by itself (QA B1-08).
@@ -185,10 +188,24 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
                       </select>
                     </label>
                   ) : null}
+                  {peek ? (
+                    // Peek preview: same actions and confirmations; secondary ones move into the ⋯ menu (sheet on phones).
+                    <div className="w-full flex items-center gap-2">
+                      <button type="button" className={btnClass("tint", "default", "flex-1")} onClick={() => setPicking(display)}>{t("disp.changeImage")}</button>
+                      <PeekOverflowMenu label={t("screens.moreFor", { name: display.name })} items={[
+                        { id: "assign", label: t("disp.assignHere"), onSelect: () => setAssigning([display.id]) },
+                        { id: "rename", label: t("disp.rename"), onSelect: () => { void rename(display); } },
+                        { id: "disconnect", label: t("disp.disconnect"), danger: true, onSelect: () => { void disconnect(display); } },
+                      ]} />
+                    </div>
+                  ) : (
+                  <>
                   <button type="button" className="btn btn-primary" onClick={() => setPicking(display)}>{t("disp.changeImage")}</button>
                   <button type="button" className="btn btn-quiet" onClick={() => setAssigning([display.id])}>{t("disp.assignHere")}</button>
                   <button type="button" className="btn btn-quiet" onClick={() => rename(display)}>{t("disp.rename")}</button>
                   <button type="button" className="btn btn-quiet text-danger" onClick={() => disconnect(display)}>{t("disp.disconnect")}</button>
+                  </>
+                  )}
                 </>
               } />
             </li>
@@ -224,6 +241,7 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
   const [busy, setBusy] = useState(false);
   const t = useT();
   const requiredMsg = useRequiredMessage();
+  const peek = usePeekWeb();
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -243,7 +261,7 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
     }
   }
   return (
-    <form id="add-screen" onSubmit={submit} className="card p-4 md:p-5 scroll-mt-20 md:scroll-mt-4" aria-labelledby="add-screen-title">
+    <form id="add-screen" onSubmit={submit} className={`card p-4 md:p-5 scroll-mt-20 md:scroll-mt-4${peek ? " pk-pair" : ""}`} aria-labelledby="add-screen-title">
       <h2 id="add-screen-title" className="font-semibold">{t("disp.addTitle")}</h2>
       <ol className="mt-2 mb-4 grid gap-2 text-sm text-muted list-decimal pl-5">
         <li>{t("disp.step1")}
@@ -252,10 +270,13 @@ function PairForm({ names, onPaired, onSubmitting, onError }: { names: string[];
         <li>{t("disp.step2")}</li>
         <li>{t("disp.step3a")} <strong className="text-ink">{t("disp.connectTv")}</strong>. {t("disp.step3b")}</li>
       </ol>
-      <div className="grid gap-3 lg:grid-cols-[10rem_1fr_auto]">
+      <div className={peek ? "grid gap-3 lg:grid-cols-[auto_1fr_auto] lg:items-center pk-pair-row" : "grid gap-3 lg:grid-cols-[10rem_1fr_auto]"}>
+        {/* Peek preview: the same single input drawn as 6 boxes (03-COMPONENTS). The server normalizes either form. */}
+        {peek ? <CodeInput value={code} onChange={setCode} label={t("disp.codeLabel")} required inputProps={requiredMsg} /> : (
         <input className="field text-xl tracking-[0.2em] font-semibold" inputMode="numeric" autoComplete="one-time-code"
           placeholder="123 456" maxLength={7} required {...requiredMsg} value={code}
           onChange={(event) => setCode(event.target.value.replace(/[^\d ]/g, ""))} aria-label={t("disp.codeLabel")} />
+        )}
         <input className="field" placeholder={t("disp.namePlaceholder")} maxLength={60} required {...requiredMsg}
           value={name} onChange={(event) => setName(event.target.value)} aria-label={t("disp.tvName")} />
         <button className="btn btn-primary" disabled={busy}>{busy ? t("disp.connectingShort") : t("disp.connectTv")}</button>
