@@ -20,7 +20,7 @@ describe("published legal pages", () => {
   it("uses the authorized operator, address, mailbox, and refund policy", () => {
     expect(LEGAL_OPERATOR).toBe("Francisco Lopez, a sole proprietor doing business as Pekko");
     expect(LEGAL_UPDATED).toBe("November 21, 2026");
-    expect(LEGAL_PRIVACY_UPDATED).toBe("November 19, 2026");
+    expect(LEGAL_PRIVACY_UPDATED).toBe("November 28, 2026");
     expect(LEGAL_ADDRESS).toBe("20227 Saticoy St, Apt 202, Winnetka, CA 91306, US");
     expect(SUPPORT_EMAIL).toBe("support@pekkotv.com");
     expect(REFUND_POLICY).toMatch(/not refunded for unused time/);
@@ -62,9 +62,10 @@ describe("published legal pages", () => {
     expect(privacy).toMatch(/first-party cookie and your browser/);
     expect(privacy).toMatch(/we do not overwrite it later/);
     expect(privacy).toMatch(/The copy on your account is deleted when your account is deleted/);
-    expect(privacy).toMatch(/we don&apos;t use advertising pixels or third-party analytics scripts/);
+    expect(privacy).toMatch(/we don&apos;t use advertising pixels. We do use one third-party analytics service, HeyCatch, described below./);
     expect(privacy).toMatch(/measure which ads and channels bring new sign-ups/);
-    expect(privacy).toMatch(/does not include an advertising network or a third-party website-analytics script/);
+    expect(privacy).toMatch(/does not include an advertising network. It uses two kinds of website analytics/);
+    expect(privacy).toMatch(/HeyCatch/);
     expect(privacy).toMatch(/not a promise that every backup/);
     expect(privacy).toMatch(/not a guarantee that all processing stays/);
     expect(privacy).toMatch(/not a claim of compliance/);

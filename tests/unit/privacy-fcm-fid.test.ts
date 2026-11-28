@@ -22,7 +22,7 @@ describe("Privacy: Firebase push token and installation ID", () => {
     expect(t).toContain("Mobile push. If you use the Pekko app and the device allows notifications, a push token for that device. To deliver notifications, Google's Firebase software in the app also creates a Firebase installation ID on the device and shares it with Google; Pekko does not store or use that ID.");
     expect(t).toContain("It receives the push token, the Firebase installation ID and the notification content.");
     expect(t).toContain("Allow or refuse mobile notifications on the device, or turn push alerts off in Pekko Settings. A push token is stored only when notifications are used.");
-    expect(snap.dateLine).toBe("Effective November 19, 2026. Last updated November 19, 2026.");
+    expect(snap.dateLine).toBe("Effective November 28, 2026. Last updated November 28, 2026.");
   });
   it("ES has the same three disclosures (usted) and the current privacy date", async () => {
     cookieLocale = "es";
@@ -32,7 +32,7 @@ describe("Privacy: Firebase push token and installation ID", () => {
     expect(t).toContain("el software Firebase de Google incluido en la app también crea un ID de instalación de Firebase en el dispositivo y lo comparte con Google; Pekko no almacena ni usa ese ID.");
     expect(t).toContain("Recibe el token push, el ID de instalación de Firebase y el contenido de la notificación.");
     expect(t).toContain("o desactive las alertas push en Configuración de Pekko.");
-    expect(JSON.stringify(snap)).toContain("19 de noviembre de 2026");
+    expect(JSON.stringify(snap)).toContain("28 de noviembre de 2026");
     expect(t).not.toMatch(/\b(tú|puedes|desactiva)\b/);
     void html;
   });
