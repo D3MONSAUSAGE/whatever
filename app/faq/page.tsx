@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { HeyCatchAnalytics } from "@/components/site/heycatch-analytics";
 import { marketingPeek } from "@/lib/home-variant";
 import { PeekPage } from "@/components/site/peek/shell";
 import { PeekFaqPage } from "@/components/site/peek/pages";
@@ -22,6 +23,7 @@ export default async function Faq() {
   if (marketingPeek()) {
     return (
       <PeekPage base="/faq">
+        <HeyCatchAnalytics />
         <FaqStructuredData locale={locale} t={t} />
         <PeekFaqPage />
       </PeekPage>
@@ -29,6 +31,7 @@ export default async function Faq() {
   }
   return (
     <PublicPage bare theme="dark">
+      <HeyCatchAnalytics />
       <FaqStructuredData locale={locale} t={t} />
       <section className="px-5 pt-16 md:pt-24 pb-6 text-center mk-rise">
         <p className="mk-eyebrow">{t("home.faqEyebrow")}</p>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PublicPage } from "@/components/public-page";
+import { HeyCatchAnalytics } from "@/components/site/heycatch-analytics";
 import { TRIAL } from "@/lib/plans";
 import { sampleCopy } from "@/lib/marketing-samples";
 import { marketingHref, marketingMetadata } from "@/lib/seo";
@@ -28,6 +29,7 @@ export default async function Home() {
   if (variant === "peek") {
     return (
       <PeekPage base="/">
+        <HeyCatchAnalytics />
         <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_REDIRECT }} />
         <HomeStructuredData locale={locale} t={t} />
         <HomePeek t={t} locale={locale} href={href} />
@@ -36,6 +38,7 @@ export default async function Home() {
   }
   return (
     <PublicPage bare theme="dark">
+      <HeyCatchAnalytics />
       <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_REDIRECT }} />
       <HomeStructuredData locale={locale} t={t} />
       {variant === "classic"
