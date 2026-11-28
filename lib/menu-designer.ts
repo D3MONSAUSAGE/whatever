@@ -175,6 +175,7 @@ export type GalleryEntry =
 
 const DESIGN_STRUCTURE: Record<MenuDesign["composition"], Structure> = {
   showcase: "media", columns: "columns", promo: "media", list: "columns", cards: "cards", featured: "cards",
+  showcaseLeft: "media", editorial: "media", spotlight: "media", timetable: "media",
 };
 
 /** The original layouts, in the order the previous layout picker showed them (option ids match LAYOUT_OPTIONS). */

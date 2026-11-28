@@ -52,12 +52,20 @@ describe("existing boards are untouched", () => {
 });
 
 describe("template library", () => {
-  it("has 38 templates: the 22 food templates (18 + 4 photo templates) and 16 non-food templates, including the three approved designs", () => {
-    expect(MENU_DESIGNS.length).toBe(38);
+  it("has 42 templates: the 22 food templates (18 + 4 photo templates), 16 non-food templates and the 4 premium service templates", () => {
+    expect(MENU_DESIGNS.length).toBe(42);
     expect(MENU_DESIGNS.filter((d) => ["restaurant", "cafe", "fast", "bar", "sweets"].includes(d.business))).toHaveLength(22);
+    // The approved premium service templates (salon, retail, fitness), last, in every approved colour style.
+    expect(MENU_DESIGNS.slice(38).map((d) => [d.id, d.business, d.variants.map((v) => v.id)])).toEqual([
+      ["luxury-barbershop", "salon", ["noir", "bone", "oxblood"]],
+      ["boutique-promotion", "retail", ["stone", "sage", "noir"]],
+      ["product-spotlight", "retail", ["stone", "sage", "noir"]],
+      ["modern-gym", "fitness", ["volt", "signal", "ice"]],
+    ]);
     expect(new Set(MENU_DESIGNS.map((d) => d.id)).size).toBe(MENU_DESIGNS.length);
     for (const id of ["modern-restaurant", "coffee-shop", "bold-fast-casual"]) expect(designById(id), id).not.toBeNull();
     for (const business of ["restaurant", "cafe", "fast", "bar", "sweets"] as const) expect(filterDesigns(business, "all").length, business).toBeGreaterThanOrEqual(2);
+    for (const business of ["salon", "retail", "fitness"] as const) expect(filterDesigns(business, "all").length, business).toBeGreaterThanOrEqual(1);
     for (const style of ["dark", "light", "bold"] as const) expect(filterDesigns("all", style).length, style).toBeGreaterThanOrEqual(4);
     expect(filterDesigns("cafe", "light").every((d) => d.business === "cafe" && d.style === "light")).toBe(true);
   });
@@ -77,8 +85,9 @@ describe("template library", () => {
       if (design.stock) expect(STOCK_PHOTOS).toContain(design.stock);
       expect(design.variants.length).toBeGreaterThanOrEqual(2);
       // Realistic content: every template ships with real items and prices, no placeholders. Menus are full;
-      // non-food boards (welcome screens, recognition) carry fewer, larger lines.
-      expect(items, design.id).toBeGreaterThanOrEqual(design.terms ? 6 : 8);
+      // non-food boards carry fewer, larger lines; the premium service boards ship their approved, shorter lists.
+      const premium = ["showcaseLeft", "editorial", "spotlight", "timetable"].includes(design.composition);
+      expect(items, design.id).toBeGreaterThanOrEqual(premium ? 4 : design.terms ? 6 : 8);
       expect(JSON.stringify(doc)).not.toMatch(/lorem|placeholder|item name/i);
     }
     const scratch = parseLayout(scratchDocument());
@@ -253,9 +262,16 @@ describe("server-rendered TV image", () => {
       if (!designHasMedia(design)) { expect(comp).toBeNull(); continue; }
       expect(comp?.video?.box, design.id).toBeTruthy();
       const box = comp!.video!.box;
-      const menuRight = { showcase: 1140, columns: 1344, promo: 1260, list: 1920, cards: 1920, featured: 1920 }[design.composition];
-      expect(box.x, design.id).toBeGreaterThanOrEqual(menuRight);
-      expect(box.x + box.w).toBeLessThanOrEqual(1920);
+      // The video must stay inside the photo area of each composition (text never sits under it).
+      const photoArea: Record<string, [number, number]> = {
+        showcase: [1140, 1920], columns: [1344, 1920], promo: [1260, 1920], list: [1920, 1920], cards: [1920, 1920], featured: [1920, 1920],
+        showcaseLeft: [0, 760], editorial: [0, 840], spotlight: [650, 1270], timetable: [760, 1920],
+      };
+      const [from, to] = photoArea[design.composition];
+      expect(box.x, design.id).toBeGreaterThanOrEqual(from);
+      expect(box.x + box.w, design.id).toBeLessThanOrEqual(to);
+      // Forge's offer block sits on the photo's top right: the video starts below it.
+      if (design.composition === "timetable") expect(box.y, design.id).toBeGreaterThanOrEqual(96 + 300);
       expect(box.y + box.h).toBeLessThanOrEqual(1080);
     }
   });

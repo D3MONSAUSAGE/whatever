@@ -1717,6 +1717,8 @@ export const en = {
   "tpl.itemDetail": "Item {n} detail",
   "tpl.photoTipAny": "Tip: tap the photo square to add a photo to any item.",
   "tpl.itemPhotosWhereAny": "Photos for single items are added in step 2: tap the photo square beside an item.",
+  "tpl.timeNote": "Put each class time in the Time field, for example 6:00 or 5:30 pm. Classes show in the order you list them.",
+  "tpl.spotlightNote": "The first item is the featured product (name, details and price). The other items appear as its highlights.",
   "tpl.itemDesc": "Item {n} description",
   "tpl.moveItemUp": "Move item {n} up",
   "tpl.moveItemDown": "Move item {n} down",
@@ -2151,6 +2153,8 @@ export const en = {
   "font.montserrat.hint": "Wide and modern",
   "font.bebas-neue.hint": "All capitals, bold signage",
   "font.lobster.hint": "Friendly script",
+  "font.cormorant-garamond.hint": "Refined, high-contrast serif",
+  "font.playfair-display.hint": "Editorial display serif",
 
   // I18N-3: Layout Studio (more)
   "ls.browserCopy": "This browser copy does not write an account.",

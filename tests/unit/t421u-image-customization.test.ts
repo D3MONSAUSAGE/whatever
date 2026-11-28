@@ -20,7 +20,9 @@ import { renderLayoutPng } from "@/lib/server/layout-render";
 const PHOTO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const FOOD = MENU_DESIGNS.filter((d) => !d.terms);
-const NON_FOOD = MENU_DESIGNS.filter((d) => d.terms);
+// Premium service templates draw their own compositions (tests/unit/service-templates.test.ts); same photo-size rules.
+const PREMIUM = MENU_DESIGNS.filter((d) => ["showcaseLeft", "editorial", "spotlight", "timetable"].includes(d.composition));
+const NON_FOOD = MENU_DESIGNS.filter((d) => d.terms && !PREMIUM.includes(d));
 const ORIENTATIONS = ["landscape", "portrait"] as const;
 const LAYOUTS: LayoutTemplate[] = ["menu-promo-67", "triple-column", "split-50", "menu-banner", "signature", "two-menu-promo", "two-column"];
 
@@ -123,9 +125,9 @@ describe("t421u item photo size: rendering", () => {
     }
   });
 
-  for (const [label, list] of [["22 food templates", FOOD], ["16 non-food templates", NON_FOOD]] as const) {
+  for (const [label, list] of [["22 food templates", FOOD], ["16 non-food templates", NON_FOOD], ["4 premium service templates", PREMIUM]] as const) {
     it(`${label}: Medium/Large never drop an item or price, never shrink text past 88% of Small, and report what was drawn`, () => {
-      expect(list.length).toBe(label.startsWith("22") ? 22 : 16);
+      expect(list.length).toBe(Number(label.split(" ")[0]));
       for (const d of list) for (const o of ORIENTATIONS) for (const make of [withPhotos, dense, longText]) {
         const doc = { ...orient(existing(make(designDocument(d))), o) };
         const small = render(sized(doc, "small"));

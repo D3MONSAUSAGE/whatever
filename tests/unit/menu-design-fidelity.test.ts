@@ -38,7 +38,7 @@ describe("template boards: browser preview vs server PNG", () => {
     if (!browser) return ctx.skip("Chromium is not available");
     mkdirSync(FIDELITY_OUT, { recursive: true });
     const faces = BOARD_FONTS.flatMap((font) => font.files.map((face) =>
-      `@font-face{font-family:"${font.family}";src:url(data:font/ttf;base64,${readFileSync(resolve("assets/fonts", face.file)).toString("base64")});font-weight:${font.files.length === 1 ? "100 900" : face.weight}}`)).join("");
+      `@font-face{font-family:"${font.family}";src:url(data:font/ttf;base64,${readFileSync(resolve("assets/fonts", face.file)).toString("base64")});font-weight:${font.files.filter((x) => !x.italic).length === 1 && !face.italic ? "100 900" : face.weight};font-style:${face.italic ? "italic" : "normal"}}`)).join("");
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     const results: Record<string, { mean: number; changed: number }> = {};
     // Every template as shipped, plus text templates carrying an owner's item photo (the Burrata regression).

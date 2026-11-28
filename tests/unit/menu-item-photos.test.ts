@@ -439,8 +439,8 @@ describe("guided editor wiring and languages", () => {
     expect(s).not.toContain("tpl-show-photos");
     expect(s).not.toContain("tpl-dialog-hidden");
   });
-  it("has 38 templates (22 food, 16 non-food) including the four photo templates", () => {
-    expect(MENU_DESIGNS).toHaveLength(38);
+  it("has 42 templates (22 food, 16 non-food, 4 premium service) including the four photo templates", () => {
+    expect(MENU_DESIGNS).toHaveLength(42);
     for (const id of ["photo-menu-grid", "cafe-favorites", "taqueria-specials", "featured-dishes"]) expect(isPhotoDesign(designById(id)!), id).toBe(true);
     expect(MENU_DESIGNS.filter(isPhotoDesign)).toHaveLength(4);
   });

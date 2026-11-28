@@ -15,7 +15,10 @@ import { createFakeDb, type Store } from "./fake-db";
  */
 const previousFlag = process.env.LAYOUT_STUDIO;
 const A = "11111111-1111-4111-8111-111111111111";
-const NON_FOOD = MENU_DESIGNS.filter((d) => ["salon", "retail", "fitness", "office", "pets"].includes(d.business));
+// The 16 non-food templates on the shared compositions; the premium service templates (own compositions)
+// run the same flows in tests/api/unified-editor-flows.test.ts.
+const PREMIUM = ["showcaseLeft", "editorial", "spotlight", "timetable"];
+const NON_FOOD = MENU_DESIGNS.filter((d) => ["salon", "retail", "fitness", "office", "pets"].includes(d.business) && !PREMIUM.includes(d.composition));
 let store: Store;
 
 function req(url: string, token: string, init: RequestInit = {}) {

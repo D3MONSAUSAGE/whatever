@@ -86,14 +86,27 @@ export function designColors(doc: LayoutDocument, design: MenuDesign): DesignCol
     { key: "headings", ratio: contrast(accent.color, paper), adjusted: accent.adjusted },
     { key: "prices", ratio: contrast(priceInk, priceBg), adjusted: tag.adjusted },
   ];
-  if (design.composition !== "showcase") checks.push({ key: "feature", ratio: contrast(panelInk, panel), adjusted: panelFix.adjusted });
+  if (design.composition !== "showcase" && design.composition !== "showcaseLeft") checks.push({ key: "feature", ratio: contrast(panelInk, panel), adjusted: panelFix.adjusted });
   return { paper, ink: ink.color, muted: muted.color, accent: accent.color, panel, panelInk, tag: tag.color, tagInk, priceInk, checks };
 }
 
 /* ---------------- text measurement from the font files ---------------- */
 
-function metricsFor(family: string, weight: number) {
-  const keys = Object.keys(FONT_METRICS).filter((k) => k.startsWith(`${family}|`));
+// Text is measured thousands of times per board; the face lookup is pure, so it is cached per family/weight/style.
+const metricsCache = new Map<string, (typeof FONT_METRICS)[string]>();
+function metricsFor(family: string, weight: number, italic = false) {
+  const cacheKey = `${family}|${weight}|${italic ? "i" : ""}`;
+  const hit = metricsCache.get(cacheKey);
+  if (hit) return hit;
+  const found = findMetrics(family, weight, italic);
+  metricsCache.set(cacheKey, found);
+  return found;
+}
+function findMetrics(family: string, weight: number, italic: boolean) {
+  // Italic faces are keyed "Family|weight|i"; a family without italics measures with its upright faces.
+  const all = Object.keys(FONT_METRICS).filter((k) => k.startsWith(`${family}|`));
+  const italics = all.filter((k) => k.endsWith("|i"));
+  const keys = italic && italics.length ? italics : all.filter((k) => !k.endsWith("|i"));
   if (!keys.length) return FONT_METRICS["Inter|400"];
   let best = keys[0]; let gap = Infinity;
   for (const key of keys) {
@@ -103,27 +116,27 @@ function metricsFor(family: string, weight: number) {
   }
   return FONT_METRICS[best];
 }
-export function textWidth(value: string, size: number, family: string, weight: number, tracking = 0) {
-  const m = metricsFor(family, weight);
+export function textWidth(value: string, size: number, family: string, weight: number, tracking = 0, italic = false) {
+  const m = metricsFor(family, weight, italic);
   let units = 0; let count = 0;
   for (const ch of value) { units += m[ch] ?? m.n ?? 550; count += 1; }
   return (units * size) / 1000 + tracking * size * count;
 }
-function ellipsize(value: string, size: number, family: string, weight: number, max: number, tracking = 0) {
-  if (textWidth(value, size, family, weight, tracking) <= max) return value;
+function ellipsize(value: string, size: number, family: string, weight: number, max: number, tracking = 0, italic = false) {
+  if (textWidth(value, size, family, weight, tracking, italic) <= max) return value;
   const chars = [...value];
-  while (chars.length > 1 && textWidth(`${chars.join("").trimEnd()}…`, size, family, weight, tracking) > max) chars.pop();
+  while (chars.length > 1 && textWidth(`${chars.join("").trimEnd()}…`, size, family, weight, tracking, italic) > max) chars.pop();
   return `${chars.join("").trimEnd()}…`;
 }
 /** Greedy word wrap into at most maxLines; the last line ends in "…" only when the text truly does not fit. */
-export function wrapText(value: string, size: number, family: string, weight: number, max: number, maxLines: number, tracking = 0): string[] {
+export function wrapText(value: string, size: number, family: string, weight: number, max: number, maxLines: number, tracking = 0, italic = false): string[] {
   const words = value.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
   for (let index = 0; index < words.length; index++) {
     const word = words[index];
     const next = line ? `${line} ${word}` : word;
-    if (textWidth(next, size, family, weight, tracking) <= max || !line) {
+    if (textWidth(next, size, family, weight, tracking, italic) <= max || !line) {
       line = next;
       continue;
     }
@@ -135,7 +148,7 @@ export function wrapText(value: string, size: number, family: string, weight: nu
     }
   }
   if (line) lines.push(line);
-  return lines.slice(0, maxLines).map((l, i, all) => (i === all.length - 1 ? ellipsize(l, size, family, weight, max, tracking) : ellipsize(l, size, family, weight, max, tracking)));
+  return lines.slice(0, maxLines).map((l) => ellipsize(l, size, family, weight, max, tracking, italic));
 }
 
 /* ---------------- svg helpers ---------------- */
@@ -144,13 +157,14 @@ function esc(value: string) {
   return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 }
 const n = (v: number) => (Math.round(v * 10) / 10).toString();
-type TextOpts = { size: number; family: string; weight: number; fill: string; anchor?: "start" | "end" | "middle"; tracking?: number; opacity?: number; transform?: string };
+type TextOpts = { size: number; family: string; weight: number; fill: string; anchor?: "start" | "end" | "middle"; tracking?: number; opacity?: number; transform?: string; italic?: boolean };
 function text(x: number, y: number, value: string, o: TextOpts) {
   const ls = o.tracking ? ` letter-spacing="${n(o.tracking * o.size)}"` : "";
   const anchor = o.anchor && o.anchor !== "start" ? ` text-anchor="${o.anchor}"` : "";
   const op = o.opacity != null && o.opacity < 1 ? ` fill-opacity="${o.opacity}"` : "";
   const tf = o.transform ? ` transform="${o.transform}"` : "";
-  return `<text x="${n(x)}" y="${n(y)}" font-family="${esc(o.family)}" font-size="${n(o.size)}" font-weight="${o.weight}" fill="${o.fill}"${ls}${anchor}${op}${tf}>${esc(value)}</text>`;
+  const it = o.italic ? ` font-style="italic"` : "";
+  return `<text x="${n(x)}" y="${n(y)}" font-family="${esc(o.family)}" font-size="${n(o.size)}" font-weight="${o.weight}"${it} fill="${o.fill}"${ls}${anchor}${op}${tf}>${esc(value)}</text>`;
 }
 function rect(x: number, y: number, w: number, h: number, fill: string, extra = "") {
   return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}"${extra ? ` ${extra}` : ""}/>`;
@@ -765,6 +779,7 @@ function fitPhotos(
 export function designVideoBox(doc: LayoutDocument): ZoneBox | null {
   const design = designById(doc.design);
   if (!design) return null;
+  if (design.composition === "showcaseLeft" || design.composition === "editorial" || design.composition === "spotlight" || design.composition === "timetable") return onCanvas(doc, () => serviceVideoBox(doc, design));
   if (orientationOf(doc) === "portrait") return onCanvas(doc, () => portraitVideoBox(doc, design));
   // The owner's featured media size moves the video exactly as it moves the photo (same mediaLeft as the renderer).
   const active = activeCustom(doc);
@@ -1267,6 +1282,707 @@ function featuredCards(parts: string[], picks: LayoutItem[], panel: { x: number;
   });
 }
 
+/* ---------------- service templates: Noir & Co., Linden, Forge ----------------
+ * Four compositions for salons, retail and fitness (approved designs). Same contracts as the menu compositions:
+ * text is fitted from font metrics (preview = TV), nothing is cut silently (dropped items are reported), owner
+ * customization (sizes, weights, media size, focal point) applies, and every editable area records its region.
+ */
+
+type F2 = { head: string; body: string };
+
+/** Light text on a darkened photo: the accent lifted until it reads on near-black. */
+function onPhotoAccent(c: DesignColors) { return readableOn(c.accent, "#141414", 4.5).color; }
+const PHOTO_INK = "#f4ede2";
+
+/** Section heading in the service style (small tracked capitals). Returns the y below it. */
+function serviceHead(parts: string[], sec: PlacedSection, st: Style, x: number, y: number, w: number, color: string, ruleColor: string | null) {
+  if (!sec.name) return y;
+  const hs = sec.head ?? st.section;
+  const label = sec.name.toUpperCase();
+  const shown = ellipsize(label, hs.size, st.section.family, hs.weight, w, st.section.tracking);
+  note("menu", label, shown);
+  const si = sec.src && run ? run.sections.get(sec.src) : undefined;
+  if (si != null && run) addRegion(sectionRegion(run.doc.sections[si] ?? sec.src!, si, { x, y, w, h: hs.size * 1.05 }));
+  parts.push(text(x, y + hs.size * 0.82, shown, { size: hs.size, family: st.section.family, weight: hs.weight, fill: color, tracking: st.section.tracking }));
+  y += hs.size * 1.05;
+  if (st.rule && ruleColor) { y += hs.size * 0.45; parts.push(rect(x, y, w, 1.5, ruleColor)); y += 2; }
+  return y + st.headGap;
+}
+function itemArea(item: PlacedItem, x: number, y: number, w: number, h: number) {
+  if (!run || !item.src) return;
+  const at = run.items.get(item.src);
+  if (at) addRegion(itemRegion(item.src, at[0], at[1], { x, y, w, h }));
+  note("menu", item.src.name, item.lines);
+  if (item.src.description) note("menu", item.src.description, item.desc);
+}
+
+/**
+ * Editorial headline: up to two lines in the heading face; when it takes two, the second line is set in italic in
+ * the accent colour (the Linden device). Shrinks to fit before shortening. Returns the baselines it drew.
+ */
+function editorialHeadline(parts: string[], value: string, x: number, top: number, maxW: number, start: number, min: number, f: F2, weight: number, c: DesignColors, area: "featuredText" | "businessName") {
+  const v = value.trim();
+  if (!v) return { lines: [] as string[], size: 0, bottom: top, lastEnd: x };
+  let size = start;
+  let lines = wrapText(v, size, f.head, weight, maxW, 3);
+  while (size > min && (lines.length > 2 || lines.some((l) => l.endsWith("…")))) { size -= 4; lines = wrapText(v, size, f.head, weight, maxW, 3); }
+  lines = wrapText(v, size, f.head, weight, maxW, 2);
+  // The signature italic line: a headline that fits on one line still breaks before its last word.
+  const words = v.split(/\s+/);
+  if (lines.length === 1 && words.length > 1) lines = [words.slice(0, -1).join(" "), words[words.length - 1]];
+  if (lines.length === 2) lines[1] = ellipsize(lines.slice(1).join(" "), size, f.head, 400, maxW, 0, true);
+  note(area, v, lines);
+  const lh = size * 0.97;
+  let lastEnd = x;
+  lines.forEach((line, i) => {
+    const second = i === 1;
+    const y = top + size * 0.8 + i * lh;
+    parts.push(text(x, y, line, { size, family: f.head, weight: second ? 400 : weight, fill: second ? c.accent : c.ink, italic: second }));
+    lastEnd = x + textWidth(line, size, f.head, second ? 400 : weight, 0, second);
+  });
+  return { lines, size, bottom: top + size * 0.8 + (lines.length - 1) * lh + size * 0.22, lastEnd };
+}
+
+/** Price token (e.g. "$29") and the rest of a feature detail split on " · ". */
+function offerParts(detail: string) {
+  const price = (detail.match(/[$€£]\s?\d+(?:[.,]\d{1,2})?/) || [""])[0];
+  const rest = price ? detail.replace(price, "").replace(/\s*·\s*·\s*/g, " · ").replace(/^\s*·\s*|\s*·\s*$/g, "").trim() : detail.trim();
+  const [first, ...more] = rest.split(/\s+·\s+/);
+  return { price, first: (first || "").trim(), second: more.join(" · ").trim() };
+}
+
+/** Service list style for Noir & Co.: names and prices in the serif, details in the body face. */
+function serviceStyle(f: F2, design: MenuDesign, s: { name: number; price: number; desc: number; section: number }): Style {
+  const L = design.look;
+  return {
+    name: { family: f.head, weight: L.headWeight, size: s.name, upper: false },
+    price: { family: f.head, weight: 700, size: s.price },
+    desc: { family: f.body, weight: 400, size: s.desc },
+    section: { family: f.body, weight: L.sectionWeight, size: s.section, tracking: L.sectionTracking, upper: true },
+    itemGap: 24, sectionGap: 46, headGap: 24, leader: false, rule: true, tags: false, thumb: 0,
+  };
+}
+
+/** Noir & Co.: photo on the left that melts into the page, services in one or two columns on the right. */
+function showcaseLeft(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return showcaseLeftPortrait(parts, doc, design, c, f, art);
+  const active = run?.active ?? null;
+  const PW = active && active.mediaSize != null ? Math.round(W * active.mediaSize) : 760;
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  const dark = luminance(c.paper) < 0.4;
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  if (photo) {
+    parts.push(photoImage(photo, { x: 0, y: 0, w: PW, h: H }, doc, c.paper));
+    parts.push(`<defs><linearGradient id="dg-sl-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0.45" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity="${title || detail ? 0.82 : 0.35}"/></linearGradient>`
+      + `<linearGradient id="dg-sl-r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${c.paper}" stop-opacity="0"/><stop offset="1" stop-color="${c.paper}" stop-opacity="1"/></linearGradient></defs>`);
+    parts.push(rect(0, 0, PW, H, "url(#dg-sl-b)"));
+    // Dark paper: the photo melts into the page. Light paper keeps a clean edge (a fade would turn muddy grey).
+    if (dark) parts.push(rect(PW - 180, 0, 182, H, "url(#dg-sl-r)"));
+  } else {
+    parts.push(rect(0, 0, PW, H, c.panel));
+  }
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: PW, h: H - (title || detail ? 240 : 0) }));
+  if (title || detail) {
+    const fx = 88; const fw = PW - 176;
+    const ink = photo ? PHOTO_INK : c.panelInk;
+    const ds = roleSize("featuredText", 58); const ts = roleSize("featuredText", 21); const dw = roleWeight("featuredText", f.head, 500);
+    const lines = detail ? wrapText(detail, ds, f.head, dw, fw, 2, 0, true) : [];
+    note("featuredText", detail, lines);
+    const y = H - 84 - (lines.length - 1) * ds * 1.1;
+    lines.forEach((line, i) => parts.push(text(fx, y + i * ds * 1.1, line, { size: ds, family: f.head, weight: dw, fill: ink, italic: true })));
+    const label = title ? ellipsize(title.toUpperCase(), ts, f.body, 700, fw, 0.28) : "";
+    note("featuredText", title.toUpperCase(), label);
+    if (title) parts.push(text(fx, (lines.length ? y - ds * 1.12 : H - 84), label, { size: ts, family: f.body, weight: 700, fill: photo ? onPhotoAccent(c) : c.panelInk, tracking: 0.28 }));
+    addRegion(fixedRegion("featuredText", { x: 0, y: H - 240, w: PW, h: 240 }));
+  }
+  // Header: business name in the serif, a short brass rule and the tracked subtitle.
+  const x0 = PW + 120; const x1 = W - 96; const top = 96;
+  const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, top, 110, c.paper);
+  const tx = x0 + (logoSize ? logoSize + 30 : 0);
+  const maxW = x1 - tx;
+  const t = titleFit(doc.title || "", maxW, 124, 64, f.head, design.look.headWeight);
+  note("businessName", doc.title || "", t.value);
+  const titleBase = top + t.size * 0.8 + (logoSize ? Math.max(0, (110 - t.size * 1.1) / 2) : 0);
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink }));
+  let headBottom = titleBase + t.size * 0.2;
+  if (doc.subtitle) {
+    const sy = titleBase + 50;
+    parts.push(rect(tx, sy - 10, 64, 2, c.accent));
+    const sub = ellipsize(doc.subtitle.toUpperCase(), 21, f.body, 700, maxW - 88, 0.28);
+    parts.push(text(tx + 88, sy, sub, { size: 21, family: f.body, weight: 700, fill: c.accent, tracking: 0.28 }));
+    headBottom = sy + 8;
+  }
+  headBottom = Math.max(headBottom, logoSize ? top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: x0, y: top, w: x1 - x0, h: headBottom - top + 8 }));
+  const menuTop = headBottom + 92;
+  const footerH = doc.footer ? 110 : 0;
+  const colH = H - 64 - footerH - menuTop;
+  const avail = x1 - x0; const gap = 80; const colW = (avail - gap) / 2;
+  const shown = itemPhotosShown(doc, design);
+  const result = fitPhotos(doc.sections, serviceStyle(f, design, { name: 42, price: 44, desc: 22, section: 22 }), [{ cols: 2, colW }, { cols: 1, colW: avail }], colH, 1.15, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
+  paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : colW, gap, c);
+  if (doc.footer) {
+    parts.push(rect(x0, H - 122, avail, 1.5, mix(c.muted, c.paper, 0.7)));
+    parts.push(text(x0, H - 76, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  }
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+/** Product rows: name and detail on the left, a large serif price on the right, a hairline between rows. */
+function rowStyle(f: F2, s: { name: number; price: number; desc: number; section: number; gap: number }): Style {
+  return {
+    name: { family: f.body, weight: 700, size: s.name, upper: false },
+    price: { family: f.head, weight: 700, size: s.price },
+    desc: { family: f.body, weight: 400, size: s.desc },
+    section: { family: f.body, weight: 700, size: s.section, tracking: 0.26, upper: true },
+    itemGap: s.gap, sectionGap: 40, headGap: 18, leader: false, rule: false, tags: false, thumb: 0,
+  };
+}
+function paintRows(parts: string[], result: FitResult, x0: number, top: number, colW: number, gap: number, c: DesignColors, divider: string) {
+  const st = result.style;
+  result.columns.forEach((col, ci) => {
+    const x = x0 + ci * (colW + gap);
+    let y = top;
+    let first = true;
+    col.sections.forEach((sec, si) => {
+      if (si > 0) y += st.sectionGap;
+      y = serviceHead(parts, sec, st, x, y, colW, c.accent, null);
+      for (const item of sec.items) {
+        if (!first) parts.push(rect(x, y - st.itemGap * 0.5, colW, 1.5, divider));
+        first = false;
+        itemArea(item, x, y, colW, item.h - st.itemGap);
+        if (sec.thumbs) { paintThumbItem(parts, item, x, y, colW, st, c); y += item.h; continue; }
+        const lineH = st.name.size * 1.17;
+        const base = y + st.name.size * 0.86;
+        item.lines.forEach((line, li) => parts.push(text(x, base + li * lineH, line, { size: st.name.size, family: st.name.family, weight: st.name.weight, fill: c.ink })));
+        if (item.price) parts.push(text(x + colW, base + st.price.size * 0.12, item.price, { size: st.price.size, family: st.price.family, weight: st.price.weight, fill: c.ink, anchor: "end" }));
+        let dy = y + item.lines.length * lineH;
+        if (item.desc.length) {
+          dy += st.desc.size * 0.32;
+          item.desc.forEach((line, di) => parts.push(text(x, dy + st.desc.size * 0.95 + di * st.desc.size * 1.32, line, { size: st.desc.size, family: st.desc.family, weight: st.desc.weight, fill: c.muted })));
+        }
+        y += item.h;
+      }
+    });
+  });
+}
+
+/** Linden Atelier: tall photo on the left; eyebrow, editorial headline, one offer band and product rows. */
+function editorial(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return editorialPortrait(parts, doc, design, c, f, art);
+  const active = run?.active ?? null;
+  const PW = active && active.mediaSize != null ? Math.round(W * active.mediaSize) : 840;
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) parts.push(photoImage(photo, { x: 0, y: 0, w: PW, h: H }, doc, c.paper));
+  else parts.push(rect(0, 0, PW, H, mix(c.panel, c.paper, 0.55)));
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: PW, h: H }));
+  return editorialColumn(parts, doc, design, c, f, art, { x0: PW + 100, x1: W - 96, top: 96, bottom: H - 58, headline: 124, logoSize: 96 });
+}
+
+/** The text column of Linden Atelier (shared by both orientations). */
+function editorialColumn(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined,
+  o: { x0: number; x1: number; top: number; bottom: number; headline: number; logoSize: number }): DesignReport {
+  const { x0, x1 } = o; const avail = x1 - x0;
+  // Eyebrow: the business name (and logo).
+  const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, o.top - 8, o.logoSize * 0.5, c.paper);
+  const ex = x0 + (logoSize ? logoSize + 18 : 0);
+  const name = (doc.title || "").toUpperCase();
+  const es = roleSize("businessName", 22); const ew = roleWeight("businessName", f.body, 700);
+  const eyebrow = ellipsize(name, es, f.body, ew, x1 - ex, 0.28);
+  note("businessName", name, eyebrow);
+  if (eyebrow) parts.push(text(ex, o.top + es * 0.8 + (logoSize ? (logoSize - es) / 2 - 8 : 0), eyebrow, { size: es, family: f.body, weight: ew, fill: c.accent, tracking: 0.28 }));
+  const eyebrowBottom = o.top + Math.max(es, logoSize);
+  addRegion(fixedRegion("businessName", { x: x0, y: o.top - 8, w: avail, h: eyebrowBottom - o.top + 16 }));
+  // Headline (feature title) with the italic second line, and the subtitle beside or under it.
+  const hs = roleSize("featuredText", o.headline);
+  const hw = roleWeight("featuredText", f.head, design.look.headWeight);
+  const headTop = eyebrowBottom + 26;
+  const head = editorialHeadline(parts, doc.featureTitle || "", x0, headTop, avail, hs, Math.max(56, hs * 0.55), f, hw, c, "featuredText");
+  let y = head.bottom;
+  if (doc.subtitle) {
+    const room = x1 - head.lastEnd - 48;
+    const beside = head.lines.length && room >= 300;
+    const sx = beside ? head.lastEnd + 48 : x0; const sw = beside ? room : avail;
+    const lines = wrapText(doc.subtitle, 29, f.body, 400, sw, 2);
+    const sy = beside ? head.bottom - head.size * 0.22 - (lines.length - 1) * 38 : y + 46;
+    lines.forEach((line, i) => parts.push(text(sx, sy + i * 38, line, { size: 29, family: f.body, weight: 400, fill: c.muted })));
+    if (!beside) y = sy + (lines.length - 1) * 38 + 10;
+  }
+  addRegion(fixedRegion("featuredText", { x: x0, y: headTop, w: avail, h: Math.max(10, y - headTop) }));
+  // Offer band (feature detail): bold claim on the left, the rest on the right.
+  const detail = (doc.featureDetail || "").trim();
+  let menuTop = y + 52;
+  if (detail) {
+    const [claim, ...rest] = detail.split(/\s+·\s+/);
+    const bs = roleSize("featuredText", 37); const bh = Math.round(bs * 2.4);
+    const by = y + 46;
+    parts.push(rect(x0, by, avail, bh, c.panel));
+    const right = rest.join(" · ");
+    const rw = right ? Math.min(avail * 0.42, textWidth(right, bs * 0.7, f.body, 400) + 4) : 0;
+    const left = ellipsize(claim, bs, f.body, 700, avail - 68 - (rw ? rw + 32 : 0));
+    note("featuredText", claim, left);
+    parts.push(text(x0 + 34, by + bh / 2 + bs * 0.36, left, { size: bs, family: f.body, weight: 700, fill: c.panelInk }));
+    if (right) {
+      const shown = ellipsize(right, bs * 0.7, f.body, 400, rw);
+      note("featuredText", right, shown);
+      parts.push(text(x1 - 34, by + bh / 2 + bs * 0.25, shown, { size: bs * 0.7, family: f.body, weight: 400, fill: c.panelInk, anchor: "end", opacity: 0.92 }));
+    }
+    addRegion(fixedRegion("featuredText", { x: x0, y: by, w: avail, h: bh }));
+    menuTop = by + bh + 56;
+  }
+  const footerH = doc.footer ? 52 : 0;
+  // The last row's trailing gap needs no room above the footer.
+  const colH = o.bottom - footerH - menuTop + 30;
+  const shown = itemPhotosShown(doc, design);
+  const result = fitPhotos(doc.sections, rowStyle(f, { name: 36, price: 50, desc: 24, section: 20, gap: 30 }), [{ cols: 1, colW: avail }, { cols: 2, colW: (avail - 72) / 2 }], colH, 1.1, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
+  paintRows(parts, result, x0, menuTop, result.cols === 1 ? avail : (avail - 72) / 2, 72, c, mix(c.muted, c.paper, 0.72));
+  if (doc.footer) parts.push(text(x0, o.bottom, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+/** The hero product is the first item; the rest are its notes. */
+function spotlightSplit(doc: LayoutDocument) {
+  let hero: { item: LayoutItem; si: number; ii: number } | null = null;
+  const rest: LayoutSection[] = [];
+  doc.sections.forEach((section, si) => {
+    const items = section.items.filter((item, ii) => {
+      if (!hero && item.name.trim()) { hero = { item, si, ii }; return false; }
+      return true;
+    });
+    rest.push({ ...section, items });
+    if (run) run.sections.set(rest[rest.length - 1], si);
+  });
+  return { hero: hero as { item: LayoutItem; si: number; ii: number } | null, rest };
+}
+
+/** Linden Spotlight: one hero product photographed in the centre, its story and price left, its notes right. */
+function spotlight(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return spotlightPortrait(parts, doc, design, c, f, art);
+  const PX = 650; const PW = 620;
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) parts.push(photoImage(photo, { x: PX, y: 0, w: PW, h: H }, doc, c.paper));
+  else parts.push(rect(PX, 0, PW, H, mix(c.panel, c.paper, 0.55)));
+  addRegion(fixedRegion("featuredMedia", { x: PX, y: 0, w: PW, h: H }));
+  const { hero, rest } = spotlightSplit(doc);
+  spotlightStory(parts, doc, design, c, f, hero, { x0: 96, w: PX - 96 - 56, top: 150, bottom: H - 58, headline: 118, price: 150, art });
+  const rx = PX + PW + 80; const rw = W - 96 - rx;
+  const result = spotlightNotes(parts, doc, c, f, rest, { x: rx, w: rw, top: 150, bottom: H - 120 }, art);
+  if (doc.title) {
+    const t = titleFit(doc.title, rw, 30, 22, f.head, design.look.headWeight);
+    note("businessName", doc.title, t.value);
+    parts.push(text(rx, H - 58, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink }));
+    addRegion(fixedRegion("businessName", { x: rx, y: H - 58 - t.size, w: rw, h: t.size * 1.3 }));
+  }
+  if (doc.footer) parts.push(text(96, H - 58, ellipsize(doc.footer, 24, f.body, 400, PX - 96 - 56), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  return { dropped: result.dropped, scale: result.scale };
+}
+
+/** Eyebrow (subtitle), headline (feature title), hero name, details, big price and the offer line (feature detail). */
+function spotlightStory(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, hero: { item: LayoutItem; si: number; ii: number } | null,
+  o: { x0: number; w: number; top: number; bottom: number; headline: number; price: number; art?: DesignArt }) {
+  const { x0, w } = o;
+  let y = o.top;
+  if (doc.subtitle) {
+    const sub = ellipsize(doc.subtitle.toUpperCase(), 21, f.body, 700, w, 0.28);
+    parts.push(text(x0, y + 17, sub, { size: 21, family: f.body, weight: 700, fill: c.accent, tracking: 0.28 }));
+    y += 40;
+  }
+  const hs = roleSize("featuredText", o.headline); const hw = roleWeight("featuredText", f.head, design.look.headWeight);
+  const head = editorialHeadline(parts, doc.featureTitle || "", x0, y + 6, w, hs, Math.max(56, hs * 0.5), f, hw, c, "featuredText");
+  if (head.lines.length) addRegion(fixedRegion("featuredText", { x: x0, y: o.top, w, h: head.bottom - o.top }));
+  y = head.lines.length ? head.bottom + 56 : y + 20;
+  if (hero) {
+    const { item } = hero;
+    const top = y;
+    const ns = roleSize("itemName", 38); const nw = roleWeight("itemName", f.body, 700);
+    // An owner's photo on the hero product shows as a tile beside its name.
+    const ownPhoto = item.imageMediaId ? itemPhotoResolver(o.art)(item) : null;
+    const tile = item.imageMediaId ? Math.round(ns * 2.6) : 0;
+    if (tile) photoTile(parts, ownPhoto, x0, y, tile, tile, tile * 0.16, c, initialOf(item.name), c.paper);
+    const nx = x0 + (tile ? tile + 24 : 0);
+    const names = wrapText(item.name, ns, f.body, nw, w - (tile ? tile + 24 : 0), 2);
+    note("menu", item.name, names);
+    names.forEach((line) => { parts.push(text(nx, y + ns * 0.86, line, { size: ns, family: f.body, weight: nw, fill: c.ink })); y += ns * 1.2; });
+    if (tile) y = Math.max(y, top + tile);
+    if (item.description) {
+      const ds = roleSize("description", 28); const dw = roleWeight("description", f.body, 400);
+      const desc = wrapText(item.description, ds, f.body, dw, w, 3);
+      note("menu", item.description, desc);
+      y += 6;
+      desc.forEach((line) => { parts.push(text(x0, y + ds * 0.95, line, { size: ds, family: f.body, weight: dw, fill: c.muted })); y += ds * 1.36; });
+    }
+    if (item.price) {
+      const ps = roleSize("price", o.price); const pw = roleWeight("price", f.head, 700);
+      const fitP = fitTitle(item.price, w, ps, 60, f.head, pw);
+      y += 26;
+      parts.push(text(x0, y + fitP.size * 0.78, fitP.value, { size: fitP.size, family: f.head, weight: pw, fill: c.ink }));
+      y += fitP.size * 0.92;
+    }
+    if (run) addRegion(itemRegion(item, hero.si, hero.ii, { x: x0, y: top, w, h: y - top }));
+  }
+  const detail = (doc.featureDetail || "").trim();
+  if (detail) {
+    const lines = wrapText(detail, 26, f.body, 700, w, 2);
+    note("featuredText", detail, lines);
+    y += 20;
+    lines.forEach((line) => { parts.push(text(x0, y + 22, line, { size: 26, family: f.body, weight: 700, fill: c.accent })); y += 34; });
+  }
+  return y;
+}
+
+/** The notes column: section name as a tracked heading, rows with a hairline above each. */
+function spotlightNotes(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, rest: LayoutSection[], o: { x: number; w: number; top: number; bottom: number; cols?: number; gap?: number; dry?: boolean }, art?: DesignArt) {
+  const st = rowStyle(f, { name: 36, price: 30, desc: 25, section: 23, gap: 70 });
+  const styled: Style = { ...st, price: { family: f.body, weight: 700, size: 30 }, headGap: 40 };
+  const shown = hasOwnerItemPhoto({ ...doc, sections: rest });
+  const cols = o.cols ?? 1; const gap = o.gap ?? 0; const colW = (o.w - gap * (cols - 1)) / cols;
+  const result = fitPhotos(rest, styled, [{ cols, colW }], o.bottom - o.top, 1.1, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
+  if (!o.dry) paintRows(parts, result, o.x, o.top, colW, gap, c, mix(c.muted, c.paper, 0.72));
+  return result;
+}
+
+/** Forge: big wordmark, a time-first class schedule, a photo that melts into the dark page and an offer block. */
+function timetable(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  if (isPortrait()) return timetablePortrait(parts, doc, design, c, f, art);
+  const PX = mediaLeft(run?.active ?? null, 760);
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) {
+    parts.push(photoImage(photo, { x: PX, y: 0, w: W - PX, h: H }, doc, c.paper));
+    parts.push(`<defs><linearGradient id="dg-tt" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${c.paper}" stop-opacity="1"/><stop offset="0.35" stop-color="${c.paper}" stop-opacity="0"/></linearGradient></defs>`);
+    parts.push(rect(PX, 0, W - PX, H, "url(#dg-tt)"));
+  }
+  const offer = offerBlock(parts, doc, c, f, { x: W - 96 - 400, y: 96, w: 400, h: 300 });
+  addRegion(fixedRegion("featuredMedia", { x: PX, y: offer ? 96 + 300 + 40 : 0, w: W - PX, h: H - (offer ? 436 : 0) }));
+  const x0 = 96;
+  const head = timetableHeader(parts, doc, design, c, f, art, { x0, top: 70, maxW: (offer ? W - 96 - 400 - 60 : W - 96) - x0 });
+  const rowW = Math.min(PX - x0 + 240, (offer ? W - 96 - 400 - 60 : W - 96) - x0);
+  const result = timetableRows(parts, doc, c, f, { x0, w: rowW, top: head + 70, bottom: H - (doc.footer ? 118 : 64), art });
+  if (doc.footer) parts.push(text(x0, H - 62, ellipsize(doc.footer, 24, f.body, 400, rowW), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+/** Wordmark (title, capitals) with the accent bar and the tracked subtitle. Returns the header's bottom. */
+function timetableHeader(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined, o: { x0: number; top: number; maxW: number }) {
+  const logoSize = logo(parts, safeDesignHref(art?.logoHref), o.x0, o.top + 20, 120, c.paper);
+  const tx = o.x0 + (logoSize ? logoSize + 30 : 0);
+  const value = (doc.title || "").toUpperCase();
+  const t = titleFit(value, o.maxW - (logoSize ? logoSize + 30 : 0), 220, 110, f.head, design.look.headWeight, 0.03);
+  note("businessName", value, t.value);
+  const base = o.top + t.size * 0.84;
+  if (t.value) parts.push(text(tx, base, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink, tracking: 0.03 }));
+  let bottom = base + 8;
+  if (doc.subtitle) {
+    parts.push(rect(o.x0 + 4, base + 26, 96, 8, c.accent));
+    const sub = fitTitle(doc.subtitle.toUpperCase(), o.maxW - 124, 22, 16, f.body, 700, 0.28);
+    note("businessName", doc.subtitle.toUpperCase(), sub.value);
+    parts.push(text(o.x0 + 124, base + 36 - (22 - sub.size) * 0.3, sub.value, { size: sub.size, family: f.body, weight: 700, fill: c.accent, tracking: 0.28 }));
+    bottom = base + 44;
+  }
+  bottom = Math.max(bottom, logoSize ? o.top + 20 + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: o.x0, y: o.top, w: o.maxW, h: bottom - o.top }));
+  return bottom;
+}
+
+/** Time-first rows: the item's price field holds the time (any short text works). */
+function timetableRows(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, o: { x0: number; w: number; top: number; bottom: number; art?: DesignArt }) {
+  const times = new Map<LayoutItem, string>();
+  const shadow = doc.sections.map((section, si) => {
+    const s: LayoutSection = { ...section, items: section.items.map((item, ii) => {
+      const copy = { ...item, price: "" };
+      times.set(copy, item.price || "");
+      if (run) run.items.set(copy, [si, ii]);
+      return copy;
+    }) };
+    if (run) run.sections.set(s, si);
+    return s;
+  });
+  const base: Style = {
+    name: { family: f.head, weight: 400, size: 50, upper: true },
+    price: { family: f.head, weight: 400, size: 72 },
+    desc: { family: f.body, weight: 400, size: 23 },
+    section: { family: f.body, weight: 700, size: 26, tracking: 0.2, upper: true },
+    itemGap: 22, sectionGap: 44, headGap: 26, leader: false, rule: false, tags: false, thumb: 0,
+  };
+  // The time column is sized by the widest time at the design size (scaled with the rows).
+  const widest = Math.max(0, ...[...times.values()].map((t) => textWidth(t, base.price.size, base.price.family, base.price.weight)));
+  const timeCol = Math.max(150, widest + 44);
+  const shown = hasOwnerItemPhoto(doc);
+  const result = fitPhotos(shadow, base, [{ cols: 1, colW: o.w - timeCol }], o.bottom - o.top, 1.1, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(o.art) : undefined);
+  const st = result.style;
+  const k = st.name.size / base.name.size;
+  let y = o.top;
+  const divider = mix(c.muted, c.paper, 0.78);
+  result.columns.forEach((col) => col.sections.forEach((sec, si) => {
+    if (si > 0) y += st.sectionGap;
+    y = serviceHead(parts, sec, { ...st, section: { ...st.section } }, o.x0, y, o.w, c.muted, null);
+    for (const item of sec.items) {
+      parts.push(rect(o.x0, y - st.itemGap * 0.55, o.w, 1.5, divider));
+      const time = item.src ? times.get(item.src) ?? "" : "";
+      const lineH = st.name.size * 1.17;
+      const nameBase = y + st.name.size * 0.86;
+      if (time) {
+        const ts = st.price.size;
+        const shown = ellipsize(time, ts, st.price.family, st.price.weight, timeCol * k - 20);
+        parts.push(text(o.x0, nameBase + ts * 0.18, shown, { size: ts, family: st.price.family, weight: st.price.weight, fill: c.accent, tracking: 0.01 }));
+      }
+      let nx = o.x0 + timeCol * k;
+      itemArea(item, o.x0, y, o.w, item.h - st.itemGap);
+      if (sec.thumbs) {
+        // An owner's class photo sits between the time and the class name.
+        if (item.photo) photoTile(parts, item.photo, nx, y, st.thumb, st.thumb, st.thumb * 0.16, c, item.initial ?? "", c.paper);
+        nx += st.thumb + st.thumb * 0.22;
+      }
+      item.lines.forEach((line, li) => parts.push(text(nx, nameBase + li * lineH, line, { size: st.name.size, family: st.name.family, weight: st.name.weight, fill: c.ink, tracking: 0.02 })));
+      let dy = y + item.lines.length * lineH;
+      if (item.desc.length) {
+        dy += st.desc.size * 0.32;
+        item.desc.forEach((line, di) => parts.push(text(nx, dy + st.desc.size * 0.95 + di * st.desc.size * 1.32, line, { size: st.desc.size, family: st.desc.family, weight: st.desc.weight, fill: c.muted })));
+      }
+      y += item.h;
+    }
+  }));
+  return result;
+}
+
+/** Offer block (feature title + detail): eyebrow, a big price with words beside it, and a closing line. */
+function offerBlock(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, b: { x: number; y: number; w: number; h: number }) {
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  if (!title && !detail) return false;
+  parts.push(rect(b.x, b.y, b.w, b.h, c.panel));
+  const ink = c.panelInk; const pad = 36;
+  const ts = roleSize("featuredText", 21);
+  if (title) {
+    const label = ellipsize(title.toUpperCase(), ts, f.body, 800, b.w - pad * 2, 0.2);
+    note("featuredText", title.toUpperCase(), label);
+    parts.push(text(b.x + pad, b.y + 60, label, { size: ts, family: f.body, weight: 800, fill: ink, tracking: 0.2 }));
+  }
+  const { price, first, second } = offerParts(detail);
+  const kd = roleSize("featuredText", 170) / 170;
+  if (price) {
+    const ps = Math.min(170 * kd, fitTitle(price, b.w * 0.62, 170 * kd, 80, f.head, 400).size);
+    parts.push(text(b.x + pad - 4, b.y + 212, price, { size: ps, family: f.head, weight: 400, fill: ink }));
+    if (first) {
+      // Words beside the price, one per line where possible; they shrink to fit rather than being shortened.
+      const px = b.x + pad + textWidth(price, ps, f.head, 400) + 16;
+      const room = b.x + b.w - 22 - px;
+      const words = first.toUpperCase();
+      let ws = 54 * kd;
+      while (ws > 30 && words.split(/\s+/).some((w) => textWidth(w, ws, f.head, 400, 0.01) > room)) ws -= 2;
+      const lines = wrapText(words, ws, f.head, 400, room, 2, 0.01);
+      note("featuredText", words, lines);
+      const top = b.y + 146 - (lines.length === 1 ? -ws * 0.5 : 0);
+      lines.forEach((line, i) => parts.push(text(px, top + i * ws, line, { size: ws, family: f.head, weight: 400, fill: ink, tracking: 0.01 })));
+    }
+  } else if (first) {
+    const lines = wrapText(first.toUpperCase(), 80 * kd, f.head, 400, b.w - pad * 2, 2);
+    note("featuredText", first.toUpperCase(), lines);
+    lines.forEach((line, i) => parts.push(text(b.x + pad, b.y + 150 + i * 78 * kd, line, { size: 80 * kd, family: f.head, weight: 400, fill: ink })));
+  }
+  if (second) {
+    const shown = ellipsize(second, 24, f.body, 700, b.w - pad * 2);
+    note("featuredText", second, shown);
+    parts.push(text(b.x + pad, b.y + b.h - 38, shown, { size: 24, family: f.body, weight: 700, fill: ink }));
+  }
+  addRegion(fixedRegion("featuredText", b));
+  return true;
+}
+
+/* Vertical (9:16) versions: re-composed for a tall screen, never a stretched landscape board. */
+const SL_BAND = 760 / 1920;
+const ED_BAND = 0.36;
+const TT_BAND = 0.42;
+const SP_BAND = 0.36;
+
+function showcaseLeftPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  const MB = mediaBand(run?.active ?? null, SL_BAND);
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  const dark = luminance(c.paper) < 0.4;
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  if (photo) {
+    parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc, c.paper));
+    parts.push(`<defs><linearGradient id="dg-slp" x1="0" y1="0" x2="0" y2="1"><stop offset="0.4" stop-color="${dark ? c.paper : "#000000"}" stop-opacity="0"/><stop offset="1" stop-color="${dark ? c.paper : "#000000"}" stop-opacity="${dark ? 1 : 0.78}"/></linearGradient></defs>`);
+    parts.push(rect(0, 0, W, MB, "url(#dg-slp)"));
+  } else {
+    parts.push(rect(0, 0, W, MB, c.panel));
+  }
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: W, h: MB - (title || detail ? 220 : 0) }));
+  const x0 = 80; const x1 = W - 80;
+  if (title || detail) {
+    const fw = x1 - x0;
+    const ink = photo ? (dark ? c.ink : PHOTO_INK) : c.panelInk;
+    const ds = roleSize("featuredText", 58); const ts = roleSize("featuredText", 21); const dw = roleWeight("featuredText", f.head, 500);
+    const lines = detail ? wrapText(detail, ds, f.head, dw, fw, 2, 0, true) : [];
+    note("featuredText", detail, lines);
+    const y = MB - 60 - (lines.length - 1) * ds * 1.1;
+    lines.forEach((line, i) => parts.push(text(x0, y + i * ds * 1.1, line, { size: ds, family: f.head, weight: dw, fill: ink, italic: true })));
+    const label = title ? ellipsize(title.toUpperCase(), ts, f.body, 700, fw, 0.28) : "";
+    note("featuredText", title.toUpperCase(), label);
+    if (title) parts.push(text(x0, lines.length ? y - ds * 1.12 : MB - 60, label, { size: ts, family: f.body, weight: 700, fill: photo ? (dark ? c.accent : onPhotoAccent(c)) : c.panelInk, tracking: 0.28 }));
+    addRegion(fixedRegion("featuredText", { x: 0, y: MB - 220, w: W, h: 220 }));
+  }
+  const top = MB + 84;
+  const logoSize = logo(parts, safeDesignHref(art?.logoHref), x0, top, 100, c.paper);
+  const tx = x0 + (logoSize ? logoSize + 26 : 0);
+  const t = titleFit(doc.title || "", x1 - tx, 112, 60, f.head, design.look.headWeight);
+  note("businessName", doc.title || "", t.value);
+  const titleBase = top + t.size * 0.8;
+  if (t.value) parts.push(text(tx, titleBase, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink }));
+  let headBottom = titleBase + t.size * 0.2;
+  if (doc.subtitle) {
+    const sy = titleBase + 48;
+    parts.push(rect(tx, sy - 10, 56, 2, c.accent));
+    parts.push(text(tx + 78, sy, ellipsize(doc.subtitle.toUpperCase(), 21, f.body, 700, x1 - tx - 78, 0.28), { size: 21, family: f.body, weight: 700, fill: c.accent, tracking: 0.28 }));
+    headBottom = sy + 8;
+  }
+  headBottom = Math.max(headBottom, logoSize ? top + logoSize : 0);
+  addRegion(fixedRegion("businessName", { x: x0, y: top, w: x1 - x0, h: headBottom - top + 8 }));
+  const menuTop = headBottom + 80;
+  const footerH = doc.footer ? 110 : 0;
+  const avail = x1 - x0; const gap = 64; const colW = (avail - gap) / 2;
+  const shown = itemPhotosShown(doc, design);
+  const result = fitPhotos(doc.sections, serviceStyle(f, design, { name: 42, price: 44, desc: 22, section: 22 }), [{ cols: 1, colW: avail }, { cols: 2, colW }], H - 64 - footerH - menuTop, 1.15, 0.55, 0.9, shown, false, shown ? itemPhotoResolver(art) : undefined);
+  paintColumns(parts, result, x0, menuTop, result.cols === 1 ? avail : colW, gap, c);
+  if (doc.footer) {
+    parts.push(rect(x0, H - 122, avail, 1.5, mix(c.muted, c.paper, 0.7)));
+    parts.push(text(x0, H - 76, ellipsize(doc.footer, 24, f.body, 400, avail), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  }
+  return { dropped: result.dropped, scale: result.scale, photosSuppressed: result.photosSuppressed };
+}
+
+function editorialPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  const MB = mediaBand(run?.active ?? null, ED_BAND);
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc, c.paper));
+  else parts.push(rect(0, 0, W, MB, mix(c.panel, c.paper, 0.55)));
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: W, h: MB }));
+  return editorialColumn(parts, doc, design, c, f, art, { x0: 80, x1: W - 80, top: MB + 76, bottom: H - 64, headline: 112, logoSize: 88 });
+}
+
+function spotlightPortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  const x0 = 80; const x1 = W - 80;
+  parts.push(rect(0, 0, W, H, c.paper));
+  // Eyebrow and headline across the top.
+  let y = 110;
+  if (doc.subtitle) {
+    parts.push(text(x0, y + 17, ellipsize(doc.subtitle.toUpperCase(), 21, f.body, 700, x1 - x0, 0.28), { size: 21, family: f.body, weight: 700, fill: c.accent, tracking: 0.28 }));
+    y += 40;
+  }
+  const hs = roleSize("featuredText", 112); const hw = roleWeight("featuredText", f.head, design.look.headWeight);
+  const head = editorialHeadline(parts, doc.featureTitle || "", x0, y + 6, x1 - x0, hs, Math.max(56, hs * 0.5), f, hw, c, "featuredText");
+  addRegion(fixedRegion("featuredText", { x: x0, y: 110, w: x1 - x0, h: Math.max(10, head.bottom - 110) }));
+  const bandY = Math.round((head.lines.length ? head.bottom : y) + 56);
+  const { hero, rest } = spotlightSplit(doc);
+  const colW = (x1 - x0 - 64) / 2;
+  // The product photo keeps its full band unless the notes need the room: then it gives up height (never items).
+  const bands = [mediaBand(run?.active ?? null, SP_BAND), Math.round(H * 0.28), Math.round(H * 0.22)];
+  let BH = bands[0]; let best = Infinity;
+  for (const band of bands) {
+    const dropped = spotlightNotes(parts, doc, c, f, rest, { x: x0 + colW + 64, w: colW, top: bandY + band + 64, bottom: H - 130, dry: true }, art).dropped;
+    if (dropped < best) { best = dropped; BH = band; }
+    if (dropped === 0) break;
+  }
+  const photo = photoHref(doc, art);
+  if (photo) parts.push(photoImage(photo, { x: 0, y: bandY, w: W, h: BH }, doc, c.paper));
+  else parts.push(rect(0, bandY, W, BH, mix(c.panel, c.paper, 0.55)));
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: bandY, w: W, h: BH }));
+  const belowTop = bandY + BH + 64;
+  const storyBottom = spotlightStory(parts, { ...doc, subtitle: "", featureTitle: "" }, design, c, f, hero, { x0, w: colW, top: belowTop, bottom: H - 120, headline: 0, price: 120, art });
+  // Notes beside the story; when they would still hide items there, they run in two full-width columns under it.
+  const beside = { x: x0 + colW + 64, w: colW, top: belowTop, bottom: H - 130 };
+  const under = { x: x0, w: x1 - x0, top: storyBottom + 56, bottom: H - 130, cols: 2, gap: 64 };
+  const sideFit = spotlightNotes(parts, doc, c, f, rest, { ...beside, dry: true }, art);
+  const underFit = sideFit.dropped > 0 ? spotlightNotes(parts, doc, c, f, rest, { ...under, dry: true }, art) : null;
+  const result = spotlightNotes(parts, doc, c, f, rest, underFit && underFit.dropped < sideFit.dropped ? under : beside, art);
+  if (doc.title) {
+    const t = titleFit(doc.title, colW, 30, 22, f.head, design.look.headWeight);
+    note("businessName", doc.title, t.value);
+    parts.push(text(x1, H - 64, t.value, { size: t.size, family: f.head, weight: t.weight, fill: c.ink, anchor: "end" }));
+    addRegion(fixedRegion("businessName", { x: x1 - colW, y: H - 64 - t.size, w: colW, h: t.size * 1.3 }));
+  }
+  if (doc.footer) parts.push(text(x0, H - 64, ellipsize(doc.footer, 24, f.body, 400, colW), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  return { dropped: result.dropped, scale: result.scale };
+}
+
+function timetablePortrait(parts: string[], doc: LayoutDocument, design: MenuDesign, c: DesignColors, f: F2, art: DesignArt | undefined): DesignReport {
+  const MB = mediaBand(run?.active ?? null, TT_BAND);
+  parts.push(rect(0, 0, W, H, c.paper));
+  const photo = photoHref(doc, art);
+  if (photo) {
+    parts.push(photoImage(photo, { x: 0, y: 0, w: W, h: MB }, doc, c.paper));
+    parts.push(`<defs><linearGradient id="dg-ttp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.paper}" stop-opacity="0.95"/><stop offset="0.3" stop-color="${c.paper}" stop-opacity="0.88"/><stop offset="0.5" stop-color="${c.paper}" stop-opacity="0"/><stop offset="0.7" stop-color="${c.paper}" stop-opacity="0"/><stop offset="1" stop-color="${c.paper}" stop-opacity="1"/></linearGradient></defs>`);
+    parts.push(rect(0, 0, W, MB, "url(#dg-ttp)"));
+  }
+  const x0 = 72;
+  addRegion(fixedRegion("featuredMedia", { x: 0, y: 0, w: W, h: MB }));
+  timetableHeader(parts, doc, design, c, f, art, { x0, top: 60, maxW: W - 72 - x0 });
+  // On a tall screen the offer runs as a full-width strip under the photo, so the athlete stays clear.
+  const stripH = offerStrip(parts, doc, c, f, { x: 0, y: MB, w: W, h: 168 });
+  const result = timetableRows(parts, doc, c, f, { x0, w: W - x0 * 2, top: MB + stripH + 56, bottom: H - (doc.footer ? 118 : 64), art });
+  if (doc.footer) parts.push(text(x0, H - 62, ellipsize(doc.footer, 24, f.body, 400, W - x0 * 2), { size: 24, family: f.body, weight: 400, fill: c.muted }));
+  return { dropped: result.dropped, scale: result.scale };
+}
+
+/** Vertical Forge: the offer as one full-width band (eyebrow over a big price and its words, closing line right). */
+function offerStrip(parts: string[], doc: LayoutDocument, c: DesignColors, f: F2, b: { x: number; y: number; w: number; h: number }) {
+  const title = (doc.featureTitle || "").trim(); const detail = (doc.featureDetail || "").trim();
+  if (!title && !detail) return 0;
+  parts.push(rect(b.x, b.y, b.w, b.h, c.panel));
+  const ink = c.panelInk; const pad = 72;
+  const kd = roleSize("featuredText", 110) / 110;
+  const { price, first, second } = offerParts(detail);
+  if (title) {
+    const label = ellipsize(title.toUpperCase(), roleSize("featuredText", 20), f.body, 800, b.w - pad * 2, 0.2);
+    note("featuredText", title.toUpperCase(), label);
+    parts.push(text(b.x + pad, b.y + 44, label, { size: roleSize("featuredText", 20), family: f.body, weight: 800, fill: ink, tracking: 0.2 }));
+  }
+  let x = b.x + pad;
+  const base = b.y + b.h - 30;
+  const big = price || first;
+  if (big) {
+    const ps = 110 * kd;
+    parts.push(text(x - 2, base, big.toUpperCase(), { size: ps, family: f.head, weight: 400, fill: ink }));
+    x += textWidth(big.toUpperCase(), ps, f.head, 400) + 22;
+  }
+  const rightW = second ? Math.min(380, textWidth(second, 24, f.body, 700) + 2) : 0;
+  if (price && first) {
+    const room = b.x + b.w - pad - x - (rightW ? rightW + 30 : 0);
+    const t = fitTitle(first.toUpperCase(), room, 54 * kd, 30, f.head, 400, 0.01);
+    note("featuredText", first.toUpperCase(), t.value);
+    parts.push(text(x, base - 6, t.value, { size: t.size, family: f.head, weight: 400, fill: ink, tracking: 0.01 }));
+  }
+  if (second) {
+    const shown = ellipsize(second, 24, f.body, 700, rightW);
+    note("featuredText", second, shown);
+    parts.push(text(b.x + b.w - pad, base - 12, shown, { size: 24, family: f.body, weight: 700, fill: ink, anchor: "end" }));
+  }
+  addRegion(fixedRegion("featuredText", b));
+  return b.h;
+}
+
+/** Video areas for the service compositions (the photo area, clear of text drawn on it). */
+function serviceVideoBox(doc: LayoutDocument, design: MenuDesign): ZoneBox | null {
+  const active = activeCustom(doc);
+  const feature = Boolean((doc.featureTitle || doc.featureDetail || "").trim());
+  if (orientationOf(doc) === "portrait") {
+    if (design.composition === "showcaseLeft") { const MB = mediaBand(active, SL_BAND); return { x: 0, y: 0, w: W, h: MB - (feature ? 220 : 0) }; }
+    if (design.composition === "editorial") return { x: 0, y: 0, w: W, h: mediaBand(active, ED_BAND) };
+    if (design.composition === "timetable") return { x: 0, y: 0, w: W, h: mediaBand(active, TT_BAND) };
+    return null; // Spotlight's band moves with its headline; its photo stays a still on vertical boards.
+  }
+  if (design.composition === "showcaseLeft") { const PW = active && active.mediaSize != null ? Math.round(W * active.mediaSize) : 760; return { x: 0, y: 0, w: PW, h: H - (feature ? 240 : 0) }; }
+  if (design.composition === "editorial") { const PW = active && active.mediaSize != null ? Math.round(W * active.mediaSize) : 840; return { x: 0, y: 0, w: PW, h: H }; }
+  if (design.composition === "spotlight") return { x: 650, y: 0, w: 620, h: H };
+  if (design.composition === "timetable") { const PX = mediaLeft(active, 760); return feature ? { x: PX, y: 436, w: W - PX, h: H - 436 } : { x: PX, y: 0, w: W - PX, h: H }; }
+  return null;
+}
+
+
 /* ---------------- vertical (9:16) compositions ----------------
  * The same template, fonts, colours, sizes and fitting on a 1080×1920 canvas. Only the arrangement changes: the
  * right-hand photo/video/feature column becomes a full-width band at the bottom, and the menu uses the full width
@@ -1468,7 +2184,7 @@ function renderDesignOn(doc: LayoutDocument, art: DesignArt | undefined, active:
   const previous = run;
   run = { active, s0, regions: [], clips: emptyClips(), sections, items, imageSize: art?.imageSize ?? null, doc };
   try {
-    const draw = { showcase, columns, promo, list, cards, featured }[design.composition];
+    const draw = { showcase, columns, promo, list, cards, featured, showcaseLeft, editorial, spotlight, timetable }[design.composition];
     const report = draw(parts, doc, design, c, f, art);
     parts.push("</svg>");
     const itemPhotos = run.photoEffective !== undefined ? { itemPhotos: { requested: askedPhotoSize(), effective: run.photoEffective } } : {};

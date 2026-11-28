@@ -1705,6 +1705,8 @@ export const es: Record<MessageKey, string> = {
   "tpl.itemDetail": "Detalle del elemento {n}",
   "tpl.photoTipAny": "Consejo: toque el cuadro de foto para agregar una foto a cualquier elemento.",
   "tpl.itemPhotosWhereAny": "Las fotos de cada elemento se agregan en el paso 2: toque el cuadro de foto junto al elemento.",
+  "tpl.timeNote": "Escriba la hora de cada clase en el campo Hora, por ejemplo 6:00 o 5:30 pm. Las clases se muestran en el orden de la lista.",
+  "tpl.spotlightNote": "El primer elemento es el producto destacado (nombre, detalles y precio). Los demás elementos aparecen como sus puntos clave.",
   "tpl.itemDesc": "Descripción del producto {n}",
   "tpl.moveItemUp": "Subir el producto {n}",
   "tpl.moveItemDown": "Bajar el producto {n}",
@@ -2139,6 +2141,8 @@ export const es: Record<MessageKey, string> = {
   "font.montserrat.hint": "Ancha y moderna",
   "font.bebas-neue.hint": "Todo en mayúsculas, letrero llamativo",
   "font.lobster.hint": "Cursiva amigable",
+  "font.cormorant-garamond.hint": "Serifa refinada de alto contraste",
+  "font.playfair-display.hint": "Serifa editorial de exhibición",
 
   // I18N-3: Layout Studio (more)
   "ls.browserCopy": "Esta copia del navegador no guarda cambios en ninguna cuenta.",

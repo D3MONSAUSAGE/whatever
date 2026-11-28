@@ -241,15 +241,20 @@ describe("switching between templates and original layouts", () => {
 
 describe("one gallery", () => {
   const all = galleryEntries();
-  it("holds the 38 templates, the 7 original layouts and the full-screen classic menu", () => {
-    expect(all.filter((e) => e.kind === "design")).toHaveLength(38);
+  it("holds the 42 templates, the 7 original layouts and the full-screen classic menu", () => {
+    expect(all.filter((e) => e.kind === "design")).toHaveLength(42);
     expect(all.filter((e) => e.kind === "layout").map((e) => e.id)).toEqual(ORIGINAL_LAYOUTS.map((l) => l.id));
     expect(all.filter((e) => e.kind === "classic")).toHaveLength(1);
-    expect(all).toHaveLength(46);
+    expect(all).toHaveLength(50);
   });
   it("filters by business type, style, photos and layout structure; original layouts suit any business", () => {
     const f = { business: "all", style: "all", photos: false, structure: "all" } as const;
-    expect(filterGallery(all, f)).toHaveLength(46);
+    expect(filterGallery(all, f)).toHaveLength(50);
+    // The premium service templates appear under their business types.
+    for (const [business, ids] of [["salon", ["luxury-barbershop"]], ["retail", ["boutique-promotion", "product-spotlight"]], ["fitness", ["modern-gym"]]] as const) {
+      const hits = filterGallery(all, { ...f, business }).filter((e) => e.kind === "design").map((e) => e.id);
+      for (const id of ids) expect(hits, business).toContain(id);
+    }
     const cafes = filterGallery(all, { ...f, business: "cafe" });
     expect(cafes.every((e) => e.business === "cafe" || e.business === "any")).toBe(true);
     expect(cafes.some((e) => e.kind === "layout")).toBe(true);

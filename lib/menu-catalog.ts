@@ -9,7 +9,7 @@
  * layouts and the classic board are seeded from the kit, templates only take the kit's business name as their title.
  */
 import { makeT, type MessageKey } from "@/lib/i18n/index";
-import { BOARD_FONT_IDS } from "@/lib/board-fonts";
+import { BOARD_FONT_IDS, CLASSIC_FONT_IDS } from "@/lib/board-fonts";
 import { MENU_DESIGNS, designDocument, scratchDocument, type DesignBusiness, type DesignStyle } from "@/lib/menu-designs";
 import { galleryEntries, newLayoutDocument, type GalleryEntry, type Structure } from "@/lib/menu-designer";
 import { sampleLayout, type LayoutDocument } from "@/lib/layout-studio";
@@ -67,7 +67,13 @@ export type MenuCatalog = {
     style: { id: DesignStyle | "all"; name: Localized }[];
     structure: { id: Structure | "all"; name: Localized }[];
   };
+  /** The six faces every client knows (Brand Kit, classic boards, font pickers). Unchanged since schema 1. */
   fonts: string[];
+  /**
+   * Additive: every face a template board may use, including the newer template-only ones (Cormorant Garamond,
+   * Playfair Display). Older clients ignore it; a board may carry one of these in `font` / `bodyFont`.
+   */
+  templateFonts: string[];
   /** Shared customization limits (additive). Bounds are clamped by the server too; floors are in canvas px (1920×1080). */
   customization: typeof CUSTOMIZATION_META;
   entries: CatalogEntry[];
@@ -166,7 +172,8 @@ export function buildCatalog(brand: Brand | null): MenuCatalog {
       style: STYLES.map((id) => ({ id, name: both(`tpl.style.${id}` as MessageKey) })),
       structure: STRUCTURES.map((id) => ({ id, name: both(`tpl.structure.${id}` as MessageKey) })),
     },
-    fonts: [...BOARD_FONT_IDS],
+    fonts: [...CLASSIC_FONT_IDS],
+    templateFonts: [...BOARD_FONT_IDS],
     customization: CUSTOMIZATION_META,
     entries: galleryEntries().map((e) => entryFor(e, brand, version)),
     scratch: { create: { route: "POST /api/layout-studio", document: scratchDocument() } },

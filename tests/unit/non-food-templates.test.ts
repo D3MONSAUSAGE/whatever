@@ -24,12 +24,15 @@ const designs = IDS.map((id) => designById(id)!);
 const portrait = (doc: LayoutDocument): LayoutDocument => ({ ...doc, orientation: "portrait" });
 const sha = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 
+const PREMIUM = ["luxury-barbershop", "boutique-promotion", "product-spotlight", "modern-gym"];
+
 describe("non-food templates", () => {
   it("adds 16 templates after the 22 food templates, 3–4 per category, with a use case in English and Spanish", () => {
     expect(designs.every(Boolean)).toBe(true);
-    expect(MENU_DESIGNS.slice(22).map((d) => d.id)).toEqual(IDS);
+    // The four premium service templates (own compositions, tests/unit/service-templates.test.ts) follow these 16.
+    expect(MENU_DESIGNS.slice(22, 38).map((d) => d.id)).toEqual(IDS);
     for (const [business, ids] of Object.entries(NON_FOOD)) {
-      expect(MENU_DESIGNS.filter((d) => d.business === business).map((d) => d.id)).toEqual(ids);
+      expect(MENU_DESIGNS.filter((d) => d.business === business && !PREMIUM.includes(d.id)).map((d) => d.id)).toEqual(ids);
       expect(ids.length).toBeGreaterThanOrEqual(3);
     }
     for (const d of designs) {
@@ -104,7 +107,7 @@ describe("non-food templates", () => {
     const all = galleryEntries();
     const f = { business: "all", style: "all", photos: false, structure: "all" } as const;
     for (const [business, ids] of Object.entries(NON_FOOD)) {
-      const hits = filterGallery(all, { ...f, business: business as DesignBusiness }).filter((e) => e.kind === "design").map((e) => e.id);
+      const hits = filterGallery(all, { ...f, business: business as DesignBusiness }).filter((e) => e.kind === "design" && !PREMIUM.includes(e.id)).map((e) => e.id);
       expect(hits).toEqual(ids);
       const key = `tpl.business.${business}` as keyof typeof en;
       expect(en[key]).toBeTruthy();

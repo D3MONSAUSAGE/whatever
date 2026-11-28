@@ -188,3 +188,89 @@ describe("unified designer, signed in: classic boards", () => {
     expect(kept.ok && photoIds(kept.value)).toEqual([PHOTO]);
   });
 });
+
+describe("service templates (salon, retail, fitness), signed in: the real save/publish routes in both shapes", () => {
+  const SERVICE = ["luxury-barbershop", "boutique-promotion", "product-spotlight", "modern-gym"];
+  const pngSize = (bytes: Uint8Array) => { const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength); return [v.getUint32(16), v.getUint32(20)]; };
+  const publishedSize = (menuId: string) => {
+    const media = store.media.find((row) => row.id === store.menus.find((m) => m.id === menuId)!.media_id)!;
+    return pngSize(store.objects.get(String(media.storage_path))!);
+  };
+  // The web editor's requests say they can edit vertical boards (lib/api.ts); older phone builds don't.
+  const saveV = (token: string, mode: "draft" | "publish", menuId: string | null, name: string, document: LayoutDocument) =>
+    studioPost(req("/api/layout-studio", token, { method: "POST", headers: { "X-Pekko-Client-Caps": "orientation" }, body: JSON.stringify(accountSaveBody({ mode, menuId, name, document })) }));
+
+  it("create → draft → reopen → edit (photo, colour style, text size) → publish → add screen, horizontal and vertical", async () => {
+    const { otherBoardMedia } = await seed();
+    for (const id of SERVICE) for (const orientation of ["landscape", "portrait"] as const) {
+      const design = designById(id)!;
+      const start: LayoutDocument = { ...designDocument(design), ...(orientation === "portrait" ? { orientation } : {}) };
+      const draft = await saveV("token-a", "draft", null, `${id} ${orientation}`, start);
+      expect(draft.status, `${id}/${orientation}`).toBe(200);
+      const { menuId } = await draft.json() as { menuId: string };
+      breakfastUntouched(otherBoardMedia);
+      const loaded = readAccountStudio(await (await studioGet(req("/api/layout-studio", "token-a"))).json());
+      const reopened = parseLayout(loaded!.boards.find((b) => b.id === menuId)!.document);
+      expect(reopened.ok && reopened.value.design, id).toBe(id);
+      expect(reopened.ok && (reopened.value.orientation ?? "landscape"), id).toBe(orientation);
+      // Owner edits: item photo, the second colour style, larger text, a renamed item.
+      const base = reopened.ok ? reopened.value : start;
+      let doc: LayoutDocument = { ...withItemPhoto(base, 0, 0, PHOTO), variant: design.variants[1].id };
+      const rs = doc.sections.findIndex((s) => s.items.length >= 2);
+      doc = { ...doc, custom: { v: 1, textScale: 1.1 }, sections: doc.sections.map((s, si) => si !== rs ? s : { ...s, items: s.items.map((it, ii) => ii === 1 ? { ...it, name: "Renamed" } : it) }) } as LayoutDocument;
+      const published = await saveV("token-a", "publish", menuId, `${id} ${orientation}`, doc);
+      expect(published.status, `${id}/${orientation} ${await published.clone().text()}`).toBe(200);
+      const after = parseLayout(store.menus.find((row) => row.id === menuId)!.content);
+      expect(after.ok && after.value.variant, id).toBe(design.variants[1].id);
+      expect(after.ok && (after.value.orientation ?? "landscape"), id).toBe(orientation);
+      expect(after.ok && photoIds(after.value), id).toEqual([PHOTO]);
+      expect(after.ok && after.value.sections[rs].items[1].name, id).toBe("Renamed");
+      expect(publishedSize(menuId), `${id}/${orientation}`).toEqual(orientation === "portrait" ? [1080, 1920] : [1920, 1080]);
+      breakfastUntouched(otherBoardMedia);
+    }
+    const first = store.menus.find((m) => String(m.name).startsWith("modern-gym landscape"))!;
+    const assigned = await assignBoard(req("/api/layout-studio/assign", "token-a", { method: "POST", body: JSON.stringify({ menuId: first.id, displayId: "10000000-0000-4000-8000-0000000000f2" }) }));
+    expect(assigned.status).toBe(200);
+    breakfastUntouched(otherBoardMedia);
+  }, 120000);
+
+  it("an older phone client that re-sends the stored JSON, or picks one of the original six fonts, saves cleanly", async () => {
+    await seed();
+    for (const id of SERVICE) {
+      const res = await save("token-a", "draft", null, id, designDocument(designById(id)!));
+      const { menuId } = await res.json() as { menuId: string };
+      const raw = store.menus.find((row) => row.id === menuId)!.content as LayoutDocument;
+      // Round trip of the raw document (what the phone keeps) is lossless.
+      expect((await save("token-a", "draft", menuId, id, raw)).status, id).toBe(200);
+      expect(store.menus.find((row) => row.id === menuId)!.content, id).toEqual(raw);
+      // A picker that only knows the original faces.
+      expect((await save("token-a", "publish", menuId, id, { ...raw, font: "oswald", bodyFont: "inter" })).status, id).toBe(200);
+    }
+  }, 60000);
+
+  it("an older phone client can't flatten a vertical service board (409 orientation_unsupported); rename still works", async () => {
+    await seed();
+    const tall: LayoutDocument = { ...designDocument(designById("modern-gym")!), orientation: "portrait" };
+    const { menuId } = await (await saveV("token-a", "draft", null, "Tall", tall)).json() as { menuId: string };
+    const raw = { ...(store.menus.find((row) => row.id === menuId)!.content as LayoutDocument) };
+    delete (raw as { orientation?: string }).orientation;
+    const old = await studioPost(req("/api/layout-studio", "token-a", { method: "POST", body: JSON.stringify({ mode: "draft", menuId, name: "Tall", document: raw }) }));
+    expect(old.status).toBe(409);
+    expect((store.menus.find((row) => row.id === menuId)!.content as LayoutDocument).orientation).toBe("portrait");
+  });
+
+  it("switching between a service template, an original template and an original layout keeps every item", async () => {
+    await seed();
+    const gym = designDocument(designById("modern-gym")!);
+    const res = await save("token-a", "draft", null, "Classes", gym);
+    const { menuId } = await res.json() as { menuId: string };
+    const asRestaurant = switchDesign(gym, designById("modern-restaurant")!);
+    const asLayout = switchToLayout(asRestaurant, "two-column");
+    const back = switchDesign(asLayout, designById("luxury-barbershop")!);
+    for (const doc of [asRestaurant, asLayout, back]) {
+      expect((await save("token-a", "draft", menuId, "Classes", doc)).status).toBe(200);
+      const stored = parseLayout(store.menus.find((row) => row.id === menuId)!.content);
+      expect(stored.ok && stored.value.sections.map((s) => s.items.map((i) => [i.name, i.price]))).toEqual(gym.sections.map((s) => s.items.map((i) => [i.name, i.price])));
+    }
+  });
+});

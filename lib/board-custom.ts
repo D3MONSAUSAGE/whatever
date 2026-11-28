@@ -13,7 +13,7 @@
  *
  * Client-safe: no server imports.
  */
-import { BOARD_FONTS, type BoardFontId } from "@/lib/board-fonts";
+import { BOARD_FONTS, uprightFaces, type BoardFontId } from "@/lib/board-fonts";
 import { designById, isDesignId, DESIGN_ITEM_PHOTO_DEFAULT, type DesignComposition } from "@/lib/menu-designs";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
@@ -99,6 +99,9 @@ export const DESIGN_MEDIA: Partial<Record<DesignComposition, MediaSpec>> = {
   showcase: { axis: "width", min: 0.3, max: 0.5, def: 780 / 1920 },
   columns: { axis: "width", min: 0.24, max: 0.4, def: 576 / 1920 },
   promo: { axis: "width", min: 0.26, max: 0.42, def: 660 / 1920 },
+  showcaseLeft: { axis: "width", min: 0.3, max: 0.5, def: 760 / 1920 },
+  editorial: { axis: "width", min: 0.34, max: 0.5, def: 840 / 1920 },
+  timetable: { axis: "width", min: 0.45, max: 0.65, def: 1160 / 1920 },
 };
 const DESIGN_SPEC: Record<DesignComposition, Omit<CustomizationSpec, "media" | "engine" | "itemPhotoSize">> = {
   showcase: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
@@ -108,6 +111,11 @@ const DESIGN_SPEC: Record<DesignComposition, Omit<CustomizationSpec, "media" | "
   cards: { roles: ["businessName", "itemName", "description", "price"], sectionHeadings: false, spacing: false, imageFocus: false },
   // Featured dishes: the dish cards keep their own sizes; the photo width slider is hidden (approved recommendation 4).
   featured: { roles: NO_FEATURE, sectionHeadings: true, spacing: true, imageFocus: false },
+  showcaseLeft: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
+  editorial: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
+  // Spotlight's product photo keeps a fixed column (no size slider); its focal point is still adjustable.
+  spotlight: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
+  timetable: { roles: ALL_ROLES, sectionHeadings: true, spacing: true, imageFocus: true },
 };
 
 /** Original layouts: mediaSize maps onto the existing `split` (kept in sync), so older clients draw the same frame. */
@@ -151,11 +159,11 @@ export function customizationSpec(doc: Pick<LayoutDocument, "design" | "template
 /** Weights each bundled font ships, as weight choices a client may offer (others snap to these). */
 export function fontWeightChoices(font: BoardFontId): FontWeightChoice[] {
   const spec = BOARD_FONTS.find((f) => f.id === font);
-  const shipped = spec ? spec.files.map((f) => f.weight) : [400];
+  const shipped = spec ? uprightFaces(spec).map((f) => f.weight) : [400];
   return WEIGHT_CHOICES.filter((choice) => shipped.includes(WEIGHT_VALUE[choice]));
 }
 export function fontWeightsByFont(): Record<BoardFontId, { choices: FontWeightChoice[]; weights: number[] }> {
-  return Object.fromEntries(BOARD_FONTS.map((f) => [f.id, { choices: fontWeightChoices(f.id), weights: f.files.map((x) => x.weight) }])) as Record<BoardFontId, { choices: FontWeightChoice[]; weights: number[] }>;
+  return Object.fromEntries(BOARD_FONTS.map((f) => [f.id, { choices: fontWeightChoices(f.id), weights: uprightFaces(f).map((x) => x.weight) }])) as Record<BoardFontId, { choices: FontWeightChoice[]; weights: number[] }>;
 }
 function snapWeightTo(shipped: number[], weight: number): number {
   let best = shipped[0] ?? 400; let gap = Infinity;
@@ -169,7 +177,7 @@ function snapWeightTo(shipped: number[], weight: number): number {
 /** The weight actually drawn for a choice in a family (render-time snap to shipped faces). */
 export function snapWeight(family: string, choice: FontWeightChoice): number {
   const spec = BOARD_FONTS.find((f) => f.family === family);
-  return snapWeightTo(spec ? spec.files.map((f) => f.weight) : [400, 700], WEIGHT_VALUE[choice]);
+  return snapWeightTo(spec ? uprightFaces(spec).map((f) => f.weight) : [400, 700], WEIGHT_VALUE[choice]);
 }
 
 /* ---------------- parsing (server and clients) ---------------- */

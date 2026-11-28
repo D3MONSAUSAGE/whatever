@@ -7,10 +7,11 @@ import { menuSvg, renderMenuPng } from "@/lib/server/menu-render";
 import { parseMenuContent, sampleMenu } from "@/lib/menu-templates";
 import { layoutSvg, parseLayout, sampleLayout, seedBrand } from "@/lib/layout-studio";
 import { seedClassicMenu } from "@/lib/brand-kit";
-import { ALL_FONT_FILES, BOARD_FONTS, boardFont, FONT_FILES, fontFaceCss, type BoardFontId } from "@/lib/board-fonts";
+import { ALL_FONT_FILES, BOARD_FONTS, boardFont, FONT_FILES, fontFaceCss, isClassicFont, type BoardFontId } from "@/lib/board-fonts";
 
 const sha = (b: Uint8Array | string) => createHash("sha256").update(b).digest("hex").slice(0, 16);
-const IDS = BOARD_FONTS.map((f) => f.id) as BoardFontId[];
+// Brand Kit faces (CLASSIC_FONT_IDS): newer board-only fonts are not Brand Kit choices (database constraint).
+const IDS = BOARD_FONTS.map((f) => f.id).filter((id) => isClassicFont(id)) as BoardFontId[];
 /** Every heading/body pair a Brand Kit can hold (different fonts). */
 const PAIRS: [BoardFontId, BoardFontId][] = IDS.flatMap((h) => IDS.filter((b) => b !== h).map((b) => [h, b] as [BoardFontId, BoardFontId]));
 /** The QA-reported pairs also get the real-browser face check. */

@@ -1,5 +1,5 @@
 /** Shared (client + server) menu-board definitions and validation. */
-import { FONT_CHOICE_ERROR, isBoardFont, type BoardFontId } from "@/lib/board-fonts";
+import { FONT_CHOICE_ERROR, isClassicFont, type BoardFontId } from "@/lib/board-fonts";
 import { orientationField, orientationOf, type BoardOrientation } from "@/lib/board-orientation";
 
 export type MenuTemplate = "classic" | "fresh" | "bold";
@@ -114,7 +114,8 @@ export function parseMenuContent(input: unknown): { ok: true; value: MenuContent
   for (const key of ["headingFont", "bodyFont"] as const) {
     const value = raw[key];
     if (value == null || value === "") continue;
-    if (!isBoardFont(value)) return { ok: false, error: FONT_CHOICE_ERROR };
+    // Classic menus keep the six faces the Android app knows (template/layout boards may use every board font).
+    if (!isClassicFont(value)) return { ok: false, error: FONT_CHOICE_ERROR };
     fonts[key] = value;
   }
   if (raw.itemPhotos != null && typeof raw.itemPhotos !== "boolean") return { ok: false, error: "Item photos has to be true or false." };
@@ -133,7 +134,7 @@ export function keepStoredFonts(incoming: unknown, parsed: MenuContent, stored: 
   for (const key of ["headingFont", "bodyFont"] as const) {
     if (Object.prototype.hasOwnProperty.call(raw, key)) continue;
     const value = old[key];
-    if (isBoardFont(value)) next[key] = value;
+    if (isClassicFont(value)) next[key] = value;
   }
   return next;
 }

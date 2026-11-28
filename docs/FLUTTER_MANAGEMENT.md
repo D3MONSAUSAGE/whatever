@@ -200,7 +200,7 @@ Menus are still images on the TV. The server renders a 1920×1080 PNG and stores
 | --- | --- | --- | --- | --- |
 | Classic full-screen | `content.layoutVersion` absent | `MenuContent` (`lib/menu-templates.ts`): `title, subtitle, footer, sections[{ name, items[{ name, price, description, imageMediaId? }] }], photoMediaId?, useBrand?, headingFont?, bodyFont?, itemPhotos?` | `POST /api/menus`, `PATCH /api/menus/:id` (re-render, swap image on its screens; no draft) | Create, edit, rename, assign |
 | Original layout (7) | `content.layoutVersion === 1`, no `design` | `LayoutDocument` (`lib/layout-studio.ts`): `layoutVersion: 1, template ∈ {two-column, menu-promo-67, two-menu-promo, triple-column, split-50, menu-banner, signature}, split, title, subtitle, footer, sections, imageMediaId, videoMediaId, palette, primaryColor, accentColor, typeScale, font, bodyFont?, textColor, backgroundColor, featureTitle, featureDetail, columnWidths, imageFit, imageAnchor`; items may have `imageMediaId` | `POST /api/layout-studio {mode: "draft"\|"publish", menuId, name, document}` | Create, edit, rename, assign via `POST /api/layout-studio` (phone since Android +17). `PATCH /api/menus/:id` with `content` or `template` is still 409 |
-| Professional template (38) | `content.layoutVersion === 1` **and** `content.design` | `LayoutDocument` + `design` (template id), `variant`, `stockPhoto?`, `logoMediaId?`, deprecated `photoStyle?`; items may have `imageMediaId` and `stockPhoto` (item photos auto-display whenever present) | same as layouts | same as layouts |
+| Professional template (42) | `content.layoutVersion === 1` **and** `content.design` | `LayoutDocument` + `design` (template id), `variant`, `stockPhoto?`, `logoMediaId?`, deprecated `photoStyle?`; items may have `imageMediaId` and `stockPhoto` (item photos auto-display whenever present) | same as layouts | same as layouts |
 
 Rules for clients:
 
@@ -211,7 +211,7 @@ Rules for clients:
 5. **Lossless classic edits.** The server keeps what an older client omits: `headingFont` / `bodyFont` and `itemPhotos` when the key is absent, and an item's `imageMediaId` when the item is sent without that key (matched by section name or position, then item **name**, first match). An explicit `null` clears. Renaming an item on a client that omits `imageMediaId` therefore loses that item's photo: send `imageMediaId` back unchanged (keep each item's raw JSON).
 6. **Item photos** must be this account's own JPEG/PNG/WebP (`media` ids); others are dropped on save. Limits: 4 sections, 12 items per section, 24 items in total for classic boards.
 
-Template ids (`lib/menu-designs.ts`): `modern-restaurant, trattoria, cocktail-lounge, coffee-shop, bakery, brunch-house, espresso-bar, bold-fast-casual, pizza-night, smokehouse-bbq, happy-hour, morning-rush, taqueria, diner-classics, chalkboard-bistro, juice-bar, ice-cream-parlor, boba-tea, photo-menu-grid, cafe-favorites, taqueria-specials, featured-dishes`, then the 16 non-food templates `salon-maison, barber-blade, beauty-glow, nails-polished, retail-sale, retail-offers, retail-boutique, fitness-timetable, fitness-join, fitness-motivate, office-welcome, office-rooms, office-kudos, pets-groom, pets-treats, pets-care` (see `docs/MENU_TEMPLATES.md`). Don't hard-code this list; read the catalog. Fonts (`lib/board-fonts.ts`): `inter, noto-serif, oswald, montserrat, bebas-neue, lobster`. `GET /api/menu-templates` → `{ enabled, unified }` says whether the account has the designer (true for everyone today).
+Template ids (`lib/menu-designs.ts`): `modern-restaurant, trattoria, cocktail-lounge, coffee-shop, bakery, brunch-house, espresso-bar, bold-fast-casual, pizza-night, smokehouse-bbq, happy-hour, morning-rush, taqueria, diner-classics, chalkboard-bistro, juice-bar, ice-cream-parlor, boba-tea, photo-menu-grid, cafe-favorites, taqueria-specials, featured-dishes, luxury-barbershop, boutique-promotion, product-spotlight, modern-gym`, then the 16 non-food templates `salon-maison, barber-blade, beauty-glow, nails-polished, retail-sale, retail-offers, retail-boutique, fitness-timetable, fitness-join, fitness-motivate, office-welcome, office-rooms, office-kudos, pets-groom, pets-treats, pets-care` (see `docs/MENU_TEMPLATES.md`). Don't hard-code this list; read the catalog. Fonts (`lib/board-fonts.ts`): `inter, noto-serif, oswald, montserrat, bebas-neue, lobster`. `GET /api/menu-templates` → `{ enabled, unified }` says whether the account has the designer (true for everyone today).
 
 Publishing a web-designer board (PR #159) swaps the board's own image on its playlist. Promotion items attached to the same playlist are no longer at risk of being replaced.
 
@@ -240,7 +240,7 @@ Everything the web gallery and guided editor use, exposed so the app never keeps
 
 | Call | Auth | Purpose | Source |
 | --- | --- | --- | --- |
-| `GET /api/menu-templates/catalog` | Bearer | Gallery: filters, 46 entries, seeds | `app/api/menu-templates/catalog/route.ts` |
+| `GET /api/menu-templates/catalog` | Bearer | Gallery: filters, 50 entries, seeds | `app/api/menu-templates/catalog/route.ts` |
 | `GET /api/menu-templates/thumbnail/:id` | **Public** | 16:9 PNG of an entry's sample board | `app/api/menu-templates/thumbnail/[id]/route.ts` |
 | `POST /api/menu-templates/switch` | Bearer | Change template / variant / layout, keeping content | `app/api/menu-templates/switch/route.ts` |
 | `POST /api/layout-studio/preview` | Bearer | Exact publish PNG, or fit report only; saves nothing | `app/api/layout-studio/preview/route.ts` |
@@ -263,11 +263,12 @@ Everything the web gallery and guided editor use, exposed so the app never keeps
     "style":     [ "all", "dark", "light", "bold" ],             // same {id, name{en,es}} objects
     "structure": [ "all", "single", "columns", "media", "cards" ]
   },
-  "fonts": ["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"],
+  "fonts": ["inter", "noto-serif", "oswald", "montserrat", "bebas-neue", "lobster"],   // unchanged: Brand Kit, classic boards, pickers
+  "templateFonts": [ ...fonts, "cormorant-garamond", "playfair-display" ],              // additive: faces a template board may carry
   "entries": [
     {
       "id": "modern-restaurant",       // stable; also the value of content.design on saved boards
-      "kind": "template",              // "template" (38) | "classic" (1, id "full-screen") | "layout" (7)
+      "kind": "template",              // "template" (42) | "classic" (1, id "full-screen") | "layout" (7)
       "name": { "en": "Modern Restaurant", "es": "Restaurante moderno" },
       "description": { "en": "...", "es": "..." },
       "business": "restaurant",        // "any" on layouts and classic: matches every business filter
@@ -288,10 +289,16 @@ Everything the web gallery and guided editor use, exposed so the app never keeps
 }
 ```
 
-- **Order** is the web gallery's: 38 templates, the classic board, then 7 layouts. Filter exactly like the web: business `all` or equal or entry `any`; style `all` or equal; structure `all` or equal; photos toggle → `photos === true`.
+- **Order** is the web gallery's: 42 templates, the classic board, then 7 layouts. Filter exactly like the web: business `all` or equal or entry `any`; style `all` or equal; structure `all` or equal; photos toggle → `photos === true`.
 - **Names** are both languages in every response; pick by the app language. `Accept-Language` doesn't change the body.
 - **Seeds are per account, like the web.** Layout and classic seeds carry this account's Brand Kit (colours, fonts, business name, footer contact); templates take only the kit's business name as `title`. No other account data is included: no ids, emails, media ids or logo.
 - **Create a board:** `POST /api/layout-studio { mode: "draft" | "publish", menuId: null, name, document: entry.create.document }`, or for `kind: "classic"` `POST /api/menus { name, template: "classic", content }` (existing contract). Use `boardName ?? name[lang]` for `name`. To pick a variant other than the first, set `document.variant` to its id (or use `switch`).
+- **Premium service templates (Nov 2026)**: `luxury-barbershop`, `boutique-promotion`, `product-spotlight`, `modern-gym` (business `salon`, `retail`, `retail`, `fitness`; `terms` as on the web).
+  - Their seeds use `font` / `bodyFont` values from `templateFonts` (`cormorant-garamond`, `playfair-display`, `bebas-neue`). A client whose font picker knows only `fonts` should show such a board's font as read-only ("Template font") and send it back unchanged. It should not reset it or fail.
+  - **Modern Gym** stores each class time in the item's `price` field (e.g. `"6:00"`), like the other `terms: "classes"` templates.
+  - **Product Spotlight** features the first item; the other items' prices are optional.
+  - All rendering is on the server (the same PNG and `composition` video box as other templates), so the TV needs no update.
+- **Unknown values:** new `business`, `style` or `structure` ids, template ids and fonts can be added without a schema bump. Show an unknown filter id under "All", and keep unknown values when saving.
 - **Cache** by `version`. Unknown `kind` values or extra fields may appear later; skip entries you don't understand.
 
 ### `GET /api/menu-templates/thumbnail/:id`

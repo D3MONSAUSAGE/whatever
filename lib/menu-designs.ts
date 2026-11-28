@@ -9,13 +9,16 @@ import { normalizeCustomFor } from "@/lib/board-custom";
 import type { BoardFontId } from "@/lib/board-fonts";
 import type { LayoutDocument, LayoutSection, LayoutTemplate } from "@/lib/layout-studio";
 
-export type DesignComposition = "showcase" | "columns" | "promo" | "list" | "cards" | "featured";
+export type DesignComposition = "showcase" | "columns" | "promo" | "list" | "cards" | "featured"
+  // Premium service templates (Noir & Co., Linden, Forge).
+  | "showcaseLeft" | "editorial" | "spotlight" | "timetable";
 /**
  * t421u: item photo size seeded into NEW template boards (see lib/board-custom.ts ITEM_PHOTO_SIZES). Existing boards
  * have no `itemPhotoSize` and keep the legacy size (= "small"). Lists have the widest columns, so they start Large.
  */
 export const DESIGN_ITEM_PHOTO_DEFAULT: Record<DesignComposition, "small" | "medium" | "large"> = {
   list: "large", showcase: "medium", columns: "medium", promo: "medium", cards: "medium", featured: "medium",
+  showcaseLeft: "medium", editorial: "medium", spotlight: "medium", timetable: "medium",
 };
 export type DesignStyle = "dark" | "light" | "bold";
 export type DesignBusiness = "restaurant" | "cafe" | "fast" | "bar" | "sweets"
@@ -42,7 +45,7 @@ export type DesignVariant = {
 
 export type DesignLook = {
   head: BoardFontId;
-  headWeight: 400 | 700 | 800;
+  headWeight: 400 | 500 | 600 | 700 | 800;
   body: BoardFontId;
   /** Section headings use the heading face (true) or the body face. */
   sectionInHead: boolean;
@@ -68,6 +71,8 @@ export const STOCK_PHOTOS = [
   "streettacos", "wings", "macarons", "cake", "chicken", "muffins", "quesadilla", "burrito",
   // Non-food templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
   "shoppingbags", "beagle",
+  // Premium service templates (Unsplash licence; ids in docs/MENU_TEMPLATES.md).
+  "barbershave", "knitwear", "amberoil", "deadlift",
 ] as const;
 export type StockPhotoId = (typeof STOCK_PHOTOS)[number];
 
@@ -109,6 +114,11 @@ export const COMPOSITION_LAYOUT: Record<DesignComposition, { template: LayoutTem
   // Photo templates fill the whole board with menu content; there is no single feature photo or video area.
   cards: { template: "triple-column", split: 1 / 3, columnWidths: null },
   featured: { template: "triple-column", split: 1 / 3, columnWidths: null },
+  // Service templates draw their own frame; this geometry is only what the Advanced editor's layout fields hold.
+  showcaseLeft: { template: "split-50", split: 0.6, columnWidths: null },
+  editorial: { template: "split-50", split: 1 - 840 / 1920, columnWidths: null },
+  spotlight: { template: "triple-column", split: 1 / 3, columnWidths: null },
+  timetable: { template: "split-50", split: 0.4, columnWidths: null },
 };
 
 const i = (name: string, price: string, description = "", stockPhoto?: StockPhotoId) => ({ name, price, description, ...(stockPhoto ? { stockPhoto } : {}) });
@@ -935,6 +945,91 @@ export const MENU_DESIGNS: MenuDesign[] = [
         { name: "Daycare", items: [i("Half day", "$22"), i("Full day", "$35"), i("10-day pass", "$300", "Save $50")] },
         { name: "Boarding", items: [i("Dog suite", "$55", "Per night, two walks"), i("Cat condo", "$35", "Per night"), i("Late pickup", "$15", "After 7 PM")] },
         { name: "Grooming", items: [i("Bath & brush", "$40"), i("Full groom", "From $65")] },
+      ],
+    },
+  },
+  /* ---------------- premium service templates (salons, retail, fitness) ---------------- */
+  {
+    id: "luxury-barbershop", composition: "showcaseLeft", business: "salon", style: "dark", terms: "services",
+    name: { en: "Luxury Barbershop", es: "Barbería de lujo" },
+    blurb: { en: "Quiet and expensive. A refined serif, brass details and a moody photo that melts into the page.", es: "Sobria y exclusiva. Serifa refinada, detalles dorados y una foto que se funde con la página." },
+    useCase: { en: "Premium barbershop service list", es: "Lista premium de servicios de barbería" },
+    look: { head: "cormorant-garamond", headWeight: 600, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.25, rule: true, accentPrices: true },
+    variants: [
+      v("noir", "Noir & brass", "Negro y latón", "#100f0e", "#f1e9dc", "#9c9183", "#c8a46e", "#1b1a18"),
+      v("bone", "Bone & ink", "Hueso y tinta", "#ece6dc", "#1d1a16", "#6b6257", "#7d5f35", "#d9d0c2"),
+      v("oxblood", "Oxblood", "Burdeos", "#1f100f", "#f3e7d7", "#b39d8a", "#d6a877", "#2c1715"),
+    ],
+    stock: "barbershave",
+    sample: {
+      title: "Noir & Co.", subtitle: "Barbers & grooming · Est. 2012", footer: "Walk-ins welcome · Book at the front desk or online · Tue–Sat 9 am – 8 pm",
+      featureTitle: "Signature ritual", featureDetail: "The hot towel shave · $48",
+      sections: [
+        { name: "Cuts", items: [i("Signature cut", "$55", "45 min · Wash, cut and style"), i("Skin fade", "$50", "40 min · Foil finish"), i("Long hair restyle", "$70", "60 min")] },
+        { name: "Rituals", items: [i("The full service", "$95", "90 min · Cut, shave, scalp massage")] },
+        { name: "Shave & beard", items: [i("Hot towel shave", "$48", "40 min · Straight razor, balm"), i("Beard sculpt", "$32", "25 min · Shape and line")] },
+        { name: "Finishing", items: [i("Grey blending", "$40", "30 min"), i("Brow & ear tidy", "$15", "10 min")] },
+      ],
+    },
+  },
+  {
+    id: "boutique-promotion", composition: "editorial", business: "retail", style: "light", terms: "products",
+    name: { en: "Boutique Promotion", es: "Promoción boutique" },
+    blurb: { en: "Editorial and calm, like a magazine page. A big serif headline, one offer band and featured products.", es: "Editorial y serena, como una página de revista. Gran titular con serifa, una franja de oferta y productos destacados." },
+    useCase: { en: "Boutique collection promotion", es: "Promoción de colección boutique" },
+    look: { head: "playfair-display", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.26 },
+    variants: [
+      v("stone", "Stone & rust", "Piedra y óxido", "#f2ede5", "#1c1a17", "#746b61", "#9b4a2c", "#9b4a2c"),
+      v("sage", "Sage", "Salvia", "#eef0ea", "#18201b", "#66706a", "#3f5f4b", "#3f5f4b"),
+      v("noir", "Noir", "Negro", "#141312", "#f3eee6", "#a49b90", "#d9a78a", "#d9a78a"),
+    ],
+    stock: "knitwear",
+    sample: {
+      title: "Linden & Co.", subtitle: "Knitwear, coats and quiet essentials.", footer: "Members get early access · Free alterations in store",
+      featureTitle: "The Autumn Edit", featureDetail: "Up to 25% off knitwear · This weekend only",
+      sections: [
+        { name: "", items: [i("Merino crewneck", "$128", "Was $160 · Oat, charcoal"), i("Cable-knit cardigan", "$156", "Was $195 · Undyed wool"), i("Alpaca scarf", "$68", "Was $85 · Six colours"), i("Wool-blend coat", "$296", "Was $370 · Camel, black")] },
+      ],
+    },
+  },
+  {
+    id: "product-spotlight", composition: "spotlight", business: "retail", style: "light", terms: "products",
+    name: { en: "Product Spotlight", es: "Producto destacado" },
+    blurb: { en: "One hero product in the centre, its story and price on one side, what makes it special on the other.", es: "Un producto protagonista en el centro, su historia y precio a un lado y lo que lo hace especial al otro." },
+    useCase: { en: "Single hero product launch", es: "Lanzamiento de un producto estrella" },
+    look: { head: "playfair-display", headWeight: 700, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.26 },
+    variants: [
+      v("stone", "Stone & rust", "Piedra y óxido", "#f2ede5", "#1c1a17", "#746b61", "#9b4a2c", "#9b4a2c"),
+      v("sage", "Sage", "Salvia", "#eef0ea", "#18201b", "#66706a", "#3f5f4b", "#3f5f4b"),
+      v("noir", "Noir", "Negro", "#141312", "#f3eee6", "#a49b90", "#d9a78a", "#d9a78a"),
+    ],
+    stock: "amberoil",
+    sample: {
+      title: "Solène Skin Studio", subtitle: "New arrival", footer: "Ask to try it in store",
+      featureTitle: "Glow, bottled.", featureDetail: "Free travel mini with every bottle",
+      sections: [
+        { name: "Product", items: [i("Amber Facial Oil", "$64", "Rosehip, squalane and sea buckthorn. 30 ml.")] },
+        { name: "Why it works", items: [i("Fragrance-free", "", "Gentle on sensitive skin"), i("Fast absorbing", "", "No greasy finish"), i("Refillable glass", "", "Bring it back for 15% off"), i("Made in small batches", "", "Cold-pressed oils")] },
+      ],
+    },
+  },
+  {
+    id: "modern-gym", composition: "timetable", business: "fitness", style: "bold", terms: "classes",
+    name: { en: "Modern Gym", es: "Gimnasio moderno" },
+    blurb: { en: "Dark and athletic. A huge wordmark, today's classes by time and a bright offer block.", es: "Oscuro y atlético. Un gran logotipo, las clases de hoy por hora y una oferta llamativa." },
+    useCase: { en: "Today's classes & member offer", es: "Clases de hoy y oferta para socios" },
+    look: { head: "bebas-neue", headWeight: 400, body: "inter", sectionInHead: false, sectionWeight: 700, sectionTracking: 0.2, namesUpper: true },
+    variants: [
+      v("volt", "Volt", "Voltio", "#0a0a0b", "#f5f6f2", "#8c9088", "#d4ff3a", "#d4ff3a"),
+      v("signal", "Signal", "Señal", "#0b0a0a", "#f6f3f1", "#958b86", "#ff5b2e", "#ff5b2e"),
+      v("ice", "Ice", "Hielo", "#080b0e", "#f1f6fa", "#869099", "#5fd3ff", "#5fd3ff"),
+    ],
+    stock: "deadlift",
+    sample: {
+      title: "Forge", subtitle: "Strength & conditioning", footer: "Open 5 am – 11 pm daily · Book classes in the app or at the desk",
+      featureTitle: "New member offer", featureDetail: "$29 · First month · No joining fee this week",
+      sections: [
+        { name: "Today’s classes", items: [i("HIIT Burn", "6:00", "Coach Maya · 45 min · Studio A"), i("Strength Lab", "7:15", "Coach Dre · 60 min · Platform"), i("Spin 45", "12:00", "Coach Lena · 45 min · Ride room"), i("Olympic Lifting", "17:30", "Coach Dre · 75 min · Platform"), i("Mobility Flow", "19:00", "Coach Sam · 40 min · Studio B")] },
       ],
     },
   },
