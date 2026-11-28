@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SignupAttribution } from "@/components/signup-attribution";
+import { HeyCatchIdentity } from "@/components/heycatch-identity";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { getLocale } from "@/lib/i18n/server";
 import { publicAppOrigin } from "@/lib/public-url";
@@ -46,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} className={inter.variable}>
       <body className={`${inter.className} antialiased`}>
-        <LocaleProvider initial={locale}><SignupAttribution />{children}</LocaleProvider>
+        <LocaleProvider initial={locale}><SignupAttribution /><HeyCatchIdentity />{children}</LocaleProvider>
       </body>
     </html>
   );

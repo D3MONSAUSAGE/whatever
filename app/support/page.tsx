@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
-import { HeyCatchAnalytics } from "@/components/site/heycatch-analytics";
 import { ContactBlock } from "@/components/contact-block";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { marketingMetadata } from "@/lib/seo";
@@ -23,7 +22,6 @@ export default async function Support() {
   const t = await getT();
   return (
     <PublicPage theme="dark">
-      <HeyCatchAnalytics />
       <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight"><span className="mk-gradient-text">{t("support.title")}</span></h1>
       <p className="text-muted mt-3 text-lg">{t("support.lede")}</p>
       <div className="mt-6 grid gap-3">
