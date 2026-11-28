@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { SignupAttribution } from "@/components/signup-attribution";
 import { HeyCatchIdentity } from "@/components/heycatch-identity";
-import { LocaleProvider } from "@/lib/i18n/client";
+import { LocaleProvider } from "@/lib/i18n/locale-context";
 import { getLocale } from "@/lib/i18n/server";
 import { publicAppOrigin } from "@/lib/public-url";
 

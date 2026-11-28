@@ -19,10 +19,10 @@ export function TrialLink({ href, location, className, children, tabIndex, testI
   );
 }
 
-/** Counts a cta_click for any signup link inside (used around server-rendered pricing cards). */
+/** Counts a cta_click for any trial link inside (used around server-rendered pricing cards). */
 export function TrackSignupClicks({ location, children }: { location: CtaLocation; children: ReactNode }) {
   return (
-    <div onClickCapture={(e) => { if ((e.target as Element).closest?.('a[href="/signup"]')) trackFunnel("cta_click", location); }}>
+    <div onClickCapture={(e) => { if ((e.target as Element).closest?.('a[href="/signup"], a[href="/create"]')) trackFunnel("cta_click", location); }}>
       {children}
     </div>
   );
@@ -122,6 +122,8 @@ export function LiveDemo({ chips, text, children, ns = "hb", initial }: { chips:
   const [fontsTick, setFontsTick] = useState(0);
   const used = useRef(false);
   const booted = useRef<(() => void) | null>(null);
+  // The guest-editor link reads what the visitor typed, so the editor opens on the same menu.
+  useEffect(() => { demoState = { id: current, input }; }, [current, input]);
 
   // Performance: the renderer and board fonts load only once the demo is on screen and the browser is idle, or as
   // soon as the visitor touches the form. Until then the same template is shown as its pre-rendered image.
@@ -246,5 +248,42 @@ export function StickyCta({ href, label, days, card, watch, ns = "hb", btnClass 
       <span><b>{days}</b><br />{card}</span>
       <TrialLink href={href} location="sticky" className={btnClass} tabIndex={on ? 0 : -1}>{label}</TrialLink>
     </div>
+  );
+}
+
+/** The demo's latest design and text, for GuestDemoLink. Module state: one demo per page. */
+let demoState: { id: string; input: { title: string; itemName: string; itemPrice: string } } | null = null;
+
+/**
+ * "Make this menu for free" with the guest editor on (GUEST_EDITOR): saves the demo's menu (design + what the visitor
+ * typed, exactly as the demo draws it) as the browser's guest draft and opens the real editor on it. Nothing goes in
+ * the URL. If anything fails, it still opens the editor on the same design.
+ */
+export function GuestDemoLink({ className, children, names }: { className?: string; children: ReactNode; names: Record<string, string> }) {
+  return (
+    <a href="/create" className={className} data-cta="demo" data-testid="demo-cta" onClick={(e) => {
+      e.preventDefault();
+      trackFunnel("cta_click", "demo");
+      const state = demoState;
+      const fallback = `/create${state ? `?design=${encodeURIComponent(state.id)}` : ""}`;
+      if (!state) { location.assign(fallback); return; }
+      void (async () => {
+        try {
+          const [designs, guest] = await Promise.all([import("@/lib/menu-designs"), import("@/lib/guest-draft")]);
+          const design = designs.designById(state.id);
+          if (!design) throw new Error("design");
+          const d = designs.designDocument(design);
+          const sections = d.sections.map((sec) => ({ ...sec, items: sec.items.map((i) => ({ ...i })) }));
+          const first = sections[0]?.items[0];
+          if (state.input.title.trim()) d.title = state.input.title.trim().slice(0, 40);
+          if (first && state.input.itemName.trim()) first.name = state.input.itemName.trim().slice(0, 40);
+          if (first && state.input.itemPrice.trim()) first.price = state.input.itemPrice.trim().slice(0, 12);
+          await guest.startGuestDraft({ ...d, sections }, state.input.title.trim().slice(0, 80) || (names[state.id] ?? design.name.en), "demo");
+          location.assign("/create?from=demo");
+        } catch {
+          location.assign(fallback);
+        }
+      })();
+    }}>{children}</a>
   );
 }

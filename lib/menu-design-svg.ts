@@ -160,6 +160,8 @@ export function safeDesignHref(value: string | null | undefined): string | null 
   if (!value) return null;
   if (/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=\s]+$/i.test(value)) return value.replace(/\s/g, "");
   if (/^https:\/\/[^\s"'<>]+$/i.test(value)) return value;
+  // Guest editor: a photo kept in this browser (URL.createObjectURL). Only ever drawn in that same page.
+  if (/^blob:https?:\/\/[a-z0-9.:-]+\/[0-9a-f-]{36}$/i.test(value)) return value;
   if (/^\/menu-templates\/[a-z]+\.jpg$/.test(value)) return value;
   return null;
 }

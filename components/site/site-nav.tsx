@@ -3,23 +3,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogoMark, Wordmark } from "@/components/brand";
-import { useLocale } from "@/lib/i18n/client";
+import { useLocaleCode } from "@/lib/i18n/locale-context";
 import { marketingBaseOf, marketingHref } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
-import { LanguageSelect } from "@/components/i18n/language-select";
+import { LanguageSelectBase } from "@/components/i18n/language-select-base";
 import { trackFunnel } from "@/lib/funnel-client";
+import { NAV_LINKS } from "@/lib/site-nav-keys";
+export { NAV_LINKS };
 
-export const NAV_LINKS: readonly { href: string; label: MessageKey }[] = [
-  { href: "/", label: "nav.home" },
-  { href: "/features", label: "nav.features" },
-  { href: "/pricing", label: "nav.pricing" },
-  { href: "/faq", label: "nav.faq" },
-];
+
+export type SiteNavLabels = Record<MessageKey, string>;
 
 /** `tone="dark"` is the marketing look (PublicPage theme="dark"); the default is unchanged for legal and other pages. */
-export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
+export function SiteNav({ tone = "light", labels }: { tone?: "light" | "dark"; labels: Partial<SiteNavLabels> }) {
   const dark = tone === "dark";
-  const { t, locale } = useLocale();
+  const locale = useLocaleCode();
+  const t = (key: MessageKey) => labels[key] ?? key;
   const pathname = usePathname();
   const current = marketingBaseOf(pathname ?? "") ?? pathname;
   const href = (path: string) => marketingHref(path, locale);
@@ -49,7 +48,7 @@ export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
           ))}
         </nav>
         <div className="hidden md:flex items-center gap-2 text-sm font-semibold">
-          <LanguageSelect compact />
+          <LanguageSelectBase compact label={t("lang.label")} />
           <Link href="/login" className={dark ? "rounded-full px-3.5 py-2 text-[#c5d3ee] hover:bg-white/10 hover:text-white" : "rounded-lg px-3 py-2 hover:bg-black/5"} data-testid="nav-login">{t("nav.login")}</Link>
           <Link href="/signup" className="btn btn-primary" data-testid="nav-trial" onClick={() => trackFunnel("cta_click", "nav")}>{t("nav.startTrial")}</Link>
         </div>
@@ -68,7 +67,7 @@ export function SiteNav({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
             ))}
             <li><Link href="/login" className="block py-3" onClick={() => setOpen(false)}>{t("nav.login")}</Link></li>
           </ul>
-          <LanguageSelect className="mt-2" />
+          <LanguageSelectBase className="mt-2" label={t("lang.label")} />
           <Link href="/signup" className="btn btn-primary mt-3 w-full" onClick={() => { trackFunnel("cta_click", "nav"); setOpen(false); }}>{t("nav.startTrial")}</Link>
         </nav>
       ) : null}

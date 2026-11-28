@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { createMenuHref } from "@/lib/guest-editor-flag";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { localizedPath, marketingHref, type MarketingPath } from "@/lib/seo";
 import { LEGAL_COPYRIGHT } from "@/lib/legal";
@@ -16,6 +17,7 @@ import "@/components/site/peek/peek-marketing.css";
  * contact, legal pages and the Option B rollback render exactly as before.
  * The lockup is Pantalla's /peek/brand file and the fonts come from app/peek.css; both are only read here.
  */
+/** Sign-up page. Trial CTAs use createMenuHref() (lib/guest-editor-flag.ts): /create when GUEST_EDITOR=on. */
 export const SIGNUP_HREF = "/signup";
 const OTHER: Record<Locale, { locale: Locale; short: string; name: string }> = {
   en: { locale: "es", short: "ES", name: "Español" },
@@ -62,6 +64,7 @@ export async function PeekPage({ base, children }: { base: MarketingPath; childr
   // On the home page the nav jumps to its sections; elsewhere it opens those sections on the home page.
   const section = (id: string) => (base === "/" ? `#${id}` : `${home}#${id}`);
   const cta = t("home2.cta");
+  const start = createMenuHref();
   return (
     <div className="pkm" lang={locale} data-testid="pkm-root">
       <header className="pkm-header" data-testid="site-nav">
@@ -75,14 +78,14 @@ export async function PeekPage({ base, children }: { base: MarketingPath; childr
           <span className="pkm-spacer" />
           <LangLink base={base} locale={locale} />
           <Link href="/login" className="pkm-login" data-testid="nav-login">{t("nav.login")}</Link>
-          <TrialLink href={SIGNUP_HREF} location="nav" className="pkm-btn-line pkm-btn-sm pkm-header-cta" testId="nav-trial">{cta}</TrialLink>
+          <TrialLink href={start} location="nav" className="pkm-btn-line pkm-btn-sm pkm-header-cta" testId="nav-trial">{cta}</TrialLink>
           <PeekMenu openLabel={t("nav.openMenu")} closeLabel={t("nav.closeMenu")}>
             <nav aria-label={t("nav.mobile")}>
               {SECTION_LINKS.map(([k, id]) => <a key={id} href={section(id)}>{t(k)}</a>)}
               <Link href="/login">{t("nav.login")}</Link>
             </nav>
             <div className="pkm-sheet-cta">
-              <TrialLink href={SIGNUP_HREF} location="nav" className="pkm-cta pkm-cta-block">{cta}<Arrow /></TrialLink>
+              <TrialLink href={start} location="nav" className="pkm-cta pkm-cta-block">{cta}<Arrow /></TrialLink>
               <p className="pkm-trial">{rich(t("home2.trialLine", { days: TRIAL.days }))}</p>
             </div>
             <div className="pkm-sheet-peek"><PeekFace mood="open" className="pkm-sheet-face" /></div>
@@ -100,7 +103,7 @@ async function PeekFooter({ base }: { base: MarketingPath }) {
   const t = await getT();
   const locale = await getLocale();
   const cols: { title: MessageKey; links: [string, string][] }[] = [
-    { title: "footer.product", links: [[t("nav.features"), "/features"], [t("nav.pricing"), "/pricing"], [t("nav.faq"), "/faq"], [t("home2.cta"), SIGNUP_HREF], [t("nav.login"), "/login"]] },
+    { title: "footer.product", links: [[t("nav.features"), "/features"], [t("nav.pricing"), "/pricing"], [t("nav.faq"), "/faq"], [t("home2.cta"), createMenuHref()], [t("nav.login"), "/login"]] },
     { title: "footer.help", links: [[t("common.support"), "/support"], [t("footer.contact"), "/contact"]] },
     { title: "footer.legal", links: [[t("footer.terms"), "/terms"], [t("footer.privacy"), "/privacy"], [t("footer.billingTerms"), "/terms#billing"], [t("footer.deleteAccount"), "/account-deletion"]] },
   ];

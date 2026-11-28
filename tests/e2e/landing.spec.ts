@@ -8,7 +8,7 @@ test("signed-out visitors get the landing page with verified claims only", async
   const text = await page.locator("main").innerText();
   for (const s of ["$19", "$39", "$59", "14 days free", "No credit card"]) expect(text).toContain(s);
   expect(text).not.toMatch(/Technologies|LLC|Inc\.|checkout/i);
-  await expect(page.locator('[data-testid="start-trial"], [data-testid="hero-cta"]').first()).toHaveAttribute("href", "/signup");
+  await expect(page.locator('[data-testid="start-trial"], [data-testid="hero-cta"]').first()).toHaveAttribute("href", /^\/(signup|create)$/);
   for (const href of ["/support", "/privacy", "/terms", "/pricing"]) await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
 });
 

@@ -7,7 +7,8 @@ import { FAQ_IDS, FAQ_VARS, FEATURE_IDS, faqKeys, featureKeys, SHOTS } from "@/l
 import { ENGLISH_ONLY, type MessageKey } from "@/lib/i18n/index";
 import { TrialDetails } from "@/components/site/sections";
 import { ContactBlock } from "@/components/contact-block";
-import { Arrow, SIGNUP_HREF } from "@/components/site/peek/shell";
+import { Arrow } from "@/components/site/peek/shell";
+import { createMenuHref } from "@/lib/guest-editor-flag";
 import { PeekFinal, PeekPricingCards } from "@/components/site/peek/sections";
 import { heroImage, heroSrcSet } from "@/lib/marketing-home";
 import { designById } from "@/lib/menu-designs";
@@ -27,7 +28,7 @@ async function PageHead({ eyebrow, title, lede, cta = true, secondary }: { eyebr
         <p className="pkm-lede">{lede}</p>
         {cta ? (
           <div className="pkm-cta-zone">
-            <Link href={SIGNUP_HREF} className="pkm-cta pkm-cta-block" data-testid="start-trial">{t("home2.cta")}<Arrow /></Link>
+            <Link href={createMenuHref()} className="pkm-cta pkm-cta-block" data-testid="start-trial">{t("home2.cta")}<Arrow /></Link>
             <p className="pkm-trial">{t("site.trialNote", { days: TRIAL.days, screens: TRIAL.screens })}</p>
             {secondary}
           </div>

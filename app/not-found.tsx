@@ -12,7 +12,7 @@ export default async function NotFound() {
         <LogoMark className="size-14 mx-auto" />
         <h1 className="mt-6 text-2xl font-semibold tracking-tight">{t("error.notFoundTitle")}</h1>
         <p className="mt-2 text-muted leading-relaxed">{t("error.notFoundBody")}</p>
-        <NotFoundActions />
+        <NotFoundActions labels={{ dashboard: t("common.goToDashboard"), home: t("error.goHome"), login: t("nav.login") }} />
       </div>
     </PublicPage>
   );

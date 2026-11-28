@@ -126,6 +126,9 @@ export function Displays({ fixture }: { fixture?: DisplayItem[] }) {
       <PairForm names={(displays.data ?? []).map((display) => display.name)}
         onPaired={(warning, id) => {
           toast.show(warning || t("disp.connected"));
+          // Guest editor (Show on my TV): the menu made before sign-up opens next, with this TV to publish to.
+          const guestMenu = new URLSearchParams(location.search).get("menu");
+          if (guestMenu && /^[0-9a-f-]{36}$/i.test(guestMenu) && id) { location.assign(`/dashboard/media/menus?board=${guestMenu}&screen=${id}`); return; }
           setWatch({ id: id ?? null, before: beforePair.current });
           displays.reload();
           setWatchUntil(Date.now() + PAIR_WATCH_FOR_MS);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { getSupabase, supabaseConfigured } from "@/lib/supabase-browser";
+import { usePathname } from "next/navigation";
+import { loadSupabase, needsAuthClient } from "@/lib/supabase-lazy";
 import {
   COOKIE_NAME,
   MAX_AGE_SECONDS,
@@ -67,6 +68,8 @@ async function postAttribution(token: string, values: Attribution): Promise<bool
 
 /** Capture first-touch UTMs on any public landing, and persist them after signup. */
 export function SignupAttribution() {
+  const pathname = usePathname();
+  const needed = needsAuthClient(pathname);
   useEffect(() => {
     const existing = readStored();
     const next = captureFirstTouch(
@@ -75,45 +78,54 @@ export function SignupAttribution() {
       existing,
     );
     if (next && !existing) writeStored(next);
-    const values = next ?? existing;
-    if (!values || !supabaseConfigured()) return;
-
-    return startAttributionPersist(values, {
-      getToken: () =>
-        getSupabase()
-          .auth.getSession()
-          .then(({ data }) => data.session?.access_token ?? null)
-          .catch(() => null),
-      onAuth: (cb) => {
-        const { data } = getSupabase().auth.onAuthStateChange((event, session) => {
-          cb(session?.access_token ?? null, event);
-        });
-        return () => data.subscription.unsubscribe();
-      },
-      post: postAttribution,
-      isSent: () => {
-        try {
-          return sessionStorage.getItem(SENT_KEY) === "1";
-        } catch {
-          return false;
-        }
-      },
-      markSent: () => {
-        try {
-          sessionStorage.setItem(SENT_KEY, "1");
-        } catch {
-          /* private mode */
-        }
-      },
-      clearSent: () => {
-        try {
-          sessionStorage.removeItem(SENT_KEY);
-        } catch {
-          /* private mode */
-        }
-      },
-    });
   }, []);
+
+  // Posting to the account needs the auth client, which loads only off the marketing pages or once signed in.
+  useEffect(() => {
+    if (!needed) return;
+    const values = readStored();
+    if (!values) return;
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void loadSupabase().then((supabase) => {
+      if (!supabase || cancelled) return;
+      stop = startAttributionPersist(values, {
+        getToken: () =>
+          supabase.auth.getSession()
+            .then(({ data }) => data.session?.access_token ?? null)
+            .catch(() => null),
+        onAuth: (cb) => {
+          const { data } = supabase.auth.onAuthStateChange((event, session) => {
+            cb(session?.access_token ?? null, event);
+          });
+          return () => data.subscription.unsubscribe();
+        },
+        post: postAttribution,
+        isSent: () => {
+          try {
+            return sessionStorage.getItem(SENT_KEY) === "1";
+          } catch {
+            return false;
+          }
+        },
+        markSent: () => {
+          try {
+            sessionStorage.setItem(SENT_KEY, "1");
+          } catch {
+            /* private mode */
+          }
+        },
+        clearSent: () => {
+          try {
+            sessionStorage.removeItem(SENT_KEY);
+          } catch {
+            /* private mode */
+          }
+        },
+      });
+    });
+    return () => { cancelled = true; stop?.(); };
+  }, [needed]);
 
   return null;
 }

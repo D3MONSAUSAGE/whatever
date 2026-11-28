@@ -39,3 +39,12 @@ export function trackSignupCompleted(userId: string | null | undefined): boolean
   analytics.trackEvent("signup_completed", { method: "email_password" });
   return true;
 }
+
+/**
+ * Product events for the guest-editor funnel (docs/GUEST_EDITOR_PLAN.md §6). Opaque, fixed property values only:
+ * never menu text, names or prices. Integration point for ad-platform mapping lives in lib/conversion-events.ts.
+ */
+export function trackProductEvent(name: string, props: Record<string, string | number | boolean> = {}): void {
+  if (typeof window === "undefined" || browserOptedOut()) return;
+  try { analytics.trackEvent(name, props); } catch { /* analytics must never affect the page */ }
+}
