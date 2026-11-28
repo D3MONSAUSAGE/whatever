@@ -4,7 +4,7 @@ import { LEGAL_COPYRIGHT } from "@/lib/legal";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { marketingHref } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
-import { LanguageSelect } from "@/components/i18n/language-select";
+import { LanguageSelectBase } from "@/components/i18n/language-select-base";
 
 const COLS: { title: MessageKey; links: [MessageKey, string][] }[] = [
   { title: "footer.product", links: [["nav.features", "/features"], ["nav.pricing", "/pricing"], ["nav.faq", "/faq"], ["footer.startTrial", "/signup"], ["nav.login", "/login"]] },
@@ -22,7 +22,7 @@ export async function SiteFooter({ tone = "light" }: { tone?: "light" | "dark" }
         <div>
           <Link href={marketingHref("/", locale)} className="inline-flex items-center gap-2.5" aria-label={t("brand.homeLabel")}><LogoMark className="size-8" /><Wordmark size="sm" /></Link>
           <p className="mt-3 text-sm text-muted">{t("brand.footerTagline")}</p>
-          <LanguageSelect className="mt-4" />
+          <LanguageSelectBase className="mt-4" label={t("lang.label")} />
         </div>
         {COLS.map((c) => (
           <nav key={c.title} aria-label={t(c.title)}>

@@ -86,10 +86,10 @@ describe("I18N-1F-05: 404 has the public nav, language selector and a signed-out
   it("uses the public shell", () => {
     const src = readFileSync("app/not-found.tsx", "utf8");
     expect(src).toContain("<PublicPage>");
-    expect(readFileSync("components/public-page.tsx", "utf8")).toContain("<SiteNav />");
+    expect(readFileSync("components/public-page.tsx", "utf8")).toContain("<SiteNav labels={labels} />");
   });
   it("signed out (default): home + login, no dashboard", () => {
-    const html = render("es", h(NotFoundActions));
+    const html = render("es", h(NotFoundActions, { labels: { dashboard: es["common.goToDashboard"], home: es["error.goHome"], login: es["nav.login"] } }));
     expect(html).toContain("Ir a la página de inicio");
     expect(html).toContain('data-testid="not-found-login"');
     expect(html).not.toContain("Ir al panel");

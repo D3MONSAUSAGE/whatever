@@ -14,7 +14,7 @@ describe("DA-2 /developer/accounts page", () => {
   it("its not-found shows the same markup as the site 404 and loads data only from the gated API", () => {
     const site = read("app/not-found.tsx");
     const seg = read("app/developer/accounts/not-found.tsx");
-    for (const line of ['data-testid="not-found"', 't("error.notFoundTitle")', 't("error.notFoundBody")', "<NotFoundActions />", "<PublicPage>"]) {
+    for (const line of ['data-testid="not-found"', 't("error.notFoundTitle")', 't("error.notFoundBody")', "<NotFoundActions labels={{ dashboard: t(\"common.goToDashboard\"), home: t(\"error.goHome\"), login: t(\"nav.login\") }} />", "<PublicPage>"]) {
       expect(site).toContain(line);
       expect(seg).toContain(line);
     }
