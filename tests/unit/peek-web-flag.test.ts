@@ -86,10 +86,12 @@ describe("Peek stays out of out-of-scope surfaces", () => {
       "public/player-sw.js",
     ];
     // The only app/ files allowed to touch Peek are the four sign-in layouts, which wrap their pages in <PeekServer>
-    // (server-rendered Peek, no flash). Marketing, /pair, /tv, /player, Staff and the layout root never do.
+    // (server-rendered Peek, no flash), and the Developer Console client (t428u, client flag after the developer check).
+    // Marketing, /pair, /tv, /player, Staff and the layout root never do.
     const signInLayouts = ["app/auth/confirm/layout.tsx", "app/forgot-password/layout.tsx", "app/login/layout.tsx", "app/reset-password/layout.tsx"].map((f) => path.normalize(f));
+    const developerConsole = path.normalize("app/developer/analytics/client.tsx");
     const hits = files.filter((f) => /peek-flag|peek-gate|components\/peek\//.test(readFileSync(f, "utf8")));
-    expect(hits.sort()).toEqual(signInLayouts);
+    expect(hits.sort()).toEqual([...signInLayouts, developerConsole].sort());
     for (const f of signInLayouts) expect(readFileSync(f, "utf8")).toContain("<PeekServer>");
   });
 });

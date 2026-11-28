@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="14 14 80 80" width="1024" height="1024">
+  <!-- Approved Peek TV app icon: yellow mark on indigo. Source: public/peek/brand/pekko-app-icon-master.svg -->
+  <rect width="108" height="108" fill="#4A2FBD"/>
+  <g transform="translate(19.440 14.040) scale(1.08)">
+    <rect x="6" y="14" width="52" height="40" rx="14" fill="#FFC53D"/>
+    <rect x="25" y="55" width="14" height="5" rx="2.5" fill="#FFC53D"/>
+    <ellipse cx="25.5" cy="35" rx="4.2" ry="6" fill="#251A3A"/>
+    <ellipse cx="41.5" cy="35" rx="4.2" ry="6" fill="#251A3A"/>
+  </g>
+</svg>

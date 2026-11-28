@@ -48,6 +48,11 @@ const nextConfig: NextConfig = {
       { source: "/pair", destination: "/player.html" },
     ];
   },
+  // HeyCatch channel attribution (https://heycatch.ai/agents.md step 4): single-character paths (/a-/z, /0-/9) are reserved
+  // for HeyCatch short links and forward to the home page with the attribution query. No real route uses one character.
+  async redirects() {
+    return [{ source: "/:l([a-z0-9])", destination: "/?utm_source=heycatch&utm_campaign=:l", permanent: false }];
+  },
   async headers() {
     const security = [
       { key: "X-Content-Type-Options", value: "nosniff" },
@@ -66,6 +71,28 @@ const nextConfig: NextConfig = {
         headers: [
           ...security,
           { key: "Cache-Control", value: "no-cache, must-revalidate" },
+        ],
+      })),
+      // Stable favicon URLs (not hashed). Cache for a day; revalidate in the background for a week.
+      ...[
+        "/favicon-96x96.png",
+        "/favicon-48x48.png",
+        "/favicon-192x192.png",
+        "/icon.svg",
+        "/favicon.ico",
+        "/brand/favicon-16.png",
+        "/brand/favicon-32.png",
+        "/brand/favicon-48.png",
+        "/brand/apple-touch-icon.png",
+        "/brand/icon-192.png",
+        "/brand/icon-512.png",
+        "/brand/icon-maskable-192.png",
+        "/brand/icon-maskable-512.png",
+      ].map((source) => ({
+        source,
+        headers: [
+          ...security,
+          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
         ],
       })),
     ];

@@ -44,16 +44,25 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
       </p>
 
       <h2 className="font-semibold text-lg">What is measured, and what is not</h2>
-      <p>The records above are first-party records of the account&apos;s own screens and changes. This application does not include an advertising network or a third-party website-analytics script. The public website pages use Pekko&apos;s own cookieless visit counter, described below. The dashboard sign-in client stores the session in the browser and calls Pekko&apos;s API with a bearer token.</p>
+      <p>The records above are first-party records of the account&apos;s own screens and changes. This application does not include an advertising network. It uses two kinds of website analytics: Pekko&apos;s own cookieless visit counter and a third-party product-analytics service, HeyCatch, both described below. The dashboard sign-in client stores the session in the browser and calls Pekko&apos;s API with a bearer token.</p>
       <p>Transactional email goes through Resend as plain text. The send request does not turn on open or click tracking, and the verified pekkotv.com sending domain reports open and click tracking off. That describes this application and that domain setting. It is not a promise that a provider never logs or measures its own systems.</p>
 
       <h2 className="font-semibold text-lg">Ad and campaign attribution</h2>
       <p>
         When you first arrive at pekkotv.com, we may save campaign tags from the link (source, medium, campaign, content and term) and the address of the site that sent you (the referrer) in a first-party cookie and your browser&apos;s local storage for up to 90 days.
         If you create an account in that time, we copy this first-visit information to your account once, at sign-up, and we do not overwrite it later.
-        We use it only to measure which ads and channels bring new sign-ups, and authorized Pekko staff can see an account&apos;s first-visit source on the internal page described above. We don&apos;t sell it or share it with advertisers or ad networks, and we don&apos;t use advertising pixels or third-party analytics scripts.
+        We use it only to measure which ads and channels bring new sign-ups, and authorized Pekko staff can see an account&apos;s first-visit source on the internal page described above. We don&apos;t sell it or share it with advertisers or ad networks, and we don&apos;t use advertising pixels. We do use one third-party analytics service, HeyCatch, described below.
         The copy on your account is deleted when your account is deleted.
       </p>
+
+      <h2 className="font-semibold text-lg" id="product-analytics">Product analytics (HeyCatch)</h2>
+      <p>Pekko uses HeyCatch (<a className="underline" href="https://heycatch.ai">heycatch.ai</a>) to understand how visitors find pekkotv.com, which buttons they use, and whether they finish creating an account. Pekko decides what is collected and why, and HeyCatch acts as our service provider (processor).</p>
+      <p><strong>What is stored on your device.</strong> When you open pekkotv.com, HeyCatch&apos;s code sets a first-party cookie named ph_phc_…_posthog on pekkotv.com that lasts up to 365 days. It holds a random device ID and visitor ID that recognize your browser on later visits, and it keeps a copy of the same information in your browser&apos;s local storage and, for the open tab, session storage (including a random session ID).</p>
+      <p><strong>What is sent.</strong> With each page view, and with clicks on the public pages (home, features, pricing, FAQ, support, contact; English and Spanish), your browser sends HeyCatch: the page address (without any part after a #, and without sign-in or confirmation links&apos; details), the site that sent you, campaign tags in the link, the page title on public pages, the text and type of the button or link you clicked on public pages, your browser, operating system, device type, language, time zone, screen size and user agent. HeyCatch&apos;s servers also receive your IP address with the request and may derive an approximate location. On the sign-in, sign-up and dashboard pages only page views are sent.</p>
+      <p><strong>Account creation.</strong> When a new account is created we send one &quot;signup completed&quot; event and link it to the visit that led to it, using a random account ID. This lets us see how many people who click &quot;Create my free menu&quot; finish signing up. After you sign in, later page views are tied to that random account ID.</p>
+      <p><strong>What is never sent.</strong> Your email address, your name, your business name, menu or screen content, passwords, sign-in or confirmation tokens, and anything you type into a form. Staff and developer pages, the TV player and pairing pages send nothing.</p>
+      <p><strong>Your choice.</strong> If your browser sends Do Not Track or Global Privacy Control, the HeyCatch code does not start: it sets no cookie and sends nothing. There is no cookie banner; this signal is the way to opt out on pekkotv.com. You can also block or delete the ph_phc_… cookie and storage in your browser settings; the next visit may create a new one. HeyCatch states that it does not itself respond to those signals, which is why we apply them before anything is sent.</p>
+      <p><strong>Who sees it and how long.</strong> The data is held by HeyCatch, which hosts product analytics on PostHog&apos;s US cloud and uses other infrastructure providers listed in its privacy policy (<a className="underline" href="https://heycatch.ai/privacy">heycatch.ai/privacy</a>). HeyCatch keeps this data while Pekko&apos;s subscription is active and for two months after it ends, and keeps server logs for up to 13 months. We do not sell this data or use it for advertising.</p>
 
       <h2 className="font-semibold text-lg" id="website-statistics">Website visit statistics</h2>
       <p>
@@ -66,6 +75,7 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
         Visits are not counted while you are signed in to Pekko, or when your browser sends a Global Privacy Control or Do Not Track signal. Dashboards, sign-in pages, the TV player and these legal pages are not counted as visits.
         The same counter also keeps daily totals of a few steps toward starting a trial: clicks on a trial button (and where on the page it was), template previews used on the home page, views and submissions of the sign-up form, and the type of sign-up problem (for example, a password that is too short). Only the step and a daily count are kept. Your email address, what you type and any identifier are never sent with these steps.
         These statistics are not linked to any account and are not shared with advertisers or ad networks.
+        This counter is separate from HeyCatch. Where the counter says it sets no cookie and keeps no persistent identifier, that applies to the counter only; HeyCatch does set a cookie, as described above. HeyCatch&apos;s analytics do not stop when you are signed in, but they send only page views and a random account ID.
       </p>
 
       <h2 className="font-semibold text-lg">Service providers</h2>
@@ -75,12 +85,14 @@ export default async function Privacy({ searchParams }: { searchParams: LegalPar
         <li><strong>Stripe</strong> processes paid subscriptions when a paid plan is started, under standard Stripe Billing. Pekko is the seller. Publishing this policy does not enable charges.</li>
         <li><strong>Resend</strong> sends transactional service and billing email. The verified pekkotv.com sending domain reports region us-east-1. That is the sending region, not a promise that every Resend system stays there. The support address below receives mail on that domain. Use that address, not the billing sender, for privacy and support.</li>
         <li><strong>Google Firebase Cloud Messaging</strong> delivers mobile push notifications when a device token is registered and the device allows notifications. It receives the push token, the Firebase installation ID and the notification content.</li>
+        <li><strong>HeyCatch</strong> (heycatch.ai): website and sign-up analytics described above.</li>
       </ul>
       <p>No exclusive residency or cross-border-transfer assurance is made. A reported project or sending region is not a guarantee that all processing stays in that region.</p>
 
       <h2 className="font-semibold text-lg">How long it is kept</h2>
       <p>Account and content information is kept while the account is open, and longer where a provider backup or a legal need retains it. This application does not set Supabase&apos;s backup cycle or Stripe&apos;s billing-record period, so it does not state a number of days for either. Screen uptime, playback events, offline periods, activity records, and screen alerts are removed after 90 days. Trial expiry, a failed payment, or cancellation does not by itself delete content.</p>
       <p>The account owner can update the display name, business name, and password in Settings, and can request account deletion in Settings or at <a className="underline" href="/account-deletion">/account-deletion</a>. Deletion runs 7 days after the request and can be canceled until then. It removes the account, sign-in, content, and the records listed on that page. A deletion record of the account id, user id, and request dates is kept, without the email address or the content. Do not read the screen-preservation rule as a promise that provider backups or legally required billing records disappear immediately.</p>
+      <p>HeyCatch analytics data: see &quot;Product analytics (HeyCatch)&quot; above.</p>
 
       <h2 className="font-semibold text-lg">Choices</h2>
       <ul className="list-disc pl-5 grid gap-1">
