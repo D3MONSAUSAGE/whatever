@@ -11,6 +11,7 @@ import { useRequiredMessage } from "@/components/ui";
 import { SignupView } from "@/components/auth/signup-view";
 import { trackFunnel } from "@/lib/funnel-client";
 import { signupErrorCode } from "@/lib/funnel";
+import { identifyUser, trackSignupCompleted } from "@/lib/heycatch-events";
 
 export default function LoginPage() {
   return (
@@ -89,7 +90,14 @@ function Login() {
         if (mode === "up") trackFunnel("signup_error", signupErrorCode(res.error.message));
         return setNote({ text: friendlyAuthError(res.error.message, t), error: true });
       }
-      if (res.data.session) return router.replace(nextPath());
+      if (res.data.session) {
+        if (mode === "up") trackSignupCompleted(res.data.user?.id); // HeyCatch: account created and signed in at once
+        return router.replace(nextPath());
+      }
+      // HeyCatch: tie this browser's visit (the "Create my free menu" click) to the new account now, so the funnel still
+      // connects when the email link is opened on another device. A repeat sign-up for an existing email returns a
+      // fake user with no identities; never identify that.
+      if (mode === "up" && (res.data.user?.identities?.length ?? 0) > 0) identifyUser(res.data.user?.id);
       setPending(email.trim());
       setResendWait(RESEND_COOLDOWN_S);
       if (mode === "up") {

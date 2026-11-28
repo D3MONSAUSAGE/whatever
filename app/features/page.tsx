@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
-import { HeyCatchAnalytics } from "@/components/site/heycatch-analytics";
 import { marketingPeek } from "@/lib/home-variant";
 import { PeekPage } from "@/components/site/peek/shell";
 import { PeekFeaturesPage } from "@/components/site/peek/pages";
@@ -103,14 +102,12 @@ export default async function Features() {
   if (marketingPeek()) {
     return (
       <PeekPage base="/features">
-        <HeyCatchAnalytics />
         <PeekFeaturesPage />
       </PeekPage>
     );
   }
   return (
     <PublicPage bare theme="dark">
-      <HeyCatchAnalytics />
       <section className="px-5 pt-16 pb-8 md:pt-24">
         <div className="mx-auto max-w-4xl text-center mk-rise">
           <p className="mk-eyebrow">{t("home.featuresEyebrow")}</p>

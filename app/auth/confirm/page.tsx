@@ -8,6 +8,7 @@ import type { MessageKey } from "@/lib/i18n/index";
 import { AuthFrame, friendlyAuthError } from "@/components/auth-frame";
 import { CLEAN_CONFIRM_PATH, confirmPlan } from "@/lib/auth-confirm";
 import { ResendConfirmation } from "@/components/auth/resend-confirmation";
+import { trackSignupCompleted } from "@/lib/heycatch-events";
 
 /**
  * Branded landing page for Supabase email links (B2-07 option A).
@@ -78,12 +79,14 @@ function AuthConfirm() {
     if (!supabaseConfigured()) return setError(t("auth.signInUnavailable"));
     setBusy(true);
     try {
-      const { error: err } = await getSupabase().auth.verifyOtp({ token_hash: plan.tokenHash, type: plan.type });
+      const { data, error: err } = await getSupabase().auth.verifyOtp({ token_hash: plan.tokenHash, type: plan.type });
       if (err) {
         setError(friendlyAuthError(err.message, t));
         setBusy(false);
         return;
       }
+      // HeyCatch: a confirmed sign-up link is the moment a new account is created (re-clicked links fail above).
+      if (plan.type === "signup") trackSignupCompleted(data?.user?.id);
       setDone(true);
       location.replace(plan.next);
     } catch (err) {
