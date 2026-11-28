@@ -83,6 +83,10 @@ export function heycatchInitConfig() {
     install: { framework: "nextjs", frameworkVersion: "15", agent: "other" },
     optOutCapturingByDefault: optedOut,
     respectDnt: true,
+    // Send each event as it happens (not in a 3 s batch): some navigations here are full page loads (email-confirmation
+    // redirect, language switch, external links) and a queued batch would be lost with the page. The guide's advice for
+    // multi-page sites.
+    requestBatching: false,
     beforeSend: (event: Evt | null) => heycatchBeforeSend(event),
   } as const;
 }

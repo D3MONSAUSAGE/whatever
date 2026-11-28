@@ -72,6 +72,9 @@ describe("HeyCatch init config and consent", () => {
     expect(heycatchInitConfig().optOutCapturingByDefault).toBe(true);
     expect(heycatchInitConfig().respectDnt).toBe(true);
   });
+  it("sends events immediately so full page loads cannot drop them", () => {
+    expect(heycatchInitConfig().requestBatching).toBe(false);
+  });
   it("sets no site tag (marketing, sign-in and the app are one project)", () => {
     expect(heycatchInitConfig()).not.toHaveProperty("site");
   });
