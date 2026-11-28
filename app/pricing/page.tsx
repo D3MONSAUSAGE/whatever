@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicPage } from "@/components/public-page";
+import { HeyCatchAnalytics } from "@/components/site/heycatch-analytics";
 import { marketingPeek } from "@/lib/home-variant";
 import { PeekPage } from "@/components/site/peek/shell";
 import { PeekPricingPage } from "@/components/site/peek/pages";
@@ -24,6 +25,7 @@ export default async function Pricing() {
   if (marketingPeek()) {
     return (
       <PeekPage base="/pricing">
+        <HeyCatchAnalytics />
         <PricingStructuredData locale={locale} t={t} />
         <PeekPricingPage canBuy={checkoutAvailable()} />
       </PeekPage>
@@ -31,6 +33,7 @@ export default async function Pricing() {
   }
   return (
     <PublicPage bare theme="dark">
+      <HeyCatchAnalytics />
       <PricingStructuredData locale={locale} t={t} />
       <section className="px-5 pt-16 md:pt-24 text-center mk-rise">
         <p className="mk-eyebrow">{t("home.pricingEyebrow")}</p>

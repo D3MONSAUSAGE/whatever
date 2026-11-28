@@ -48,6 +48,11 @@ const nextConfig: NextConfig = {
       { source: "/pair", destination: "/player.html" },
     ];
   },
+  // HeyCatch channel attribution (https://heycatch.ai/agents.md step 4): single-character paths (/a-/z, /0-/9) are reserved
+  // for HeyCatch short links and forward to the home page with the attribution query. No real route uses one character.
+  async redirects() {
+    return [{ source: "/:l([a-z0-9])", destination: "/?utm_source=heycatch&utm_campaign=:l", permanent: false }];
+  },
   async headers() {
     const security = [
       { key: "X-Content-Type-Options", value: "nosniff" },
