@@ -347,3 +347,10 @@
 .pkm .card h2, .pkm .card h3 { font-family: var(--m-display); font-weight: 800; }
 .pkm .card .text-muted, .pkm .card p { color: var(--m-muted); }
 .pkm .card a { color: var(--m-on-tint); }
+
+/* Guest editor hero (GUEST_EDITOR=on): "No extra hardware" as a highlighted line under the CTA. */
+.pkm .pkm-hw { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px auto 0; padding: 9px 14px; width: fit-content; max-width: 100%;
+  border-radius: 14px; background: #EFEAFF; color: var(--m-text); font-size: 15px; line-height: 1.35; text-align: left; }
+.pkm .pkm-hw b { font-weight: 800; }
+.pkm .pkm-hw svg { flex: none; width: 22px; height: 22px; color: #4F2FCB; }
+@media (min-width: 900px) { .pkm .pkm-hw { margin-left: 0; } }

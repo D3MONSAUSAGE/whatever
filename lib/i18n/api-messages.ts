@@ -5,6 +5,11 @@
  * Developer-facing messages (field names, cron, player protocol) and billing wording stay English.
  */
 export const API_MESSAGES_ES: Readonly<Record<string, string>> = {
+  // Guest editor (POST /api/guest/claim)
+  "This menu is too large to save.": "Este menú es demasiado grande para guardarlo.",
+  "Couldn't save your menu. Try again.": "No se pudo guardar su menú. Intente de nuevo.",
+  "Missing menu.": "Falta el menú.",
+  "Some photos haven't finished uploading. Try again.": "Algunas fotos no terminaron de subirse. Intente de nuevo.",
   // Screens, pairing, groups
   "A group with that name already exists.": "Ya existe un grupo con ese nombre.",
   "Choose horizontal or vertical.": "Elija horizontal o vertical.",

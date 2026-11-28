@@ -90,9 +90,11 @@ describe("Peek stays out of out-of-scope surfaces", () => {
     // Marketing, /pair, /tv, /player, Staff and the layout root never do.
     const signInLayouts = ["app/auth/confirm/layout.tsx", "app/forgot-password/layout.tsx", "app/login/layout.tsx", "app/reset-password/layout.tsx"].map((f) => path.normalize(f));
     const developerConsole = path.normalize("app/developer/analytics/client.tsx");
+    // The guest menu designer (/create, GUEST_EDITOR) is the product editor, not marketing: Peek like sign-in.
+    const guestEditor = path.normalize("app/create/layout.tsx");
     const hits = files.filter((f) => /peek-flag|peek-gate|components\/peek\//.test(readFileSync(f, "utf8")));
-    expect(hits.sort()).toEqual([...signInLayouts, developerConsole].sort());
-    for (const f of signInLayouts) expect(readFileSync(f, "utf8")).toContain("<PeekServer>");
+    expect(hits.sort()).toEqual([...signInLayouts, developerConsole, guestEditor].sort());
+    for (const f of [...signInLayouts, guestEditor]) expect(readFileSync(f, "utf8")).toContain("<PeekServer>");
   });
 });
 

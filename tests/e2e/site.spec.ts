@@ -31,7 +31,8 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
         expect(r?.status(), p).toBe(200);
         await expect(page.getByTestId("site-nav")).toBeVisible();
         await expect(page.getByTestId("site-footer")).toBeVisible();
-        for (const href of FOOTER) await expect(page.getByTestId("site-footer").locator(`a[href="${href}"]`)).toHaveCount(1);
+        // The trial link is /signup, or /create on the Peek pages when GUEST_EDITOR is on.
+        for (const href of FOOTER) await expect(page.getByTestId("site-footer").locator(href === "/signup" ? 'a[href="/signup"], a[href="/create"]' : `a[href="${href}"]`)).toHaveCount(1);
         const text = await page.locator("body").innerText();
         expect(text, p).not.toMatch(/Technologies/i);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), p).toBe(true);
@@ -73,13 +74,20 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
       }
     });
 
-    test("Start Free Trial opens sign-up", async ({ page }) => {
+    test("Start Free Trial opens sign-up (or the guest menu designer when GUEST_EDITOR is on)", async ({ page }) => {
       await page.goto("/");
+      const guest = (await page.locator('[data-testid="hero-cta"]').first().getAttribute("href")) === "/create";
       if (mobile) {
         await page.getByTestId("menu-toggle").click();
         await page.locator("#mobile-menu").getByRole("link", { name: TRIAL_LABEL }).click();
       } else {
         await page.getByTestId("nav-trial").click();
+      }
+      if (guest) {
+        // No account needed to start: the real editor's design gallery opens.
+        await page.waitForURL((u) => u.pathname === "/create");
+        await expect(page.getByTestId("guest-gallery")).toBeVisible();
+        await page.goto("/signup");
       }
       await page.waitForURL(/\/login\?mode=up/);
       await expect(page.getByRole("heading", { name: SIGNUP_HEADING })).toBeVisible();
@@ -89,7 +97,8 @@ for (const vp of [{ name: "desktop", width: 1440, height: 900 }, { name: "mobile
       await expect(legal.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
       await page.goto("/");
       await page.locator('[data-testid="start-trial"], [data-testid="hero-cta"]').first().click();
-      await page.waitForURL(/\/login\?mode=up/);
+      if (guest) await page.waitForURL((u) => u.pathname === "/create");
+      else await page.waitForURL(/\/login\?mode=up/);
     });
 
     test("mobile menu closes with Escape", async ({ page }) => {

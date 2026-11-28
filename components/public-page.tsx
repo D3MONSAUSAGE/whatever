@@ -1,4 +1,5 @@
-import { SiteNav, SITE_NAV_KEYS } from "@/components/site/site-nav";
+import { SiteNav } from "@/components/site/site-nav";
+import { SITE_NAV_KEYS } from "@/lib/site-nav-keys";
 import { getT } from "@/lib/i18n/server";
 import { SiteFooter } from "@/components/site/site-footer";
 import { TrafficBeacon } from "@/components/site/traffic-beacon";

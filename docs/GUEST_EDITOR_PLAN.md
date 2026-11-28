@@ -1,6 +1,6 @@
 # Guest menu creation: audit, architecture and plan
 
-Status: **proposal, nothing implemented yet.** Audited against `main` at `a580f12` (Nov 28 2026).
+Status: **Phases 1–2 (guest editor, claim and resume), analytics integration points and the hero copy are implemented behind `GUEST_EDITOR` (off by default).** Sharing (Phase 4) is not built yet. Audited against `main` at `a580f12` (Nov 28 2026). See §9 for what was built and how to turn it on.
 
 Principle: let customers experience the value of Pekko before asking them for commitment.
 
@@ -313,3 +313,29 @@ A "Guest funnel" panel in the developer console (Website traffic tab) adds the s
 2. **Meta Pixel:** there is no pixel or Conversions API code in this repository. Is Meta connected through HeyCatch, Google Tag Manager, or Vercel, or does it need adding? The answer decides where the Meta events in §6.2 go.
 3. **Guest scope:** confirm that guests get templates and original layouts with photos and logos, but not video or classic boards (both need the server).
 4. **Hero sub-line wording** (§3.7).
+
+## 9. Implementation (Nov 28 2026)
+
+### Turning it on
+1. Apply `supabase/migrations/0038_guest_funnel_events.sql` (counter allow-list) and `0039_guest_claims.sql` (claim idempotency). Rollbacks are in `supabase/rollback/`. Until 0039 exists, `POST /api/guest/claim` answers 404 and the visitor's menu stays in their browser.
+2. Set `GUEST_EDITOR=on` in Vercel and redeploy. Every Peek trial CTA then opens `/create`, and the hero shows "No account or credit card required to start creating." plus the "No extra hardware" line.
+3. Rollback: unset `GUEST_EDITOR` (or set `off`) and redeploy. CTAs return to `/signup`; `/create` and `/dashboard/claim` become 404. Boards already claimed stay in their accounts.
+
+### What was built
+| Piece | Files |
+|---|---|
+| Flag | `lib/guest-editor-flag.ts` |
+| Browser draft (IndexedDB + memory fallback, photo downscale, limits, 30-day expiry) | `lib/guest-draft.ts` |
+| Guest page (gallery, resume, editor, "Your menu is ready", sign-up sheet) | `app/create/*`, `components/guest/guest-create.tsx`, `components/guest/guest-auth-sheet.tsx` |
+| Real editor in guest mode (browser library, no video, account actions) | `components/menu-templates.tsx` (`guest` prop) |
+| Demo hand-off | `GuestDemoLink` in `components/site/marketing/home-b-client.tsx` |
+| Claim and resume | `app/api/guest/claim/route.ts`, `lib/guest-claim.ts`, `app/dashboard/claim/page.tsx`, `components/guest/guest-claim.tsx`; pairing then opens the board with that TV (`components/displays-screen.tsx`) |
+| Analytics | `lib/conversion-events.ts` (HeyCatch + counters + `registerConversionSink` for Meta), `lib/funnel.ts`, migration 0038; internal mark set for developer accounts (`lib/dev-access.ts`) |
+| Renderer | `safeDesignHref` / `safeImageHref` accept same-page `blob:` URLs so browser-held photos draw in the preview |
+
+### Not done / follow-ups
+- Sharing and download (Phase 4). The `share` and `download` intents currently resume on the board in the dashboard.
+- "Show on my TV" after pairing opens the board with the new TV preselected. The owner still presses Publish, which is the existing flow; there is no auto-publish.
+- The shared `SiteNav`/`SiteFooter` (support, contact, legal pages) still link to `/signup`. They are Pantalla's shared layout, so they are left for coordination.
+- Classic full-screen boards and video stay account-only.
+- Real iOS Safari and Android Chrome were not available here. Tested in Chromium with mobile emulation; IndexedDB Blob storage is supported in Safari 14+ and Chrome.

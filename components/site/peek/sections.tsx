@@ -2,7 +2,8 @@ import { PLANS, TRIAL } from "@/lib/plans";
 import { getT } from "@/lib/i18n/server";
 import { rich } from "@/components/i18n/rich";
 import { TrackSignupClicks, TrialLink } from "@/components/site/marketing/home-b-client";
-import { Arrow, PeekFace, SIGNUP_HREF } from "@/components/site/peek/shell";
+import { Arrow, PeekFace } from "@/components/site/peek/shell";
+import { createMenuHref } from "@/lib/guest-editor-flag";
 
 /**
  * Peek pricing cards (home #pricing and /pricing). Prices, screen counts, "Popular" and the plan features come from
@@ -26,7 +27,7 @@ export async function PeekPricingCards({ canBuy, testPrefix = "plan", track = fa
                   <li key={k} className="pkm-check">{t(k).replace(/^✓\s*/, "")}</li>
                 ))}
               </ul>
-              <a href={SIGNUP_HREF} className={featured ? "pkm-btn-pri" : "pkm-btn-line"}>{t("home2.cta")}</a>
+              <a href={createMenuHref()} className={featured ? "pkm-btn-pri" : "pkm-btn-line"}>{t("home2.cta")}</a>
               {canBuy === undefined ? null : canBuy ? (
                 <a href="/dashboard/billing" className="pkm-link pkm-buy" data-testid={`buy-${p.id}`}>{t("site.choosePlan", { plan: p.name })}</a>
               ) : (
@@ -52,8 +53,8 @@ export async function PeekFinal({ title, body, track = false, home = false }: { 
         <div><h2 id="pkm-final-title">{title}</h2><p>{body}</p></div>
         <div className="pkm-final-actions">
           {track
-            ? <TrialLink href={SIGNUP_HREF} location="final" className="pkm-cta pkm-cta-block" testId="final-cta">{t("home2.cta")}<Arrow /></TrialLink>
-            : <a href={SIGNUP_HREF} className="pkm-cta pkm-cta-block" data-testid="final-cta">{t("home2.cta")}<Arrow /></a>}
+            ? <TrialLink href={createMenuHref()} location="final" className="pkm-cta pkm-cta-block" testId="final-cta">{t("home2.cta")}<Arrow /></TrialLink>
+            : <a href={createMenuHref()} className="pkm-cta pkm-cta-block" data-testid="final-cta">{t("home2.cta")}<Arrow /></a>}
           <p className="pkm-trial">{home ? rich(t("home2.trialLine", { days: TRIAL.days })) : t("site.trialNote", { days: TRIAL.days, screens: TRIAL.screens })}</p>
         </div>
       </div>

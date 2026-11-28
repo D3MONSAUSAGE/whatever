@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { preload } from "react-dom";
 import { rich } from "@/components/i18n/rich";
-import { LiveDemo, StickyCta, TrialLink } from "@/components/site/marketing/home-b-client";
+import { GuestDemoLink, LiveDemo, StickyCta, TrialLink } from "@/components/site/marketing/home-b-client";
 import { PeekHeroBoards } from "@/components/site/peek/client";
-import { Arrow, PeekFace, SIGNUP_HREF } from "@/components/site/peek/shell";
+import { Arrow, PeekFace } from "@/components/site/peek/shell";
+import { createMenuHref, guestEditorEnabled } from "@/lib/guest-editor-flag";
 import { Icon, PeekFinal, PeekPricingCards } from "@/components/site/peek/sections";
 import { LEGAL_COPYRIGHT, SUPPORT_EMAIL } from "@/lib/legal";
 import { TRIAL } from "@/lib/plans";
@@ -25,6 +26,8 @@ export function HomePeek({ t, locale, href }: { t: T; locale: Locale; href: (pat
   const named = (list: readonly HomeTemplate[]) => list.map((c) => ({ id: c.id, label: t(c.chip), name: designById(c.id)?.name[locale] ?? c.id }));
   const hero = named(HERO_TEMPLATES);
   const demo = named(DEMO_TEMPLATES);
+  const guest = guestEditorEnabled();
+  const start = createMenuHref();
   // Performance: the first board is the largest element on first paint (LCP), so fetch it with the HTML.
   preload(heroImage(hero[0].id, 640), { as: "image", imageSrcSet: heroSrcSet(hero[0].id), imageSizes: HERO_SIZES, fetchPriority: "high" });
   const em = { em: (c: React.ReactNode) => <em>{c}</em> };
@@ -64,9 +67,19 @@ export function HomePeek({ t, locale, href }: { t: T; locale: Locale; href: (pat
               badge={t("home2.realTemplate")} corner={<PeekFace className="pkm-peek-corner" />} />
           </div>
           <div className="pkm-cta-zone" id="hb-hero-cta">
-            <TrialLink href={SIGNUP_HREF} location="hero" className="pkm-cta pkm-cta-block" testId="hero-cta">{t("home2.cta")}<Arrow /></TrialLink>
-            <p className="pkm-trial" data-testid="hero-trial">{rich(t("home2.trialLine", { days: TRIAL.days }))}</p>
-            <p className="pkm-tvline"><Icon name="tv" />{t("home2.tvLine")}</p>
+            <TrialLink href={start} location="hero" className="pkm-cta pkm-cta-block" testId="hero-cta">{t("home2.cta")}<Arrow /></TrialLink>
+            {guest ? (
+              <>
+                {/* Guest editor: say plainly there's nothing to commit to; trial terms come at sign-up. */}
+                <p className="pkm-trial" data-testid="hero-trial">{t("home2.startLine")}</p>
+                <p className="pkm-hw" data-testid="hero-hw"><Icon name="tv" /><span><b>{t("home2.hwLead")}</b> {t("home2.hwBody")}</span></p>
+              </>
+            ) : (
+              <>
+                <p className="pkm-trial" data-testid="hero-trial">{rich(t("home2.trialLine", { days: TRIAL.days }))}</p>
+                <p className="pkm-tvline"><Icon name="tv" />{t("home2.tvLine")}</p>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -80,7 +93,9 @@ export function HomePeek({ t, locale, href }: { t: T; locale: Locale; href: (pat
           note: t("home2.demoNote"), loading: t("home2.demoLoading"), failed: t("home2.demoFailed"), preview: t("home2.demoPreview") }}>
           <div className="pkm-demo-tv-wrap" style={{ marginTop: 22 }}>
             <ul className="pkm-facts"><li className="pkm-check">{t("home2.fact1")}</li><li className="pkm-check">{t("home2.fact2")}</li><li className="pkm-check">{t("home2.fact3")}</li></ul>
-            <TrialLink href={SIGNUP_HREF} location="demo" className="pkm-btn-line pkm-demo-cta">{t("home2.demoCta")}</TrialLink>
+            {guest
+              ? <GuestDemoLink className="pkm-btn-line pkm-demo-cta" names={Object.fromEntries(demo.map((c) => [c.id, c.name]))}>{t("home2.demoCta")}</GuestDemoLink>
+              : <TrialLink href={start} location="demo" className="pkm-btn-line pkm-demo-cta">{t("home2.demoCta")}</TrialLink>}
           </div>
         </LiveDemo>
       </section>
@@ -160,7 +175,7 @@ export function HomePeek({ t, locale, href }: { t: T; locale: Locale; href: (pat
       {/* 7 · Final CTA */}
       <PeekFinal title={t("home2.finalTitle")} body={t("home2.finalBody")} track home />
 
-      <StickyCta ns="pkm" btnClass="pkm-cta" href={SIGNUP_HREF} label={t("home2.cta")} days={t("home2.stickyDays", { days: TRIAL.days })} card={t("home2.stickyCard")} watch="hb-hero-cta" />
+      <StickyCta ns="pkm" btnClass="pkm-cta" href={start} label={t("home2.cta")} days={t("home2.stickyDays", { days: TRIAL.days })} card={t("home2.stickyCard")} watch="hb-hero-cta" />
     </>
   );
 }

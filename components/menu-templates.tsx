@@ -297,7 +297,7 @@ export function TemplateGallery({ onPick, onCancel, onAdvanced }: { onPick: (doc
 
 /* ------------------------------------------------------------------ editor ------------------------------------------------------------------ */
 
-type Step = 0 | 1 | 2 | 3;
+export type Step = 0 | 1 | 2 | 3;
 const blankItem = () => ({ name: "", price: "", description: "" });
 function itemCount(doc: LayoutDocument) { return doc.sections.reduce((a, s) => a + s.items.length, 0); }
 
@@ -441,9 +441,26 @@ export function BoardView({ engine, doc, classic, art, brand, label, className =
   );
 }
 
+export type GuestEditorHooks = {
+  /** Photos and logos kept in this browser, as library files with blob: URLs. */
+  library: AccountLibraryFile[];
+  /** Keeps a photo in the browser and returns its guest id. Throws an Error with a translated message. */
+  upload: (file: File) => Promise<string>;
+  /** Called on every change, so the draft is saved as the visitor works. */
+  onChange: (doc: LayoutDocument, name: string) => void;
+  /** "Save" anywhere in the editor (e.g. before splitting) asks the visitor to keep their menu. */
+  onSave: () => void;
+  /** Replaces the Save draft / Publish buttons. */
+  actions: React.ReactNode;
+  /** Replaces the Saved / Unsaved badge ("Saved on this device"). */
+  status: string;
+  /** Label of the back button (guests go back to the designs, not to Menu Boards). */
+  backLabel?: string;
+};
+
 export function TemplateEditor({
   menuId: initialMenuId, name: initialName, document: initialDoc, displays, brand, preview = false, onClose, onAdvanced, onSaved, onSplit,
-  unified = false, classic: initialClassic = null, onNewBoard, fixtureLibrary, board = null,
+  unified = false, classic: initialClassic = null, onNewBoard, fixtureLibrary, board = null, guest = null, initialStep = 0,
 }: {
   menuId: string | null;
   name: string;
@@ -466,6 +483,14 @@ export function TemplateEditor({
   fixtureLibrary?: AccountLibraryFile[];
   /** The saved board's playlist and image, for the Peek publish dialog's locked rows (lib/peek-publish.ts). */
   board?: PublishBoardRef;
+  /**
+   * Guest mode (/create, GUEST_EDITOR): the visitor has no account yet. The library is the photos kept in this
+   * browser, uploads stay in the browser, video is off, and Save / Publish become the account actions in `actions`.
+   * Every other control is the real editor.
+   */
+  guest?: GuestEditorHooks | null;
+  /** The step to open on (the homepage demo hands over on the Menu step). */
+  initialStep?: Step;
 }) {
   const { locale, t } = useLocale();
   const peek = usePeekWeb();
@@ -475,7 +500,7 @@ export function TemplateEditor({
   const [classic, setClassic] = useState<ClassicSettings | null>(initialClassic);
   const [name, setName] = useState(initialName || initialDoc.title || t("tpl.untitled"));
   const [menuId, setMenuId] = useState<string | null>(initialMenuId);
-  const [step, setStep] = useState<Step>(0);
+  const [step, setStep] = useState<Step>(initialStep);
   const [dirty, setDirty] = useState(!initialMenuId);
   const [busy, setBusy] = useState<null | "draft" | "publish" | "upload">(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -494,6 +519,7 @@ export function TemplateEditor({
   const design = designById(doc.design) ?? designById("coffee-shop")!;
 
   async function reloadLibrary() {
+    if (guest) { setLibrary(guest.library); return guest.library; }
     if (preview) {
       // UI preview only (no account): two bundled sample photos stand in for the owner's media.
       // Fixture videos (and any other library files) stay available so a selected video can preview.
@@ -530,9 +556,12 @@ export function TemplateEditor({
     setLibrary(next);
     return next;
   }
-  useEffect(() => { void reloadLibrary().catch(() => {}); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void reloadLibrary().catch(() => {}); }, [guest?.library]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Guest mode: every change is handed to the page, which keeps the draft in this browser.
+  const onGuestChange = guest?.onChange;
+  useEffect(() => { onGuestChange?.(doc, name); }, [doc, name, onGuestChange]);
   useEffect(() => {
-    if (preview || !library.some((f) => isProcessingMediaStatus(f.processingStatus))) return;
+    if (preview || guest || !library.some((f) => isProcessingMediaStatus(f.processingStatus))) return;
     const timer = setInterval(() => { void reloadLibrary().catch(() => {}); }, 4000);
     return () => clearInterval(timer);
   }, [library, preview]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -601,7 +630,8 @@ export function TemplateEditor({
   function setSections(fn: (s: LayoutDocument["sections"]) => LayoutDocument["sections"]) { update({ ...doc, sections: fn(doc.sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }))) }); }
 
   const media = engine === "layout" ? layoutMedia(doc.template) : null;
-  const supportsVideo = engine === "design" ? designHasMedia(design) : engine === "layout" ? Boolean(media?.video) : false;
+  // Video needs an account (server conversion and storage), so guest boards are photo-only.
+  const supportsVideo = guest ? false : engine === "design" ? designHasMedia(design) : engine === "layout" ? Boolean(media?.video) : false;
   /** Selecting featured media picks one primary item (photo, video, sample, or none) and immediately updates the preview. */
   function setBoardPhoto(id: string | null) {
     if (!id) { clearFeaturedMedia(); return; }
@@ -623,8 +653,23 @@ export function TemplateEditor({
   }
 
   async function upload(file: File | undefined, role: "photo" | "logo" | "item", target?: { si: number; ii: number }) {
-    if (!file || preview) return;
+    if (!file || (preview && !guest)) return;
     if (!isImageUploadFile(file)) { toast.show(t("tpl.photoType"), true); return; }
+    if (guest) {
+      setBusy("upload");
+      try {
+        const id = await guest.upload(file);
+        if (role === "item" && target) setItemPhoto(target.si, target.ii, id);
+        else if (role === "photo") setBoardPhoto(id);
+        else patch({ logoMediaId: id });
+        if (role !== "item") toast.show(t("guest.photoKept"));
+      } catch (err) {
+        toast.show((err as Error).message || t("tpl.uploadFailed"), true);
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
     setBusy("upload");
     try {
       const upload = await asUploadImage(file, t);
@@ -644,7 +689,7 @@ export function TemplateEditor({
 
   /** Same signed upload as the previous layout editor: prepare, upload straight to storage, then register. */
   async function uploadVideo(file: File | undefined) {
-    if (!file || preview) return;
+    if (!file || preview || guest) return;
     if (file.type && !isVideoUploadFile(file)) { toast.show(t("tpl.videoType"), true); return; }
     const existing = findSameVideo(library, file);
     if (existing) { setBoardVideo(existing.id); toast.show(t("ls.videoInLibrary")); return; }
@@ -681,7 +726,7 @@ export function TemplateEditor({
   }
 
   async function uploadMedia(file: File | undefined) {
-    if (!file || preview) return;
+    if (!file || (preview && !guest)) return;
     if (isImageUploadFile(file)) return upload(file, "photo");
     if (isVideoUploadFile(file)) {
       if (!supportsVideo) { toast.show(t("tpl.videoNotSupported"), true); return; }
@@ -691,6 +736,7 @@ export function TemplateEditor({
   }
 
   async function save(mode: "draft" | "publish", override?: LayoutDocument, displayIds: string[] = []) {
+    if (guest) { guest.onSave(); return null; }
     if (preview) { toast.show(t("tpl.previewOnly")); return null; }
     if (engine === "classic" && classic) return saveClassic(override ?? doc, displayIds);
     const parsed = parseLayout(override ?? doc);
@@ -893,21 +939,22 @@ export function TemplateEditor({
     <section data-testid="template-editor" data-engine={engine} aria-labelledby="tpl-editor-title">
       <style>{STYLES}</style>
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <button type="button" className="btn btn-quiet" onClick={onClose}>← {t("tpl.back")}</button>
+        <button type="button" className="btn btn-quiet" onClick={onClose}>← {guest?.backLabel ?? t("tpl.back")}</button>
         <label className="sr-only" htmlFor="tpl-name">{t("tpl.boardName")}</label>
         <input id="tpl-name" className="field font-display font-bold text-lg max-w-xs" value={name} maxLength={80} onChange={(e) => { setName(e.target.value); setDirty(true); }} />
-        <span className={`badge ${published ? "badge-live" : ""}`} data-testid="tpl-status">{published ? t("tpl.statusLive") : dirty ? t("tpl.statusUnsaved") : t("tpl.statusSaved")}</span>
+        <span className={`badge ${published ? "badge-live" : ""}`} data-testid="tpl-status">{guest ? guest.status : published ? t("tpl.statusLive") : dirty ? t("tpl.statusUnsaved") : t("tpl.statusSaved")}</span>
         {unified ? <span className="text-xs text-muted" data-testid="tpl-design-name">{styleName}</span> : null}
         <span className="flex-1" />
         {/* The advanced (layout studio) editor is 16:9 only; vertical boards stay in this editor. */}
-        {unified || orientationOf(doc) === "portrait" ? null : (
+        {unified || guest || orientationOf(doc) === "portrait" ? null : (
           <button type="button" className="btn btn-quiet" disabled={busy !== null} onClick={async () => {
             const id = menuId ?? (await save("draft"));
             if (id) onAdvanced(id);
           }}>{t("tpl.advanced")}</button>
         )}
         {peek && showingOn.length ? <span className="tpl-showing-on" data-testid="tpl-showing-on">{t("peek.editor.showingOn", { names: screenList(showingOn, locale) })}</span> : null}
-        {peek ? <div className="tpl-actions" data-testid="tpl-actions">{saveDraftButton}{publishButton}</div> : <>{saveDraftButton}{publishButton}</>}
+        {guest ? <div className="tpl-actions" data-testid="tpl-actions">{guest.actions}</div>
+          : peek ? <div className="tpl-actions" data-testid="tpl-actions">{saveDraftButton}{publishButton}</div> : <>{saveDraftButton}{publishButton}</>}
       </div>
       {engine === "classic" ? <p className="text-xs text-muted -mt-2 mb-3" data-testid="tpl-classic-note">{t("tpl.classicNote")}</p> : null}
       {progress ? <p className="text-sm text-muted mb-2" role="status">{progress}</p> : null}
@@ -1573,10 +1620,15 @@ function ScratchCard({ onPick }: { onPick: () => void }) {
   );
 }
 
-export function DesignGallery({ onPick, onCancel, brand }: {
+export function DesignGallery({ onPick, onCancel, brand, includeClassic = true, title, lede, cancelLabel }: {
   onPick: (pick: { document: LayoutDocument; name: string; classic: ClassicSettings | null }) => void;
   onCancel: () => void;
   brand: Brand | null;
+  /** The classic full-screen menu previews through the server, so the guest gallery leaves it out. */
+  includeClassic?: boolean;
+  title?: string;
+  lede?: string;
+  cancelLabel?: string;
 }) {
   const { locale, t } = useLocale();
   const L = locale === "es" ? "es" : "en";
@@ -1584,7 +1636,7 @@ export function DesignGallery({ onPick, onCancel, brand }: {
   const [style, setStyle] = useState<DesignStyle | "all">("all");
   const [structure, setStructure] = useState<Structure | "all">("all");
   const [photos, setPhotos] = useState(false);
-  const entries = useMemo(() => galleryEntries(), []);
+  const entries = useMemo(() => galleryEntries().filter((e) => includeClassic || e.kind !== "classic"), [includeClassic]);
   const shown = filterGallery(entries, { business, style, photos, structure });
   const noArt: Art = { imageHref: null, logoHref: null };
   const classicSample = useMemo(() => fromClassic("classic", sampleMenu()), []);
@@ -1603,10 +1655,10 @@ export function DesignGallery({ onPick, onCancel, brand }: {
       <style>{STYLES}</style>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="tpl-gallery-title" className="font-display text-2xl font-bold">{t("tpl.unifiedTitle")}</h2>
-          <p className="text-sm text-muted mt-1">{t("tpl.unifiedLede")}</p>
+          <h2 id="tpl-gallery-title" className="font-display text-2xl font-bold">{title ?? t("tpl.unifiedTitle")}</h2>
+          <p className="text-sm text-muted mt-1">{lede ?? t("tpl.unifiedLede")}</p>
         </div>
-        <button type="button" className="btn btn-quiet" onClick={onCancel}>{t("tpl.cancel")}</button>
+        <button type="button" className="btn btn-quiet" onClick={onCancel}>{cancelLabel ?? t("tpl.cancel")}</button>
       </div>
       <div className="tpl-filters mt-4" data-testid="gallery-filters">
         <FilterRow id="tpl-f-business" label={t("tpl.filterBusiness")}>

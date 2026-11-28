@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CTA_LOCATIONS, FUNNEL_EVENTS, SIGNUP_ERROR_CODES, TEMPLATE_TRY_SPOTS } from "@/lib/funnel";
+import { CTA_LOCATIONS, FUNNEL_EVENTS, GUEST_ACTIONS, GUEST_SOURCES, SIGNUP_ERROR_CODES, TEMPLATE_TRY_SPOTS } from "@/lib/funnel";
 
 // 0032 signup funnel counters: counting, allow-list, access backstop, snapshot, rollback.
 const databaseUrl = process.env.DATABASE_URL || "";
@@ -55,6 +55,9 @@ describe.skipIf(!databaseUrl)("0032 funnel daily counters", () => {
     await client.query(sql("supabase/migrations/0032_funnel_daily.sql"));
     // Re-running the migration is safe.
     await client.query(sql("supabase/migrations/0032_funnel_daily.sql"));
+    // 0038 widens the event list for the guest editor (and is safe to re-run too).
+    await client.query(sql("supabase/migrations/0038_guest_funnel_events.sql"));
+    await client.query(sql("supabase/migrations/0038_guest_funnel_events.sql"));
     await client.query(`select set_config('request.jwt.claims', '{"role":"service_role"}', false)`);
   });
 
@@ -88,6 +91,10 @@ describe.skipIf(!databaseUrl)("0032 funnel daily counters", () => {
       ["signup_view", ""], ["signup_submit", ""],
       ...SIGNUP_ERROR_CODES.map((d) => ["signup_error", d] as [string, string]),
       ...TEMPLATE_TRY_SPOTS.map((d) => ["template_try", d] as [string, string]),
+      ...GUEST_SOURCES.map((d) => ["guest_open", d] as [string, string]),
+      ["guest_edit", ""], ["guest_preview", ""],
+      ...GUEST_ACTIONS.map((d) => ["guest_action", d] as [string, string]),
+      ...GUEST_ACTIONS.map((d) => ["signup_prompt", d] as [string, string]),
     ];
     expect(new Set(allowed.map(([e]) => e))).toEqual(new Set(FUNNEL_EVENTS));
     for (const [e, d] of allowed) await rec("2026-11-17", e, d);
@@ -132,6 +139,15 @@ describe.skipIf(!databaseUrl)("0032 funnel daily counters", () => {
     await rec("2026-11-19", "signup_view");
     const old = (await client.query(`select count(*)::int as n from public.funnel_daily where day = '2025-01-01'`)).rows[0].n;
     expect(old).toBe(0);
+  });
+
+  it("0038 rolls back to the original event list, dropping only guest-editor rows", async () => {
+    await rec("2026-11-20", "guest_open", "demo");
+    await rec("2026-11-20", "signup_view");
+    await client.query(sql("supabase/rollback/0038_guest_funnel_events.sql"));
+    const left = (await client.query(`select event from public.funnel_daily where day = '2026-11-20' order by 1`)).rows.map((r) => r.event);
+    expect(left).toEqual(["signup_view"]);
+    await expect(rec("2026-11-20", "guest_open", "demo")).rejects.toMatchObject({ code: "23514" });
   });
 
   it("rolls back cleanly, leaving 0031 in place", async () => {

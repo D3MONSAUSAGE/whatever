@@ -8,19 +8,11 @@ import { marketingBaseOf, marketingHref } from "@/lib/seo";
 import type { MessageKey } from "@/lib/i18n/index";
 import { LanguageSelectBase } from "@/components/i18n/language-select-base";
 import { trackFunnel } from "@/lib/funnel-client";
+import { NAV_LINKS } from "@/lib/site-nav-keys";
+export { NAV_LINKS };
 
-export const NAV_LINKS: readonly { href: string; label: MessageKey }[] = [
-  { href: "/", label: "nav.home" },
-  { href: "/features", label: "nav.features" },
-  { href: "/pricing", label: "nav.pricing" },
-  { href: "/faq", label: "nav.faq" },
-];
 
-/** Every string the nav shows, translated on the server by PublicPage (so public pages don't ship the dictionaries). */
 export type SiteNavLabels = Record<MessageKey, string>;
-export const SITE_NAV_KEYS: readonly MessageKey[] = [
-  ...NAV_LINKS.map((l) => l.label), "brand.homeLabel", "nav.main", "nav.login", "nav.startTrial", "nav.openMenu", "nav.closeMenu", "nav.mobile", "lang.label",
-];
 
 /** `tone="dark"` is the marketing look (PublicPage theme="dark"); the default is unchanged for legal and other pages. */
 export function SiteNav({ tone = "light", labels }: { tone?: "light" | "dark"; labels: Partial<SiteNavLabels> }) {
